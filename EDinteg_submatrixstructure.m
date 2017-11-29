@@ -43,7 +43,7 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 28 Nov. 2017 
+% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2017 
 %
 % Hsubmatrixdata = ...
 %    EDinteg_submatrixstructure(edgelengthvec,closwedangvec,edgetoedgedata,planesatedge,showtext)
@@ -60,6 +60,7 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 % 27 Nov. 2017 Copied from ESIE2toolbox. Moved the edge discretization part
 %               out of this function.
 %  28 Nov. 2017 Introduced the non-global showtext input parameter
+% 29 Nov. 2017 Changed call from ESIE2distelements to EDdistelements
 
 if nargin < 7
     showtext = 0;
@@ -300,7 +301,7 @@ quadraturematrix_weights = sparse(zeros(max(uniquelistofedgepoints),max(uniqueli
 
 for ii = 1:length(uniquelistofedgepoints)
     n = uniquelistofedgepoints(ii);
-    [n1vec,weightvec] = ESIE2distelements(n,inteq_discretizationtype);
+    [n1vec,weightvec] = EDdistelements(n,inteq_discretizationtype);
     quadraturematrix_pos(n,1:n)     = n1vec(:).';
     quadraturematrix_weights(n,1:n) = weightvec(:).';
 end

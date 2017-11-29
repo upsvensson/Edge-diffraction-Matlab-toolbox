@@ -54,7 +54,7 @@ function [tfdirect,tfgeom,tfdiff] = EDmaketfs(envdata,planedata,edgedata,edgetoe
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
 % 
-% Peter Svensson 27 Nov. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 29 Nov. 2017 (peter.svensson@ntnu.no)
 %
 % [tfdirect,tfgeom,tfdiff] = EDmaketfs(envdata,planedata,edgedata,edgetoedgedata,...
 %     reflpaths,specextradata,edgeextradata,S,R,mainlistguide,mainlistguidepattern,...
@@ -71,6 +71,7 @@ function [tfdirect,tfgeom,tfdiff] = EDmaketfs(envdata,planedata,edgedata,edgetoe
 % 27 Nov. 2017 Copied from ESIE2toolbox
 % 28 Nov. 2017 Cleaned up code. Introduced the non-glbal input parameter
 %               showtext. Introduced the input struct "pathstruct"
+% 29 Nov. 2017 Changed two calls to ESIE2coordtrans
 
 reflpaths = pathstruct.reflpaths;
 specextradata = pathstruct.specextradata;
@@ -757,12 +758,12 @@ if userwantsdiff2 == 1
 		
                     cylS = zeros(ncombs,3);
                     edgecoords = [edgestartcoords(edgeshortlist(ii,1),:);edgeendcoords(edgeshortlist(ii,1),:)];
-                	[cylS(:,1),cylS(:,2),cylS(:,3)] = ESIE2coordtrans1(IS,edgecoords,edgenvecs(edgeshortlist(ii,1),:));               
+                	[cylS(:,1),cylS(:,2),cylS(:,3)] = EDcoordtrans1(IS,edgecoords,edgenvecs(edgeshortlist(ii,1),:));               
 % % % % %                 	[cylS(:,1),cylS(:,2),cylS(:,3)] = EDBcoordtrans1(full(specextradata(ivlonglist(iv),1:3)),edgecoords,edgenvecs(edgeshortlist(ii,1),:));               
 		
                     cylR = zeros(ncombs,3);
                     edgecoords = [edgestartcoords(edgeshortlist(ii,Ndifforder),:);edgeendcoords(edgeshortlist(ii,Ndifforder),:)];
-                	[cylR(:,1),cylR(:,2),cylR(:,3)] = ESIE2coordtrans1(IR,edgecoords,edgenvecs(edgeshortlist(ii,Ndifforder),:));     
+                	[cylR(:,1),cylR(:,2),cylR(:,3)] = EDcoordtrans1(IR,edgecoords,edgenvecs(edgeshortlist(ii,Ndifforder),:));     
 % % % % %                 	[cylR(:,1),cylR(:,2),cylR(:,3)] = EDBcoordtrans1(full(specextradata(ivlonglist(iv),4:6)),edgecoords,edgenvecs(edgeshortlist(ii,Ndifforder),:));     
                         
                     bc = ones(Ndifforder,2);    % Check real reflfactors!!!    

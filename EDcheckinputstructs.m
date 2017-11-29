@@ -26,7 +26,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .savesetupfile       (default: 1)
 %                       .showtext        (default: 1)
 %                       .savecadgeofile      (default: 0)
-%                       .saveSRindatafiles     (default: 0)
+%                       .saveSRdatafiles     (default: 0)
 %                       .saveeddatafile      (default: 0)
 %                       .savesubmatrixdata   (default: 0)
 %                       .saveinteqsousigs     (default: 0)
@@ -35,13 +35,14 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .logfilename         (default: '')
 %   EDmaincase          1, if convexESIE
 % 
-% Peter Svensson 28 Nov. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 29 Nov. 2017 (peter.svensson@ntnu.no)
 % 
 % [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
 
 % 24 Nov. 2017 First version
 % 28 Nov. 2017 Cleaned code a bit
+% 29 Nov. 2017 Corrected mistake: saveSRdatafiles was called saveSRindatafiles
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -190,8 +191,8 @@ end
 if ~isfield(filehandlingparameters,'savecadgeofile')
     filehandlingparameters.savecadgeofile = 0;
 end
-if ~isfield(filehandlingparameters,'saveSRindatafiles')
-    filehandlingparameters.saveSRindatafiles = 0;
+if ~isfield(filehandlingparameters,'saveSRdatafiles')
+    filehandlingparameters.saveSRdatafiles = 0;
 end
 if ~isfield(filehandlingparameters,'saveeddatafile')
     filehandlingparameters.saveeddatafile = 0;

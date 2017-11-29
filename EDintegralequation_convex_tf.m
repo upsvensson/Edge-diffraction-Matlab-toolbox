@@ -25,7 +25,7 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 % Uses functions EDdistelements, ESIE2calcedgeinteqmatrixsub2_mex, EDinteg_souterm, EDcalcpropagatematrix
 % EDcoordtrans1
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  28 Nov. 2017  
+% Peter Svensson (peter.svensson@ntnu.no)  29 Nov. 2017  
 %                       
 % [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
 %    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,...
@@ -59,6 +59,7 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 % 27 Nov. 2017 Copied from ESIE2toolbox and trimmed down + changed to the
 %               use of cells for the Hsubs.
 % 28 Nov. 2017 Cleaned up code a bit. Added timingdata.
+% 29 Nov. 2017 Cleaned up: removed the old timingdata code.
 
 showtext = filehandlingparameters.showtext;
 
@@ -85,36 +86,7 @@ vispartedgesfromIS = sparse(zeros(nplanes,nedges));
 [gaussvec1,gaussvec2] = EDdistelements(controlparameters.ngauss,controlparameters.discretizationtype);
 gaussvectors = [gaussvec1 gaussvec2];
 
-% tESSIEinitial = etime(clock,t00);
-
-% tESSIEmatrix = zeros(nfrequencies,1);
-% % tESSIEmatrixsubtimes = zeros(nfrequencies,size(Hsubmatrixdata.listofsubmatrices,1)+1);
-% 
-% if nsources == 1 || doaddsources == 1
-%    tESSIEsourceterm = zeros(nfrequencies,1); 
-% else
-%    tESSIEsourceterm = zeros(nfrequencies,nsources);     
-% end
-% if nsources == 1 || doaddsources == 1
-%    tESSIEedgesignals = zeros(nfrequencies,1); 
-% else
-%    tESSIEedgesignals = zeros(nfrequencies,nsources);     
-% end
-% if nsources == 1 || doaddsources == 1
-%    tESSIEpropagate = zeros(nfrequencies,nreceivers); 
-% else
-%    tESSIEpropagate = zeros(nfrequencies,nreceivers,nsources);     
-% end
-% tESSIEmatrixsubtimes = zeros(nfrequencies,10);
-
 ivproblematicmatrix = zeros(nreceivers,100);
-
-if doaddsources == 2
-%     nx = sqrt(nsources);
-%    matrixforflipping = reshape([1:nsources],nx,nx);
-%    horflipmat = fliplr(matrixforflipping);
-%    vertflipmat = flipud(matrixforflipping);
-end
 
 listofactiveHsubs = zeros(size(Hsubmatrixdata.listofsubmatrices,1),1);
 Hsubcounter = 1;
@@ -135,12 +107,6 @@ end
 if symmetrycompression < 1
    reftoshortlist = 1:size(Hsubmatrixdata.listofsubmatrices,1);
 end
-
-% inteqversion = 'new';
-% nrowspertriplet = prod(Hsubmatrixdata.nedgeelems(Hsubmatrixdata.edgetripletlist).').';
-% rowend_bigdatamatrix = cumsum(nrowspertriplet);
-% rowstart_bigdatamatrix = [1;rowend_bigdatamatrix(1:end-1)+1];
-% nrows = rowend_bigdatamatrix(end);
 
 Hsubconstant = -1/4/pi/2;
 
@@ -201,12 +167,6 @@ for ifreq = 1:nfrequencies
 
     if controlparameters.difforder > 2
         for nn = 1:nsubmatrices
-
-%             if nn == 1
-%                 t00sub = clock;
-%             end
-%             ii = Hsubmatrixdata.listofsubmatrices(nn,2);
-%             jj = Hsubmatrixdata.listofsubmatrices(nn,3);
 
             edge1 = Hsubmatrixdata.edgetripletlist(nn,3);
             n1 = Hsubmatrixdata.nedgeelems(edge1);
@@ -296,11 +256,6 @@ for ifreq = 1:nfrequencies
 
            end
 
-%            if nn == 1
-%               tESSIEmatrixsubtimes(ifreq,2) = etime(clock,t00sub);
-%               t00sub = clock;           
-%            end
-
            % Build vectors that will be referred to by the n1,n2,n3
            % matrices
 
@@ -323,11 +278,6 @@ for ifreq = 1:nfrequencies
                 n3vec = n3vec(:);
                 n3prev = n3;
             end
-
-%            if nn == 1
-%               tESSIEmatrixsubtimes(ifreq,3) = etime(clock,t00sub);
-%               t00sub = clock;           
-%            end
 
             % Bug found and fixed 22 Sep. 2014: lines below did not always detect if another
             % edge was skewed relative to the first one, because only the
@@ -359,10 +309,6 @@ for ifreq = 1:nfrequencies
            ze3_re2 = edgetoedgedata.ze1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.ze2sho(refto(edge3,edge2))-edgetoedgedata.ze1sho(refto(edge3,edge2))   );
     %        re3_re2 = edgetoedgedata.re1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.re2sho(refto(edge3,edge2))-edgetoedgedata.re1sho(refto(edge3,edge2))   );
 
-%            if nn == 1
-%               tESSIEmatrixsubtimes(ifreq,4) = etime(clock,t00sub);
-%               t00sub = clock;           
-%            end
            if shortlistnumber ~= shortlistprev      
 
                n1vec = n1vec(:).';
@@ -438,21 +384,12 @@ for ifreq = 1:nfrequencies
         %           disp(['Edge1: ',int2str(edge1),' edge2: ',int2str(edge2),' edge3: ',int2str(edge3)])
                end
 
-%                if nn == 1
-%                 tESSIEmatrixsubtimes(ifreq,5) = etime(clock,t00sub);
-%                 t00sub = clock;           
-%                end
-
                 Hsubdatalists{nn} = (2-acrossface_out)*Hsubconstant*ny*beta.*dz_expjkmoverm*thinplaneboostvec(nn);   
                 ivuselists{nn} = ivuse;
                 if ifreq == 1
                     listofactiveHsubs(Hsubcounter) = nn;
                     Hsubcounter = Hsubcounter + 1;
                 end
-%                 if nn == 1
-%                     tESSIEmatrixsubtimes(ifreq,6) = etime(clock,t00sub);
-%                     t00sub = clock;                                  
-%                 end            
 
            end
 
@@ -465,9 +402,6 @@ for ifreq = 1:nfrequencies
         ivactive = listofactiveHsubs~=0;
         listofactiveHsubs = listofactiveHsubs(ivactive);
     end
-%     if ifreq == 1
-%         listofactiveHsubs = listofactiveHsubs(listofactiveHsubs);
-%     end
     
     if ifreq == 1
         timingdata(1) = etime(clock,t00);
@@ -589,7 +523,6 @@ for ifreq = 1:nfrequencies
         % Propagate Qfinal to the external receiver(s)
         
         for irec = 1:nreceivers
-%             t00 = clock;
             if showtext >=2
                 disp(['      Receiver number ',int2str(irec)]) 
             end

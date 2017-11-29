@@ -132,7 +132,8 @@ function [edgedata,planedata] = EDedgeo(planedata,firstcornertoskip,listofcorner
 %               (from firstskipcorner).
 % 28 Nov. 2017  Introduced the non-global showtext parameter. Made some
 % code improvements.
-% 29 Nov. 2017  Small correction with findstr( and modeltype
+% 29 Nov. 2017  Small correction with findstr( and modeltype. Changed call,
+% from ESIE2checkobstrpaths to ED
 
 geomacc = 1e-10;
 
@@ -901,7 +902,7 @@ if planeseesplanestrategy == 1
         iv3 = find(toplane~=planeobsc & fromplane~=planeobsc & ((planeseesplane(ivcheckvis1) == 1) | (planeseesplane(ivcheckvis2) == 1)) & (planeseesplane(ivcheckvis1) >= 0) & (planeseesplane(ivcheckvis2) >= 0) );
         tempcanplaneobstruct = zerosvec1.';
         tempcanplaneobstruct(planeobsc) = 1;
-        [nonobstructedpaths,nobstructions,edgehits,cornerhits] = ESIE2checkobstrpaths(planemidpoints(fromplane(iv3),:),planemidpoints(toplane(iv3),:),[],[],tempcanplaneobstruct,planeseesplane,...
+        [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstrpaths(planemidpoints(fromplane(iv3),:),planemidpoints(toplane(iv3),:),[],[],tempcanplaneobstruct,planeseesplane,...
             planeeqs,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec,rearsideplane);
         if length(iv3) > length(nonobstructedpaths)
             iv3(nonobstructedpaths) = [];

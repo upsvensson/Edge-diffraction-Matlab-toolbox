@@ -107,7 +107,7 @@ function [edgedata,planedata] = EDedgeo(planedata,firstcornertoskip,listofcorner
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 28 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2017
 %
 % [edgedata,planedata,outputfile] = EDedgeo(planedata,firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,showtext);
 
@@ -132,6 +132,7 @@ function [edgedata,planedata] = EDedgeo(planedata,firstcornertoskip,listofcorner
 %               (from firstskipcorner).
 % 28 Nov. 2017  Introduced the non-global showtext parameter. Made some
 % code improvements.
+% 29 Nov. 2017  Small correction with findstr( and modeltype
 
 geomacc = 1e-10;
 
@@ -1282,7 +1283,8 @@ end
 % For exterior problems, all active planes can potentially obstruct.
 
 canplaneobstruct = [];
-if strfind(planedata.modeltype,'convex_ext') || strfind(planedata.modeltype,'plate')
+
+if ~isempty(strfind(planedata.modeltype,'convex_ext')) || ~isempty(strfind(planedata.modeltype,'plate'))
 %     canplaneobstruct = ones(1,nplanes,int8);
     canplaneobstruct = int8(reflfactors.'~=0);
 elseif strfind(planedata.modeltype,'convex_int')

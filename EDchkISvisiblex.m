@@ -10,7 +10,7 @@ function [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints]
 %               equations.
 %   planenvecs,minvals, maxvals, planecorners, corners, ncornersperplanevec
 %               Data that should have been taken from the corresponding
-%               variables in the eddatafile,see ESIE2edgeo for more information.
+%               variables in the eddatafile.
 %               NB!! The matrices planeeqs, minvals, maxvals
 %               have been rearranged so that they have nIS rows, and each
 %               row contain the data for one specific plane: the reflecting
@@ -33,7 +33,7 @@ function [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints]
 %    cornerhitpoints  List, [ncornerhits,3] of the hitpoint coordinates for the
 %                   planes that were hit at a corner.
 %
-% Uses the function ESIE2poinplax.
+% Uses the function EDpoinplax.
 %
 % ----------------------------------------------------------------------------------------------
 %   This file is part of the Edge Diffraction Toolbox by Peter Svensson.                       
@@ -49,12 +49,13 @@ function [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints]
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 27 Nov. 2016
+% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2016
 % 
 % [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = EDchkISvisiblex(bigplanelist,planeeqs_lastvalue,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec)
 
 % 16 Jan. 2005 Functioning version
 % 27 Nov. 2017 Copied from ESIE2toolbox
+% 29 Nov. 2017 Called ESIE2poinplax - changed to ED
 
 global BIGFROMCOORDSSHORTLIST REFTOFROMSHORTLIST BIGTOCOORDSSHORTLIST REFTOTOSHORTLIST
 
@@ -129,7 +130,7 @@ if ~isempty(iv1)
         if ~isempty(iv2)
             disp('Lowest value (should always be > 0)')
             min(udir(iv2))
-             error('WARNING!!! Check ESIE2chkISvisiblex; some hit point is in the wrong direction from the receiver. Check the plane warping tolerances etc.')
+             error('WARNING!!! Check EDchkISvisiblex; some hit point is in the wrong direction from the receiver. Check the plane warping tolerances etc.')
         end
         
         iv2 = find(   (udir - dirveclengths(iv1)) > eps*1e4);
@@ -138,7 +139,7 @@ if ~isempty(iv1)
             min(udir(iv2) - dirveclengths(iv1(iv2)))
             disp(['Problematic hit point is related to plane ',int2str(bigplanelist(iv1(iv2(1)))),' and IS w coords: '])
             ISlist(iv2(1),:)
-             error('WARNING!!! Check ESIE2chkISvisiblex; some hit point was at a shorter distance than the IS-receiver distance. Check the plane warping tolerances etc.')
+             error('WARNING!!! Check EDchkISvisiblex; some hit point was at a shorter distance than the IS-receiver distance. Check the plane warping tolerances etc.')
         end
         
         
@@ -147,7 +148,7 @@ if ~isempty(iv1)
         tempmatrix = ISlist + udir(:,ones(1,3)).*tempmatrix(iv1,:);
         
         clear ISlist udir
-        [hitvec,edgehitvec,cornerhitvec] = ESIE2poinplax(bigplanelist,tempmatrix,iv1,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs.');
+        [hitvec,edgehitvec,cornerhitvec] = EDpoinplax(bigplanelist,tempmatrix,iv1,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs.');
         
 	   	hitplanes = [];
         hitpoints = [];

@@ -46,7 +46,7 @@ function 	[validISlist,validIScoords,allreflpoints,listguide,listofreflorder] = 
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 28 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2017
 %
 % [validISlist,validIScoords,allreflpoints,listguide,listofreflorder] = EDspeculISES(corners,planecorners,planeeqs,planenvecs,...
 %     S,R,lengthNspecmatrix,specorder,visplanesfromoner,planeisthin,canplaneobstruct,minvals,maxvals,ncornersperplanevec,planeseesplane,rearsideplane,modeltype,showtext);
@@ -56,6 +56,8 @@ function 	[validISlist,validIScoords,allreflpoints,listguide,listofreflorder] = 
 % modeltype: for a convex scatterer, obstruction test is not needed for
 % the first-order specular reflection. Also introduced the non-global input
 % parameter showtext.
+% 29 Nov. 2017 Changed so that a thin-plate model doesn't need obstruction
+%              check for the specular reflections.
 
 global POTENTIALISES ISCOORDS ORIGINSFROM IVNSPECMATRIX
 
@@ -94,7 +96,7 @@ listguide        = zeros(specorder,3);
 listofreflorder = zeros(specorder,1);
 listguide(1,2)   = 1;
 
-obstructtestneeded = (sum(canplaneobstruct)~=0) && strcmp(modeltype,'convex_ext')==0;
+obstructtestneeded = (sum(canplaneobstruct)~=0) && strcmp(modeltype,'convex_ext')==0 && isempty(strfind(modeltype,'plate'));
 
 for norder = 1:specorder_maxpossible
 

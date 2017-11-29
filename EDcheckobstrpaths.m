@@ -58,7 +58,7 @@ function [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstrpa
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 28 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2017
 %
 % [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstrpaths(fromcoords,tocoords,startplanes,endplanes,canplaneobstruct,planeseesplane,...
 %    planeeqs,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec,rearsideplane);
@@ -66,6 +66,8 @@ function [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstrpa
 % 21 June 2006 Functioning version
 % 27 Nov. 2017 Copied to EDtoolbox
 % 28 Nov. 2017 Cleaned code a bit.
+% 29 Nov. 2017 Fixed a problem with mismatch between planesareseen (logical) 
+%              and canplaneobstruct (int8)
 
 global BIGFROMCOORDSSHORTLIST REFTOFROMSHORTLIST BIGTOCOORDSSHORTLIST REFTOTOSHORTLIST
 
@@ -115,13 +117,15 @@ else
 end
 
 % In addition, we only need to check planes for which canplaneobstruct = 1.
+% planesareseen has logical values
+% canplaneobstruct has int8 values
 
 if nplanes <= 255
-    maxlistofplanestocheck = uint8(find((planesareseen && canplaneobstruct)>0).');
+    maxlistofplanestocheck = uint8(find((planesareseen & canplaneobstruct==1)>0).');
 elseif nplanes <= 65535
-    maxlistofplanestocheck = uint16(find((planesareseen && canplaneobstruct)>0).');    
+    maxlistofplanestocheck = uint16(find((planesareseen & canplaneobstruct==1)>0).');    
 else
-    maxlistofplanestocheck = uint32(find((planesareseen && canplaneobstruct)>0).');
+    maxlistofplanestocheck = uint32(find((planesareseen & canplaneobstruct==1)>0).');
 end
 
 nplanestocheck = length(maxlistofplanestocheck);

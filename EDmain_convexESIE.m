@@ -19,10 +19,11 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .docalctf            (default: 1)
 %                       .docalcir            (default: 0)
 %                       .Rstart              (default: 0)
-%                       .frequencies         (obligatory, if docalftf = 1)
+%                       .frequencies         (obligatory, if docalcftf = 1)
 %                       .discretizationtype  (default: 2 = G-L)
 %                       .ngauss              (default: 16)
-%   filehandlingparameters    .outputdirectory  (default: /result, in the folder of the geoinputfile)  
+%   filehandlingparameters (optional)    
+%                       .outputdirectory  (default: /result, in the folder of the geoinputfile)  
 %                       .filestem        (default: name of the cad-file, with an underscore + running integer)
 %                       .savesetupfile       (default: 1)
 %                       .showtext        (default: 1)
@@ -30,8 +31,9 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .saveSRdatafiles     (default: 0)
 %                       .saveeddatafile      (default: 0)
 %                       .logfilename         (default: '')
+%                       .lineending          (set automatically)
 % 
-% Peter Svensson 28 Nov. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 29 Nov. 2017 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -39,6 +41,8 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % specialized for the scattering from a convex object.
 % 28 Nov. 2017 Removed the JJ. Added the handling of timing data and
 % writing to a logfile.
+% 29 Nov. 2017 Added the semicolon after fclose(fid). Made some adjustments to
+% handle input matrices instead of a cad file.
 
 global POTENTIALISES ISCOORDS IVNDIFFMATRIX
 global IVNSPECMATRIX ORIGINSFROM ISESVISIBILITY REFLORDER
@@ -47,8 +51,10 @@ global IVNSPECMATRIX ORIGINSFROM ISESVISIBILITY REFLORDER
 % Check input data, assign default values if needed
 
 if nargin < 6
-   disp('ERROR: All six input parameters to EDmain_convexESIE must be specified')  
-   return
+    filehandlingparameters = struct('showtext',0);
+    if nargin < 5
+        error('ERROR: The first five input parameters to EDmain_convexESIE must be specified')  
+    end
 end
 
 [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,1);
@@ -60,7 +66,7 @@ end
 
 if filehandlingparameters.showtext >= 1
 	disp(' ');disp('####################################################################')
-              disp('#  EDmain_convexESIE, v. 28 Nov. 2017')
+              disp('#  EDmain_convexESIE, v. 29 Nov. 2017')
 end
 if ~isempty(filehandlingparameters.logfilename)
     fid = fopen(filehandlingparameters.logfilename,'w');
@@ -70,26 +76,45 @@ if ~isempty(filehandlingparameters.logfilename)
     end
     fwrite(fid,[' ',filehandlingparameters.lineending],'char');   
     fwrite(fid,['####################################################################',filehandlingparameters.lineending],'char');
-    fwrite(fid,['#  EDmain_convexESIE, v. 28 Nov. 2017',filehandlingparameters.lineending],'char');
+    fwrite(fid,['#  EDmain_convexESIE, v. 29 Nov. 2017',filehandlingparameters.lineending],'char');
     fwrite(fid,[' ',filehandlingparameters.lineending],'char');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Read the input CAD-file and create the planedata struct
+% Read the input CAD-file, or input matrices, and create the planedata struct
 
-if filehandlingparameters.showtext >= 1
-	disp(' ');disp('   Creating the planedata struct from the CAD file')
-end
+if isfield(geofiledata,'geoinputfile')
+    if filehandlingparameters.showtext >= 1
+        disp(' ');disp('   Creating the planedata struct from the CAD file')
+    end
 
-t00 = clock;
-[planedata,extraCATTdata] = EDreadcad(geofiledata.geoinputfile,'circ',0);
-if filehandlingparameters.savecadgeofile == 1
-    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
-    eval(['save ',desiredname,' planedata extraCATTdata'])
-end
-t01 = etime(clock,t00);
-if ~isempty(filehandlingparameters.logfilename)
-    fwrite(fid,['   EDreadcad, time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+    t00 = clock;
+    [planedata,extraCATTdata] = EDreadcad(geofiledata.geoinputfile,'circ',0);
+    if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
+        error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
+    end
+    if filehandlingparameters.savecadgeofile == 1
+        desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
+        eval(['save ',desiredname,' planedata extraCATTdata'])
+    end
+    t01 = etime(clock,t00);
+    if ~isempty(filehandlingparameters.logfilename)
+        fwrite(fid,['   EDreadcad, time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+    end
+else
+    if filehandlingparameters.showtext >= 1
+        disp(' ');disp('   Creating the planedata struct from the input geometry matrices')
+    end
+
+    t00 = clock;
+    planedata = EDreadgeomatrices(geofiledata.corners,geofiledata.planecorners);
+    if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
+        error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
+    end
+    t01 = etime(clock,t00);
+    if ~isempty(filehandlingparameters.logfilename)
+        fwrite(fid,['   EDreadgeomatrices, time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+    end    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -259,7 +284,7 @@ desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,
 eval(['save ',desiredname,' tfdirect tfgeom tfdiff'])
 
 if ~isempty(filehandlingparameters.logfilename)
-    fclose(fid)
+    fclose(fid);
 end
 
 

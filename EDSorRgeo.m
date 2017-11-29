@@ -45,8 +45,8 @@ function outputstruct = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,ne
 %
 % NB! The text on the screeen, and in the code refers to 'R' or 'receivers' but it should be S or R.
 %
-% Uses the functions 	EDinfrontofplane, EDpoinpla, 
-%                       EDgetedgepoints, EDcheckobstr_pointtoedge
+% Uses the functions 	EDinfrontofplane, EDpoinpla, EDcompress3
+%                       EDcoordtrans1 EDgetedgepoints, EDcheckobstr_pointtoedge
 %
 % ----------------------------------------------------------------------------------------------
 %   This file is part of the Edge Diffraction Toolbox by Peter Svensson.                       
@@ -913,14 +913,14 @@ thetaRcomplete = zeros(nedges,nreceivers);
 zRcomplete     = zeros(nedges,nreceivers);
 
 for ii = 1:nedges
-    [rR,thetaR,zR] = ESIE2coordtrans1(pointcoords,[edgedata.edgestartcoords(ii,:);edgedata.edgeendcoords(ii,:)],edgedata.edgenvecs(ii,:),reshape(edgedata.edgerelatedcoordsysmatrices(ii,:),3,3));
+    [rR,thetaR,zR] = EDcoordtrans1(pointcoords,[edgedata.edgestartcoords(ii,:);edgedata.edgeendcoords(ii,:)],edgedata.edgenvecs(ii,:),reshape(edgedata.edgerelatedcoordsysmatrices(ii,:),3,3));
     rRcomplete(ii,:) = rR.';
     thetaRcomplete(ii,:) = thetaR.';
     zRcomplete(ii,:) = zR.';    
 end
 
 [reftoshortlistR,rRsho,thetaRsho,zRsho,~] = ...
-ESIE2compress3(rRcomplete,thetaRcomplete,zRcomplete);
+EDcompress3(rRcomplete,thetaRcomplete,zRcomplete);
 
 %----------------------------------------------------------------------------
 %

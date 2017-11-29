@@ -9,7 +9,7 @@ function [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_e
 %   canplaneobstruct,planeseesplane,planeeqs,planenvecs,minvals,maxvals,...
 %   planecorners,corners,ncornersperplanevec,rearsideplane
 %                       Data that should have been passed on from the
-%                       eddatafile. See ESIE2edgeo for more information.
+%                       eddatafile.
 %   global:
 %   REFTOFROMCOSHO  REFTOTOCOSHO STARTPLANES ENDPLANES
 %   BIGTOCOORDS BIGFROMCOORDS BIGSTARTPLANES BIGENDPLANES

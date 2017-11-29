@@ -1,5 +1,5 @@
-function outval = ESIE2betaoverml_fd(zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm)
-% ESIE2betaoverml_fd - Integrand function which is called for num. int. of ED TF.
+function outval = EDbetaoverml_fd(zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm)
+% EDbetaoverml_fd - Integrand function which is called for num. int. of ED TF.
 %
 % Input parameters:
 %  zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm
@@ -21,7 +21,7 @@ function outval = ESIE2betaoverml_fd(zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson 28 Nov 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 29 Nov 2017 (peter.svensson@ntnu.no)
 %
 % outval = EDbetaoverml_fd(zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm);
 
@@ -30,6 +30,7 @@ function outval = ESIE2betaoverml_fd(zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec
 % or 1. If the value is zero, then that term (of the four) should be set to
 % zero due to a singularity.
 % 28 Nov. 2017 Copied to EDtoolbox
+% 29 Nov. 2017 Name was ESIE2betaoverml_fd
 
 m = sqrt( (zvec-zs).^2 + rs^2 );
 l = sqrt( (zvec-zr).^2 + rr^2 );

@@ -10,7 +10,7 @@ function [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints]
 %               equations.
 %   planenvecs,minvals, maxvals, planecorners, corners, ncornersperplanevec
 %               Data that should have been taken from the corresponding
-%               variables in the eddatafile,see ESIE2edgeo for more information.
+%               variables in the eddatafile.
 %               NB!! The matrices planeeqs, minvals, maxvals
 %               have been rearranged so that they have nIS rows, and each
 %               row contain the data for one specific plane: the reflecting

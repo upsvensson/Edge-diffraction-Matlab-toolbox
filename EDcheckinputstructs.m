@@ -4,7 +4,12 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 % 
 % Input parameters:
 %   geofiledata         .geoinputfile        (specified or file open
-%                                             window)
+%                                             window - unless the fields .corners and .planecorners are given)
+%                       .corners             (optional; alternative to
+%                                             .geoinputfile. But, the use of this option
+%                                             requires that filehandlingparameters.outputdirectory and .filestem are specified)
+%                       .planecorners        (optional; alternative to
+%                                             .geoinputfile)
 %                       .firstcornertoskip   (default: 1e6)
 %   Sindata             .coordinates         (obligatory)
 %                       .doaddsources        (default: 0 = no)
@@ -33,6 +38,8 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .loadinteqsousigs     (default: 0)
 %                       .savediff2result      (default:0)
 %                       .logfilename         (default: '')
+%                       .lineending          (set automatically for the
+%                                            computer type)
 %   EDmaincase          1, if convexESIE
 % 
 % Peter Svensson 29 Nov. 2017 (peter.svensson@ntnu.no)
@@ -42,7 +49,10 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 
 % 24 Nov. 2017 First version
 % 28 Nov. 2017 Cleaned code a bit
-% 29 Nov. 2017 Corrected mistake: saveSRdatafiles was called saveSRindatafiles
+% 29 Nov. 2017 Corrected mistake: saveSRdatafiles was called
+%              saveSRindatafiles. Adjusted to the new indata option:
+%              specified corners and planecorners matrices instead of a CAD
+%              file.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -58,24 +68,32 @@ if ~isstruct(geofiledata)
     [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
 
     CADfile = [CADfilepath,CADfile];
-    geofiledata.geoinputfile = CADfile;
+    geofiledata = struct ('geoinputfile',CADfile);
 
+    [infilepath,CADfilestem] = fileparts(geofiledata.geoinputfile);
+    if ~isfield(filehandlingparameters,'outputdirectory')
+        filehandlingparameters.outputdirectory = infilepath;
+    end    
 end
 if ~isfield(geofiledata,'geoinputfile')
-	[CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
-    [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
+    if ~isfield(geofiledata,'corners') || ~isfield(geofiledata,'planecorners')
+    	[CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
+        [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
 
-    CADfile = [CADfilepath,CADfile];
-    geofiledata.geoinputfile = CADfile;
-
+        CADfile = [CADfilepath,CADfile];
+        geofiledata.geoinputfile = CADfile;
+        [infilepath,CADfilestem] = fileparts(geofiledata.geoinputfile);        
+        if ~isfield(filehandlingparameters,'outputdirectory')
+            filehandlingparameters.outputdirectory = infilepath;
+        end    
+    else
+        if isfield(filehandlingparameters,'outputdirectory') == 0 || isfield(filehandlingparameters,'filestem') == 0
+            error('ERROR: When you give the geometry input in the form of data matrices, you must specify filehandlingparameters.outputdirectory and .filestem')            
+        end
+    end
 end
 if ~isfield(geofiledata,'firstcornertoskip')
     geofiledata.firstcornertoskip = 1e6;
-end
-
-[infilepath,CADfilestem] = fileparts(geofiledata.geoinputfile);
-if exist([infilepath,filesep,'results'],'dir') ~=7
-      mkdir([infilepath,filesep,'results'])
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -161,26 +179,33 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct filehandlingparameters
     
-if ~isfield(filehandlingparameters,'outputdirectory')
-    filehandlingparameters.outputdirectory = infilepath;
+% if ~isfield(filehandlingparameters,'outputdirectory')
+%     filehandlingparameters.outputdirectory = infilepath;
+% end
+if exist([filehandlingparameters.outputdirectory,filesep,'results'],'dir') ~=7
+      mkdir([filehandlingparameters.outputdirectory,filesep,'results'])
 end
+
 if ~isfield(filehandlingparameters,'filestem')
-    
-    ifile = 1;
-    filename1 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_tf.mat'];
-    filename2 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_ir.mat'];
-    if exist(filename1,'file') == 2 || exist(filename2,'file') == 2
-        failedtofindfile = 0;
-        while (failedtofindfile == 0)
-            ifile = ifile + 1;
-            filename1 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_tf.mat'];
-            filename2 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_ir.mat'];
-            if exist(filename1,'file') ~= 2 && exist(filename2,'file') ~= 2
-                failedtofindfile = 1;
+    if exist('CADfilestem','var') == 1
+        ifile = 1;
+        filename1 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_tf.mat'];
+        filename2 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_ir.mat'];
+        if exist(filename1,'file') == 2 || exist(filename2,'file') == 2
+            failedtofindfile = 0;
+            while (failedtofindfile == 0)
+                ifile = ifile + 1;
+                filename1 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_tf.mat'];
+                filename2 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_ir.mat'];
+                if exist(filename1,'file') ~= 2 && exist(filename2,'file') ~= 2
+                    failedtofindfile = 1;
+                end
             end
         end
+        filehandlingparameters.filestem = [CADfilestem,'_',int2str(ifile)];
+    else
+       filehandlingparameters.filestem = Filestem;        
     end
-    filehandlingparameters.filestem = [CADfilestem,'_',int2str(ifile)];
 end
 if ~isfield(filehandlingparameters,'savesetupfile')
     filehandlingparameters.savesetupfile = 1;

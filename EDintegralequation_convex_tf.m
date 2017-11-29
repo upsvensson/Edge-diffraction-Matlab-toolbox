@@ -59,7 +59,8 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 % 27 Nov. 2017 Copied from ESIE2toolbox and trimmed down + changed to the
 %               use of cells for the Hsubs.
 % 28 Nov. 2017 Cleaned up code a bit. Added timingdata.
-% 29 Nov. 2017 Cleaned up: removed the old timingdata code.
+% 29 Nov. 2017 Cleaned up: removed the old timingdata code. Reduced the
+%              no. of displayed frequencies.
 
 showtext = filehandlingparameters.showtext;
 
@@ -77,8 +78,7 @@ timingdata = zeros(1,4);
 nsources = size(Sdata.sources,1);
 nreceivers = size(Rdata.receivers,1);
 
-% Find if there are image sources that could see any
-% edges
+% Find if there are image sources that could see any edges
 nplanes = size(planedata.planecorners,1);
 nedges = size(edgedata.edgecorners,1);
 vispartedgesfromIS = sparse(zeros(nplanes,nedges));
@@ -131,6 +131,14 @@ isthinhole = 0;
 % We must have an outer loop over frequency, since all matrices change with
 % frequency
 
+if showtext >= 1
+    freqstep = round(nfrequencies/10);
+    if freqstep == 0
+       freqstep = 1; 
+    end
+end
+
+
 for ifreq = 1:nfrequencies 
     if ifreq == 1
         t00 = clock;
@@ -138,7 +146,9 @@ for ifreq = 1:nfrequencies
     
     frequency = controlparameters.frequencies(ifreq);
     if showtext >= 1
-        disp(['   Frequency: ',num2str(frequency),' Hz'])
+        if round(ifreq/freqstep)*freqstep == ifreq
+            disp(['      Frequency no. ',int2str(ifreq),' (of ',int2str(nfrequencies),'): ',num2str(frequency),' Hz'])
+        end
     end
 
     k = 2*pi*frequency/envdata.cair;

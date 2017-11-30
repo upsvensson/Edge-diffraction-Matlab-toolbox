@@ -33,7 +33,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .logfilename         (default: '')
 %                       .lineending          (set automatically)
 % 
-% Peter Svensson 29 Nov. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 30 Nov. 2017 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -43,6 +43,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % writing to a logfile.
 % 29 Nov. 2017 Added the semicolon after fclose(fid). Made some adjustments to
 % handle input matrices instead of a cad file.
+% 30 Nov. 2017 Fixed a missing part with calctfs and doaddsources = 1
 
 global POTENTIALISES ISCOORDS IVNDIFFMATRIX
 global IVNSPECMATRIX ORIGINSFROM ISESVISIBILITY REFLORDER
@@ -232,6 +233,30 @@ end
 
 nsources = size(Sdata.sources,1);
 nreceivers = size(Rdata.receivers,1);
+nfrequencies = length(controlparameters.frequencies);
+
+if controlparameters.docalctf == 1
+    if Sindata.doaddsources == 1
+       tfdirect = zeros(nfrequencies,nreceivers);
+       tfgeom = zeros(nfrequencies,nreceivers);
+       tfdiff = zeros(nfrequencies,nreceivers);        
+    elseif Sindata.doaddsources == 0
+       tfdirect = zeros(nfrequencies,nreceivers,nsources);
+       tfgeom = zeros(nfrequencies,nreceivers,nsources);
+       tfdiff = zeros(nfrequencies,nreceivers,nsources);        
+    end
+end
+if controlparameters.docalcir == 1
+    if Sindata.doaddsources == 1
+       irdirect = zeros(ntimesteps,nreceivers);
+       irgeom = zeros(ntimesteps,nreceivers);
+       irdiff = zeros(ntimesteps,nreceivers);
+    elseif Sindata.doaddsources == 0
+       irdirect = zeros(ntimesteps,nreceivers,nsources);
+       irgeom = zeros(ntimesteps,nreceivers,nsources);
+       irdiff = zeros(ntimesteps,nreceivers,nsources);
+    end
+end
 
 for isou = 1:nsources
     if isou ==1
@@ -257,20 +282,25 @@ for isou = 1:nsources
             Sdata.vispartedgesfroms(:,isou),Rdata.vispartedgesfromr(:,irec),filehandlingparameters.showtext);
             pathdata{isou,irec} = pathstruct;    
             
-            [tfdirect_one,tfgeom_one,tfdiff_one] = EDmaketfs(envdata,planedata,edgedata,edgetoedgedata,...
-                pathstruct,1,controlparameters.frequencies,controlparameters.Rstart,...                        
-                [],controlparameters.directsound,filehandlingparameters.showtext);
+            if controlparameters.docalctf == 1
+                [tfdirect_one,tfgeom_one,tfdiff_one] = EDmaketfs(envdata,planedata,edgedata,edgetoedgedata,...
+                    pathstruct,1,controlparameters.frequencies,controlparameters.Rstart,...                        
+                    [],controlparameters.directsound,filehandlingparameters.showtext);
 
-            if Sindata.doaddsources == 1
-                tfdirect(:,irec) = tfdirect(:,irec) + tfdirect_one; 
-                tfgeom(:,irec)   = tfgeom(:,irec)   + tfgeom_one; 
-                tfdiff(:,irec)   = tfdiff(:,irec)   + tfdiff_one; 
-            elseif Sindata.doaddsources == 0
-                tfdirect(:,irec,isou) =  tfdirect_one; 
-                tfgeom(:,irec,isou)   = tfgeom_one; 
-                tfdiff(:,irec,isou)   = tfdiff_one; 
+                if Sindata.doaddsources == 1
+                    tfdirect(:,irec) = tfdirect(:,irec) + tfdirect_one; 
+                    tfgeom(:,irec)   = tfgeom(:,irec)   + tfgeom_one; 
+                    tfdiff(:,irec)   = tfdiff(:,irec)   + tfdiff_one; 
+                elseif Sindata.doaddsources == 0
+                    tfdirect(:,irec,isou) =  tfdirect_one; 
+                    tfgeom(:,irec,isou)   = tfgeom_one; 
+                    tfdiff(:,irec,isou)   = tfdiff_one; 
+                end
             end
-        
+            if controlparameters.docalcir == 1
+                disp('WARNING: calcirs not implemented yet');
+            end
+            
     end
     if isou == 1
         t01 = etime(clock,t00);

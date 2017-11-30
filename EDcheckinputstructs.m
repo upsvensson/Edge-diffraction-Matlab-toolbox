@@ -31,8 +31,8 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .savesetupfile       (default: 1)
 %                       .showtext        (default: 1)
 %                       .savecadgeofile      (default: 0)
-%                       .saveSRdatafiles     (default: 0)
-%                       .saveeddatafile      (default: 0)
+%                       .saveSRdatafiles     (default: 1)
+%                       .saveeddatafile      (default: 1)
 %                       .savesubmatrixdata   (default: 0)
 %                       .saveinteqsousigs     (default: 0)
 %                       .loadinteqsousigs     (default: 0)
@@ -42,7 +42,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                                            computer type)
 %   EDmaincase          1, if convexESIE
 % 
-% Peter Svensson 29 Nov. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 30 Nov. 2017 (peter.svensson@ntnu.no)
 % 
 % [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -53,6 +53,9 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %              saveSRindatafiles. Adjusted to the new indata option:
 %              specified corners and planecorners matrices instead of a CAD
 %              file.
+% 30 Nov. 2017 Fixed a bug where docalctf, instead of docalcir, was set to
+%              0. Changed defaults to create eddata and SRfiles, because of
+%              plotting the model.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -158,7 +161,7 @@ if EDmaincase == 1
         controlparameters.docalctf = 1;
     end
     if ~isfield(controlparameters,'docalcir')
-        controlparameters.docalctf = 0;
+        controlparameters.docalcir = 0;
     end
     if ~isfield(controlparameters,'Rstart')
         controlparameters.Rstart = 0;
@@ -217,10 +220,10 @@ if ~isfield(filehandlingparameters,'savecadgeofile')
     filehandlingparameters.savecadgeofile = 0;
 end
 if ~isfield(filehandlingparameters,'saveSRdatafiles')
-    filehandlingparameters.saveSRdatafiles = 0;
+    filehandlingparameters.saveSRdatafiles = 1;
 end
 if ~isfield(filehandlingparameters,'saveeddatafile')
-    filehandlingparameters.saveeddatafile = 0;
+    filehandlingparameters.saveeddatafile = 1;
 end
 if ~isfield(filehandlingparameters,'savesubmatrixdata')
     filehandlingparameters.savesubmatrixdata = 0;

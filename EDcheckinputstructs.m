@@ -29,17 +29,15 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %   filehandlingparameters    .outputdirectory  (default: /result, in the folder of the geoinputfile)  
 %                       .filestem        (default: name of the cad-file, with an underscore + running integer)
 %                       .savesetupfile       (default: 1)
-%                       .showtext        (default: 1)
 %                       .savecadgeofile      (default: 0)
 %                       .saveSRdatafiles     (default: 1)
 %                       .saveeddatafile      (default: 1)
 %                       .savesubmatrixdata   (default: 0)
 %                       .saveinteqsousigs     (default: 0)
 %                       .loadinteqsousigs     (default: 0)
-%                       .savediff2result      (default:0)
-%                       .logfilename         (default: '')
-%                       .lineending          (set automatically for the
-%                                            computer type)
+%                       .savelogfile          (default: 0)
+%                       .savediff2result      (default: 0)
+%                       .showtext             (default: 1)
 %   EDmaincase          1, if convexESIE
 % 
 % Peter Svensson 30 Nov. 2017 (peter.svensson@ntnu.no)
@@ -55,7 +53,8 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %              file.
 % 30 Nov. 2017 Fixed a bug where docalctf, instead of docalcir, was set to
 %              0. Changed defaults to create eddata and SRfiles, because of
-%              plotting the model.
+%              plotting the model. Changed one field from logfilename to
+%              savelogfile. Removed the field lineending.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -237,19 +236,8 @@ end
 if ~isfield(filehandlingparameters,'savediff2result')
     filehandlingparameters.savediff2result = 0;
 end
-if ~isfield(filehandlingparameters,'logfilename')
-    filehandlingparameters.logfilename = '';
-end
-compstr = computer;
-compstr = lower(compstr(1:3));
-if compstr == 'mac'  
-	filehandlingparameters.lineending = 13;
-elseif compstr == 'sun' || compstr == 'sol'            
-	filehandlingparameters.lineending = 10;
-elseif compstr == 'pcw'
-	filehandlingparameters.lineending = [13,10];
-else
-    error('ERROR: Not implemented for this computer type yet')	
+if ~isfield(filehandlingparameters,'savelogfile')
+    filehandlingparameters.savelogfile = 0;
 end
 
 

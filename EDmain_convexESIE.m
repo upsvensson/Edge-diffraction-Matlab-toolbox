@@ -26,12 +26,12 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .outputdirectory  (default: /result, in the folder of the geoinputfile)  
 %                       .filestem        (default: name of the cad-file, with an underscore + running integer)
 %                       .savesetupfile       (default: 1)
-%                       .showtext        (default: 1)
+%                       .showtext            (default: 1)
 %                       .savecadgeofile      (default: 0)
-%                       .saveSRdatafiles     (default: 0)
-%                       .saveeddatafile      (default: 0)
-%                       .logfilename         (default: '')
-%                       .lineending          (set automatically)
+%                       .saveSRdatafiles     (default: 1)
+%                       .saveeddatafile      (default: 1)
+%                       .savelogfile         (default: 1)
+%                       .savediff2result      (default: 0)
 % 
 % Peter Svensson 30 Nov. 2017 (peter.svensson@ntnu.no)
 %
@@ -43,7 +43,9 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % writing to a logfile.
 % 29 Nov. 2017 Added the semicolon after fclose(fid). Made some adjustments to
 % handle input matrices instead of a cad file.
-% 30 Nov. 2017 Fixed a missing part with calctfs and doaddsources = 1
+% 30 Nov. 2017 Fixed a missing part with calctfs and doaddsources = 1.
+% Changed one field to savelogfile instead of logfilename. Removed the
+% lineending field.
 
 global POTENTIALISES ISCOORDS IVNDIFFMATRIX
 global IVNSPECMATRIX ORIGINSFROM ISESVISIBILITY REFLORDER
@@ -58,6 +60,22 @@ if nargin < 6
     end
 end
 
+compstr = computer;
+compstr = lower(compstr(1:3));
+if compstr == 'mac'  
+	lineending = 13;
+elseif compstr == 'sun' || compstr == 'sol'            
+	lineending = 10;
+elseif compstr == 'pcw'
+	lineending = [13,10];
+else
+    error('ERROR: Not implemented for this computer type yet')	
+end
+
+if filehandlingparameters.savelogfile == 1
+    logfilename = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_log.txt'];
+end
+
 [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,1);
 
 if filehandlingparameters.savesetupfile == 1
@@ -67,18 +85,18 @@ end
 
 if filehandlingparameters.showtext >= 1
 	disp(' ');disp('####################################################################')
-              disp('#  EDmain_convexESIE, v. 29 Nov. 2017')
+              disp('#  EDmain_convexESIE, v. 30 Nov. 2017')
 end
-if ~isempty(filehandlingparameters.logfilename)
-    fid = fopen(filehandlingparameters.logfilename,'w');
+if filehandlingparameters.savelogfile == 1
+    fid = fopen(logfilename,'w');
     if fid == -1
         disp('This file is not possible to open - check that it isn''t opened by any program!')
     	return
     end
-    fwrite(fid,[' ',filehandlingparameters.lineending],'char');   
-    fwrite(fid,['####################################################################',filehandlingparameters.lineending],'char');
-    fwrite(fid,['#  EDmain_convexESIE, v. 29 Nov. 2017',filehandlingparameters.lineending],'char');
-    fwrite(fid,[' ',filehandlingparameters.lineending],'char');
+    fwrite(fid,[' ',lineending],'char');   
+    fwrite(fid,['####################################################################',lineending],'char');
+    fwrite(fid,['#  EDmain_convexESIE, v. 30 Nov. 2017',lineending],'char');
+    fwrite(fid,[' ',lineending],'char');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -99,8 +117,8 @@ if isfield(geofiledata,'geoinputfile')
         eval(['save ',desiredname,' planedata extraCATTdata'])
     end
     t01 = etime(clock,t00);
-    if ~isempty(filehandlingparameters.logfilename)
-        fwrite(fid,['   EDreadcad, time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   EDreadcad, time: ',num2str(t01),' s',lineending],'char');
     end
 else
     if filehandlingparameters.showtext >= 1
@@ -113,8 +131,8 @@ else
         error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
     end
     t01 = etime(clock,t00);
-    if ~isempty(filehandlingparameters.logfilename)
-        fwrite(fid,['   EDreadgeomatrices, time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   EDreadgeomatrices, time: ',num2str(t01),' s',lineending],'char');
     end    
 end
 
@@ -132,8 +150,8 @@ if filehandlingparameters.saveeddatafile == 1
     eval(['save ',desiredname,' planedata edgedata'])
 end
 t01 = etime(clock,t00);
-if ~isempty(filehandlingparameters.logfilename)
-    fwrite(fid,['   EDedgeo, time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   EDedgeo, time: ',num2str(t01),' s',lineending],'char');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -150,8 +168,8 @@ if filehandlingparameters.saveSRdatafiles == 1
     eval(['save ',desiredname,' Sdata'])    
 end
 t01 = etime(clock,t00);
-if ~isempty(filehandlingparameters.logfilename)
-    fwrite(fid,['   EDSorRgeo(S), time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   EDSorRgeo(S), time: ',num2str(t01),' s',lineending],'char');
 end
 
 if filehandlingparameters.showtext >= 1	
@@ -164,8 +182,8 @@ if filehandlingparameters.saveSRdatafiles == 1
     eval(['save ',desiredname,' Rdata'])    
 end
 t01 = etime(clock,t00);
-if ~isempty(filehandlingparameters.logfilename)
-    fwrite(fid,['   EDSorRgeo(R), time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   EDSorRgeo(R), time: ',num2str(t01),' s',lineending],'char');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -181,8 +199,8 @@ if filehandlingparameters.saveeddatafile == 1
     eval(['save ',desiredname,' planedata edgedata edgetoedgedata'])
 end
 t01 = etime(clock,t00);
-if ~isempty(filehandlingparameters.logfilename)
-    fwrite(fid,['   EDed2geo, time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   EDed2geo, time: ',num2str(t01),' s',lineending],'char');
 end
  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -200,8 +218,8 @@ if filehandlingparameters.savesubmatrixdata == 1
     eval(['save ',desiredname,' Hsubmatrixdata'])
 end
 t01 = etime(clock,t00);
-if ~isempty(filehandlingparameters.logfilename)
-    fwrite(fid,['   EDinteg_submatrixstructure, time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   EDinteg_submatrixstructure, time: ',num2str(t01),' s',lineending],'char');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -218,8 +236,8 @@ t00 = clock;
 desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
 eval(['save ',desiredname,' tfinteqdiff extraoutputdata'])
 t01 = etime(clock,t00);
-if ~isempty(filehandlingparameters.logfilename)
-    fwrite(fid,['   EDintegralequation_convex_tf, time: ',num2str(t01),' s. Parts, for one freq: ',num2str(timingdata),' s',filehandlingparameters.lineending],'char');
+if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   EDintegralequation_convex_tf, time: ',num2str(t01),' s. Parts, for one freq: ',num2str(timingdata),' s',lineending],'char');
 end
 
 
@@ -266,8 +284,8 @@ for isou = 1:nsources
     EDfindISEStree(planedata,edgedata,edgetoedgedata,Sdata.sources(isou,:),1,1,Sdata.visplanesfroms(:,isou),Sdata.vispartedgesfroms(:,isou),filehandlingparameters.showtext);
     if isou == 1
         t01 = etime(clock,t00);
-        if ~isempty(filehandlingparameters.logfilename)
-            fwrite(fid,['   EDfindISEStree, one source time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+        if filehandlingparameters.savelogfile == 1
+            fwrite(fid,['   EDfindISEStree, one source, time: ',num2str(t01),' s',lineending],'char');
         end
     end
 
@@ -304,8 +322,8 @@ for isou = 1:nsources
     end
     if isou == 1
         t01 = etime(clock,t00);
-        if ~isempty(filehandlingparameters.logfilename)
-            fwrite(fid,['   EDfindpathsISESx and EDmaketfs, one source, time: ',num2str(t01),' s',filehandlingparameters.lineending],'char');
+        if filehandlingparameters.savelogfile == 1
+            fwrite(fid,['   EDfindpathsISESx and EDmaketfs, one source, time: ',num2str(t01),' s',lineending],'char');
         end
     end
 
@@ -313,7 +331,7 @@ end
 desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
 eval(['save ',desiredname,' tfdirect tfgeom tfdiff'])
 
-if ~isempty(filehandlingparameters.logfilename)
+if filehandlingparameters.savelogfile == 1
     fclose(fid);
 end
 

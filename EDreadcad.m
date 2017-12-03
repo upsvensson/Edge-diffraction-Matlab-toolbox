@@ -79,6 +79,8 @@ function [planedata,extraCATTdata] = EDreadcad(CADfile,planecornerstype,checkgeo
 %               Added the fields cornerinfrontofplane and modeltype.
 %               Removed the file saving.
 % 28 Nov. 2017 Did some code improving as suggested by Matlab
+% 3 Dec. 2017 Fixed a bug: if a plane definition had all zeros, then
+% an infinite loop happened, around line 460.
 
 if nargin == 0
 	CADfile = '';
@@ -455,11 +457,14 @@ else
 	end
 end
 
+% In the next loop, before the && ~isempty(iv) was inserted, an infinite
+% loop was generated if a plane definition had all zeros.
+
 if strcmp(planecornerstype,'circ') == 1
 	for ii = 1:nplanes
 		iv = find( planecorners(ii,:) ~= 0);
 		ncornersatplane = length(iv);
-		if ncornersatplane ~= ncornersperplane
+		if (ncornersatplane ~= ncornersperplane) && ~isempty(iv)
 			pattern = planecorners(ii,iv);
 			nrepeatings = ceil(ncornersperplane/ncornersatplane);
 			for jj = 1:nrepeatings-1

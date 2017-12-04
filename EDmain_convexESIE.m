@@ -30,10 +30,12 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savecadgeofile      (default: 0)
 %                       .saveSRdatafiles     (default: 1)
 %                       .saveeddatafile      (default: 1)
+%                       .savepathsfile       (default: 0)
+%                       .saveISEStree        (default: 0)
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 30 Nov. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 4 Dec. 2017 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -46,6 +48,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % 30 Nov. 2017 Fixed a missing part with calctfs and doaddsources = 1.
 % Changed one field to savelogfile instead of logfilename. Removed the
 % lineending field.
+% 4 Dec. 2017 Added more info in the printouts and logfiles.
 
 global POTENTIALISES ISCOORDS IVNDIFFMATRIX
 global IVNSPECMATRIX ORIGINSFROM ISESVISIBILITY REFLORDER
@@ -85,7 +88,9 @@ end
 
 if filehandlingparameters.showtext >= 1
 	disp(' ');disp('####################################################################')
-              disp('#  EDmain_convexESIE, v. 30 Nov. 2017')
+              disp('#  EDmain_convexESIE, v. 4 Dec. 2017')
+              disp(['#  filestem for results: ',filehandlingparameters.filestem])
+              disp(' ')
 end
 if filehandlingparameters.savelogfile == 1
     fid = fopen(logfilename,'w');
@@ -93,9 +98,9 @@ if filehandlingparameters.savelogfile == 1
         disp('This file is not possible to open - check that it isn''t opened by any program!')
     	return
     end
-    fwrite(fid,[' ',lineending],'char');   
     fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['#  EDmain_convexESIE, v. 30 Nov. 2017',lineending],'char');
+    fwrite(fid,['#  EDmain_convexESIE, v. 4 Dec. 2017',lineending],'char');
+    fwrite(fid,['#  filestem for results: ',filehandlingparameters.filestem,lineending],'char');
     fwrite(fid,[' ',lineending],'char');
 end
 
@@ -104,9 +109,8 @@ end
 
 if isfield(geofiledata,'geoinputfile')
     if filehandlingparameters.showtext >= 1
-        disp(' ');disp('   Creating the planedata struct from the CAD file')
+        disp('   Creating the planedata struct from the CAD file')
     end
-
     t00 = clock;
     [planedata,extraCATTdata] = EDreadcad(geofiledata.geoinputfile,'circ',0);
     if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
@@ -117,22 +121,28 @@ if isfield(geofiledata,'geoinputfile')
         eval(['save ',desiredname,' planedata extraCATTdata'])
     end
     t01 = etime(clock,t00);
+    ncorners = size(planedata.corners,1);
+    nplanes = (size(planedata.planecorners,1));
+    if filehandlingparameters.showtext >= 1
+        disp(['      ',int2str(ncorners),' corners and ',int2str(nplanes),' planes'])
+    end
     if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDreadcad, time: ',num2str(t01),' s',lineending],'char');
+        fwrite(fid,['   EDreadcad (',int2str(ncorners),' corners and ',int2str(nplanes),' planes), time: ',num2str(t01),' s',lineending],'char');
     end
 else
     if filehandlingparameters.showtext >= 1
-        disp(' ');disp('   Creating the planedata struct from the input geometry matrices')
+        disp('   Creating the planedata struct from the input geometry matrices')
     end
-
     t00 = clock;
-    planedata = EDreadgeomatrices(geofiledata.corners,geofiledata.planecorners);
-    if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
-        error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
-    end
+    planedata = EDreadgeomatrices(geofiledata.corners,geofiledata.planecorners);    
+    ncorners = size(planedata.corners,1);
+    nplanes = size(size(planedata.planecorners,1));
     t01 = etime(clock,t00);
+    if filehandlingparameters.showtext >= 1
+        disp(['      ',int2str(ncorners),' and ',int2str(nplanes),' planes'])
+    end
     if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDreadgeomatrices, time: ',num2str(t01),' s',lineending],'char');
+        fwrite(fid,['   EDreadgeomatrices (',int2str(ncorners),' corners and ',int2str(nplanes),' planes), time: ',num2str(t01),' s',lineending],'char');
     end    
 end
 
@@ -140,7 +150,7 @@ end
 % Use the planedata struct and create an edgedata struct
 
 if filehandlingparameters.showtext >= 1	
-	disp(' ');disp('   Creating the edgedata struct ')
+	disp('   Creating the edgedata struct ')
 end
 
 t00 = clock;
@@ -149,31 +159,41 @@ if filehandlingparameters.saveeddatafile == 1
     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_eddata.mat'];
     eval(['save ',desiredname,' planedata edgedata'])
 end
+nedges = size(edgedata.edgecorners,1);
 t01 = etime(clock,t00);
+if filehandlingparameters.showtext >= 1
+     disp(['      ',int2str(nedges),' edges'])
+end
 if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDedgeo, time: ',num2str(t01),' s',lineending],'char');
+    fwrite(fid,['   EDedgeo, (',int2str(nedges),' edges), time: ',num2str(t01),' s',lineending],'char');
+end
+if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
+    error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create the Sdata and Rdata structs
 
 if filehandlingparameters.showtext >= 1	
-	disp(' ');disp('   Creating the Sdata struct ')
+	disp('   Creating the Sdata struct ')
 end
-
 t00 = clock;
 Sdata = EDSorRgeo(planedata,edgedata,Sindata.coordinates,'S',controlparameters.nedgepoints_visibility,filehandlingparameters.showtext);
 if filehandlingparameters.saveSRdatafiles == 1
     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_Sdata.mat'];
     eval(['save ',desiredname,' Sdata'])    
 end
+nsources = size(Sdata.sources,1);
 t01 = etime(clock,t00);
+if filehandlingparameters.showtext >= 1
+     disp(['      ',int2str(nsources),' source(s)'])
+end
 if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDSorRgeo(S), time: ',num2str(t01),' s',lineending],'char');
+    fwrite(fid,['   EDSorRgeo(S), (',int2str(nsources),' source(s)),time: ',num2str(t01),' s',lineending],'char');
 end
 
 if filehandlingparameters.showtext >= 1	
-	disp(' ');disp('   Creating the Rdata struct ')
+	disp('   Creating the Rdata struct ')
 end
 t00 = clock;
 Rdata = EDSorRgeo(planedata,edgedata,Rindata.coordinates,'R',controlparameters.nedgepoints_visibility,filehandlingparameters.showtext);
@@ -181,9 +201,13 @@ if filehandlingparameters.saveSRdatafiles == 1
     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_Rdata.mat'];
     eval(['save ',desiredname,' Rdata'])    
 end
+nreceivers = size(Rdata.receivers,1);
 t01 = etime(clock,t00);
+if filehandlingparameters.showtext >= 1
+     disp(['      ',int2str(nreceivers),' receiver(s)'])
+end
 if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDSorRgeo(R), time: ',num2str(t01),' s',lineending],'char');
+    fwrite(fid,['   EDSorRgeo(R), (',int2str(nreceivers),' receiver(s)),time: ',num2str(t01),' s',lineending],'char');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -207,9 +231,8 @@ end
 % Prepare for the integral equation: set up the submatrix structure
 
 if filehandlingparameters.showtext >= 1	
-	disp(' ');disp('   Creating the integral equation Hsubmatrixdata struct ')
+	disp('   Creating the integral equation Hsubmatrixdata struct ')
 end
-
 t00 = clock;
 Hsubmatrixdata = EDinteg_submatrixstructure(edgedata.edgelengthvec,edgedata.closwedangvec,...
     controlparameters.ngauss,controlparameters.discretizationtype,edgetoedgedata,edgedata.planesatedge,filehandlingparameters.showtext);
@@ -217,16 +240,20 @@ if filehandlingparameters.savesubmatrixdata == 1
     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
     eval(['save ',desiredname,' Hsubmatrixdata'])
 end
+nsousigs = Hsubmatrixdata.bigmatrixendnums(end);
 t01 = etime(clock,t00);
+if filehandlingparameters.showtext >= 1
+     disp(['      ',int2str(nsousigs),' edge source signals to compute'])
+end
 if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDinteg_submatrixstructure, time: ',num2str(t01),' s',lineending],'char');
+    fwrite(fid,['   EDinteg_submatrixstructure, (',int2str(nsousigs),' edge source signals to compute), time: ',num2str(t01),' s',lineending],'char');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate the HOD contribution with the integral equation
 
 if filehandlingparameters.showtext >= 1	
-	disp(' ');disp('   Calculating the HOD contribution with the FD integral equation')
+	disp('   Calculating the HOD contribution with the FD integral equation')
 end
 
 t00 = clock;
@@ -246,7 +273,7 @@ end
 % diffraction paths.
 
 if filehandlingparameters.showtext >= 1	
-	disp(' ');disp('   Find the (first-order) GA paths, and tfs, one source at a time')
+	disp('   Find the (first-order) GA paths, and tfs, one source at a time')
 end
 
 nsources = size(Sdata.sources,1);
@@ -282,6 +309,11 @@ for isou = 1:nsources
     end
     [lengthNspecmatrix,lengthNdiffmatrix,singlediffcol,startindicessinglediff,endindicessinglediff,ndecimaldivider,PointertoIRcombs,IRoriginsfrom] = ...
     EDfindISEStree(planedata,edgedata,edgetoedgedata,Sdata.sources(isou,:),1,1,Sdata.visplanesfroms(:,isou),Sdata.vispartedgesfroms(:,isou),filehandlingparameters.showtext);
+    if filehandlingparameters.saveISEStree == 1
+        desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_',int2str(isou),'_ISEStree.mat'];
+        eval(['save ',desiredname,' POTENTIALISES ISCOORDS IVNDIFFMATRIX IVNSPECMATRIX ORIGINSFROM ISESVISIBILITY REFLORDER ', ...
+        ' lengthNspecmatrix lengthNdiffmatrix singlediffcol startindicessinglediff endindicessinglediff ndecimaldivider PointertoIRcombs IRoriginsfrom'])                 
+    end
     if isou == 1
         t01 = etime(clock,t00);
         if filehandlingparameters.savelogfile == 1
@@ -299,6 +331,11 @@ for isou = 1:nsources
             controlparameters.nedgepoints_visibility,Sdata.visplanesfroms(:,isou),Rdata.visplanesfromr(:,irec),...
             Sdata.vispartedgesfroms(:,isou),Rdata.vispartedgesfromr(:,irec),filehandlingparameters.showtext);
             pathdata{isou,irec} = pathstruct;    
+            
+            if filehandlingparameters.savepathsfile == 1
+                desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_',int2str(isou),'_',int2str(irec),'_edpaths.mat'];
+                eval(['save ',desiredname,' pathstruct'])                 
+            end
             
             if controlparameters.docalctf == 1
                 [tfdirect_one,tfgeom_one,tfdiff_one] = EDmaketfs(envdata,planedata,edgedata,edgetoedgedata,...

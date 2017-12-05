@@ -19,6 +19,7 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 %       edgepairlist
 %       edgetripletlist
 %       submatrixcounter
+%       nuniquesubmatrices
 %       nedgeelems
 %       bigmatrixstartnums
 %       bigmatrixendnums
@@ -43,7 +44,7 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2017 
+% Peter Svensson (peter.svensson@ntnu.no) 5 Dec. 2017 
 %
 % Hsubmatrixdata = ...
 %    EDinteg_submatrixstructure(edgelengthvec,closwedangvec,edgetoedgedata,planesatedge,showtext)
@@ -61,6 +62,8 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 %               out of this function.
 %  28 Nov. 2017 Introduced the non-global showtext input parameter
 % 29 Nov. 2017 Changed call from ESIE2distelements to EDdistelements
+% 5 Dec. 2017 Allow odd numbers of edge points. Stored one extra field:
+%               nuniquesubmatrices
 
 if nargin < 7
     showtext = 0;
@@ -118,12 +121,12 @@ end
 %
 % First the number of discretization points is determined for each edge.
 
-nedgeelems = ceil(inteq_ngauss*(edgelengthvec/max(edgelengthvec))/2)*2;
+% Before 5 Dec. 2017: only even numbers of edge points were used
+%  nedgeelems = ceil(inteq_ngauss*(edgelengthvec/max(edgelengthvec))/2)*2;
+nedgeelems = ceil(inteq_ngauss*(edgelengthvec/max(edgelengthvec)));
 
 [~,sortvec] = sortrows([nedgeelems(edgepairlist(:,1)) nedgeelems(edgepairlist(:,2))]);
 edgepairlist = [edgepairlist(sortvec,1) edgepairlist(sortvec,2)];
-
-
 
 % ----------------------------------------------------------------------------------------------
 % Make two lists, bigmatrixstartnums and bigmatrixendnums, which for each
@@ -211,6 +214,7 @@ if symmetrycompression == 1
     end
     
     [shortlist,~,reftoshortlist] = unique(round(datamatrix*1e5)/1e5,'rows');
+    nuniquesubmatrices = size(shortlist,1);    
 
     if size(shortlist,1) > round(length(reftoshortlist)*0.8)
         symmetrycompression = -1;
@@ -311,6 +315,7 @@ Hsubmatrixdata.listofsubmatrices = listofsubmatrices;
 Hsubmatrixdata.edgepairlist = edgepairlist;
 Hsubmatrixdata.edgetripletlist = edgetripletlist;
 Hsubmatrixdata.submatrixcounter = submatrixcounter;
+Hsubmatrixdata.nuniquesubmatrices = nuniquesubmatrices;
 Hsubmatrixdata.nedgeelems = nedgeelems;
 Hsubmatrixdata.bigmatrixstartnums = bigmatrixstartnums;
 Hsubmatrixdata.bigmatrixendnums = bigmatrixendnums;
@@ -319,6 +324,7 @@ Hsubmatrixdata.isthinplanetriplet = isthinplanetriplet;
 Hsubmatrixdata.isthinplaneedgepair = isthinplaneedgepair;
 Hsubmatrixdata.quadraturematrix_pos = quadraturematrix_pos;
 Hsubmatrixdata.quadraturematrix_weights = quadraturematrix_weights;
+
 
 
 

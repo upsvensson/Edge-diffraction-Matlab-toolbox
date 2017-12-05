@@ -35,6 +35,8 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .savesubmatrixdata   (default: 0)
 %                       .saveinteqsousigs     (default: 0)
 %                       .loadinteqsousigs     (default: 0)
+%                       .savepathsfile        (default: 0)
+%                       .saveISEStree         (default: 0)
 %                       .savelogfile          (default: 0)
 %                       .savediff2result      (default: 0)
 %                       .showtext             (default: 1)
@@ -77,7 +79,12 @@ if ~isstruct(geofiledata)
         filehandlingparameters.outputdirectory = infilepath;
     end    
 end
-if ~isfield(geofiledata,'geoinputfile')
+if isfield(geofiledata,'geoinputfile')
+    [infilepath,CADfilestem] = fileparts(geofiledata.geoinputfile);
+    if ~isfield(filehandlingparameters,'outputdirectory')
+        filehandlingparameters.outputdirectory = infilepath;
+    end    
+else
     if ~isfield(geofiledata,'corners') || ~isfield(geofiledata,'planecorners')
     	[CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
         [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
@@ -181,9 +188,6 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct filehandlingparameters
     
-% if ~isfield(filehandlingparameters,'outputdirectory')
-%     filehandlingparameters.outputdirectory = infilepath;
-% end
 if exist([filehandlingparameters.outputdirectory,filesep,'results'],'dir') ~=7
       mkdir([filehandlingparameters.outputdirectory,filesep,'results'])
 end
@@ -232,6 +236,12 @@ if ~isfield(filehandlingparameters,'saveinteqsousigs')
 end
 if ~isfield(filehandlingparameters,'loadinteqsousigs')
     filehandlingparameters.loadinteqsousigs = 0;
+end
+if ~isfield(filehandlingparameters,'savepathsfile')
+    filehandlingparameters.savepathsfile = 0;
+end
+if ~isfield(filehandlingparameters,'saveISEStree')
+    filehandlingparameters.saveISEStree = 0;
 end
 if ~isfield(filehandlingparameters,'savediff2result')
     filehandlingparameters.savediff2result = 0;

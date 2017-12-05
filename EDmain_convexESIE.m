@@ -35,7 +35,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 4 Dec. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 5 Dec. 2017 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -49,6 +49,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % Changed one field to savelogfile instead of logfilename. Removed the
 % lineending field.
 % 4 Dec. 2017 Added more info in the printouts and logfiles.
+% 5 Dec. 2017 Added more info in the printouts and logfiles.
 
 global POTENTIALISES ISCOORDS IVNDIFFMATRIX
 global IVNSPECMATRIX ORIGINSFROM ISESVISIBILITY REFLORDER
@@ -241,12 +242,14 @@ if filehandlingparameters.savesubmatrixdata == 1
     eval(['save ',desiredname,' Hsubmatrixdata'])
 end
 nsousigs = Hsubmatrixdata.bigmatrixendnums(end);
+nsubmatrices = size(Hsubmatrixdata.edgetripletlist,1);
 t01 = etime(clock,t00);
-if filehandlingparameters.showtext >= 1
+if filehandlingparameters.showtext >= 1    
      disp(['      ',int2str(nsousigs),' edge source signals to compute'])
+     disp(['      ',int2str(nsubmatrices),' submatrices; ',int2str(Hsubmatrixdata.nuniquesubmatrices),' unique ones to compute due to symmetry'])     
 end
 if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDinteg_submatrixstructure, (',int2str(nsousigs),' edge source signals to compute), time: ',num2str(t01),' s',lineending],'char');
+    fwrite(fid,['   EDinteg_submatrixstructure, (',int2str(nsousigs),' edge source signals,',int2str(Hsubmatrixdata.nuniquesubmatrices),'submatrices, out of ',int2str(nsubmatrices),', to compute), time: ',num2str(t01),' s',lineending],'char');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

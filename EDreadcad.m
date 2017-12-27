@@ -224,7 +224,6 @@ cornernumbers = (C{1});
 corners = [C{2} C{3} C{4}];
 ncorners = length(cornernumbers);
 
-
 %---------------------------------------------------------------
 % Look for the planes definitions between the lines containing
 % %PLANES and %SOURCES, or the end

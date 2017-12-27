@@ -963,6 +963,9 @@ if userwantsdiff2 == 1
                                     z1_end = edgelengthvec(edgeshortlist(ii,1))-nudge;
                                     z2_end = edgelengthvec(edgeshortlist(ii,2))-nudge;
 
+                                    disp('Hello')
+                                    savetemp
+                                    pause
 
                                     tfnew = zeros(nfrequencies,1);
                                     for kkk = 1:nfrequencies

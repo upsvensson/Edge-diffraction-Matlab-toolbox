@@ -826,7 +826,7 @@ if obstructtestneeded
         % The lists edgesubcoords are the shortlists.
         
         [edgesubcoords,edgeweightlist,edgenumberlist] = EDgetedgepoints(...
-            edgedata.edgestartcoords(uniqueedges,:),edgedata.edgeendcoords(uniqueedges,:),edgedata.edgelengthvec(uniqueedges,:),nedgesubs,1);
+            edgedata.edgestartcoords(uniqueedges,:),edgedata.edgeendcoords(uniqueedges,:),nedgesubs,1);
 
         % The two lists below contain pointers to the first edge segment in the
         % shortlist.

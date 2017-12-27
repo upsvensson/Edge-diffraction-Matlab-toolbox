@@ -269,7 +269,6 @@ end
 %		##      DOUBLE AND HIGHER DIFFRACTION         ##
 %		################################################
 
-
 for kk = 2:min([specorder difforder])
 
     if ~isempty(lengthNdiffmatrix)

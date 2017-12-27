@@ -182,6 +182,7 @@ else
 end
 clear iv 
 visplanesfromr = EDinfrontofplane(pointcoords(colnumb,:),planedata.planeeqs(rownumb,1:3),planedata.corners(planedata.planecorners(rownumb,1),:),planedata.corners(planedata.planecorners(rownumb,2),:)) + 1;
+
 clear rownumb colnumb
 
 if ntotabsplanes > 0
@@ -962,5 +963,3 @@ else
     outputstruct = Sdata;
     
 end
-
-

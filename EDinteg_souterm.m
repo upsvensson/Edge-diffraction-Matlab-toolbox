@@ -43,7 +43,7 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson 28 Nov. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 15 Dec. 2017 (peter.svensson@ntnu.no)
 %
 % Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,inteq_ngauss,inteq_discretizationtype,...
 %     vispartedgesfroms,vispartedgesfroms_start,vispartedgesfroms_end,frequency,gaussvectors,rSvec,thetaSvec,zSvec,showtext);
@@ -68,10 +68,13 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 %               points per edge.
 % 27 Nov. 2017 Copied from ESIE2toolbox. Trimmed down, used more structs.
 % 28 Nov. 2017 Introduced the non-global input parameter showtext
+% 15 Dec. 2017 Experiments with detecting near singularities
 
 if nargin < 14
     showtext = 0;
 end
+
+showtext = 3;
 
 discretizationtype = controlparameters.discretizationtype;
 
@@ -158,6 +161,16 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         thetaS = thetaSvec(edge2);
         zS = zSvec(edge2);
 
+        singwarning = 0;
+        singterm = [0 0 0 0];
+        if thetaout == 0 && max([  abs(cos(ny*(pi + thetaS   )))  abs(cos(ny*(pi - thetaS   )))]) > 0.999
+            singwarning = 1 
+        end
+        if thetaout ~= 0 && max([ abs(cos(ny*(pi + thetaS + thetaout   )))  abs(cos(ny*(pi + thetaS - thetaout   )))  ...
+                          abs(cos(ny*(pi - thetaS + thetaout   )))  abs(cos(ny*(pi - thetaS - thetaout   )))  ]) > 0.999
+            singwarning = 2                       
+        end
+        
         % Build vertical [n3,n2] matrices and expand them horizontally
         if n3 ~= n3previous || n2 ~= n2previous 
 
@@ -237,11 +250,36 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
 
         ch = ((ze2_re2(n2vertmat) - zS).*(ze2_re2(n2vertmat) - ze3_re2(n3vertmat)) + mdist.*ldist)./rS./re3_re2(n3vertmat);
         ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
-        ch = ( ch + 1./ch)/2;
-                
+        ch = ( ch + 1./ch)/2;               
+            
             if thetaout == 0
                 beta = 2*( sin(ny*(pi + thetaS  ))./(ch - cos(ny*(pi + thetaS   ))) + ...
-                           sin(ny*(pi - thetaS  ))./(ch - cos(ny*(pi - thetaS   ))));            
+                           sin(ny*(pi - thetaS  ))./(ch - cos(ny*(pi - thetaS   )))); 
+
+                       beta1 = 2*sin(ny*(pi + thetaS  ))./(ch - cos(ny*(pi + thetaS   )));
+                       beta2 = 2*sin(ny*(pi - thetaS  ))./(ch - cos(ny*(pi - thetaS   )));
+                       iv1 = abs(beta1)>100;
+                       iv2 = abs(beta2)>100;
+                       
+                       if sum(iv1) > 0
+                          singterm(1) = 1; 
+                       end
+                       if sum(iv2) > 0
+                          singterm(2) = 1; 
+                       end
+                       
+                       if sum(iv1) > 0                       
+                          plot([beta1 beta2],'-o')
+                          disp('iv1')
+                          sum(iv1)
+                          pause
+                       end
+                       if sum(iv2) > 0                       
+                          plot([beta1 beta2],'-o')
+                          disp('iv2')
+                          sum(iv2)
+                          pause
+                       end
             else
                 
                 if skewedges == 0
@@ -250,6 +288,40 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                              sin(ny*(pi + thetaS - thetaout  ))./(ch - cos(ny*(pi + thetaS - thetaout   ))) + ...
                              sin(ny*(pi - thetaS + thetaout  ))./(ch - cos(ny*(pi - thetaS + thetaout   ))) + ...
                              sin(ny*(pi - thetaS - thetaout  ))./(ch - cos(ny*(pi - thetaS - thetaout   ))));           
+                         beta1 = sin(ny*(pi + thetaS + thetaout  ))./(ch - cos(ny*(pi + thetaS + thetaout   )));
+                         beta2 = sin(ny*(pi + thetaS - thetaout  ))./(ch - cos(ny*(pi + thetaS - thetaout   )));
+                         beta3 = sin(ny*(pi - thetaS + thetaout  ))./(ch - cos(ny*(pi - thetaS + thetaout   )));
+                         beta4 = sin(ny*(pi - thetaS - thetaout  ))./(ch - cos(ny*(pi - thetaS - thetaout   )));
+                      iv1 = abs(beta1)>100;
+                       iv2 = abs(beta2)>100;
+                      iv3 = abs(beta3)>100;
+                       iv4 = abs(beta3)>100;
+                                                    
+                      if sum(iv1) > 0                       
+                          plot([beta1 beta2 beta3 beta4],'-o')
+                          disp('iv1')
+                          sum(iv1)
+                          pause
+                       end
+                       if sum(iv2) > 0                       
+                          plot([beta1 beta2 beta3 beta4],'-o')
+                          disp('iv2')
+                          sum(iv2)
+                          pause
+                       end
+                      if sum(iv3) > 0                       
+                          plot([beta1 beta2 beta3 beta4],'-o')
+                          disp('iv3')
+                          sum(iv3)
+                          pause
+                       end
+                       if sum(iv2) > 0                       
+                          plot([beta1 beta2 beta3 beta4],'-o')
+                          disp('iv4')
+                          sum(iv4)
+                          pause
+                       end
+                         
                 else
                     
                      beta = ( sin(ny*(pi + thetaS + thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi + thetaS + thetae3_re2(n3vertmat)   ))) + ...
@@ -263,20 +335,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
           Gsub = -(2-acrossface_out)*ny/4/pi*beta.*dz_expjkmoverm;
           
         G(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) =     G(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) + Gsub;
-        
-%         ivfindIS = find(vispartedgesfromIS(:,edge2));
-%         if ~isempty(ivfindIS)
-%             for kk = ivfindIS
-%             
-%                disp('HERE WE SHOULD ADD SOMETHING!') 
-%                disp(['From S to plane ',int2str(kk),' to edge ',int2str(edge2),' in the direction of ',int2str(edge3)]) 
-%                
-%                [xis] = ESIE2findis(sources,kk,planeeqs,1,[1 1 1]);               
-%                
-%             end   
-%         end
-        
-        
+                
     end
     
 end

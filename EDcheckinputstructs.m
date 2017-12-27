@@ -13,6 +13,9 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .firstcornertoskip   (default: 1e6)
 %   Sindata             .coordinates         (obligatory)
 %                       .doaddsources        (default: 0 = no)
+%                       .sourceamplitudes    Only used if doaddsources = 1
+%                                            (default:
+%                                             ones(nsources,nfrequencies))
 %   Rindata             .coordinates         (obligatory)
 %   envdata             .cair                (default: 344)
 %                       .rhoair              (default: 1.21)
@@ -42,7 +45,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .showtext             (default: 1)
 %   EDmaincase          1, if convexESIE
 % 
-% Peter Svensson 30 Nov. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 13 Dec. 2017 (peter.svensson@ntnu.no)
 % 
 % [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -57,6 +60,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %              0. Changed defaults to create eddata and SRfiles, because of
 %              plotting the model. Changed one field from logfilename to
 %              savelogfile. Removed the field lineending.
+% 13 Dec. 2017 Added the input field sourceamplitudes
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -117,15 +121,18 @@ end
 if ~isfield(Sindata,'doaddsources')
     Sindata.doaddsources = 0;
 end
+if ~isfield(Sindata,'sourceamplitudes')
+    Sindata.sourceamplitudes = 1;
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct Rindata
 
 if ~isstruct(Rindata)
-    error('ERROR: receiver coordinates were not specified')
+    error('ERROR 1: receiver coordinates were not specified')
 end
 if ~isfield(Rindata,'coordinates')
-    error('ERROR: receiver coordinates were not specified')
+    error('ERROR 2: receiver coordinates were not specified')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -183,6 +190,14 @@ if EDmaincase == 1
         controlparameters.ngauss = 16;
     end
       
+    nfrequencies = length(controlparameters.frequencies);
+    nsources = size(Sindata.coordinates,1);
+    if nsources > 1 || nfrequencies > 1 
+        if prod(size(Sindata.sourceamplitudes,1)) == 1
+            Sindata.sourceamplitudes = ones(nsources,nfrequencies);
+        end
+    end
+    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

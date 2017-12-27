@@ -44,7 +44,7 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 5 Dec. 2017 
+% Peter Svensson (peter.svensson@ntnu.no) 15 Dec. 2017 
 %
 % Hsubmatrixdata = ...
 %    EDinteg_submatrixstructure(edgelengthvec,closwedangvec,edgetoedgedata,planesatedge,showtext)
@@ -64,6 +64,7 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 % 29 Nov. 2017 Changed call from ESIE2distelements to EDdistelements
 % 5 Dec. 2017 Allow odd numbers of edge points. Stored one extra field:
 %               nuniquesubmatrices
+% 15 Dec. 2017 Turned off the code which suppresses symmetrycompressions
 
 if nargin < 7
     showtext = 0;
@@ -216,9 +217,9 @@ if symmetrycompression == 1
     [shortlist,~,reftoshortlist] = unique(round(datamatrix*1e5)/1e5,'rows');
     nuniquesubmatrices = size(shortlist,1);    
 
-    if size(shortlist,1) > round(length(reftoshortlist)*0.8)
-        symmetrycompression = -1;
-    end
+%     if size(shortlist,1) > round(length(reftoshortlist)*0.8)
+%         symmetrycompression = -1;
+%     end
         
     if showtext >= 3
         disp(' ')
@@ -240,9 +241,9 @@ if symmetrycompression < 1
     [~,sortvec] = sortrows(nedgeelems(edgetripletlist(:,2:3)));
     Hsubmatrix(listofsubmatrices(sortvec)) = (1:submatrixcounter);
     edgetripletlist = edgetripletlist(sortvec,:);
-%     if ~isempty(reftoshortlist)
-%         reftoshortlist = reftoshortlist(sortvec);
-%     end
+    if ~isempty(reftoshortlist)
+        reftoshortlist = reftoshortlist(sortvec);
+    end
     listofsubmatrices = listofsubmatrices(sortvec);
     reftoshortlist = [];
 else

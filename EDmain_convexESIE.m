@@ -10,6 +10,8 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .firstcornertoskip   (default: 1e6)
 %   Sindata             .coordinates         (obligatory)
 %                       .doaddsources        (default: 0 = no)
+%                       .sourceamplitudes    (default:
+%                        ones(nsources,nfrequencies)
 %   Rindata             .coordinates         (obligatory)
 %   envdata             .cair                (default: 344)
 %                       .rhoair              (default: 1.21)
@@ -35,7 +37,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 5 Dec. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 15 Dec. 2017 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -50,6 +52,10 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % lineending field.
 % 4 Dec. 2017 Added more info in the printouts and logfiles.
 % 5 Dec. 2017 Added more info in the printouts and logfiles.
+% 10 Dec. 2017 Added the timingstruct to the output file
+% 13 Dec. 2017 Added the sourceamplitudes field to the Sindata struct
+% 15 Dec. 2017 Added the number of non-zero matrix elements to the log
+% file, and on-screen.
 
 global POTENTIALISES ISCOORDS IVNDIFFMATRIX
 global IVNSPECMATRIX ORIGINSFROM ISESVISIBILITY REFLORDER
@@ -76,11 +82,11 @@ else
     error('ERROR: Not implemented for this computer type yet')	
 end
 
+[geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,1);
+
 if filehandlingparameters.savelogfile == 1
     logfilename = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_log.txt'];
 end
-
-[geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,1);
 
 if filehandlingparameters.savesetupfile == 1
     varlist = 'geofiledata Sindata Rindata envdata controlparameters filehandlingparameters';
@@ -88,8 +94,8 @@ if filehandlingparameters.savesetupfile == 1
 end
 
 if filehandlingparameters.showtext >= 1
-	disp(' ');disp('####################################################################')
-              disp('#  EDmain_convexESIE, v. 4 Dec. 2017')
+	disp('    ');disp('####################################################################')
+              disp('#  EDmain_convexESIE, v. 10 Dec. 2017')
               disp(['#  filestem for results: ',filehandlingparameters.filestem])
               disp(' ')
 end
@@ -100,7 +106,7 @@ if filehandlingparameters.savelogfile == 1
     	return
     end
     fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['#  EDmain_convexESIE, v. 4 Dec. 2017',lineending],'char');
+    fwrite(fid,['#  EDmain_convexESIE, v. 10 Dec. 2017',lineending],'char');
     fwrite(fid,['#  filestem for results: ',filehandlingparameters.filestem,lineending],'char');
     fwrite(fid,[' ',lineending],'char');
 end
@@ -137,15 +143,16 @@ else
     t00 = clock;
     planedata = EDreadgeomatrices(geofiledata.corners,geofiledata.planecorners);    
     ncorners = size(planedata.corners,1);
-    nplanes = size(size(planedata.planecorners,1));
+    nplanes = size(planedata.planecorners,1);
     t01 = etime(clock,t00);
     if filehandlingparameters.showtext >= 1
-        disp(['      ',int2str(ncorners),' and ',int2str(nplanes),' planes'])
+        disp(['      ',int2str(ncorners),' corners and ',int2str(nplanes),' planes'])
     end
     if filehandlingparameters.savelogfile == 1
         fwrite(fid,['   EDreadgeomatrices (',int2str(ncorners),' corners and ',int2str(nplanes),' planes), time: ',num2str(t01),' s',lineending],'char');
     end    
 end
+timingstruct = struct('geoinput',t01);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Use the planedata struct and create an edgedata struct
@@ -162,6 +169,7 @@ if filehandlingparameters.saveeddatafile == 1
 end
 nedges = size(edgedata.edgecorners,1);
 t01 = etime(clock,t00);
+timingstruct.edgedata = t01;
 if filehandlingparameters.showtext >= 1
      disp(['      ',int2str(nedges),' edges'])
 end
@@ -186,11 +194,12 @@ if filehandlingparameters.saveSRdatafiles == 1
 end
 nsources = size(Sdata.sources,1);
 t01 = etime(clock,t00);
+timingstruct.Sdata = t01;
 if filehandlingparameters.showtext >= 1
      disp(['      ',int2str(nsources),' source(s)'])
 end
 if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDSorRgeo(S), (',int2str(nsources),' source(s)),time: ',num2str(t01),' s',lineending],'char');
+    fwrite(fid,['   EDSorRgeo(S), (',int2str(nsources),' source(s)), time: ',num2str(t01),' s',lineending],'char');
 end
 
 if filehandlingparameters.showtext >= 1	
@@ -204,18 +213,19 @@ if filehandlingparameters.saveSRdatafiles == 1
 end
 nreceivers = size(Rdata.receivers,1);
 t01 = etime(clock,t00);
+timingstruct.Rdata = t01;
 if filehandlingparameters.showtext >= 1
      disp(['      ',int2str(nreceivers),' receiver(s)'])
 end
 if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDSorRgeo(R), (',int2str(nreceivers),' receiver(s)),time: ',num2str(t01),' s',lineending],'char');
+    fwrite(fid,['   EDSorRgeo(R), (',int2str(nreceivers),' receiver(s)), time: ',num2str(t01),' s',lineending],'char');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Add edge-to-edge visibility data
 
 if filehandlingparameters.showtext >= 1	
-	disp(' ');disp('   Creating the edgetoedgedata struct ')
+	disp('   Creating the edgetoedgedata struct ')
 end
 t00 = clock;
 edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,1,2,controlparameters.nedgepoints_visibility,filehandlingparameters.showtext);    
@@ -224,6 +234,7 @@ if filehandlingparameters.saveeddatafile == 1
     eval(['save ',desiredname,' planedata edgedata edgetoedgedata'])
 end
 t01 = etime(clock,t00);
+timingstruct.edgetoedgedata = t01;
 if filehandlingparameters.savelogfile == 1
     fwrite(fid,['   EDed2geo, time: ',num2str(t01),' s',lineending],'char');
 end
@@ -243,13 +254,27 @@ if filehandlingparameters.savesubmatrixdata == 1
 end
 nsousigs = Hsubmatrixdata.bigmatrixendnums(end);
 nsubmatrices = size(Hsubmatrixdata.edgetripletlist,1);
+edgeelemsizes = edgedata.edgelengthvec./Hsubmatrixdata.nedgeelems;
+meanelemsize = mean(edgeelemsizes);
+maxfreq = envdata.cair/(2.8*meanelemsize);
+minedgeelemnumber = min(Hsubmatrixdata.nedgeelems);
+maxedgeelemnumber = max(Hsubmatrixdata.nedgeelems);
+nonzeroelements = sum(prod(Hsubmatrixdata.nedgeelems(Hsubmatrixdata.edgetripletlist),2));
 t01 = etime(clock,t00);
+timingstruct.submatrixdata = t01;
 if filehandlingparameters.showtext >= 1    
+     disp(['      ',int2str(nsubmatrices),' submatrices; ',int2str(Hsubmatrixdata.nuniquesubmatrices),' unique will be computed due to symmetry']) 
+     disp(['      Discretizing the edges with ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discret. points, giving an avg. "edge element" length of ',num2str(meanelemsize),' m'])
+     disp(['      This discretization has an upper frequency limit of ',num2str(round(maxfreq)),' Hz (2.8 discret. points per wavelength)'])
      disp(['      ',int2str(nsousigs),' edge source signals to compute'])
-     disp(['      ',int2str(nsubmatrices),' submatrices; ',int2str(Hsubmatrixdata.nuniquesubmatrices),' unique ones to compute due to symmetry'])     
+     disp(['      The IE matrix has ',int2str(nonzeroelements),' non-zero elements, but many may be identical due to symmetries'])
 end
 if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDinteg_submatrixstructure, (',int2str(nsousigs),' edge source signals,',int2str(Hsubmatrixdata.nuniquesubmatrices),'submatrices, out of ',int2str(nsubmatrices),', to compute), time: ',num2str(t01),' s',lineending],'char');
+    fwrite(fid,['   EDinteg_submatrixstructure, (',int2str(Hsubmatrixdata.nuniquesubmatrices),' submatrices, out of ',int2str(nsubmatrices),', to compute), time: ',num2str(t01),' s',lineending],'char');
+    fwrite(fid,['                               (Edges discretized with: ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discretization points)',lineending],'char');
+    fwrite(fid,['                               (Avg. "edge element" size: ',num2str(meanelemsize),' m. OK up to ',num2str(round(maxfreq)),' Hz (2.8 discret. points per wavelength))',lineending],'char');
+    fwrite(fid,['                               (',int2str(nsousigs),' edge source signals to compute)',lineending],'char');
+    fwrite(fid,['                               (',int2str(nonzeroelements),' non-zero elements in the IE matrix)',lineending],'char');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -257,19 +282,25 @@ end
 
 if filehandlingparameters.showtext >= 1	
 	disp('   Calculating the HOD contribution with the FD integral equation')
+    disp(['      ',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',int2str(controlparameters.difforder)])
 end
 
 t00 = clock;
 [tfinteqdiff,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
-    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,Sindata.doaddsources,...
+    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,Sindata.doaddsources,Sindata.sourceamplitudes,...
         Rdata,controlparameters);
 desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
 eval(['save ',desiredname,' tfinteqdiff extraoutputdata'])
 t01 = etime(clock,t00);
+timingstruct.integralequation = [t01 timingdata];
 if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDintegralequation_convex_tf, time: ',num2str(t01),' s. Parts, for one freq: ',num2str(timingdata),' s',lineending],'char');
+    fwrite(fid,['   EDintegralequation_convex_tf (',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',int2str(controlparameters.difforder),')',lineending],'char');
+    fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for one freq, as below)',lineending],'char');
+    fwrite(fid,['                                Compute the H-matrix: ',num2str(timingdata(1)),' s',lineending],'char');
+    fwrite(fid,['                                Compute Q_firstterm: ',num2str(timingdata(2)),' s',lineending],'char');
+    fwrite(fid,['                                Compute Qfinal: ',num2str(timingdata(3)),' s',lineending],'char');
+    fwrite(fid,['                                Compute the result at the receiver(s): ',num2str(timingdata(4)),' s',lineending],'char');
 end
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Find the paths for direct sound, first-order specular, and first-order
@@ -319,6 +350,7 @@ for isou = 1:nsources
     end
     if isou == 1
         t01 = etime(clock,t00);
+        timingstruct.findISEStree = t01;
         if filehandlingparameters.savelogfile == 1
             fwrite(fid,['   EDfindISEStree, one source, time: ',num2str(t01),' s',lineending],'char');
         end
@@ -346,9 +378,9 @@ for isou = 1:nsources
                     [],controlparameters.directsound,filehandlingparameters.showtext);
 
                 if Sindata.doaddsources == 1
-                    tfdirect(:,irec) = tfdirect(:,irec) + tfdirect_one; 
-                    tfgeom(:,irec)   = tfgeom(:,irec)   + tfgeom_one; 
-                    tfdiff(:,irec)   = tfdiff(:,irec)   + tfdiff_one; 
+                    tfdirect(:,irec) = tfdirect(:,irec) + tfdirect_one*Sindata.sourceamplitudes(isou,:).'; 
+                    tfgeom(:,irec)   = tfgeom(:,irec)   + tfgeom_one*Sindata.sourceamplitudes(isou,:).'; 
+                    tfdiff(:,irec)   = tfdiff(:,irec)   + tfdiff_one*Sindata.sourceamplitudes(isou,:).'; 
                 elseif Sindata.doaddsources == 0
                     tfdirect(:,irec,isou) =  tfdirect_one; 
                     tfgeom(:,irec,isou)   = tfgeom_one; 
@@ -362,6 +394,7 @@ for isou = 1:nsources
     end
     if isou == 1
         t01 = etime(clock,t00);
+        timingstruct.findpaths_and_maketfs = t01;
         if filehandlingparameters.savelogfile == 1
             fwrite(fid,['   EDfindpathsISESx and EDmaketfs, one source, time: ',num2str(t01),' s',lineending],'char');
         end
@@ -369,7 +402,7 @@ for isou = 1:nsources
 
 end
 desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
-eval(['save ',desiredname,' tfdirect tfgeom tfdiff'])
+eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct'])
 
 if filehandlingparameters.savelogfile == 1
     fclose(fid);

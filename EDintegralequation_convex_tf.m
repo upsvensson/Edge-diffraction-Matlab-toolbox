@@ -1,5 +1,5 @@
 function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
-    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,doaddsources,...
+    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,doaddsources,sourceamplitudes,...
         Rdata,controlparameters)
 % EDintegralequation_convex_tf calculates the sound pressure representing second-
 % and higher-order diffraction, for a convex scattering object
@@ -9,6 +9,7 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 %   Hsubmatrixdata          Structs
 %   Sdata                   Struct 
 %   doaddsources            0 or 1
+%   sourceamplitudes
 %   Rdata                   Struct
 %   controlparameters       Struct
 %
@@ -25,10 +26,10 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 % Uses functions EDdistelements, ESIE2calcedgeinteqmatrixsub2_mex, EDinteg_souterm, EDcalcpropagatematrix
 % EDcoordtrans1
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  29 Nov. 2017  
+% Peter Svensson (peter.svensson@ntnu.no)  13 Dec. 2017  
 %                       
 % [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
-%    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,...
+%    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,sourceamplitudes,...
 %    Rdata,controlparameters)
 
 % 31 March 2015 Introduced detailed timing, also as output parameter.
@@ -61,6 +62,9 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 % 28 Nov. 2017 Cleaned up code a bit. Added timingdata.
 % 29 Nov. 2017 Cleaned up: removed the old timingdata code. Reduced the
 %              no. of displayed frequencies.
+% 13 Dec. 2017 Added the sourceamplitudes to the Sindata struct
+
+% 10 Dec. 2017 TODO: finish the timingdata for the CASE2 : addsources
 
 showtext = filehandlingparameters.showtext;
 
@@ -139,11 +143,7 @@ if showtext >= 1
 end
 
 
-for ifreq = 1:nfrequencies 
-    if ifreq == 1
-        t00 = clock;
-    end
-    
+for ifreq = 1:nfrequencies     
     frequency = controlparameters.frequencies(ifreq);
     if showtext >= 1
         if round(ifreq/freqstep)*freqstep == ifreq
@@ -151,12 +151,16 @@ for ifreq = 1:nfrequencies
         end
     end
 
-    k = 2*pi*frequency/envdata.cair;
-
     if showtext >= 2 && controlparameters.difforder > 2
         disp(' ')
         disp(['      Building the H matrix of size (',int2str(nbig),',',int2str(nbig),') with ',int2str(Hsubmatrixdata.submatrixcounter),' submatrices'])
     end
+    
+    if ifreq == 1
+        t00 = clock;
+    end
+
+    k = 2*pi*frequency/envdata.cair;
     
     % In the for-loop, nn will be the Hsub number
     % The ii value will refer to the row-number in the edgepairlist for the 
@@ -187,8 +191,7 @@ for ifreq = 1:nfrequencies
 
             edge3 = Hsubmatrixdata.edgetripletlist(nn,1);
             n3 = Hsubmatrixdata.nedgeelems(edge3);
-        %     disp(['triplet no. ',int2str(nn),': n1,n2,n3 = ',int2str(n1),',',int2str(n2),',',int2str(n3)])
-
+%             disp(['triplet no. ',int2str(nn),': n1,n2,n3 = ',int2str(n1),',',int2str(n2),',',int2str(n3)])
             shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
 
 %             ind_start = 1 + (Hsubmatrixdata.bigmatrixstartnums(ii)-1) + (Hsubmatrixdata.bigmatrixstartnums(jj)-1)*nbig;
@@ -447,7 +450,8 @@ for ifreq = 1:nfrequencies
                 Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
                     Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
                 
-                Q_firstterm = Q_firstterm + Q_firstterm_addition;
+%                 Q_firstterm = Q_firstterm + Q_firstterm_addition;
+                Q_firstterm = Q_firstterm + Q_firstterm_addition*sourceamplitudes(isou,ifreq);
             end
         
             if ifreq == 1
@@ -567,7 +571,7 @@ for ifreq = 1:nfrequencies
         end
         for isou = 1:nsources
             
-            if filehandlingparameters.loadinteqsousig == 0
+            if filehandlingparameters.loadinteqsousigs == 0
 
                 %-----------------------------------------------------------------
                 %-----------------------------------------------------------------
@@ -577,9 +581,9 @@ for ifreq = 1:nfrequencies
                 
                 Q_firstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
                     controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
-                    Sdata.vispartedgesfroms_end(:,isou),vispartedgesfromIS,frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
+                    Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
                     Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
-                               
+                 
                 %-----------------------------------------------------------------
                 %-----------------------------------------------------------------
                 % CASE 2: The first term of the edge source signals has been computed. 
@@ -599,12 +603,13 @@ for ifreq = 1:nfrequencies
                    end
                    Q_ackum = Q*0;              
                    shortlistprev = 0;
-                     Hsubdata = [];
+                   Hsubdata = [];
                    ivuse = [];
                    for nn = 1:size(Hsubmatrixdata.listofsubmatrices,1)
                         ivoutvec = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,2)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,2));
                         ivinvec  = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,3)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,3));
-                        shortlistnumber = reftoshortlist(nn);
+
+                        shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
                         if shortlistnumber ~= shortlistprev
                            Hsubdata = Hsubdatalists{nn}; 
                            ivuse = ivuselists{nn}; 
@@ -631,7 +636,7 @@ for ifreq = 1:nfrequencies
                 %
                 % Possibly save to a file
 
-                if filehandlingparameters.saveinteqsousig == 1
+                if filehandlingparameters.saveinteqsousigs == 1
                    filename_sousigs = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_',ISOU,'_f',int2str(ifreq),'_sousigs.mat'];  
                    eval(['save ',filename_sousigs,' Qfinal Q_firstterm doesQsegmenthavevalues'])             
                 end

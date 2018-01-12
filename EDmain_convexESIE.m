@@ -37,7 +37,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 15 Dec. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 12 Jan. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -56,9 +56,8 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % 13 Dec. 2017 Added the sourceamplitudes field to the Sindata struct
 % 15 Dec. 2017 Added the number of non-zero matrix elements to the log
 % file, and on-screen.
-
-global POTENTIALISES ISCOORDS IVNDIFFMATRIX
-global IVNSPECMATRIX ORIGINSFROM ISESVISIBILITY REFLORDER
+% 12 Jan. 2018 Made substantial changes to the GA part; calling new
+% functions EDfindconvexGApaths and EDmakefirstordertfs
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check input data, assign default values if needed
@@ -95,7 +94,7 @@ end
 
 if filehandlingparameters.showtext >= 1
 	disp('    ');disp('####################################################################')
-              disp('#  EDmain_convexESIE, v. 10 Dec. 2017')
+              disp('#  EDmain_convexESIE, v. 12 Jan. 2018')
               disp(['#  filestem for results: ',filehandlingparameters.filestem])
               disp(' ')
 end
@@ -294,7 +293,8 @@ eval(['save ',desiredname,' tfinteqdiff extraoutputdata'])
 t01 = etime(clock,t00);
 timingstruct.integralequation = [t01 timingdata];
 if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDintegralequation_convex_tf (',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',int2str(controlparameters.difforder),')',lineending],'char');
+    nfrequencies = length(controlparameters.frequencies);
+    fwrite(fid,['   EDintegralequation_convex_tf (',int2str(nfrequencies),' frequencies. Diffraction order: ',int2str(controlparameters.difforder),')',lineending],'char');
     fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for one freq, as below)',lineending],'char');
     fwrite(fid,['                                Compute the H-matrix: ',num2str(timingdata(1)),' s',lineending],'char');
     fwrite(fid,['                                Compute Q_firstterm: ',num2str(timingdata(2)),' s',lineending],'char');
@@ -303,108 +303,60 @@ if filehandlingparameters.savelogfile == 1
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Find the paths for direct sound, first-order specular, and first-order
 % diffraction paths.
 
 if filehandlingparameters.showtext >= 1	
-	disp('   Find the (first-order) GA paths, and tfs, one source at a time')
+	disp('   Find the (first-order) GA paths')
 end
 
-nsources = size(Sdata.sources,1);
-nreceivers = size(Rdata.receivers,1);
-nfrequencies = length(controlparameters.frequencies);
+% The output struct firstorderpathdata has the fields
+%   .validIScoords          matrix, [nIS,3] with IS coordinates
+%   .validsounumber         vector, [nIS,1] with original source number
+%   .validrecnumber         vector, [nIS,1] with original receiver number
+%   .diffpaths              matrix, [nreceivers,nsources,nedges] with
+%                           logical 0 or 1
+%   .edgeisactive           vector, [nedges,1] with logical 0 or 1
+%   .directsoundOK          matrix, [nreceivers,nsources] with 0 or 1
+%   .ncomponents            vector, [1,3], with number of direct sound,
+%                           specrefl and diffr components.
 
-if controlparameters.docalctf == 1
-    if Sindata.doaddsources == 1
-       tfdirect = zeros(nfrequencies,nreceivers);
-       tfgeom = zeros(nfrequencies,nreceivers);
-       tfdiff = zeros(nfrequencies,nreceivers);        
-    elseif Sindata.doaddsources == 0
-       tfdirect = zeros(nfrequencies,nreceivers,nsources);
-       tfgeom = zeros(nfrequencies,nreceivers,nsources);
-       tfdiff = zeros(nfrequencies,nreceivers,nsources);        
-    end
-end
-if controlparameters.docalcir == 1
-    if Sindata.doaddsources == 1
-       irdirect = zeros(ntimesteps,nreceivers);
-       irgeom = zeros(ntimesteps,nreceivers);
-       irdiff = zeros(ntimesteps,nreceivers);
-    elseif Sindata.doaddsources == 0
-       irdirect = zeros(ntimesteps,nreceivers,nsources);
-       irgeom = zeros(ntimesteps,nreceivers,nsources);
-       irdiff = zeros(ntimesteps,nreceivers,nsources);
-    end
+t00 = clock;
+firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
+    Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
+    Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr);
+t01 = etime(clock,t00);
+timingstruct.findpaths = t01;
+if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   EDfindconvexGApaths (',int2str(nfrequencies),' frequencies)',lineending],'char');
+    fwrite(fid,['                                Total time: ',num2str(t01),' s',lineending],'char');
 end
 
-for isou = 1:nsources
-    if isou ==1
-        t00 = clock;
-    end
-    [lengthNspecmatrix,lengthNdiffmatrix,singlediffcol,startindicessinglediff,endindicessinglediff,ndecimaldivider,PointertoIRcombs,IRoriginsfrom] = ...
-    EDfindISEStree(planedata,edgedata,edgetoedgedata,Sdata.sources(isou,:),1,1,Sdata.visplanesfroms(:,isou),Sdata.vispartedgesfroms(:,isou),filehandlingparameters.showtext);
-    if filehandlingparameters.saveISEStree == 1
-        desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_',int2str(isou),'_ISEStree.mat'];
-        eval(['save ',desiredname,' POTENTIALISES ISCOORDS IVNDIFFMATRIX IVNSPECMATRIX ORIGINSFROM ISESVISIBILITY REFLORDER ', ...
-        ' lengthNspecmatrix lengthNdiffmatrix singlediffcol startindicessinglediff endindicessinglediff ndecimaldivider PointertoIRcombs IRoriginsfrom'])                 
-    end
-    if isou == 1
-        t01 = etime(clock,t00);
-        timingstruct.findISEStree = t01;
-        if filehandlingparameters.savelogfile == 1
-            fwrite(fid,['   EDfindISEStree, one source, time: ',num2str(t01),' s',lineending],'char');
-        end
-    end
 
-    if isou ==1
-        t00 = clock;
-    end
-    for irec = 1:nreceivers
-        pathstruct = EDfindpathsISESx(planedata,edgedata,lengthNspecmatrix,lengthNdiffmatrix,singlediffcol,startindicessinglediff,...
-            endindicessinglediff,ndecimaldivider,PointertoIRcombs,IRoriginsfrom,...
-            Sdata.sources(isou,:),Rdata.receivers(irec,:),controlparameters.directsound,1,1,...
-            controlparameters.nedgepoints_visibility,Sdata.visplanesfroms(:,isou),Rdata.visplanesfromr(:,irec),...
-            Sdata.vispartedgesfroms(:,isou),Rdata.vispartedgesfromr(:,irec),filehandlingparameters.showtext);
-            pathdata{isou,irec} = pathstruct;    
-            
-            if filehandlingparameters.savepathsfile == 1
-                desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_',int2str(isou),'_',int2str(irec),'_edpaths.mat'];
-                eval(['save ',desiredname,' pathstruct'])                 
-            end
-            
-            if controlparameters.docalctf == 1
-                [tfdirect_one,tfgeom_one,tfdiff_one] = EDmaketfs(envdata,planedata,edgedata,edgetoedgedata,...
-                    pathstruct,1,controlparameters.frequencies,controlparameters.Rstart,...                        
-                    [],controlparameters.directsound,filehandlingparameters.showtext);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Generate the first-order specular, and first-order
+% diffraction tfs.
 
-                if Sindata.doaddsources == 1
-                    tfdirect(:,irec) = tfdirect(:,irec) + tfdirect_one*Sindata.sourceamplitudes(isou,:).'; 
-                    tfgeom(:,irec)   = tfgeom(:,irec)   + tfgeom_one*Sindata.sourceamplitudes(isou,:).'; 
-                    tfdiff(:,irec)   = tfdiff(:,irec)   + tfdiff_one*Sindata.sourceamplitudes(isou,:).'; 
-                elseif Sindata.doaddsources == 0
-                    tfdirect(:,irec,isou) =  tfdirect_one; 
-                    tfgeom(:,irec,isou)   = tfgeom_one; 
-                    tfdiff(:,irec,isou)   = tfdiff_one; 
-                end
-            end
-            if controlparameters.docalcir == 1
-                disp('WARNING: calcirs not implemented yet');
-            end
-            
-    end
-    if isou == 1
-        t01 = etime(clock,t00);
-        timingstruct.findpaths_and_maketfs = t01;
-        if filehandlingparameters.savelogfile == 1
-            fwrite(fid,['   EDfindpathsISESx and EDmaketfs, one source, time: ',num2str(t01),' s',lineending],'char');
-        end
-    end
-
+if filehandlingparameters.showtext >= 1	
+	disp('   Generate the (first-order) GA and diff tfs.')
 end
+
+t00 = clock;
+[tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpathdata,...
+    controlparameters,envdata,Sindata.doaddsources,Sdata.sources,Rdata.receivers,edgedata);
+t01 = etime(clock,t00);
+timingstruct.maketfs = [t01 timingdata];
+
 desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
 eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct'])
 
 if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   EDmakefirstordertfs (',int2str(nfrequencies),' frequencies)',lineending],'char');
+    fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for all frequencies, as below',lineending],'char');
+    fwrite(fid,['                                Generate the direct sound: ',num2str(timingdata(1)),' s',lineending],'char');
+    fwrite(fid,['                                Generate the specular reflections: ',num2str(timingdata(2)),' s',lineending],'char');
+    fwrite(fid,['                                Generate the first-order diffraction: ',num2str(timingdata(3)),' s',lineending],'char');
     fclose(fid);
 end
 

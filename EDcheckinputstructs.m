@@ -61,7 +61,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %              plotting the model. Changed one field from logfilename to
 %              savelogfile. Removed the field lineending.
 % 13 Dec. 2017 Added the input field sourceamplitudes
-% 12 Jan. 2018 Forced doaddsources to be 0, if the number of sources = 1.
+% 12 Jan. 2018 Forced doaddsources to be 1, if the number of sources = 1.
 %              Also followed one yellow recommendation: numel instead of
 %              prod.
 
@@ -129,7 +129,7 @@ if ~isfield(Sindata,'sourceamplitudes')
 end
 nsources = size(Sindata.coordinates,1);
 if nsources == 1
-    Sindata.doaddsources = 0;
+    Sindata.doaddsources = 1;
 end    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

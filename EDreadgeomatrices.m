@@ -34,11 +34,13 @@ function planedata = EDreadgeomatrices(corners,planecorners,planecornerstype)
 %
 % Uses the functions EDinfrontofplane
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 12 Jan. 2018
 %
 % planedata = EDreadgeomatrices(corners,planecorners,planecornerstype);
 
 % 29 Nov. 2017 First version
+% 12 Jan. 2018 Increased the bounding boxes a bit - doesn't hurt to make
+% them a bit bigger.
 
 if nargin < 3
     planecornerstype = 'circ';
@@ -47,7 +49,10 @@ if nargin < 3
     end
 end
    
-geomacc = 1e-10;
+% geomacc is only used to make the bounding boxes a bit bigger than the
+% corner coordinates. Was 1e-10 earlier.
+
+geomacc = 1e-4;
 
 %---------------------------------------------------------------
 % corners is given as an input matrix

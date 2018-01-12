@@ -65,7 +65,7 @@ function [planedata,extraCATTdata] = EDreadcad(CADfile,planecornerstype,checkgeo
 %
 % Uses the functions EDextrnums EDinfrontofplane
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 28 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 12 Jan. 2018
 %
 % [planedata,extraCATTdata] = EDreadcad(CADfile,planecornerstype,checkgeom);
 
@@ -81,6 +81,8 @@ function [planedata,extraCATTdata] = EDreadcad(CADfile,planecornerstype,checkgeo
 % 28 Nov. 2017 Did some code improving as suggested by Matlab
 % 3 Dec. 2017 Fixed a bug: if a plane definition had all zeros, then
 % an infinite loop happened, around line 460.
+% 12 Jan. 2018 Increased the bounding boxes a bit - doesn't hurt to make
+% them a bit bigger.
 
 if nargin == 0
 	CADfile = '';
@@ -93,7 +95,10 @@ elseif nargin == 2
 	checkgeom = '';
 end
 
-geomacc = 1e-10;
+% geomacc is only used to make the bounding boxes a bit bigger than the
+% corner coordinates. Was 1e-10 earlier.
+
+geomacc = 1e-4;
 
 %---------------------------------------------------------------
 % If no CAD-file was specified, present a file opening window

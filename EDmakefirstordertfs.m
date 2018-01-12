@@ -122,7 +122,7 @@ if firstorderpathdata.ncomponents(2) > 0
         if doaddsources == 1
             tfgeom(ii,1:maxrecnumber) = accumarray(firstorderpathdata.specrefllist(:,2),alltfs);
         else
-            tfgeom(ii,firstorderpathdata.validrecnumber,firstorderpathdata.validsounumber) = alltfs;
+            tfgeom(ii,firstorderpathdata.specrefllist(:,2),firstorderpathdata.specrefllist(:,1)) = alltfs;
         end
     end
 

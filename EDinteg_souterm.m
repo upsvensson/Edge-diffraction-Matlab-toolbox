@@ -74,8 +74,6 @@ if nargin < 14
     showtext = 0;
 end
 
-showtext = 3;
-
 discretizationtype = controlparameters.discretizationtype;
 
 %  symmetrycompression = 1;

@@ -45,7 +45,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .showtext             (default: 1)
 %   EDmaincase          1, if convexESIE
 % 
-% Peter Svensson 13 Dec. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 12 Jan. 2018 (peter.svensson@ntnu.no)
 % 
 % [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -61,6 +61,9 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %              plotting the model. Changed one field from logfilename to
 %              savelogfile. Removed the field lineending.
 % 13 Dec. 2017 Added the input field sourceamplitudes
+% 12 Jan. 2018 Forced doaddsources to be 0, if the number of sources = 1.
+%              Also followed one yellow recommendation: numel instead of
+%              prod.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -124,6 +127,10 @@ end
 if ~isfield(Sindata,'sourceamplitudes')
     Sindata.sourceamplitudes = 1;
 end
+nsources = size(Sindata.coordinates,1);
+if nsources == 1
+    Sindata.doaddsources = 0;
+end    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct Rindata
@@ -193,7 +200,7 @@ if EDmaincase == 1
     nfrequencies = length(controlparameters.frequencies);
     nsources = size(Sindata.coordinates,1);
     if nsources > 1 || nfrequencies > 1 
-        if prod(size(Sindata.sourceamplitudes,1)) == 1
+        if numel(Sindata.sourceamplitudes,1) == 1
             Sindata.sourceamplitudes = ones(nsources,nfrequencies);
         end
     end

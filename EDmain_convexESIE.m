@@ -105,7 +105,7 @@ if filehandlingparameters.savelogfile == 1
     	return
     end
     fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['#  EDmain_convexESIE, v. 10 Dec. 2017',lineending],'char');
+    fwrite(fid,['#  EDmain_convexESIE, v. 12 Jan. 2018',lineending],'char');
     fwrite(fid,['#  filestem for results: ',filehandlingparameters.filestem,lineending],'char');
     fwrite(fid,[' ',lineending],'char');
 end

@@ -44,7 +44,7 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (svensson@iet.ntnu.no) 28 Nov. 2017
+% Peter Svensson (svensson@iet.ntnu.no) 15 Jan. 2018
 %
 % [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc);
 
@@ -54,6 +54,8 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 %                zone boundaries, with Sara Martin
 % 28 Nov. 2017 Copied to the EDtoolbox. Introduced the non-global input
 % parameter cair.
+% 15 Jan. 2018 Turned off the automatic printing out of "Singularity for
+% term ..."
 
 localshowtext = 0;
 
@@ -220,7 +222,7 @@ singularterm = [0 0 0 0];
 
 singularterm = absnyfivec < 10*eps | abs(absnyfivec - 2*pi) < 10*eps;
 useterm = 1 - singularterm;
-if any(singularterm) %& localshowtext
+if any(singularterm) & localshowtext
      disp(['      Singularity for term ',int2str(find(singularterm))])   
 end
 

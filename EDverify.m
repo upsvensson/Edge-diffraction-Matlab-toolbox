@@ -12,6 +12,13 @@ showtext_verify = 0;
 ntests = 3;
 passtest = zeros(ntests,1);
 
+[EDversionnumber,changedate,changetime] = EDversion;
+
+clockvec = clock;
+datevec = date;
+datevec = datevec(datevec~='-');
+datetimevec = [datevec,'_',sprintf('%02d',clockvec(4)),'h', sprintf('%02d',clockvec(5)),'m',sprintf('%02d',round(clockvec(6)))];
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -21,7 +28,7 @@ passtest = zeros(ntests,1);
 
 if showtext_verify > 0
     disp(' ')
-    disp(['EDverify, EDtoolbox v. ',num2str(EDversion),', run on ',datetimevec])
+    disp(['EDverify, EDtoolbox v. ',num2str(EDversionnumber),' (last change on ',changedate,'), run on ',datetimevec])
     disp(' ')
     disp('*********************************************************************')
     disp('Test 1: EDmain_convexESIE, DC response at surface, plane wave incidence');
@@ -30,7 +37,7 @@ if showtext_verify > 0
     disp('1.3e-5 and 1.5e-5, respectively.')
 else
     disp(' ')
-    disp(['EDverify, EDtoolbox v. ',num2str(EDversion),', run on ',datetimevec])
+    disp(['EDverify, EDtoolbox v. ',num2str(EDversionnumber),' (last change on ',changedate,'), run on ',datetimevec])
     disp(' ')
     disp('*********************************************************************')
     disp('Test 1: EDmain_convexESIE, DC response at surface, plane wave incidence');    
@@ -108,21 +115,14 @@ else
     error('ERROR: Not implemented for this computer type yet')	
 end
 
-clockvec = clock;
-datevec = date;
-datevec = datevec(datevec~='-');
-datetimevec = [datevec,'_',sprintf('%02d',clockvec(4)),'h', sprintf('%02d',clockvec(5)),'m',sprintf('%02d',round(clockvec(6)))];
-
 logfilename = [infilepath,filesep,'results',filesep,'EDverify_v',num2str(EDversion),'_',datetimevec,'.txt'];
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 fid = fopen(logfilename,'w');
 if fid == -1
     disp('The logfile is not possible to open - check that it isn''t opened by any program!')
     return
 end
-fwrite(fid,['#  EDverify, EDtoolbox v. ',num2str(EDversion),', run on ',datetimevec,lineending],'char');
+fwrite(fid,['EDverify, EDtoolbox v. ',num2str(EDversionnumber),' (last change on ',changedate,'), run on ',datetimevec,lineending],'char');
 fwrite(fid,[' ',lineending],'char');
 fwrite(fid,['####################################################################',lineending],'char');
 fwrite(fid,['Test 1: EDmain_convexESIE, DC response at surface, plane wave incidence',lineending],'char');
@@ -202,8 +202,8 @@ end
 
 if showtext_verify > 0
     disp(' ')
-    disp(['Computed results at the direct sound ZB differ: ',num2str(relerrZBdirect)])
-    disp(['Computed results at the specular reflection ZB differ: ',num2str(relerrZBspec)])
+    disp(['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect)])
+    disp(['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec)])
     disp(' ')
     if passtest(2) == 1
         disp('So, verification test 2 was passed')
@@ -221,8 +221,8 @@ fwrite(fid,['Single edge; three receivers exactly at, and very near zone boundar
 fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
 fwrite(fid,['surrounding responses (< 1e-5)',lineending],'char');
 fwrite(fid,[' ',lineending],'char');
-fwrite(fid,['Computed results at the direct sound ZB differ:',num2str(relerrZBdirect),lineending],'char');
-fwrite(fid,['Computed results at the specular reflection ZB differ:',num2str(relerrZBspec),lineending],'char');
+fwrite(fid,['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
+fwrite(fid,['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec),lineending],'char');
 fwrite(fid,[' ',lineending],'char');
 if relerrZBdirect < 1e-5 & relerrZBspec < 1e-5
     fwrite(fid,['So, verification test 2 was passed',lineending],'char');
@@ -299,8 +299,8 @@ end
 
 if showtext_verify > 0
      disp(' ')
-    disp(['Computed results at the direct sound corner ZB differ: ',num2str(relerrZBdirect)])
-    disp(['Computed results at the specular reflection corner ZB differ: ',num2str(relerrZBspec)])
+    disp(['Computed results at the direct sound corner ZB differ by: ',num2str(relerrZBdirect)])
+    disp(['Computed results at the specular reflection corner ZB differ by: ',num2str(relerrZBspec)])
     disp(['   '])
     if passtest(3) == 1
         disp('So, verification test 3 was passed')
@@ -318,8 +318,8 @@ fwrite(fid,['Two edges meat at 90 deg.; three receivers exactly at, and very nea
 fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
 fwrite(fid,['surrounding responses (< 1e-3)',lineending],'char');
 fwrite(fid,[' ',lineending],'char');
-fwrite(fid,['Computed results at the direct sound corner ZB differ:',num2str(relerrZBdirect),lineending],'char');
-fwrite(fid,['Computed results at the specular reflection corner ZB differ:',num2str(relerrZBspec),lineending],'char');
+fwrite(fid,['Computed results at the direct sound corner ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
+fwrite(fid,['Computed results at the specular reflection corner ZB differ by: ',num2str(relerrZBspec),lineending],'char');
 fwrite(fid,[' ',lineending],'char');
 if relerrZBdirect < 1e-3 & relerrZBspec < 1e-3
     fwrite(fid,['So, verification test 3 was passed',lineending],'char');

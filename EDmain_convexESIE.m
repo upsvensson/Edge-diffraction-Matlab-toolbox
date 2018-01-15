@@ -37,7 +37,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 12 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 15 Jan. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -58,6 +58,10 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % file, and on-screen.
 % 12 Jan. 2018 Made substantial changes to the GA part; calling new
 % functions EDfindconvexGApaths and EDmakefirstordertfs
+% 15 Jan. 2018 Started numbering the versions. Saved all the setup structs
+% in the final result file.
+
+EDversion = 0.1;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check input data, assign default values if needed
@@ -94,7 +98,7 @@ end
 
 if filehandlingparameters.showtext >= 1
 	disp('    ');disp('####################################################################')
-              disp('#  EDmain_convexESIE, v. 12 Jan. 2018')
+              disp('#  EDmain_convexESIE, v. 0.1 (15 Jan. 2018)')
               disp(['#  filestem for results: ',filehandlingparameters.filestem])
               disp(' ')
 end
@@ -105,7 +109,7 @@ if filehandlingparameters.savelogfile == 1
     	return
     end
     fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['#  EDmain_convexESIE, v. 12 Jan. 2018',lineending],'char');
+    fwrite(fid,['#  EDmain_convexESIE, v. 0.1 (15 Jan. 2018)',lineending],'char');
     fwrite(fid,['#  filestem for results: ',filehandlingparameters.filestem,lineending],'char');
     fwrite(fid,[' ',lineending],'char');
 end
@@ -349,7 +353,7 @@ t01 = etime(clock,t00);
 timingstruct.maketfs = [t01 timingdata];
 
 desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
-eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct'])
+eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct EDversion geofiledata Sindata Rindata envdata controlparameters filehandlingparameters'])
 
 if filehandlingparameters.savelogfile == 1
     fwrite(fid,['   EDmakefirstordertfs (',int2str(nfrequencies),' frequencies)',lineending],'char');

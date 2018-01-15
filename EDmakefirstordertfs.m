@@ -23,7 +23,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpat
 %   
 % Uses functions EDcoordtrans2, EDwedge1st_fd
 % 
-% Peter Svensson 12 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 15 Jan. 2018 (peter.svensson@ntnu.no)
 %
 % [tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpathdata,...
 %     controlparameters,envdata,doaddsources,sources,receivers,edgedata)
@@ -31,6 +31,8 @@ function [tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpat
 % 12 Jan. 2018 First complete version. Much simplified version of the
 %                           previous ESIE2maketfs. Edgehits not handled
 %                           yet.
+% 15 Jan. 2018 Took the direct sound and spec refl amplitude 
+%              (1, 0.5, 0.25) into account)
 
 timingdata = zeros(1,3);
 
@@ -68,7 +70,7 @@ if firstorderpathdata.ncomponents(1) > 0
 
     if ncomponents > nfrequencies
         for ii = 1:nfrequencies   
-           alltfs = exp(-1i*kvec(ii)*alldists)./alldists;
+           alltfs = exp(-1i*kvec(ii)*alldists)./alldists.*firstorderpathdata.directsoundlist(:,3);
            if doaddsources == 1
                tfdirect(ii,1:maxrecnumber) = accumarray(firstorderpathdata.directsoundlist(:,2),alltfs);
            else
@@ -78,7 +80,7 @@ if firstorderpathdata.ncomponents(1) > 0
         end
     else
        for ii = 1:ncomponents 
-            alltfs = exp(-1i*kvec*alldists(ii))./alldists(ii);
+            alltfs = exp(-1i*kvec*alldists(ii))./alldists(ii).*firstorderpathdata.directsoundlist(ii,3);
            if doaddsources == 1
               tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) = ...
                   tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) + alltfs;
@@ -118,7 +120,7 @@ if firstorderpathdata.ncomponents(2) > 0
     maxrecnumber = max( firstorderpathdata.specrefllist(:,2) );
 
     for ii = 1:nfrequencies    
-        alltfs = exp(-1i*kvec(ii)*alldists)./alldists;
+        alltfs = exp(-1i*kvec(ii)*alldists)./alldists.*firstorderpathdata.specrefllist(:,3);
         if doaddsources == 1
             tfgeom(ii,1:maxrecnumber) = accumarray(firstorderpathdata.specrefllist(:,2),alltfs);
         else
@@ -169,13 +171,13 @@ for ii = 1:length(iv)
     
     cylcoordS(ivS,:) = [rs thetas zs];
     cylcoordR(ivR,:) = [rr thetar zr];
-    
-    
+        
     for jj = 1:length(iv2)
         [tfnew,singularterm] = EDwedge1st_fd(envdata.cair,controlparameters.frequencies,edgedata.closwedangvec(edgenumber),...
             cylcoordS(Snumber(jj),1),cylcoordS(Snumber(jj),2),cylcoordS(Snumber(jj),3),...
             cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
-            edgedata.edgelengthvec(edgenumber)*[0 1],'n',controlparameters.Rstart,[1 1]);                  
+            edgedata.edgelengthvec(edgenumber)*[0 1],'n',controlparameters.Rstart,[1 1]);  
+        
         if doaddsources == 1
             tfdiff(:,Rnumber(jj)) =  tfdiff(:,Rnumber(jj)) + tfnew;                       
         else

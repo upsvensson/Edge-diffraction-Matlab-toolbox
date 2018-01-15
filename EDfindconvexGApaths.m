@@ -44,7 +44,7 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 12 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 Jan. 2018
 %
 % firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,showtext)
@@ -53,6 +53,8 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 % 28 Dec. 2017 Functioning version for diff
 % 11 Jan. 2018 First complete version
 % 12 Jan. 2018 Small bug.fixes
+% 15 Jan. 2018 Added the direct sound amplitude: 1, 0.5 or 0.25 for edge
+% and corner hits. Also for the specular reflections.
 
 % planedata.corners = size(planedata.corners,1);
 nplanes = length(planedata.planeisthin);
@@ -88,7 +90,6 @@ edgeisactive = (edgeisactive>0);
 %
 % visplanesfromS has size [nplanes,nsources]
 % visplanesfromR has size [nplanes,nreceivers]
-
 
 min_number_elements = min([nsources nreceivers nplanes]);
 
@@ -126,13 +127,27 @@ if npotentialIS > 0
         planedata.planeeqs(possibleSPR(:,2),4),planedata.planeeqs(possibleSPR(:,2),1:3),...
         planedata.minvals(possibleSPR(:,2),:),planedata.maxvals(possibleSPR(:,2),:),...
         planedata.planecorners(possibleSPR(:,2),:),planedata.corners,planedata.ncornersperplanevec(possibleSPR(:,2)));
-
-    % We should check edgehits and cornerhits!
-
+    
+    specreflamp = ones(size(hitplanes));    
     validIScoords = coords_potentialIS(hitplanes,:);
     validsounumber = possibleSPR(hitplanes,1);
     validrecnumber = possibleSPR(hitplanes,3);
-    numberofcomponents(2) = length(hitplanes);
+    
+    if ~isempty(edgehits)
+        validIScoords  = [validIScoords;coords_potentialIS(edgehits,:)];
+        validsounumber = [validsounumber;possibleSPR(edgehits,1)];
+        validrecnumber = [validrecnumber;possibleSPR(edgehits,3)];
+        specreflamp = [specreflamp;0.5*ones(size(edgehits))];
+    end
+    if ~isempty(cornerhits)
+        validIScoords  = [validIScoords;coords_potentialIS(cornerhits,:)];
+        validsounumber = [validsounumber;possibleSPR(cornerhits,1)];
+        validrecnumber = [validrecnumber;possibleSPR(cornerhits,3)];
+        specreflamp = [specreflamp;0.25*ones(size(cornerhits))];        
+    end
+    
+    numberofcomponents(2) = length(specreflamp);
+        
 else
     validIScoords = [];
     validsounumber = [];
@@ -182,17 +197,24 @@ if npotentialobstruct > 0
         planedata.minvals(possibleSPR_obstruct(:,2),:),planedata.maxvals(possibleSPR_obstruct(:,2),:),...
         planedata.planecorners(possibleSPR_obstruct(:,2),:),planedata.corners,planedata.ncornersperplanevec(possibleSPR_obstruct(:,2)));
 
-    % We should check edgehits and cornerhits!
-
     obstructlist = possibleSPR_obstruct(hitplanes,:);
-
     directsoundOK(obstructlist(:,3),obstructlist(:,1))=0;
-
+    
+    if ~isempty(edgehits)
+        edgehitlist = possibleSPR_obstruct(edgehits,:);
+        directsoundOK(edgehitlist(:,3),edgehitlist(:,1))=0.5;
+    end
+    if ~isempty(cornerhits)
+        cornerhitlist = possibleSPR_obstruct(cornerhits,:);
+        directsoundOK(cornerhitlist(:,3),cornerhitlist(:,1))=0.75;
+    end
 end
 
 ivdirectsoundOK = find(directsoundOK);
 
 [Rnumber_directsoundOK,Snumber_directsoundOK] = ind2sub([nreceivers,nsources], ivdirectsoundOK);
+
+dirsoundamp = directsoundOK(ivdirectsoundOK);
 
 numberofcomponents(1) = length(ivdirectsoundOK);
 
@@ -201,10 +223,8 @@ numberofcomponents(1) = length(ivdirectsoundOK);
 
 firstorderpathdata = struct;
 firstorderpathdata.specreflIScoords = validIScoords;
-firstorderpathdata.specrefllist     = [validsounumber validrecnumber];
+firstorderpathdata.specrefllist     = [validsounumber validrecnumber specreflamp];
 firstorderpathdata.diffpaths        = diffpaths;
 firstorderpathdata.edgeisactive     = edgeisactive;
-firstorderpathdata.directsoundlist  = [Snumber_directsoundOK Rnumber_directsoundOK];
+firstorderpathdata.directsoundlist  = [Snumber_directsoundOK Rnumber_directsoundOK dirsoundamp];
 firstorderpathdata.ncomponents      = numberofcomponents;
-
-    

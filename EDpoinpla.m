@@ -45,7 +45,7 @@ function [hitvec,edgehit,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxval
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 27 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 15 Jan. 2018
 % 
 % [hitvec,edgehit] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs);
 
@@ -53,6 +53,7 @@ function [hitvec,edgehit,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxval
 % 111201 Fixed a bug: when the ray (from the hitpoint in the positive x-direction) passed exactly
 %		 through a vertex, then there was an error. For those rare cases an extra ray is shot in a random direction.
 % 27 Nov. 2017 Copied from ESIE2toolbox
+% 15 Jan. 2018 Added the detection of edge hits and corner hits
 
 if nargin < 9
     showtext = 0;
@@ -103,7 +104,8 @@ nposs = length(possibleones);
 
 if showtext >= 4
     disp(['         Of the ',int2str(npoints),' points,'])
-    disp(['         ',int2str(length(possibleones)),' survived the cube test:'])      
+    disp(['         ',int2str(length(possibleones)),' survived the cube test:'])   
+    disp(num2str(possibleones.'))
 end
 
 edgehit   = zeros(nposs,1,'uint32');
@@ -156,15 +158,15 @@ if nposs>0
         if showtext >= 4
             disp(['            ',int2str(length(xysubset)),' xy-projected points:'])
         end
-
         
-%         numberofedgestocheck = ncornersperplanevec(possibleones(xysubset));    
         numberofedgestocheck = ncornersperplanevec(planelist(possibleones(xysubset)));    
         edgenumbers = unique(numberofedgestocheck);
 
         yray = xpoints(possibleones(xysubset),2);
         xstart = xpoints(possibleones(xysubset),1);
         edgecrossings = zeros(size(xysubset));
+        closetoedge = zeros(size(xysubset));
+        closetocorner = zeros(size(xysubset));
 
         % Use a parametric representation for each edge:
         % x_edge = x_1 + t*(x_2 - x_1)
@@ -177,12 +179,14 @@ if nposs>0
             y1 = corners(planecorners(planelist(possibleones(xysubset)),ii),2);
             y2 = corners(planecorners(planelist(possibleones(xysubset)),ii+1),2);
             tedgecrossing = (yray - y1)./(y2-y1);
+            closetocorner = closetocorner + (abs(tedgecrossing)<geomacc | abs(tedgecrossing-1)<geomacc ).*(ii <= numberofedgestocheck);
 
             x1 = corners(planecorners(planelist(possibleones(xysubset)),ii),1);
             x2 = corners(planecorners(planelist(possibleones(xysubset)),ii+1),1);
 
             xedge = x1 + tedgecrossing.*(x2-x1);
 
+            closetoedge = closetoedge + (abs(xedge-xstart)<geomacc).*(ii <= numberofedgestocheck);            
             edgecrossings = edgecrossings + (tedgecrossing >= 0 & tedgecrossing <= 1 & xedge > xstart).*(ii <= numberofedgestocheck);
 %             edgecrossings = edgecrossings + (tedgecrossing >= 0 & ...
 %                             tedgecrossing <= 1 & xedge > xstart).*(ii <= numberofedgestocheck) ...
@@ -233,13 +237,13 @@ if nposs>0
             
         end
         
-        hitvec(possibleones(xysubset)) = (edgecrossings==1);
-
+        hitvec(possibleones(xysubset)) = (edgecrossings==1 & closetocorner~=1 & closetoedge~=1);
+        cornerhit(possibleones(xysubset)) = (closetocorner>0);
+        edgehit(possibleones(xysubset)) = (closetoedge==1 & closetocorner==0);
+        
         if showtext >= 4
             disp(['               ',int2str(sum((edgecrossings==1))),' survived the xyplane projections test:'])  
         end
-        
-        
         
     end
         
@@ -262,6 +266,8 @@ if nposs>0
         zray = xpoints(possibleones(xzsubset),3);
         xstart = xpoints(possibleones(xzsubset),1);
         edgecrossings = zeros(size(xzsubset));
+        closetoedge = zeros(size(xzsubset));
+        closetocorner = zeros(size(xzsubset));
 
         % Use a parametric representation for each edge:
         % x_edge = x_1 + t*(x_2 - x_1)
@@ -272,14 +278,17 @@ if nposs>0
        for ii = 1:max(edgenumbers)
             z1 = corners(planecorners(planelist(possibleones(xzsubset)),ii),3);
             z2 = corners(planecorners(planelist(possibleones(xzsubset)),ii+1),3);
-            tedgecrossing = (zray - z1)./(z2-z1);
-
+            tedgecrossing = (zray - z1)./(z2-z1);            
+            closetocorner = closetocorner + (abs(tedgecrossing)<geomacc | abs(tedgecrossing-1)<geomacc ).*(ii <= numberofedgestocheck);
+            
             x1 = corners(planecorners(planelist(possibleones(xzsubset)),ii),1);
             x2 = corners(planecorners(planelist(possibleones(xzsubset)),ii+1),1);
 
             xedge = x1 + tedgecrossing.*(x2-x1);
 
+            closetoedge = closetoedge + (abs(xedge-xstart)<geomacc).*(ii <= numberofedgestocheck);
             edgecrossings = edgecrossings + (tedgecrossing > 0 & tedgecrossing < 1 & xedge > xstart).*(ii <= numberofedgestocheck);
+                        
             closeones = find(abs(tedgecrossing)<geomacc | abs(tedgecrossing-1)<geomacc, 1 );
             if ~isempty(closeones)
                 closehits = 1;
@@ -322,7 +331,9 @@ if nposs>0
             
         end
         
-        hitvec(possibleones(xzsubset)) = (edgecrossings==1);
+        hitvec(possibleones(xzsubset)) = (edgecrossings==1& closetocorner~=1 & closetoedge~=1);
+        cornerhit(possibleones(xzsubset)) = (closetocorner>0);
+        edgehit(possibleones(xzsubset)) = (closetoedge==1 & closetocorner==0);
 
         if showtext >= 4
             disp(['               ',int2str(sum((edgecrossings==1))),' survived the xzplane projections test:'])  
@@ -349,6 +360,8 @@ if nposs>0
         zray = xpoints(possibleones(yzsubset),3);
         ystart = xpoints(possibleones(yzsubset),2);
         edgecrossings = zeros(size(yzsubset));
+        closetoedge = zeros(size(yzsubset));
+        closetocorner = zeros(size(yzsubset));
 
         % Use a parametric representation for each edge:
         % y_edge = y_1 + t*(y_2 - y_1)
@@ -360,12 +373,14 @@ if nposs>0
             z1 = corners(planecorners(planelist(possibleones(yzsubset)),ii),3);
             z2 = corners(planecorners(planelist(possibleones(yzsubset)),ii+1),3);
             tedgecrossing = (zray - z1)./(z2-z1);
+            closetocorner = closetocorner + (abs(tedgecrossing)<geomacc | abs(tedgecrossing-1)<geomacc ).*(ii <= numberofedgestocheck);
 
             y1 = corners(planecorners(planelist(possibleones(yzsubset)),ii),2);
             y2 = corners(planecorners(planelist(possibleones(yzsubset)),ii+1),2);
 
             yedge = y1 + tedgecrossing.*(y2-y1);
 
+            closetoedge = closetoedge + (abs(yedge-ystart)<geomacc).*(ii <= numberofedgestocheck);
             edgecrossings = edgecrossings + (tedgecrossing > 0 & tedgecrossing < 1 & yedge > ystart).*(ii <= numberofedgestocheck);
             closeones = find(abs(tedgecrossing)<geomacc | abs(tedgecrossing-1)<geomacc, 1 );
             if ~isempty(closeones)
@@ -410,13 +425,13 @@ if nposs>0
             
        end        
 
-        hitvec(possibleones(yzsubset)) = (edgecrossings==1);
+        hitvec(possibleones(yzsubset)) = (edgecrossings==1 & closetocorner~=1 & closetoedge~=1);
+        cornerhit(possibleones(yzsubset)) = (closetocorner>0);
+        edgehit(possibleones(yzsubset)) = (closetoedge==1 & closetocorner==0);
 
         if showtext >= 4
             disp(['               ',int2str(sum((edgecrossings==1))),' survived the yzplane projections test:'])      
         end
     end
     
-% % %     disp(['   Sum(hitvec) = ',int2str(sum(hitvec)),' out of ',int2str(length(hitvec))])
-        
 end

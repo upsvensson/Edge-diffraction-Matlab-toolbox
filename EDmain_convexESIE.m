@@ -114,6 +114,8 @@ if filehandlingparameters.savelogfile == 1
     fwrite(fid,[' ',lineending],'char');
 end
 
+nfrequencies = length(controlparameters.frequencies);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Read the input CAD-file, or input matrices, and create the planedata struct
 
@@ -227,83 +229,113 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Add edge-to-edge visibility data
 
-if filehandlingparameters.showtext >= 1	
-	disp('   Creating the edgetoedgedata struct ')
+if controlparameters.difforder > 1
+    if filehandlingparameters.showtext >= 1	
+        disp('   Creating the edgetoedgedata struct ')
+    end
+    t00 = clock;
+    edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,1,2,controlparameters.nedgepoints_visibility,filehandlingparameters.showtext);    
+    if filehandlingparameters.saveeddatafile == 1
+        desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_eddata.mat'];
+        eval(['save ',desiredname,' planedata edgedata edgetoedgedata'])
+    end
+    t01 = etime(clock,t00);
+    timingstruct.edgetoedgedata = t01;
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   EDed2geo, time: ',num2str(t01),' s',lineending],'char');
+    end
+else
+    if filehandlingparameters.showtext >= 1	
+        disp(['   Skipping the edgetoedgedata struct, since difforder = ',int2str(controlparameters.difforder)])
+    end
+    timingstruct.edgetoedgedata = 0;
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   EDed2geo was not run',lineending],'char');
+    end    
 end
-t00 = clock;
-edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,1,2,controlparameters.nedgepoints_visibility,filehandlingparameters.showtext);    
-if filehandlingparameters.saveeddatafile == 1
-    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_eddata.mat'];
-    eval(['save ',desiredname,' planedata edgedata edgetoedgedata'])
-end
-t01 = etime(clock,t00);
-timingstruct.edgetoedgedata = t01;
-if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDed2geo, time: ',num2str(t01),' s',lineending],'char');
-end
- 
+    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Prepare for the integral equation: set up the submatrix structure
 
-if filehandlingparameters.showtext >= 1	
-	disp('   Creating the integral equation Hsubmatrixdata struct ')
-end
-t00 = clock;
-Hsubmatrixdata = EDinteg_submatrixstructure(edgedata.edgelengthvec,edgedata.closwedangvec,...
-    controlparameters.ngauss,controlparameters.discretizationtype,edgetoedgedata,edgedata.planesatedge,filehandlingparameters.showtext);
-if filehandlingparameters.savesubmatrixdata == 1
-    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
-    eval(['save ',desiredname,' Hsubmatrixdata'])
-end
-nsousigs = Hsubmatrixdata.bigmatrixendnums(end);
-nsubmatrices = size(Hsubmatrixdata.edgetripletlist,1);
-edgeelemsizes = edgedata.edgelengthvec./Hsubmatrixdata.nedgeelems;
-meanelemsize = mean(edgeelemsizes);
-maxfreq = envdata.cair/(2.8*meanelemsize);
-minedgeelemnumber = min(Hsubmatrixdata.nedgeelems);
-maxedgeelemnumber = max(Hsubmatrixdata.nedgeelems);
-nonzeroelements = sum(prod(Hsubmatrixdata.nedgeelems(Hsubmatrixdata.edgetripletlist),2));
-t01 = etime(clock,t00);
-timingstruct.submatrixdata = t01;
-if filehandlingparameters.showtext >= 1    
-     disp(['      ',int2str(nsubmatrices),' submatrices; ',int2str(Hsubmatrixdata.nuniquesubmatrices),' unique will be computed due to symmetry']) 
-     disp(['      Discretizing the edges with ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discret. points, giving an avg. "edge element" length of ',num2str(meanelemsize),' m'])
-     disp(['      This discretization has an upper frequency limit of ',num2str(round(maxfreq)),' Hz (2.8 discret. points per wavelength)'])
-     disp(['      ',int2str(nsousigs),' edge source signals to compute'])
-     disp(['      The IE matrix has ',int2str(nonzeroelements),' non-zero elements, but many may be identical due to symmetries'])
-end
-if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDinteg_submatrixstructure, (',int2str(Hsubmatrixdata.nuniquesubmatrices),' submatrices, out of ',int2str(nsubmatrices),', to compute), time: ',num2str(t01),' s',lineending],'char');
-    fwrite(fid,['                               (Edges discretized with: ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discretization points)',lineending],'char');
-    fwrite(fid,['                               (Avg. "edge element" size: ',num2str(meanelemsize),' m. OK up to ',num2str(round(maxfreq)),' Hz (2.8 discret. points per wavelength))',lineending],'char');
-    fwrite(fid,['                               (',int2str(nsousigs),' edge source signals to compute)',lineending],'char');
-    fwrite(fid,['                               (',int2str(nonzeroelements),' non-zero elements in the IE matrix)',lineending],'char');
+if controlparameters.difforder > 1
+    if filehandlingparameters.showtext >= 1	
+        disp('   Creating the integral equation Hsubmatrixdata struct ')
+    end
+    t00 = clock;
+    Hsubmatrixdata = EDinteg_submatrixstructure(edgedata.edgelengthvec,edgedata.closwedangvec,...
+        controlparameters.ngauss,controlparameters.discretizationtype,edgetoedgedata,edgedata.planesatedge,filehandlingparameters.showtext);
+    if filehandlingparameters.savesubmatrixdata == 1
+        desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
+        eval(['save ',desiredname,' Hsubmatrixdata'])
+    end
+    
+    nsousigs = Hsubmatrixdata.bigmatrixendnums(end);
+    nsubmatrices = size(Hsubmatrixdata.edgetripletlist,1);
+    edgeelemsizes = edgedata.edgelengthvec./Hsubmatrixdata.nedgeelems;
+    meanelemsize = mean(edgeelemsizes);
+    maxfreq = envdata.cair/(2.8*meanelemsize);
+    minedgeelemnumber = min(Hsubmatrixdata.nedgeelems);
+    maxedgeelemnumber = max(Hsubmatrixdata.nedgeelems);
+    nonzeroelements = sum(prod(Hsubmatrixdata.nedgeelems(Hsubmatrixdata.edgetripletlist),2));
+    t01 = etime(clock,t00);
+    timingstruct.submatrixdata = t01;
+    if filehandlingparameters.showtext >= 1    
+         disp(['      ',int2str(nsubmatrices),' submatrices; ',int2str(Hsubmatrixdata.nuniquesubmatrices),' unique will be computed due to symmetry']) 
+         disp(['      Discretizing the edges with ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discret. points, giving an avg. "edge element" length of ',num2str(meanelemsize),' m'])
+         disp(['      This discretization has an upper frequency limit of ',num2str(round(maxfreq)),' Hz (2.8 discret. points per wavelength)'])
+         disp(['      ',int2str(nsousigs),' edge source signals to compute'])
+         disp(['      The IE matrix has ',int2str(nonzeroelements),' non-zero elements, but many may be identical due to symmetries'])
+    end
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   EDinteg_submatrixstructure, (',int2str(Hsubmatrixdata.nuniquesubmatrices),' submatrices, out of ',int2str(nsubmatrices),', to compute), time: ',num2str(t01),' s',lineending],'char');
+        fwrite(fid,['                               (Edges discretized with: ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discretization points)',lineending],'char');
+        fwrite(fid,['                               (Avg. "edge element" size: ',num2str(meanelemsize),' m. OK up to ',num2str(round(maxfreq)),' Hz (2.8 discret. points per wavelength))',lineending],'char');
+        fwrite(fid,['                               (',int2str(nsousigs),' edge source signals to compute)',lineending],'char');
+        fwrite(fid,['                               (',int2str(nonzeroelements),' non-zero elements in the IE matrix)',lineending],'char');
+    end
+else
+    if filehandlingparameters.showtext >= 1	
+        disp(['   Skipping the integral equation Hsubmatrixdata struct, since difforder = ',int2str(controlparameters.difforder)])
+        timingstruct.submatrixdata = 0;
+    end    
+    if filehandlingparameters.savelogfile >= 1	        
+        fwrite(fid,['   The integral equation Hsubmatrixdata struct was not created',lineending],'char');
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate the HOD contribution with the integral equation
 
-if filehandlingparameters.showtext >= 1	
-	disp('   Calculating the HOD contribution with the FD integral equation')
-    disp(['      ',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',int2str(controlparameters.difforder)])
-end
+if controlparameters.difforder > 1
+    if filehandlingparameters.showtext >= 1	
+        disp('   Calculating the HOD contribution with the FD integral equation')
+        disp(['      ',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',int2str(controlparameters.difforder)])
+    end
 
-t00 = clock;
-[tfinteqdiff,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
-    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,Sindata.doaddsources,Sindata.sourceamplitudes,...
-        Rdata,controlparameters);
-desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
-eval(['save ',desiredname,' tfinteqdiff extraoutputdata'])
-t01 = etime(clock,t00);
-timingstruct.integralequation = [t01 timingdata];
-if filehandlingparameters.savelogfile == 1
-    nfrequencies = length(controlparameters.frequencies);
-    fwrite(fid,['   EDintegralequation_convex_tf (',int2str(nfrequencies),' frequencies. Diffraction order: ',int2str(controlparameters.difforder),')',lineending],'char');
-    fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for one freq, as below)',lineending],'char');
-    fwrite(fid,['                                Compute the H-matrix: ',num2str(timingdata(1)),' s',lineending],'char');
-    fwrite(fid,['                                Compute Q_firstterm: ',num2str(timingdata(2)),' s',lineending],'char');
-    fwrite(fid,['                                Compute Qfinal: ',num2str(timingdata(3)),' s',lineending],'char');
-    fwrite(fid,['                                Compute the result at the receiver(s): ',num2str(timingdata(4)),' s',lineending],'char');
+    t00 = clock;
+    [tfinteqdiff,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
+        envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,Sindata.doaddsources,Sindata.sourceamplitudes,...
+            Rdata,controlparameters);
+    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
+    eval(['save ',desiredname,' tfinteqdiff extraoutputdata'])
+    t01 = etime(clock,t00);
+    timingstruct.integralequation = [t01 timingdata];
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   EDintegralequation_convex_tf (',int2str(nfrequencies),' frequencies. Diffraction order: ',int2str(controlparameters.difforder),')',lineending],'char');
+        fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for one freq, as below)',lineending],'char');
+        fwrite(fid,['                                Compute the H-matrix: ',num2str(timingdata(1)),' s',lineending],'char');
+        fwrite(fid,['                                Compute Q_firstterm: ',num2str(timingdata(2)),' s',lineending],'char');
+        fwrite(fid,['                                Compute Qfinal: ',num2str(timingdata(3)),' s',lineending],'char');
+        fwrite(fid,['                                Compute the result at the receiver(s): ',num2str(timingdata(4)),' s',lineending],'char');
+    end
+else
+    if filehandlingparameters.showtext >= 1	
+        disp(['   Skipping the FD integral equation, since difforder = ',int2str(controlparameters.difforder)])
+    end
+    timingstruct.integralequation = [0 0 0 0 0];
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   The integral equation stage was not run',lineending],'char');
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

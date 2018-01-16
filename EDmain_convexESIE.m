@@ -60,8 +60,10 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % functions EDfindconvexGApaths and EDmakefirstordertfs
 % 15 Jan. 2018 Started numbering the versions. Saved all the setup structs
 % in the final result file.
+% 15 Jan. 2018 Changed the parametername from EDversion to EDversionnumber
+% because EDversion is a function.
 
-EDversion = 0.1;
+[EDversionnumber,lastsavedate,lastsavetime] = EDversion;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check input data, assign default values if needed
@@ -385,7 +387,7 @@ t01 = etime(clock,t00);
 timingstruct.maketfs = [t01 timingdata];
 
 desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
-eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct EDversion geofiledata Sindata Rindata envdata controlparameters filehandlingparameters'])
+eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct EDversionnumber geofiledata Sindata Rindata envdata controlparameters filehandlingparameters'])
 
 if filehandlingparameters.savelogfile == 1
     fwrite(fid,['   EDmakefirstordertfs (',int2str(nfrequencies),' frequencies)',lineending],'char');

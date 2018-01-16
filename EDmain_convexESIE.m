@@ -62,8 +62,9 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % in the final result file.
 % 15 Jan. 2018 Changed the parametername from EDversion to EDversionnumber
 % because EDversion is a function.
+% 16 Jan. 2018 Adapted to the name-change for the function EDgetversion
 
-[EDversionnumber,lastsavedate,lastsavetime] = EDversion;
+[EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check input data, assign default values if needed

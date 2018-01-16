@@ -3,11 +3,13 @@
 % Script for verifying the EDtoolbox.
 % It contains a number of tests which test various aspects of the code
 % 
-% Peter Svensson 15 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 16 Jan. 2018 (peter.svensson@ntnu.no)
 
 % 15 Jan. 2018 First version
 % 15 Jan. 2018 Cleaned up the EDversion/EDversionnumber confusion. Added a
 % test 4, with fine-grain ZB check.
+% 16 Jan. 2018 Changed the function call to EDgetversion instead of
+% EDversion.
 
 showtext_verify = 1;
 
@@ -16,7 +18,8 @@ passtest = zeros(ntests,1);
 runtest = zeros(ntests,1);
 runtest(4) = 1;
 
-[EDversionnumber,changedate,changetime] = EDversion;
+[EDversionnumber,changedate,changetime] = EDgetversion;
+NN = num2str(EDversionnumber);
 
 clockvec = clock;
 datevec = date;
@@ -40,14 +43,14 @@ end
 
 mfile = mfilename('fullpath');
 [infilepath,filestem] = fileparts(mfile);
-logfilename = [infilepath,filesep,'results',filesep,'EDverify_v',num2str(EDversionnumber),'_',datetimevec,'.txt'];
+logfilename = [infilepath,filesep,'results',filesep,'EDverify_v',NN,'_',datetimevec,'.txt'];
 
 fid = fopen(logfilename,'w');
 if fid == -1
     disp('The logfile is not possible to open - check that it isn''t opened by any program!')
     return
 end
-fwrite(fid,['EDverify, EDtoolbox v. ',num2str(EDversionnumber),' (last change on ',changedate,'), run on ',datetimevec,lineending],'char');
+fwrite(fid,['EDverify, EDtoolbox v. ',NN,' (last change on ',changedate,'), run on ',datetimevec,lineending],'char');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -63,7 +66,7 @@ if runtest(1) == 1
 
     if showtext_verify > 0
         disp(' ')
-        disp(['EDverify, EDtoolbox v. ',num2str(EDversionnumber),' (last change on ',changedate,'), run on ',datetimevec])
+        disp(['EDverify, EDtoolbox v. ',NN,' (last change on ',changedate,'), run on ',datetimevec])
         disp(' ')
         disp('*********************************************************************')
         disp(['Test ',II,': EDmain_convexESIE, DC response at surface, plane wave incidence']);
@@ -72,7 +75,7 @@ if runtest(1) == 1
         disp('1.3e-5 and 1.5e-5, respectively.')
     else
         disp(' ')
-        disp(['EDverify, EDtoolbox v. ',num2str(EDversionnumber),' (last change on ',changedate,'), run on ',datetimevec])
+        disp(['EDverify, EDtoolbox v. ',NN,' (last change on ',changedate,'), run on ',datetimevec])
         disp(' ')
         disp('*********************************************************************')
         disp(['Test ',II,': EDmain_convexESIE, DC response at surface, plane wave incidence']);    

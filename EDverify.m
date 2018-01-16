@@ -190,7 +190,7 @@ if runtest(2) == 1
     planecorners = [4 3 2 1 ;1 2 3 4];
 
     geofiledata = struct('corners',corners,'planecorners',planecorners);
-    % geofiledata.firstcornertoskip = 3;
+%     geofiledata.firstcornertoskip = 3;
     Sindata = struct('coordinates',[-1 1 0]/sqrt(2));
     phivecd = [45.1 45.0 44.9 315.1 315.0 314.9].';
     receivers = [cosd(phivecd) sind(phivecd) 0*phivecd];
@@ -212,13 +212,18 @@ if runtest(2) == 1
 
     tftot = tfdirect + tfgeom + tfdiff;
 
-    tfZBdirect = tfdirect(4:6) + tfdiff(4:6);
-    tfZBdirectmean = (tfZBdirect(1) + tfZBdirect(3))/2;
-    relerrZBdirect = abs( (tfZBdirectmean-tfZBdirect(2))/tfZBdirectmean );
+    iv = 4:6;
+    ivmid = ceil(length(iv)/2);    
+    tfZBdirect = tfdirect(iv) + tfdiff(iv);
+    tfZBdirectmean = (   abs(tfZBdirect(ivmid-1))   +   abs(tfZBdirect(ivmid+1))     )/2;
+    relerrZBdirect = abs( (abs(tfZBdirectmean)-abs(tfZBdirect(ivmid)))/abs(tfZBdirectmean) );
 
-    tfZBspec = tfgeom(1:3) + tfdiff(1:3);
-    tfZBspecmean = (tfZBspec(1) + tfZBspec(3))/2;
-    relerrZBspec = abs( (tfZBspecmean-tfZBspec(2))/tfZBspecmean );
+    
+    iv = 1:3;
+    ivmid = ceil(length(iv)/2);    
+    tfZBspec = tfgeom(iv) + tfdiff(iv);
+    tfZBspecmean = (  abs(tfZBspec(ivmid-1))   +   abs(tfZBspec(ivmid+1))    )/2;
+    relerrZBspec = abs( ( abs(tfZBspecmean)-abs(tfZBspec(ivmid)))/abs(tfZBspecmean) );
 
     if relerrZBdirect < 1e-5 & relerrZBspec < 1e-5
        passtest(2) = 1; 
@@ -321,14 +326,14 @@ if runtest(3) == 1
     iv = 6:10;
     ivmid = ceil(length(iv)/2);
     tfZBdirect = tfdirect(iv) + tfdiff(iv) + tfinteqdiff(iv);
-    tfZBdirectmean = (tfZBdirect(ivmid-1) + tfZBdirect(ivmid+1))/2;
-    relerrZBdirect = abs( (tfZBdirectmean-tfZBdirect(ivmid))/tfZBdirectmean );
+    tfZBdirectmean = (   abs(tfZBdirect(ivmid-1))   +   abs(tfZBdirect(ivmid+1))     )/2;
+    relerrZBdirect = abs( (   abs(tfZBdirectmean)-abs(tfZBdirect(ivmid))   )/abs(tfZBdirectmean) );
 
     iv = 1:5;
     ivmid = ceil(length(iv)/2);   
     tfZBspec = tfgeom(iv) + tfdiff(iv) + tfinteqdiff(iv);
-    tfZBspecmean = (tfZBspec(ivmid-1) + tfZBspec(ivmid+1))/2;
-    relerrZBspec = abs( (tfZBspecmean-tfZBspec(ivmid))/tfZBspecmean );
+    tfZBspecmean = (  abs(tfZBspec(ivmid-1))   +   abs(tfZBspec(ivmid+1))    )/2;
+    relerrZBspec = abs( ( abs(tfZBspecmean)-abs(tfZBspec(ivmid)))/abs(tfZBspecmean) );
 
     if relerrZBdirect < 1e-3 & relerrZBspec < 1e-3
        passtest(3) = 1; 
@@ -420,15 +425,15 @@ if runtest(4) == 1
 
     iv = 8:14;
     ivmid = ceil(length(iv)/2);
-    tfZBdirect = tfdirect(iv) + tfdiff(iv);
-    tfZBdirectmean = (tfZBdirect(ivmid-1) + tfZBdirect(ivmid+1))/2;
-    relerrZBdirect = abs( (tfZBdirectmean-tfZBdirect(ivmid))/tfZBdirectmean );
+    tfZBdirect = tfdirect(iv) + tfdiff(iv) ;
+    tfZBdirectmean = (   abs(tfZBdirect(ivmid-1))   +   abs(tfZBdirect(ivmid+1))     )/2;
+    relerrZBdirect = abs( (   abs(tfZBdirectmean)-abs(tfZBdirect(ivmid))   )/abs(tfZBdirectmean) );
 
     iv = 1:7;
     ivmid = ceil(length(iv)/2);   
-    tfZBspec = tfgeom(iv) + tfdiff(iv);
-    tfZBspecmean = (tfZBspec(ivmid-1) + tfZBspec(ivmid+1))/2;
-    relerrZBspec = abs( (tfZBspecmean-tfZBspec(ivmid))/tfZBspecmean );
+    tfZBspec = tfgeom(iv) + tfdiff(iv) ;
+    tfZBspecmean = (  abs(tfZBspec(ivmid-1))   +   abs(tfZBspec(ivmid+1))    )/2;
+    relerrZBspec = abs( ( abs(tfZBspecmean)-abs(tfZBspec(ivmid)))/abs(tfZBspecmean) );
 
     if relerrZBdirect < 1e-5 & relerrZBspec < 1e-5
        passtest(4) = 1; 

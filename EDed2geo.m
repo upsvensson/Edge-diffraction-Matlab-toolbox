@@ -73,7 +73,7 @@ function edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,specorder,diff
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 15 Jan. 2018
 %
 % [edgetoedgedata,outputfile] = EDed2geo(edgedata,planedata,Sdata,Rdata,...
 % specorder,difforder,nedgesubs,ndiff2batches,showtext);
@@ -98,6 +98,8 @@ function edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,specorder,diff
 % 28 Nov. 2017 Introduced the non-global showtext parameter. Cleaned the
 % code a bit. Removed the parameter planeseesplane to the EDcheckobstr_edgetoedge
 % 29 Nov. 2017 Changed call from ESIE2getedgepoints to ED
+% 15 Jan. 2018 Little modification; edge-to-edge obstruction test was
+% active before, for a single plate.
 
 if nargin < 9
     showtext = 0;
@@ -768,7 +770,7 @@ if showtext >= 3
     disp('NB!!! The value of nedgesubs is temporarily set to 1 for the edge-to-edge vis. test')
 end
 
-obstructtestneeded = (sum(planedata.canplaneobstruct)~=0 && strcmp(planedata.modeltype,'convex_ext')==0);
+obstructtestneeded = (sum(planedata.canplaneobstruct)~=0 && strcmp(planedata.modeltype,'convex_ext')==0 & strcmp(planedata.modeltype,'singleplate')==0);
 
 maxedgetoedgevisvalue = 2^(2*nedgesubs)-1;
 

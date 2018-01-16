@@ -16,7 +16,10 @@ function passtest = EDverify(runtest,showtext,plotdiagrams)
 %   all the tests.
 %
 % Tests:
-% 1. 
+% 1. Response at cuboid surface, plane wave incidence, 0 Hz, no singularity
+% problem.
+% 2. Field continuity across zone boundaries, single edge, 100 Hz.
+% Perpendicular edge hit.
 % 
 % Peter Svensson 16 Jan. 2018 (peter.svensson@ntnu.no)
 % 
@@ -151,6 +154,8 @@ if runtest(1) == 1
     relerr = abs(tftot-1);
     if relerr(1) < 0.14e-4 && relerr(2) < 0.16e-4
         passtest(itest) = 1;
+    else
+        passtest(itest) = -1;        
     end
 
     if showtext > 0
@@ -188,6 +193,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %  Test 2: EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz
+%          Perpendicular edge hit
 %
 
 if runtest(2) == 1
@@ -198,13 +204,13 @@ if runtest(2) == 1
         disp(' ')
         disp('*********************************************************************')
         disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz']);
-        disp('Single edge; three receivers exactly at, and very near zone boundaries')
+        disp('Single edge; receivers distributed at, and very near, zone boundaries')
+        disp('Perpendicular edge hit.')
         disp('Computed value at ZB should be very close to the mean value of the two')
         disp('surrounding responses (< 1e-5)')
     else
         disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz']);        
     end
-
     mfile = mfilename('fullpath');
     [infilepath,filestem] = fileparts(mfile);
 
@@ -216,9 +222,9 @@ if runtest(2) == 1
     planecorners = [4 3 2 1 ;1 2 3 4];
 
     geofiledata = struct('corners',corners,'planecorners',planecorners);
-%     geofiledata.firstcornertoskip = 3;
+    % geofiledata.firstcornertoskip = 3;
     Sindata = struct('coordinates',[-1 1 0]/sqrt(2));
-    phivecd = [45.1 45.0 44.9 315.1 315.0 314.9].';
+    phivecd = [45.05 45.01 45.001 45.0 44.999 44.99 44.95 315.05 315.01 315.001 315.0 314.999 314.99 314.95].';
     receivers = [cosd(phivecd) sind(phivecd) 0*phivecd];
     Rindata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
@@ -238,21 +244,22 @@ if runtest(2) == 1
 
     tftot = tfdirect + tfgeom + tfdiff;
 
-    iv1 = 4:6;
-    ivmid1 = ceil(length(iv1)/2);    
-    tfZBdirect = tfdirect(iv1) + tfdiff(iv1);
+    iv1 = 8:14;
+    ivmid1 = ceil(length(iv1)/2);
+    tfZBdirect = tfdirect(iv1) + tfdiff(iv1) ;
     tfZBdirectmean = (   abs(tfZBdirect(ivmid1-1))   +   abs(tfZBdirect(ivmid1+1))     )/2;
-    relerrZBdirect = abs( (abs(tfZBdirectmean)-abs(tfZBdirect(ivmid1)))/abs(tfZBdirectmean) );
+    relerrZBdirect = abs( (   abs(tfZBdirectmean)-abs(tfZBdirect(ivmid1))   )/abs(tfZBdirectmean) );
 
-    
-    iv2 = 1:3;
-    ivmid2 = ceil(length(iv2)/2);    
-    tfZBspec = tfgeom(iv2) + tfdiff(iv2);
+    iv2 = 1:7;
+    ivmid2 = ceil(length(iv2)/2);   
+    tfZBspec = tfgeom(iv2) + tfdiff(iv2) ;
     tfZBspecmean = (  abs(tfZBspec(ivmid2-1))   +   abs(tfZBspec(ivmid2+1))    )/2;
     relerrZBspec = abs( ( abs(tfZBspecmean)-abs(tfZBspec(ivmid2)))/abs(tfZBspecmean) );
 
     if relerrZBdirect < 1e-5 & relerrZBspec < 1e-5
        passtest(itest) = 1; 
+    else
+        passtest(itest) = -1;        
     end
 
     if showtext > 0
@@ -266,34 +273,35 @@ if runtest(2) == 1
             disp(['So, verification test ',II,' was not passed. Please check the code'])   
         end
     end
-    
+
     if plotdiagrams == 1
        figure
         plot(phivecd(iv1),abs(tfZBdirect),'-o',phivecd(iv1(ivmid1)),abs(tfZBdirect(ivmid1)),'*')
        xlabel('Receiver angle   [deg.]');
        ylabel('TF magnitude   [-]');
-       title(['Test ',II,' Direct sound amplitude across zone boundary']);
+       title(['Test ',II,' Direct sound amplitude across zone boundary, perpendicular edge hit']);
        figure
        plot(phivecd(iv2),abs(tfZBspec),'-o',phivecd(iv2(ivmid2)),abs(tfZBspec(ivmid2)),'*')
        xlabel('Receiver angle   [deg.]');
        ylabel('TF magnitude   [-]');
-       title(['Test ',II,' Specular reflection amplitude across zone boundary']);
+       title(['Test ',II,' Specular reflection amplitude across zone boundary, perpendicular edge hit']);
        
     end
-
+    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     fwrite(fid,[' ',lineending],'char');
     fwrite(fid,['####################################################################',lineending],'char');
     fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz',lineending],'char');
-    fwrite(fid,['Single edge; three receivers exactly at, and very near zone boundaries',lineending],'char');
+    fwrite(fid,['Single edge; receivers distributed at, and very near, zone boundaries',lineending],'char');
+    fwrite(fid,['Perpendicular edge hit.',lineending],'char');
     fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
     fwrite(fid,['surrounding responses (< 1e-5)',lineending],'char');
     fwrite(fid,[' ',lineending],'char');
     fwrite(fid,['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
     fwrite(fid,['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec),lineending],'char');
     fwrite(fid,[' ',lineending],'char');
-    if relerrZBdirect < 1e-5 & relerrZBspec < 1e-5
+    if passtest(4) == 1
         fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
     else
         fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
@@ -303,11 +311,130 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Test 3: EDmain_convexESIE, diff1 continuity across corner zone boundary, at 100 Hz
-%
+%  Test 3: EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz
+%          Skewed edge hit
 
 if runtest(3) == 1
     itest = 3;
+    II = int2str(itest);
+    
+    if showtext > 0
+        disp(' ')
+        disp('*********************************************************************')
+        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz']);
+        disp('Single edge; receivers distributed at, and very near, zone boundaries')
+        disp('Skewed edge hit.')
+        disp('Computed value at ZB should be very close to the mean value of the two')
+        disp('surrounding responses (< 1e-5)')
+    else
+        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz']);        
+    end
+    mfile = mfilename('fullpath');
+    [infilepath,filestem] = fileparts(mfile);
+
+    corners = [     0   0   1
+        0 0 -1
+        -1 0 -1
+        -1 0 1];
+
+    planecorners = [4 3 2 1 ;1 2 3 4];
+
+    geofiledata = struct('corners',corners,'planecorners',planecorners);
+    % geofiledata.firstcornertoskip = 3;
+    Sindata = struct('coordinates',[-1 1 0]/sqrt(2));
+    phivecd = [45.05 45.01 45.001 45.0 44.999 44.99 44.95 315.05 315.01 315.001 315.0 314.999 314.99 314.95].';
+    receivers = [cosd(phivecd) sind(phivecd) 1*ones(size(phivecd))];
+    Rindata = struct('coordinates',receivers);
+    controlparameters = struct('frequencies',100);
+    controlparameters.difforder = 1;
+    filehandlingparameters = struct('outputdirectory',infilepath);
+    filehandlingparameters.filestem = filestem;
+    filehandlingparameters.savelogfile = 1;
+    filehandlingparameters.savelogfile = 1;
+    filehandlingparameters.showtext = 0;
+    controlparameters.Rstart = 0;
+
+    envdata.cair = 344;
+
+    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+
+    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
+
+    tftot = tfdirect + tfgeom + tfdiff;
+
+    iv1 = 8:14;
+    ivmid1 = ceil(length(iv1)/2);
+    tfZBdirect = tfdirect(iv1) + tfdiff(iv1) ;
+    tfZBdirectmean = (   abs(tfZBdirect(ivmid1-1))   +   abs(tfZBdirect(ivmid1+1))     )/2;
+    relerrZBdirect = abs( (   abs(tfZBdirectmean)-abs(tfZBdirect(ivmid1))   )/abs(tfZBdirectmean) );
+
+    iv2 = 1:7;
+    ivmid2 = ceil(length(iv2)/2);   
+    tfZBspec = tfgeom(iv2) + tfdiff(iv2) ;
+    tfZBspecmean = (  abs(tfZBspec(ivmid2-1))   +   abs(tfZBspec(ivmid2+1))    )/2;
+    relerrZBspec = abs( ( abs(tfZBspecmean)-abs(tfZBspec(ivmid2)))/abs(tfZBspecmean) );
+
+    if relerrZBdirect < 1e-5 & relerrZBspec < 1e-5
+       passtest(itest) = 1; 
+    else
+        passtest(itest) = -1;        
+    end
+
+    if showtext > 0
+        disp(' ')
+        disp(['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect)])
+        disp(['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec)])
+        disp(' ')
+        if passtest(itest) == 1
+            disp(['So, verification test ',II,' was passed'])
+        else
+            disp(['So, verification test ',II,' was not passed. Please check the code'])   
+        end
+    end
+
+    if plotdiagrams == 1
+       figure
+        plot(phivecd(iv1),abs(tfZBdirect),'-o',phivecd(iv1(ivmid1)),abs(tfZBdirect(ivmid1)),'*')
+       xlabel('Receiver angle   [deg.]');
+       ylabel('TF magnitude   [-]');
+       title(['Test ',II,' Direct sound amplitude across zone boundary, skewed edge hit']);
+       figure
+       plot(phivecd(iv2),abs(tfZBspec),'-o',phivecd(iv2(ivmid2)),abs(tfZBspec(ivmid2)),'*')
+       xlabel('Receiver angle   [deg.]');
+       ylabel('TF magnitude   [-]');
+       title(['Test ',II,' Specular reflection amplitude across zone boundary, skewed edge hit']);
+       
+    end
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    fwrite(fid,[' ',lineending],'char');
+    fwrite(fid,['####################################################################',lineending],'char');
+    fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz',lineending],'char');
+    fwrite(fid,['Single edge; receivers distributed at, and very near, zone boundaries',lineending],'char');
+    fwrite(fid,['Skewed edge hit.',lineending],'char');
+    fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
+    fwrite(fid,['surrounding responses (< 1e-5)',lineending],'char');
+    fwrite(fid,[' ',lineending],'char');
+    fwrite(fid,['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
+    fwrite(fid,['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec),lineending],'char');
+    fwrite(fid,[' ',lineending],'char');
+    if passtest(4) == 1
+        fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
+    else
+        fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+    end
+end
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  Test 4: EDmain_convexESIE, diff1 continuity across corner zone boundary, at 100 Hz
+%
+
+if runtest(4) == 1
+    itest = 4;
     II = int2str(itest);
     
     if showtext > 0
@@ -377,6 +504,8 @@ if runtest(3) == 1
 
     if relerrZBdirect < 1e-3 & relerrZBspec < 1e-3
        passtest(itest) = 1; 
+    else
+        passtest(itest) = -1;        
     end
 
     if showtext > 0
@@ -404,120 +533,6 @@ if runtest(3) == 1
     fwrite(fid,['Computed results at the specular reflection corner ZB differ by: ',num2str(relerrZBspec),lineending],'char');
     fwrite(fid,[' ',lineending],'char');
     if relerrZBdirect < 1e-3 & relerrZBspec < 1e-3
-        fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
-    else
-        fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
-    end
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Test 4: EDmain_convexESIE, diff1 fine-grain continuity across zone boundary, at 100 Hz
-%
-
-if runtest(4) == 1
-    itest = 4;
-    II = int2str(itest);
-    
-    if showtext > 0
-        disp(' ')
-        disp('*********************************************************************')
-        disp(['Test ',II,': EDmain_convexESIE, diff1 fine-grain continuity across zone boundary, at 100 Hz']);
-        disp('Single edge; three receivers exactly at, and very near zone boundaries')
-        disp('Computed value at ZB should be very close to the mean value of the two')
-        disp('surrounding responses (< 1e-5)')
-    else
-        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz']);        
-    end
-    mfile = mfilename('fullpath');
-    [infilepath,filestem] = fileparts(mfile);
-
-    corners = [     0   0   1
-        0 0 -1
-        -1 0 -1
-        -1 0 1];
-
-    planecorners = [4 3 2 1 ;1 2 3 4];
-
-    geofiledata = struct('corners',corners,'planecorners',planecorners);
-    % geofiledata.firstcornertoskip = 3;
-    Sindata = struct('coordinates',[-1 1 0]/sqrt(2));
-    phivecd = [45.05 45.01 45.001 45.0 44.999 44.99 44.95 315.05 315.01 315.001 315.0 314.999 314.99 314.95].';
-    receivers = [cosd(phivecd) sind(phivecd) 0*phivecd];
-    Rindata = struct('coordinates',receivers);
-    controlparameters = struct('frequencies',100);
-    controlparameters.difforder = 1;
-    filehandlingparameters = struct('outputdirectory',infilepath);
-    filehandlingparameters.filestem = filestem;
-    filehandlingparameters.savelogfile = 1;
-    filehandlingparameters.savelogfile = 1;
-    filehandlingparameters.showtext = 0;
-    controlparameters.Rstart = 0;
-
-    envdata.cair = 344;
-
-    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
-
-    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
-
-    tftot = tfdirect + tfgeom + tfdiff;
-
-    iv1 = 8:14;
-    ivmid1 = ceil(length(iv1)/2);
-    tfZBdirect = tfdirect(iv1) + tfdiff(iv1) ;
-    tfZBdirectmean = (   abs(tfZBdirect(ivmid1-1))   +   abs(tfZBdirect(ivmid1+1))     )/2;
-    relerrZBdirect = abs( (   abs(tfZBdirectmean)-abs(tfZBdirect(ivmid1))   )/abs(tfZBdirectmean) );
-
-    iv2 = 1:7;
-    ivmid2 = ceil(length(iv2)/2);   
-    tfZBspec = tfgeom(iv2) + tfdiff(iv2) ;
-    tfZBspecmean = (  abs(tfZBspec(ivmid2-1))   +   abs(tfZBspec(ivmid2+1))    )/2;
-    relerrZBspec = abs( ( abs(tfZBspecmean)-abs(tfZBspec(ivmid2)))/abs(tfZBspecmean) );
-
-    if relerrZBdirect < 1e-5 & relerrZBspec < 1e-5
-       passtest(itest) = 1; 
-    end
-
-    if showtext > 0
-        disp(' ')
-        disp(['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect)])
-        disp(['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec)])
-        disp(' ')
-        if passtest(itest) == 1
-            disp(['So, verification test ',II,' was passed'])
-        else
-            disp(['So, verification test ',II,' was not passed. Please check the code'])   
-        end
-    end
-
-    if plotdiagrams == 1
-       figure
-        plot(phivecd(iv1),abs(tfZBdirect),'-o',phivecd(iv1(ivmid1)),abs(tfZBdirect(ivmid1)),'*')
-       xlabel('Receiver angle   [deg.]');
-       ylabel('TF magnitude   [-]');
-       title(['Test ',II,' Direct sound amplitude across zone boundary']);
-       figure
-       plot(phivecd(iv2),abs(tfZBspec),'-o',phivecd(iv2(ivmid2)),abs(tfZBspec(ivmid2)),'*')
-       xlabel('Receiver angle   [deg.]');
-       ylabel('TF magnitude   [-]');
-       title(['Test ',II,' Specular reflection amplitude across zone boundary']);
-       
-    end
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 fine-grain continuity across zone boundary, at 100 Hz',lineending],'char');
-    fwrite(fid,['Single edge; seven receivers exactly at, and very near zone boundaries',lineending],'char');
-    fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
-    fwrite(fid,['surrounding responses (< 1e-5)',lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
-    fwrite(fid,['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec),lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-    if passtest(4) == 1
         fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
     else
         fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');

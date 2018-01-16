@@ -1,22 +1,48 @@
-% EDverify.m
+function passtest = EDverify(runtest,showtext,plotdiagrams)
+% EDverify runs EDtoolbox for one or several defined tests,
+% and compares the results to expected results. A logfile is written.
 %
-% Script for verifying the EDtoolbox.
-% It contains a number of tests which test various aspects of the code
+% Input parameters:
+%   runtest         (optional) A vector of 0 or 1, which for each position n
+%                   tells if test n should be run. Default value: all 1.
+%   showtext        (optional) 0 or 1; determines if the results should be printed on
+%                   the screen. The results are always written to the
+%                   logfile. Default value: 0.
+%   plotdiagrams    (optional) 0 or 1: determines if result plots will be
+%                   generated. Default value: 0.
+% 
+% Output parameter:
+%   passtest        A vector with -1 (fail), 0 (not run), or 1 (pass) for
+%   all the tests.
+%
+% Tests:
+% 1. 
 % 
 % Peter Svensson 16 Jan. 2018 (peter.svensson@ntnu.no)
+% 
+% passtest = EDverify(runtest,showtext,plotdiagrams);
 
 % 15 Jan. 2018 First version
 % 15 Jan. 2018 Cleaned up the EDversion/EDversionnumber confusion. Added a
 % test 4, with fine-grain ZB check.
 % 16 Jan. 2018 Changed the function call to EDgetversion instead of
 % EDversion.
-
-showtext_verify = 1;
+% 16 Jan. 2018 Changed EDverify into a function rather than a script.
+%              Added the plotdiagrams parameter.
 
 ntests = 4;
-passtest = zeros(ntests,1);
-runtest = zeros(ntests,1);
-runtest(4) = 1;
+
+if nargin < 1
+    runtest = ones(1,ntests);
+end
+if nargin < 2
+    showtext = 0;
+end
+if nargin < 3
+    plotdiagrams = 0;
+end
+
+passtest = zeros(1,ntests);
 
 [EDversionnumber,changedate,changetime] = EDgetversion;
 NN = num2str(EDversionnumber);
@@ -64,7 +90,7 @@ if runtest(1) == 1
     itest = 1;
     II = '1';
 
-    if showtext_verify > 0
+    if showtext > 0
         disp(' ')
         disp(['EDverify, EDtoolbox v. ',NN,' (last change on ',changedate,'), run on ',datetimevec])
         disp(' ')
@@ -124,14 +150,14 @@ if runtest(1) == 1
 
     relerr = abs(tftot-1);
     if relerr(1) < 0.14e-4 && relerr(2) < 0.16e-4
-        passtest(1) = 1;
+        passtest(itest) = 1;
     end
 
-    if showtext_verify > 0
+    if showtext > 0
         disp(' ')
         disp(['Computed results are:   ',num2str(relerr(1)),' and ',num2str(relerr(2))])
         disp(' ')
-        if passtest(1) == 1
+        if passtest(itest) == 1
             disp(['So, verification test ',II,' was passed'])
         else
             disp(['So, verification test ',II,' was not passed. Please check the code'])
@@ -168,7 +194,7 @@ if runtest(2) == 1
     itest = 2;
     II = int2str(itest);
     
-    if showtext_verify > 0
+    if showtext > 0
         disp(' ')
         disp('*********************************************************************')
         disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz']);
@@ -212,33 +238,47 @@ if runtest(2) == 1
 
     tftot = tfdirect + tfgeom + tfdiff;
 
-    iv = 4:6;
-    ivmid = ceil(length(iv)/2);    
-    tfZBdirect = tfdirect(iv) + tfdiff(iv);
-    tfZBdirectmean = (   abs(tfZBdirect(ivmid-1))   +   abs(tfZBdirect(ivmid+1))     )/2;
-    relerrZBdirect = abs( (abs(tfZBdirectmean)-abs(tfZBdirect(ivmid)))/abs(tfZBdirectmean) );
+    iv1 = 4:6;
+    ivmid1 = ceil(length(iv1)/2);    
+    tfZBdirect = tfdirect(iv1) + tfdiff(iv1);
+    tfZBdirectmean = (   abs(tfZBdirect(ivmid1-1))   +   abs(tfZBdirect(ivmid1+1))     )/2;
+    relerrZBdirect = abs( (abs(tfZBdirectmean)-abs(tfZBdirect(ivmid1)))/abs(tfZBdirectmean) );
 
     
-    iv = 1:3;
-    ivmid = ceil(length(iv)/2);    
-    tfZBspec = tfgeom(iv) + tfdiff(iv);
-    tfZBspecmean = (  abs(tfZBspec(ivmid-1))   +   abs(tfZBspec(ivmid+1))    )/2;
-    relerrZBspec = abs( ( abs(tfZBspecmean)-abs(tfZBspec(ivmid)))/abs(tfZBspecmean) );
+    iv2 = 1:3;
+    ivmid2 = ceil(length(iv2)/2);    
+    tfZBspec = tfgeom(iv2) + tfdiff(iv2);
+    tfZBspecmean = (  abs(tfZBspec(ivmid2-1))   +   abs(tfZBspec(ivmid2+1))    )/2;
+    relerrZBspec = abs( ( abs(tfZBspecmean)-abs(tfZBspec(ivmid2)))/abs(tfZBspecmean) );
 
     if relerrZBdirect < 1e-5 & relerrZBspec < 1e-5
-       passtest(2) = 1; 
+       passtest(itest) = 1; 
     end
 
-    if showtext_verify > 0
+    if showtext > 0
         disp(' ')
         disp(['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect)])
         disp(['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec)])
         disp(' ')
-        if passtest(2) == 1
+        if passtest(itest) == 1
             disp(['So, verification test ',II,' was passed'])
         else
             disp(['So, verification test ',II,' was not passed. Please check the code'])   
         end
+    end
+    
+    if plotdiagrams == 1
+       figure
+        plot(phivecd(iv1),abs(tfZBdirect),'-o',phivecd(iv1(ivmid1)),abs(tfZBdirect(ivmid1)),'*')
+       xlabel('Receiver angle   [deg.]');
+       ylabel('TF magnitude   [-]');
+       title(['Test ',II,' Direct sound amplitude across zone boundary']);
+       figure
+       plot(phivecd(iv2),abs(tfZBspec),'-o',phivecd(iv2(ivmid2)),abs(tfZBspec(ivmid2)),'*')
+       xlabel('Receiver angle   [deg.]');
+       ylabel('TF magnitude   [-]');
+       title(['Test ',II,' Specular reflection amplitude across zone boundary']);
+       
     end
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -270,7 +310,7 @@ if runtest(3) == 1
     itest = 3;
     II = int2str(itest);
     
-    if showtext_verify > 0
+    if showtext > 0
         disp(' ')
         disp('*********************************************************************')
         disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across corner zone boundary, at 100 Hz']);
@@ -311,7 +351,7 @@ if runtest(3) == 1
     filehandlingparameters = struct('outputdirectory',infilepath);
     filehandlingparameters.filestem = filestem;
     filehandlingparameters.savelogfile = 1;
-    filehandlingparameters.showtext = 0;
+    filehandlingparameters.showtext = 1;
     controlparameters.Rstart = 0;
 
     envdata.cair = 344;
@@ -336,15 +376,15 @@ if runtest(3) == 1
     relerrZBspec = abs( ( abs(tfZBspecmean)-abs(tfZBspec(ivmid)))/abs(tfZBspecmean) );
 
     if relerrZBdirect < 1e-3 & relerrZBspec < 1e-3
-       passtest(3) = 1; 
+       passtest(itest) = 1; 
     end
 
-    if showtext_verify > 0
+    if showtext > 0
          disp(' ')
         disp(['Computed results at the direct sound corner ZB differ by: ',num2str(relerrZBdirect)])
         disp(['Computed results at the specular reflection corner ZB differ by: ',num2str(relerrZBspec)])
         disp(['   '])
-        if passtest(3) == 1
+        if passtest(itest) == 1
             disp(['So, verification test ',II,' was passed'])
         else
             disp(['So, verification test ',II,' was not passed. Please check the code'])   
@@ -380,7 +420,7 @@ if runtest(4) == 1
     itest = 4;
     II = int2str(itest);
     
-    if showtext_verify > 0
+    if showtext > 0
         disp(' ')
         disp('*********************************************************************')
         disp(['Test ',II,': EDmain_convexESIE, diff1 fine-grain continuity across zone boundary, at 100 Hz']);
@@ -423,34 +463,48 @@ if runtest(4) == 1
 
     tftot = tfdirect + tfgeom + tfdiff;
 
-    iv = 8:14;
-    ivmid = ceil(length(iv)/2);
-    tfZBdirect = tfdirect(iv) + tfdiff(iv) ;
-    tfZBdirectmean = (   abs(tfZBdirect(ivmid-1))   +   abs(tfZBdirect(ivmid+1))     )/2;
-    relerrZBdirect = abs( (   abs(tfZBdirectmean)-abs(tfZBdirect(ivmid))   )/abs(tfZBdirectmean) );
+    iv1 = 8:14;
+    ivmid1 = ceil(length(iv1)/2);
+    tfZBdirect = tfdirect(iv1) + tfdiff(iv1) ;
+    tfZBdirectmean = (   abs(tfZBdirect(ivmid1-1))   +   abs(tfZBdirect(ivmid1+1))     )/2;
+    relerrZBdirect = abs( (   abs(tfZBdirectmean)-abs(tfZBdirect(ivmid1))   )/abs(tfZBdirectmean) );
 
-    iv = 1:7;
-    ivmid = ceil(length(iv)/2);   
-    tfZBspec = tfgeom(iv) + tfdiff(iv) ;
-    tfZBspecmean = (  abs(tfZBspec(ivmid-1))   +   abs(tfZBspec(ivmid+1))    )/2;
-    relerrZBspec = abs( ( abs(tfZBspecmean)-abs(tfZBspec(ivmid)))/abs(tfZBspecmean) );
+    iv2 = 1:7;
+    ivmid2 = ceil(length(iv2)/2);   
+    tfZBspec = tfgeom(iv2) + tfdiff(iv2) ;
+    tfZBspecmean = (  abs(tfZBspec(ivmid2-1))   +   abs(tfZBspec(ivmid2+1))    )/2;
+    relerrZBspec = abs( ( abs(tfZBspecmean)-abs(tfZBspec(ivmid2)))/abs(tfZBspecmean) );
 
     if relerrZBdirect < 1e-5 & relerrZBspec < 1e-5
-       passtest(4) = 1; 
+       passtest(itest) = 1; 
     end
 
-    if showtext_verify > 0
+    if showtext > 0
         disp(' ')
         disp(['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect)])
         disp(['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec)])
         disp(' ')
-        if passtest(4) == 1
+        if passtest(itest) == 1
             disp(['So, verification test ',II,' was passed'])
         else
             disp(['So, verification test ',II,' was not passed. Please check the code'])   
         end
     end
 
+    if plotdiagrams == 1
+       figure
+        plot(phivecd(iv1),abs(tfZBdirect),'-o',phivecd(iv1(ivmid1)),abs(tfZBdirect(ivmid1)),'*')
+       xlabel('Receiver angle   [deg.]');
+       ylabel('TF magnitude   [-]');
+       title(['Test ',II,' Direct sound amplitude across zone boundary']);
+       figure
+       plot(phivecd(iv2),abs(tfZBspec),'-o',phivecd(iv2(ivmid2)),abs(tfZBspec(ivmid2)),'*')
+       xlabel('Receiver angle   [deg.]');
+       ylabel('TF magnitude   [-]');
+       title(['Test ',II,' Specular reflection amplitude across zone boundary']);
+       
+    end
+    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     fwrite(fid,[' ',lineending],'char');

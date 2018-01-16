@@ -44,7 +44,7 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (svensson@iet.ntnu.no) 15 Jan. 2018
+% Peter Svensson (svensson@iet.ntnu.no) 16 Jan. 2018
 %
 % [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc);
 
@@ -56,6 +56,8 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 % parameter cair.
 % 15 Jan. 2018 Turned off the automatic printing out of "Singularity for
 % term ..."
+% 16 Jan. 2018 Implemented (de-commented) the serial expansion around the
+% apex point.
 
 localshowtext = 0;
 
@@ -199,7 +201,6 @@ if sign( zw(1)*zw(2) ) == 1
     apexincluded = 0;
 end
 
-
 %------------------------------------------------------------------
 %
 
@@ -209,10 +210,9 @@ if apexincluded == 1
 	% (=zrangespecial) should be only up to z = 0.01
 	% or whatever is specified as zrelmax for the analytic approximation
 
-	zrangespecial = zrelmax*min([rs,rr]);
+	zrangespecial = zrelmax*min([rs,rr])/100;
 
 end
-
 
 %----------------------------------------------------------------
 % Compute the transfer function by carrying out a numerical integration for
@@ -228,21 +228,130 @@ end
 
 tf = zeros(nfrequencies,1);
 
-if bc(1) == 1
-    for ii = 1:nfrequencies
-        k = 2*pi*frequencies(ii)/cair;
-        tf(ii) = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi);
+Rextra = R0 - Rstart;
+Rstarttemp = R0;
+
+% disp(['zw = ',num2str(zw(1)),' to ',num2str(zw(2))])
+% disp(['za = ',num2str(za)])
+% disp(['apexincluded = ',int2str(apexincluded)])
+
+if apexincluded == 0
+    if bc(1) == 1
+        for ii = 1:nfrequencies
+            k = 2*pi*frequencies(ii)/cair;
+            tf(ii) = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi);
+            tf(ii) = tf(ii)*exp(-1i*k*Rextra);
+        end
+    else
+        for ii = 1:nfrequencies
+            k = 2*pi*frequencies(ii)/cair;
+            tf(ii) = quadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi);
+            tf(ii) = tf(ii)*exp(-1i*k*Rextra);
+        end        
     end
 else
-    for ii = 1:nfrequencies
-        k = 2*pi*frequencies(ii)/cair;
-        tf(ii) = quadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi);
-    end    
-    
+    if bc(1) == 1
+        for ii = 1:nfrequencies
+            k = 2*pi*frequencies(ii)/cair;
+            tf1 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol)*(-ny/4/pi);
+            tf3 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol)*(-ny/4/pi);
+            
+            %-----------------------------------------------------------
+            % First the analytical approximation
+
+            rho = rr/rs;
+            sinpsi = (rs+rr)/R0;
+            cospsi = (zr-zs)/R0;
+            
+            tempfact = (1+rho)^2*sinpsi^2 - 2*rho;        
+
+            useserialexp1 = absnyfivec < 0.01;
+            useserialexp2 = abs(absnyfivec - 2*pi) < 0.01;
+            useserialexp = (useserialexp1 | useserialexp2) & (~singularterm);
+              
+            sqrtB1vec    = ( sqrt( 2*(1-cosnyfivec) )*R0*rho/(1+rho)^2/ny    ).*(useserialexp==0) + ...
+                               ( fivec.*sqrt(1-(ny*fivec).^2/12)*R0*rho/(1+rho)^2 ).*(useserialexp1==1) + ...
+                               ( (fivec-2*pi/ny).*sqrt(1-(ny*fivec-2*pi).^2/12)*R0*rho/(1+rho)^2 ).*(useserialexp2==1);
+
+            if skewcase == 0               % Use the slightly simpler formulation of the analytical approx.
+
+                sqrtB3 = sqrt(2)*R0*rho/(1+rho)/sqrt(tempfact);
+
+                usespecialcase = abs(sqrtB3 - sqrtB1vec) < 1e-14;
+
+                fifactvec    = ( (1-cosnyfivec)./ny^2             ).*(useserialexp==0) + ...
+                               ( fivec.^2/2.*(1-(ny*fivec).^2/12) ).*(useserialexp1==1) + ...
+                               ( (fivec-2*pi/ny).^2/2.*(1-(ny*fivec-2*pi).^2/12) ).*(useserialexp2==1);
+
+                temp1vec = sinnyfivec./( (1+rho)^2 - tempfact.*fifactvec + eps*10);
+
+
+                temp1_2vec = (sinnyfivec+ 10*eps)./( (1+rho)^2 - tempfact.*fifactvec)./(sqrtB1vec+10*eps).*atan( zrangespecial./(sqrtB1vec+eps) );
+
+                temp3vec = -1./sqrtB3.*atan( zrangespecial./sqrtB3 );
+
+                approxintvalvec = 2/ny^2*rho*(temp1_2vec + temp1vec*temp3vec);	
+                approxintvalvec = approxintvalvec.*(sinnyfivec~=0).*(usespecialcase==0);
+
+                if any(usespecialcase)
+%                     disp('SPECIAL CASE!')
+                    specialcasevalue = 1/(2*sqrtB3*sqrtB3).*( zrangespecial./(zrangespecial^2 + sqrtB3*sqrtB3) + 1./sqrtB3.*atan(zrangespecial./(sqrtB3+eps)) );
+                    approxintvalvec = approxintvalvec + 4*R0*R0*rho*rho*rho*sinnyfivec/ny/ny/(1+rho)^4./tempfact.*specialcasevalue.*(usespecialcase==1);
+                end
+
+
+            else                           % Use the more general formulation of the analytical approx.
+                B3 = 2*R0*R0*rho*rho/(1+rho)/(1+rho)/tempfact;
+                B1vec = sqrtB1vec.^2;
+                B2 = -2*R0*(1-rho)*rho*cospsi/(1+rho)/tempfact;
+                E1vec = 4*R0^2*rho^3*sinnyfivec./ny^2/(1+rho)^4./tempfact;
+        % Error found 050117 by PS. The line below is wrong and should be
+        % replaced by the next one.
+        %         multfact = E1vec.*B2./(B1vec*B2^2 + B1vec.^2 - B3.^2);
+                multfact = -E1vec.*B2./(B1vec*B2^2 + (B1vec - B3).^2);
+        
+        % Error found 050118 by PS: the abs in the P1 equation were missing!
+                P1 = 0.5*log( abs(B3)*abs(zrangespecial^2 + B1vec)./abs(B1vec)./abs(zrangespecial^2 + B2*zrangespecial + B3 ) );
+                P2 = (B1vec-B3)./(sqrtB1vec+10*eps)./B2.*atan(zrangespecial./(sqrtB1vec+10*eps));
+                q = 4*B3-B2^2;
+
+                if q > 0
+                    sqrtq = sqrt(q);
+                    F = 2/sqrtq*( atan( (2*zrangespecial+B2)/sqrtq ) - atan( B2/sqrtq ) );  
+                elseif q < 0
+                    sqrtminq = sqrt(-q);
+        % Error found 050118 by PS: the abs in the F equation were missing!
+                    F = 1./sqrtminq.*log( abs(2*zrangespecial+B2-sqrtminq).*abs(B2+sqrtminq)./abs(2*zrangespecial+B2+sqrtminq)./abs(B2-sqrtminq) );            
+                else   % q = 0
+                    F = 4*zrangespecial./B2./(2*zrangespecial+B2);
+                end
+                P3 = (2*(B3-B1vec)-B2^2)/2/B2.*F;
+
+        % Error found 050118 by PC. The line below is wrong and should be replaced
+        % by the one after.
+        %        approxintvalvec = sum(multfact.*(P1+P2+P3))      
+                approxintvalvec = multfact.*(P1+P2+P3);      
+            end
+
+%             approxintvalvec
+%             pause
+%             
+
+%             approxintvalvec = sum(approxintvalvec.*(1-singularterm));
+            tf2 = sum(approxintvalvec.*(1-singularterm)*(-ny/2/pi));
+                        
+            tf(ii) = (tf1+tf2+tf3)*exp(-1i*k*Rextra);
+        end
+    else
+        for ii = 1:nfrequencies
+            k = 2*pi*frequencies(ii)/cair;
+            tf1 = quadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol)*(-ny/4/pi);
+            tf2 = 0;
+            tf3 = quadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol)*(-ny/4/pi);
+            tf(ii) = (tf1+tf2+tf3)*exp(-1i*k*Rextra);
+        end        
+    end
 end
-
-
-
 
 
 

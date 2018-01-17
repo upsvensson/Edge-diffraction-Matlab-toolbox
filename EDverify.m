@@ -559,12 +559,12 @@ if runtest(5) == 1
     if showtext > 0
         disp(' ')
         disp('*********************************************************************')
-        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across edge, at 10 Hz']);
-        disp('Single edge; receivers distributed very near the edge')
-        disp('Computed value at ZB should be very close to the mean value of the two')
-        disp('surrounding responses (< 1e-3)')
+        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across edge, for very low frequencies']);
+        disp('Single edge; receivers very near the edge, in front and in back')
+        disp('Far source, perp. incidence and skewed incidence.')
+        disp('Computed values in front and in back should be within 1.5e-3 for the three frequencies')
     else
-        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across edge, at 10 Hz']);    
+        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across edge, for very low frequencies']);    
     end
 
     mfile = mfilename('fullpath');
@@ -584,12 +584,12 @@ if runtest(5) == 1
     Sindata = struct('coordinates',sources);
     receivers = [-0.000001 -0.00000001 0;-0.000001 0.00000001 0];
     Rindata = struct('coordinates',receivers);
-    controlparameters = struct('frequencies',[0.1 1 10]);
+    controlparameters = struct('frequencies',[0.1 ]);
     controlparameters.difforder = 1;
     filehandlingparameters = struct('outputdirectory',infilepath);
     filehandlingparameters.filestem = filestem;
     filehandlingparameters.savelogfile = 1;
-    filehandlingparameters.showtext = 1;
+    filehandlingparameters.showtext = 0;
     controlparameters.Rstart = soudist;
 
     envdata.cair = 344;
@@ -610,17 +610,16 @@ if runtest(5) == 1
         passtest(itest) = -1;        
     end
 
-%     if showtext > 0
-%          disp(' ')
-%         disp(['Computed results at the direct sound corner ZB differ by: ',num2str(relerrZBdirect)])
-%         disp(['Computed results at the specular reflection corner ZB differ by: ',num2str(relerrZBspec)])
-%         disp(['   '])
-%         if passtest(itest) == 1
-%             disp(['So, verification test ',II,' was passed'])
-%         else
-%             disp(['So, verification test ',II,' was not passed. Please check the code'])   
-%         end
-%     end
+    if showtext > 0
+         disp(' ')
+        disp(['Computed results differ by max: ',num2str(max(pressurediff))])
+        disp(['   '])
+        if passtest(itest) == 1
+            disp(['So, verification test ',II,' was passed'])
+        else
+            disp(['So, verification test ',II,' was not passed. Please check the code'])   
+        end
+    end
 
     if plotdiagrams == 1
        figure
@@ -636,19 +635,17 @@ if runtest(5) == 1
 
     fwrite(fid,[' ',lineending],'char');
     fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across edge, at 100 Hz',lineending],'char');
-    fwrite(fid,['Single edge; receivers distributed very near the edge',lineending],'char');
-%     fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
-%     fwrite(fid,['surrounding responses (< 1e-3)',lineending],'char');
-%     fwrite(fid,[' ',lineending],'char');
-%     fwrite(fid,['Computed results at the direct sound corner ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
-%     fwrite(fid,['Computed results at the specular reflection corner ZB differ by: ',num2str(relerrZBspec),lineending],'char');
-%     fwrite(fid,[' ',lineending],'char');
-%     if relerrZBdirect < 1e-3 & relerrZBspec < 1e-3
-%         fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
-%     else
-%         fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
-%     end
+    fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across edge, for very low frequencies',lineending],'char');
+    fwrite(fid,['Single edge; receivers very near the edge, in front and in back',lineending],'char');
+    fwrite(fid,['Far source, perp. incidence and skewed incidence.',lineending],'char');
+    fwrite(fid,['Computed values in front and in back should be within 1.5e-3 for the three frequencies',lineending],'char');
+    fwrite(fid,['Computed results differ by max: ',num2str(max(pressurediff)),lineending],'char');
+    fwrite(fid,[' ',lineending],'char');
+    if passtest(itest) == 1
+        fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
+    else
+        fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

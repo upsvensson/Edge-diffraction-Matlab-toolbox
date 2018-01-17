@@ -1,7 +1,8 @@
 function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
-    sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR)
-% EDfindconvexGApaths - Finds all the first-order specular and first-order 
-% diffraction paths for a convex object.
+    sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,...
+    vispartedgesfromR,difforder,showtext)
+% EDfindconvexGApaths - Finds all the first-order specular and (possibly)
+% first-order diffraction paths for a convex object.
 %
 % Input parameters:
 %   planedata, edgedata,edgetoedgedata   structs
@@ -9,7 +10,8 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 % 	visplanesfromS, vispartedgesfromS       From the Sdata struct
 %   receivers
 % 	visplanesfromR, vispartedgesfromR       From the Rdata struct
-%   showtext
+%   difforder
+%   showtext                (optional) Default: 0
 %
 % Output parameters:
 %   firstorderpathdata      struct with the fields:
@@ -44,10 +46,10 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 15 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 17 Jan. 2018
 %
 % firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
-% sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,showtext)
+% sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,difforder,showtext)
 
 % 27 Dec. 2017 First start
 % 28 Dec. 2017 Functioning version for diff
@@ -55,6 +57,12 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 % 12 Jan. 2018 Small bug.fixes
 % 15 Jan. 2018 Added the direct sound amplitude: 1, 0.5 or 0.25 for edge
 % and corner hits. Also for the specular reflections.
+% 17 Jan 2018 Introduced the input parameter difforder, so one can skip the
+% diffraction, if wanted.
+
+if nargin < 10
+   showtext = 0; 
+end
 
 % planedata.corners = size(planedata.corners,1);
 nplanes = length(planedata.planeisthin);
@@ -69,19 +77,27 @@ numberofcomponents = zeros(1,3);
 % both the source and the receiver can see an edge, then it is fully
 % visible. Otherwise it is not at all visible.
 
-diffpaths = zeros(nreceivers,nsources,nedges);
-edgeisactive = zeros(nedges,1,'uint8');
-
-for ii = 1:nreceivers
-    for jj = 1:nsources
-        tempvec = vispartedgesfromR(:,ii).*vispartedgesfromS(:,jj);
-
-        edgeisactive = edgeisactive + tempvec;        
-        diffpaths(ii,jj,:)=( tempvec>0 );
+if difforder > 0
+    if showtext >= 2
+       disp(['      Finding first-order diffraction paths']) 
     end
-end
+    diffpaths = zeros(nreceivers,nsources,nedges);
+    edgeisactive = zeros(nedges,1,'uint8');
 
-edgeisactive = (edgeisactive>0);
+    for ii = 1:nreceivers
+        for jj = 1:nsources
+            tempvec = vispartedgesfromR(:,ii).*vispartedgesfromS(:,jj);
+
+            edgeisactive = edgeisactive + tempvec;        
+            diffpaths(ii,jj,:)=( tempvec>0 );
+        end
+    end
+
+    edgeisactive = (edgeisactive>0);
+else
+    diffpaths = [];
+    edgeisactive = [];
+end
 
 %--------------------------------------------------------------------------
 % Then the first-order specular paths. 
@@ -90,6 +106,10 @@ edgeisactive = (edgeisactive>0);
 %
 % visplanesfromS has size [nplanes,nsources]
 % visplanesfromR has size [nplanes,nreceivers]
+
+if showtext >= 2
+   disp(['      Finding first-order specular reflection paths']) 
+end
 
 min_number_elements = min([nsources nreceivers nplanes]);
 
@@ -162,6 +182,10 @@ end
 %
 % visplanesfromS has size [nplanes,nsources]
 % visplanesfromR has size [nplanes,nreceivers]
+
+if showtext >= 2
+   disp(['      Finding direct sound paths']) 
+end
 
 if nsources == min_number_elements
     possibleSPR_obstruct = [];

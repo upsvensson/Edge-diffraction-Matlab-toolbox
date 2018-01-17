@@ -80,6 +80,7 @@ function outputstruct = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,ne
 % 27 Nov. 2017 Copied from ESIE2toolbox. Removed the input parameter
 %               difforder, and removed the file saving.
 % 17 Jan 2018 Turned off the check if an S/R is very close to a thin plane.
+% 17 Jan 2018 Turned off some text printouts
 
 % geomacc = 1e-10;
 
@@ -657,8 +658,10 @@ end
 
 iv = uint32(find(visedgesfromr>=5));
 if ~isempty(iv)
-    disp('      We check aligned-edge obstructions')
-
+    if showtext > 1
+        disp('      We check aligned-edge obstructions')
+    end
+    
     % All edges must be checked vs all other edges?
     % Make subdivision of edges. If a line from R to edge segments
     % pass through a plane that is constructed by an edge and perpendicular to
@@ -676,7 +679,9 @@ if ~isempty(iv)
     nedgesperreceiver = histc(recnumbers,(1:nreceivers));
     iv1 = find(nedgesperreceiver > 2, 1);
     if isempty(iv1)
-        disp('   No aligned-edges can obscure each other')    
+        if showtext > 2
+            disp('   No aligned-edges can obscure each other')    
+        end
         visedgesfromr(iv)    = ones(size(iv));
     else
         error('ERROR: Obstruction check of aligned-edges not implemented yet!')        
@@ -685,8 +690,9 @@ if ~isempty(iv)
 
 iv = uint32(find(visedgesfromr==3));
 if ~isempty(iv)
-    disp('      We check within-plane obstructions')
-
+    if showtext > 2
+        disp('      We check within-plane obstructions')
+    end
 %     visedgesfromr(iv)      = zeros(size(iv));
     error('ERROR: Obstruction check of within-same-plane-edges not implemented yet!')        
     %    vispartedgesfromr(iv) = 0 - full;
@@ -694,7 +700,9 @@ end
 
 iv = uint32(find(visedgesfromr==2));
 if ~isempty(iv)
-    disp('      Edge fully visible')
+    if showtext > 2
+        disp('      Edge fully visible')
+    end
     visedgesfromr(iv)      = zeros(size(iv));
     vispartedgesfromr(iv)  =  maxvisibilityval*ones(size(iv));
     
@@ -702,7 +710,9 @@ end
 
 iv = uint32(find(visedgesfromr==4));
 if ~isempty(iv)
-    disp('      Edge in totabs plane')
+    if showtext > 2
+        disp('      Edge in totabs plane')
+    end
     visedgesfromr(iv)      = zeros(size(iv));
     vispartedgesfromr(iv)  =  zeros(size(iv));
     

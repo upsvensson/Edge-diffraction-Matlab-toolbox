@@ -23,7 +23,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpat
 %   
 % Uses functions EDcoordtrans2, EDwedge1st_fd
 % 
-% Peter Svensson 15 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 17 Jan. 2018 (peter.svensson@ntnu.no)
 %
 % [tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpathdata,...
 %     controlparameters,envdata,doaddsources,sources,receivers,edgedata)
@@ -33,6 +33,8 @@ function [tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpat
 %                           yet.
 % 15 Jan. 2018 Took the direct sound and spec refl amplitude 
 %              (1, 0.5, 0.25) into account)
+% 17 Jan. 2018 Had forgotten the Rstart factor for the diret sound and
+% specular reflection.
 
 timingdata = zeros(1,3);
 
@@ -70,7 +72,7 @@ if firstorderpathdata.ncomponents(1) > 0
 
     if ncomponents > nfrequencies
         for ii = 1:nfrequencies   
-           alltfs = exp(-1i*kvec(ii)*alldists)./alldists.*firstorderpathdata.directsoundlist(:,3);
+           alltfs = exp(-1i*kvec(ii)*(alldists-controlparameters.Rstart))./alldists.*firstorderpathdata.directsoundlist(:,3);
            if doaddsources == 1
                tfdirect(ii,1:maxrecnumber) = accumarray(firstorderpathdata.directsoundlist(:,2),alltfs);
            else
@@ -80,7 +82,7 @@ if firstorderpathdata.ncomponents(1) > 0
         end
     else
        for ii = 1:ncomponents 
-            alltfs = exp(-1i*kvec*alldists(ii))./alldists(ii).*firstorderpathdata.directsoundlist(ii,3);
+            alltfs = exp(-1i*kvec*alldists(ii))./(alldists(ii)-controlparameters.Rstart).*firstorderpathdata.directsoundlist(ii,3);
            if doaddsources == 1
               tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) = ...
                   tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) + alltfs;
@@ -120,7 +122,7 @@ if firstorderpathdata.ncomponents(2) > 0
     maxrecnumber = max( firstorderpathdata.specrefllist(:,2) );
 
     for ii = 1:nfrequencies    
-        alltfs = exp(-1i*kvec(ii)*alldists)./alldists.*firstorderpathdata.specrefllist(:,3);
+        alltfs = exp(-1i*kvec(ii)*(alldists-controlparameters.Rstart))./alldists.*firstorderpathdata.specrefllist(:,3);
         if doaddsources == 1
             tfgeom(ii,1:maxrecnumber) = accumarray(firstorderpathdata.specrefllist(:,2),alltfs);
         else

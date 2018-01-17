@@ -7,6 +7,9 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %
 % Input parameters are six structs with fields as specified below:
 %   geofiledata         .geoinputfile        (obligatory)
+%                       As an alternative to specifying geoinputfile, it is
+%                       possible to specify .corners, .planecorners, and
+%                       optionally .planecornertype.
 %                       .firstcornertoskip   (default: 1e6)
 %   Sindata             .coordinates         (obligatory)
 %                       .doaddsources        (default: 0 = no)
@@ -37,7 +40,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 15 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 17 Jan. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -63,6 +66,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % 15 Jan. 2018 Changed the parametername from EDversion to EDversionnumber
 % because EDversion is a function.
 % 16 Jan. 2018 Adapted to the name-change for the function EDgetversion
+% 17 Jan 2018 Added the handling of the planecornertype input field.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -101,7 +105,7 @@ end
 
 if filehandlingparameters.showtext >= 1
 	disp('    ');disp('####################################################################')
-              disp('#  EDmain_convexESIE, v. 0.1 (15 Jan. 2018)')
+              disp('#  EDmain_convexESIE, v. 0.1 (17 Jan. 2018)')
               disp(['#  filestem for results: ',filehandlingparameters.filestem])
               disp(' ')
 end
@@ -112,7 +116,7 @@ if filehandlingparameters.savelogfile == 1
     	return
     end
     fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['#  EDmain_convexESIE, v. 0.1 (15 Jan. 2018)',lineending],'char');
+    fwrite(fid,['#  EDmain_convexESIE, v. 0.1 (17 Jan. 2018)',lineending],'char');
     fwrite(fid,['#  filestem for results: ',filehandlingparameters.filestem,lineending],'char');
     fwrite(fid,[' ',lineending],'char');
 end
@@ -149,7 +153,7 @@ else
         disp('   Creating the planedata struct from the input geometry matrices')
     end
     t00 = clock;
-    planedata = EDreadgeomatrices(geofiledata.corners,geofiledata.planecorners);    
+    planedata = EDreadgeomatrices(geofiledata.corners,geofiledata.planecorners,geofiledata.planecornertype);    
     ncorners = size(planedata.corners,1);
     nplanes = size(planedata.planecorners,1);
     t01 = etime(clock,t00);

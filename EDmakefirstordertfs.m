@@ -70,14 +70,14 @@ if firstorderpathdata.ncomponents(1) > 0
 
     kvec = 2*pi*controlparameters.frequencies(:)/envdata.cair;
 
-    if ncomponents > nfrequencies
+    if ncomponents > nfrequencies && doaddsources == 1
         for ii = 1:nfrequencies   
            alltfs = exp(-1i*kvec(ii)*(alldists-controlparameters.Rstart))./alldists.*firstorderpathdata.directsoundlist(:,3);
-           if doaddsources == 1
+%            if doaddsources == 1
                tfdirect(ii,1:maxrecnumber) = accumarray(firstorderpathdata.directsoundlist(:,2),alltfs);
-           else
-              tfdirect(ii,firstorderpathdata.directsoundlist(:,2),firstorderpathdata.directsoundlist(:,1)) = alltfs;
-           end
+%            else
+%               tfdirect(ii,firstorderpathdata.directsoundlist(:,2),firstorderpathdata.directsoundlist(:,1)) = alltfs;
+%            end
 
         end
     else
@@ -121,15 +121,28 @@ if firstorderpathdata.ncomponents(2) > 0
 
     maxrecnumber = max( firstorderpathdata.specrefllist(:,2) );
 
-    for ii = 1:nfrequencies    
-        alltfs = exp(-1i*kvec(ii)*(alldists-controlparameters.Rstart))./alldists.*firstorderpathdata.specrefllist(:,3);
-        if doaddsources == 1
-            tfgeom(ii,1:maxrecnumber) = accumarray(firstorderpathdata.specrefllist(:,2),alltfs);
-        else
-            tfgeom(ii,firstorderpathdata.specrefllist(:,2),firstorderpathdata.specrefllist(:,1)) = alltfs;
+    if ncomponents > nfrequencies && doaddsources == 1
+        for ii = 1:nfrequencies    
+            alltfs = exp(-1i*kvec(ii)*(alldists-controlparameters.Rstart))./alldists.*firstorderpathdata.specrefllist(:,3);
+%             if doaddsources == 1
+                tfgeom(ii,1:maxrecnumber) = accumarray(firstorderpathdata.specrefllist(:,2),alltfs);
+%             else
+%                 tfgeom(ii,firstorderpathdata.specrefllist(:,2),firstorderpathdata.specrefllist(:,1)) = alltfs;
+%             end
         end
+    else
+        for ii = 1:ncomponents 
+            alltfs = exp(-1i*kvec*(alldists(ii)-controlparameters.Rstart))./alldists(ii).*firstorderpathdata.specrefllist(ii,3);
+           if doaddsources == 1
+              tfgeom(:,firstorderpathdata.specrefllist(ii,2)) = ...
+                  tfdirect(:,firstorderpathdata.specrefllist(ii,2)) + alltfs;
+           else
+              tfgeom(:,firstorderpathdata.specrefllist(ii,2),firstorderpathdata.specrefllist(ii,1)) = alltfs;
+           end
+       end
+       
+        
     end
-
 end
 
 timingdata(2) = etime(clock,t00);

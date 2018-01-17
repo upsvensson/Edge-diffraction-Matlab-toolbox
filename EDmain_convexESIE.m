@@ -67,6 +67,8 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % because EDversion is a function.
 % 16 Jan. 2018 Adapted to the name-change for the function EDgetversion
 % 17 Jan 2018 Added the handling of the planecornertype input field.
+% 17 Jan. 2018 Added the showtext input parameter to the "findGA..." and
+% "makefirstordertfs".
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -368,7 +370,8 @@ end
 t00 = clock;
 firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
     Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
-    Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr);
+    Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr,...
+    controlparameters.difforder,filehandlingparameters.showtext);
 t01 = etime(clock,t00);
 timingstruct.findpaths = t01;
 if filehandlingparameters.savelogfile == 1
@@ -387,7 +390,8 @@ end
 
 t00 = clock;
 [tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpathdata,...
-    controlparameters,envdata,Sindata.doaddsources,Sdata.sources,Rdata.receivers,edgedata);
+    controlparameters,envdata,Sindata.doaddsources,Sdata.sources,Rdata.receivers,...
+    edgedata,filehandlingparameters.showtext);
 t01 = etime(clock,t00);
 timingstruct.maketfs = [t01 timingdata];
 

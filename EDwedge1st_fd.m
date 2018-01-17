@@ -44,7 +44,7 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (svensson@iet.ntnu.no) 16 Jan. 2018
+% Peter Svensson (svensson@iet.ntnu.no) 17 Jan. 2018
 %
 % [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc);
 
@@ -58,6 +58,7 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 % term ..."
 % 16 Jan. 2018 Implemented (de-commented) the serial expansion around the
 % apex point.
+% 17 Jan. 2018 Made some experiments with the zrelrange.
 
 localshowtext = 0;
 
@@ -72,7 +73,6 @@ end
 if nargin < 13
 	bc = [1 1];
 else
-% 	if bc(1)*bc(2)~=1 | bc(1) ~= 1,
 	if bc(1)*bc(2)~=1
 		error('ERROR: Only all-rigid, or all-soft, wedges are implemented');
 	end
@@ -92,9 +92,6 @@ end
 
 ny = pi/(2*pi-closwedang);
 
-% initdelay = Rstart/CAIR;
-% sampconst = CAIR/fs;
-
 if Method(1) == 'N' || Method(1) == 'n'
 	Method = 'New';
 else
@@ -103,8 +100,8 @@ end
 
 nfrequencies = length(frequencies);
 
-% % % tol = 1e-11;                         % The relative accuracy for the numerical integration
 tol = 1e-11;                         % The relative accuracy for the numerical integration
+                                     % The relative accuracy for the numerical integration
                                     % It was found that 1e-6 generated a
                                     % substantial error for some cases (PC
                                     % 041129)
@@ -210,7 +207,7 @@ if apexincluded == 1
 	% (=zrangespecial) should be only up to z = 0.01
 	% or whatever is specified as zrelmax for the analytic approximation
 
-	zrangespecial = zrelmax*min([rs,rr])/100;
+	zrangespecial = zrelmax*min([rs,rr]);
 
 end
 
@@ -222,7 +219,7 @@ singularterm = [0 0 0 0];
 
 singularterm = absnyfivec < 10*eps | abs(absnyfivec - 2*pi) < 10*eps;
 useterm = 1 - singularterm;
-if any(singularterm) & localshowtext
+if any(singularterm) && localshowtext
      disp(['      Singularity for term ',int2str(find(singularterm))])   
 end
 
@@ -230,10 +227,6 @@ tf = zeros(nfrequencies,1);
 
 Rextra = R0 - Rstart;
 Rstarttemp = R0;
-
-% disp(['zw = ',num2str(zw(1)),' to ',num2str(zw(2))])
-% disp(['za = ',num2str(za)])
-% disp(['apexincluded = ',int2str(apexincluded)])
 
 if apexincluded == 0
     if bc(1) == 1
@@ -253,8 +246,11 @@ else
     if bc(1) == 1
         for ii = 1:nfrequencies
             k = 2*pi*frequencies(ii)/cair;
-            tf1 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol)*(-ny/4/pi);
-            tf3 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol)*(-ny/4/pi);
+            tf1 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol);
+            tf1 = tf1*(-ny/4/pi);
+            tf3 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol);
+            tf3 = tf3*(-ny/4/pi);
+                        
             
             %-----------------------------------------------------------
             % First the analytical approximation
@@ -333,16 +329,13 @@ else
                 approxintvalvec = multfact.*(P1+P2+P3);      
             end
 
-%             approxintvalvec
-%             pause
-%             
-
-%             approxintvalvec = sum(approxintvalvec.*(1-singularterm));
             tf2 = sum(approxintvalvec.*(1-singularterm)*(-ny/2/pi));
-                        
+                               
             tf(ii) = (tf1+tf2+tf3)*exp(-1i*k*Rextra);
+            
         end
     else
+        error('ERROR: Not implemented the integration properly for the Dirichlet wedge yet');
         for ii = 1:nfrequencies
             k = 2*pi*frequencies(ii)/cair;
             tf1 = quadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol)*(-ny/4/pi);

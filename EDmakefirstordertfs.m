@@ -65,7 +65,7 @@ if firstorderpathdata.ncomponents(1) > 0
     else
         alldists = sqrt( sum(distvecs.^2,2) ); 
     end
-
+    
     maxrecnumber = max( firstorderpathdata.directsoundlist(:,2) );
 
     kvec = 2*pi*controlparameters.frequencies(:)/envdata.cair;
@@ -82,7 +82,7 @@ if firstorderpathdata.ncomponents(1) > 0
         end
     else
        for ii = 1:ncomponents 
-            alltfs = exp(-1i*kvec*alldists(ii))./(alldists(ii)-controlparameters.Rstart).*firstorderpathdata.directsoundlist(ii,3);
+            alltfs = exp(-1i*kvec*(alldists(ii)-controlparameters.Rstart))./alldists(ii).*firstorderpathdata.directsoundlist(ii,3);
            if doaddsources == 1
               tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) = ...
                   tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) + alltfs;

@@ -62,7 +62,7 @@ function outputstruct = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,ne
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 27 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 17 Jan. 2018
 %
 % outputstruct = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,nedgesubs,showtext);
 
@@ -79,6 +79,7 @@ function outputstruct = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,ne
 %               .vispartedgesfroms_end
 % 27 Nov. 2017 Copied from ESIE2toolbox. Removed the input parameter
 %               difforder, and removed the file saving.
+% 17 Jan 2018 Turned off the check if an S/R is very close to a thin plane.
 
 % geomacc = 1e-10;
 
@@ -231,16 +232,16 @@ if ~isempty(ivec_visR1)
             end
         end
         ivec_visR1(hitvec) = [];
-        if nthinplanes > 0
-            insidethinplane = planedata.planeisthin(rownumb(hitvec));
-            ivec2 = find(insidethinplane);
-            if ~isempty(ivec2)
-                recinthinplane = colnumb(hitvec(ivec2));
-                thinplanenumber = rownumb(hitvec(ivec2));
-        	    error(['ERROR: R number ',int2str(double(recinthinplane(:).')),' has been placed exactly on the thin plane ',int2str(double(thinplanenumber(:).')),...
-				    ' so it is undefined which side of the plane the R is. Move the R a short distance away'])
-            end
-        end
+%         if nthinplanes > 0
+%             insidethinplane = planedata.planeisthin(rownumb(hitvec));
+%             ivec2 = find(insidethinplane);
+%             if ~isempty(ivec2)
+%                 recinthinplane = colnumb(hitvec(ivec2));
+%                 thinplanenumber = rownumb(hitvec(ivec2));
+%         	    error(['ERROR: R number ',int2str(double(recinthinplane(:).')),' has been placed exactly on the thin plane ',int2str(double(thinplanenumber(:).')),...
+% 				    ' so it is undefined which side of the plane the R is. Move the R a short distance away'])
+%             end
+%         end
     end
 end
 

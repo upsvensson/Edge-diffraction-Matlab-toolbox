@@ -23,10 +23,10 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 %   timingdata
 %   extraoutputdata
 %
-% Uses functions EDdistelements, ESIE2calcedgeinteqmatrixsub2_mex, EDinteg_souterm, EDcalcpropagatematrix
+% Uses functions EDdistelements, EDcalcedgeinteqmatrixsub2_mex, EDinteg_souterm, EDcalcpropagatematrix
 % EDcoordtrans1
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  13 Dec. 2017  
+% Peter Svensson (peter.svensson@ntnu.no)  19 Jan 2018  
 %                       
 % [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
 %    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,sourceamplitudes,...
@@ -63,8 +63,10 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 % 29 Nov. 2017 Cleaned up: removed the old timingdata code. Reduced the
 %              no. of displayed frequencies.
 % 13 Dec. 2017 Added the sourceamplitudes to the Sindata struct
+% 19 Jan 2018 Renamed the ESIE2...mex to ED...mex
 
 % 10 Dec. 2017 TODO: finish the timingdata for the CASE2 : addsources
+% 19 Jan 2018 The TODO above is probably done
 
 showtext = filehandlingparameters.showtext;
 
@@ -261,7 +263,8 @@ for ifreq = 1:nfrequencies
                    n1hormat  = n1hormat(ivuse);
 
                else
-                    [ivuse,n1hormat,n2vertmat,n3vertmat] = ESIE2calcedgeinteqmatrixsub2_mex(n1,n2,n3);       
+%                     [ivuse,n1hormat,n2vertmat,n3vertmat] = ESIE2calcedgeinteqmatrixsub2_mex(n1,n2,n3);       
+                    [ivuse,n1hormat,n2vertmat,n3vertmat] = EDcalcedgeinteqmatrixsub2_mex(n1,n2,n3);       
 
                end
 
@@ -335,7 +338,7 @@ for ifreq = 1:nfrequencies
 
                if acrossface_in*acrossface_out == 0
                     % Reconvert the cylindrical coordinates of
-                    % edge1-re2 into cartesian! Then we can use the ESIE2coordtrans.
+                    % edge1-re2 into cartesian! Then we can use the EDcoordtrans.
                     % We define our own cartesian coord syst such that the reference
                     % edge (edge2) has its starting point in [0 0 0], the z-axis along its
                     % own edge, and the x-axis is along (onto) the reference plane.

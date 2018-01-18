@@ -70,6 +70,8 @@ else
     tfdirect = zeros(nfrequencies,nreceivers,nsources);
 end
 
+kvec = 2*pi*controlparameters.frequencies(:)/envdata.cair;
+
 % alldists will be a matrix of size [nreceivers,nsources]
 
 if firstorderpathdata.ncomponents(1) > 0
@@ -84,9 +86,7 @@ if firstorderpathdata.ncomponents(1) > 0
         alldists = sqrt( sum(distvecs.^2,2) ); 
     end
     
-    maxrecnumber = max( firstorderpathdata.directsoundlist(:,2) );
-
-    kvec = 2*pi*controlparameters.frequencies(:)/envdata.cair;
+    maxrecnumber = max( firstorderpathdata.directsoundlist(:,2) );   
 
     if ncomponents > nfrequencies && Sindata.doaddsources == 1
         for ii = 1:nfrequencies   
@@ -227,7 +227,7 @@ if controlparameters.difforder > 0
                 cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
                 edgedata.edgelengthvec(edgenumber)*[0 1],'n',controlparameters.Rstart,[1 1]);  
 
-            tfnew = tfnew*.*Sindata.sourceamplitudes( Snumber(jj) );
+            tfnew = tfnew.*Sindata.sourceamplitudes( Snumber(jj) );
             if Sindata.doaddsources == 1
                 tfdiff(:,Rnumber(jj)) =  tfdiff(:,Rnumber(jj)) + tfnew;                       
             else

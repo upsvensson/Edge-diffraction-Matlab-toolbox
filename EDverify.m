@@ -26,8 +26,9 @@ function passtest = EDverify(runtest,showtext,plotdiagrams)
 % Diff1 test.
 % 5. Field continuity for receivers close to a single edge, 100 Hz.
 % Diff1 test.
+% 6. Replicate a non-centered internal monopole, at 0.1 Hz.
 % 
-% Peter Svensson 17 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 18 Jan. 2018 (peter.svensson@ntnu.no)
 % 
 % passtest = EDverify(runtest,showtext,plotdiagrams);
 
@@ -39,8 +40,9 @@ function passtest = EDverify(runtest,showtext,plotdiagrams)
 % 16 Jan. 2018 Changed EDverify into a function rather than a script.
 %              Added the plotdiagrams parameter.
 % 17 Jan 2018 Added test 5
+% 18 Jan 2018 Added test6
 
-ntests = 5;
+ntests = 6;
 
 if nargin < 1
     runtest = ones(1,ntests);
@@ -648,6 +650,194 @@ if runtest(5) == 1
     end
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  Test 6: EDmain_convexESIE, replicate internal monopole, at 0.1 Hz
+
+if runtest(6) == 1
+    itest = 6;
+    II = int2str(itest);
+    
+    if showtext > 0
+        disp(' ')
+        disp('*********************************************************************')
+        disp(['Test ',II,': EDmain_convexESIE, replicate internal monopole, at 0.1 Hz']);
+        disp('Cube w internal, non-centered monopole')
+        disp('Entire cube surface gets sources')
+        disp('Radiated field should be within [0.996,1.008] around a circle of receivers')
+    else
+        disp(['Test ',II,': EDmain_convexESIE, replicate internal monopole, at 0.1 Hz']);    
+    end
+
+    mfile = mfilename('fullpath');
+    [infilepath,filestem] = fileparts(mfile);
+
+    corners = [     -0.5000   -0.500   -0.500
+        0.5000   -0.500   -0.500
+        0.5000    0.5000   -0.500
+       -0.5000    0.5000   -0.500
+       -0.5000   -0.500         0.5
+        0.5000   -0.500         0.5
+        0.5000    0.5000         0.5
+       -0.5000    0.5000         0.5];
+    planecorners = [   1     4     3     2
+         5     6     7     8
+         1     2     6     5
+         3     4     8     7
+         2     3     7     6
+         1     5     8     4];
+    geofiledata = struct('corners',corners);
+    geofiledata.planecorners = planecorners;
+    planedata = EDreadgeomatrices(geofiledata.corners,geofiledata.planecorners);
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Controlparameters
+
+    controlparameters = struct('frequencies',0.1);
+    nfrequencies = length(controlparameters.frequencies);
+    controlparameters.ngauss = 32;
+    controlparameters.difforder = 15;
+
+    envdata = struct('cair',344);
+    envdata.rhoair = 1.21;
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Sources
+
+    patchpoints = [];
+    patchcorners = [];
+    patchareas = [];
+    patchnvecs = [];
+    n1 = 6;
+    n2 = 6;
+    planenvecs = planedata.planeeqs(:,1:3);
+    for ii = 1:6
+       [patchcornercoords,patchmidcoords,areas] = EDdivrect(corners(planecorners(ii,1),:),corners(planecorners(ii,2),:),corners(planecorners(ii,3),:),corners(planecorners(ii,4),:),n1,n2);     
+       nvec = planenvecs(ii,:);
+       patchmidcoords = patchmidcoords + 0.0001*nvec(ones(n1*n2,1),:);
+       patchpoints = [patchpoints;patchmidcoords];
+       patchcorners = [patchcorners;patchcornercoords];
+       patchareas = [patchareas;areas];
+       patchnvecs = [patchnvecs;nvec(ones(n1*n2,1),:)];
+    end
+
+    k = 2*pi*controlparameters.frequencies/envdata.cair;
+
+    internalmonopole = [0.3 0.3 0.3];
+    quadweights = [64 25 25 25 25 40 40 40 40]/81/4;
+    quadshift = sqrt(3)/sqrt(5);
+    umono_normal_patch = 0;
+
+    % Gauss point 1 = center point
+    patchquadraturepoints = patchpoints;
+    [distances,cosfi] = GEOcalccosfi(internalmonopole,patchquadraturepoints,patchnvecs);
+    pmono_patch = exp(-1i*k*distances)./distances;
+    umono_radial_patch = pmono_patch/envdata.cair/envdata.rhoair.*(1 + 1./(1i*k*distances));
+    umono_normal_patch =  quadweights(1)*umono_radial_patch.*cosfi;
+
+    % Gauss points 2-5 = from center point, towards corners
+    for ii = 1:4
+        patchquadraturepoints = patchpoints + quadshift*(patchcorners(:,[1:3] + 3*(ii-1)) - patchpoints);
+        [distances,cosfi] = GEOcalccosfi(internalmonopole,patchquadraturepoints,patchnvecs);
+        pmono_patch = exp(-1i*k*distances)./distances;
+        umono_radial_patch = pmono_patch/envdata.cair/envdata.rhoair.*(1 + 1./(1i*k*distances));
+        umono_normal_patch = umono_normal_patch + quadweights(ii+1)*umono_radial_patch.*cosfi;    
+    end
+
+    % Gauss points 6-9 = from center point, towards midpoint
+    for ii = 1:4
+        if ii < 4
+            patchedgemidpoint = 0.5*( patchcorners(:,[1:3] + 3*(ii-1)) + patchcorners(:,[1:3] + 3*(ii)) );
+        else
+            patchedgemidpoint = 0.5*( patchcorners(:,10:12) + patchcorners(:,1:3) );        
+        end
+        patchquadraturepoints = patchpoints + quadshift*(patchedgemidpoint - patchpoints);
+        [distances,cosfi] = GEOcalccosfi(internalmonopole,patchquadraturepoints,patchnvecs);
+        pmono_patch = exp(-1i*k*distances)./distances;
+        umono_radial_patch = pmono_patch/envdata.cair/envdata.rhoair.*(1 + 1./(1i*k*distances));
+        umono_normal_patch = umono_normal_patch + quadweights(ii+5)*umono_radial_patch.*cosfi;    
+    end
+
+    Sindata = struct('coordinates',patchpoints);
+    nsources = size(Sindata.coordinates,1);
+    Sindata.sourceamplitudes = patchareas.*umono_normal_patch...
+         .*1i*2*pi*controlparameters.frequencies*envdata.rhoair/4/pi;
+    Sindata.doaddsources = 1;
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Receivers
+
+    rdist = 3;
+    phivec = [0:0.1:2*pi].';
+    receivers = rdist*[cos(phivec) sin(phivec) 0*phivec];
+    nreceivers = size(receivers,1);
+    receivers = receivers + internalmonopole(ones(nreceivers,1),:);
+
+    Rindata = struct('coordinates',receivers);
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Filehandling
+
+    filehandlingparameters = struct('outputdirectory',infilepath);
+    filehandlingparameters.filestem = filestem;
+    filehandlingparameters.showtext = 1;
+
+    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Load and present the results
+
+    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
+    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'])
+
+    tftot = tfinteqdiff + tfdiff + tfdirect + tfgeom;
+
+    maxval = rdist*max(abs(tftot));
+    minval = rdist*min(abs(tftot));
+
+    if maxval < 1.008 && minval > 0.996
+       passtest(itest) = 1; 
+    else
+       passtest(itest) = -1;         
+    end
+    
+    if plotdiagrams == 1
+       figure
+
+        plot(phivec*180/pi,rdist*abs([tftot.' ]),'-o')
+        xlabel(['Receiver angle   [deg.]'])
+        ylabel(['Sound pressure amp., re. free-field   [-]'])       
+        grid
+    end
+    
+    if showtext > 0
+         disp(' ')
+        disp(['Computed results are within [',num2str(minval),',',num2str(maxval)])
+        disp(['   '])
+        if passtest(itest) == 1
+            disp(['So, verification test ',II,' was passed'])
+        else
+            disp(['So, verification test ',II,' was not passed. Please check the code'])   
+        end
+    end
+    
+    
+    fwrite(fid,[' ',lineending],'char');
+    fwrite(fid,['####################################################################',lineending],'char');
+    fwrite(fid,['Test ',II,': EDmain_convexESIE, replicate internal monopole, at 0.1 Hz.',lineending],'char');
+    fwrite(fid,['Cube w internal, non-centered monopole.',lineending],'char');
+    fwrite(fid,['Entire cube surface gets sources.',lineending],'char');
+    fwrite(fid,['Radiated field should be within [0.996,1.008] around a circle of receivers',lineending],'char');
+    fwrite(fid,['Computed results are within [',num2str(minval),',',num2str(maxval),lineending],'char');
+    fwrite(fid,[' ',lineending],'char');
+    if passtest(itest) == 1
+        fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
+    else
+        fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+    end
+    
+end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

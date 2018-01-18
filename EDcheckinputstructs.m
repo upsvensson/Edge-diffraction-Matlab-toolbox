@@ -42,12 +42,12 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .loadinteqsousigs     (default: 0)
 %                       .savepathsfile        (default: 0)
 %                       .saveISEStree         (default: 0)
-%                       .savelogfile          (default: 0)
+%                       .savelogfile          (default: 1)
 %                       .savediff2result      (default: 0)
 %                       .showtext             (default: 1)
 %   EDmaincase          1, if convexESIE
 % 
-% Peter Svensson 17 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 18 Jan. 2018 (peter.svensson@ntnu.no)
 % 
 % [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -67,6 +67,8 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %              Also followed one yellow recommendation: numel instead of
 %              prod.
 % 17 Jan 2018  Added the input field planecornertype
+% 18 Jan 2018  Fixed a bug with the sourceamplitudes; they were forced to
+% one by mistake. Changed default for savelogfile to 1.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -205,9 +207,12 @@ if EDmaincase == 1
       
     nfrequencies = length(controlparameters.frequencies);
     nsources = size(Sindata.coordinates,1);
-    if nsources > 1 || nfrequencies > 1 
-        if numel(Sindata.sourceamplitudes,1) == 1
+    [n1,n2] = size(Sindata.sourceamplitudes);
+    if  n1 ~= nsources || n2 ~= nfrequencies
+        if n1 == 1 && n2 == 1
             Sindata.sourceamplitudes = ones(nsources,nfrequencies);
+        else
+            error(['ERROR: The Sindata.sourceamplitudes input parameter must have the size [1,1] or [nsources,nfrequencies], but it had the size ',int2str(n1),' by ',int2str(n2)])
         end
     end
     
@@ -275,7 +280,7 @@ if ~isfield(filehandlingparameters,'savediff2result')
     filehandlingparameters.savediff2result = 0;
 end
 if ~isfield(filehandlingparameters,'savelogfile')
-    filehandlingparameters.savelogfile = 0;
+    filehandlingparameters.savelogfile = 1;
 end
 
 

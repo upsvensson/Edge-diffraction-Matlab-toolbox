@@ -46,7 +46,7 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 17 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 18 Jan. 2018
 %
 % firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,difforder,showtext)
@@ -59,6 +59,8 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 % and corner hits. Also for the specular reflections.
 % 17 Jan 2018 Introduced the input parameter difforder, so one can skip the
 % diffraction, if wanted.
+% 18 Jan 2018 Fixed an important bug for the direct sound, which happened
+% when there were many sources and many receivers.
 
 if nargin < 10
    showtext = 0; 
@@ -221,16 +223,19 @@ if npotentialobstruct > 0
         planedata.minvals(possibleSPR_obstruct(:,2),:),planedata.maxvals(possibleSPR_obstruct(:,2),:),...
         planedata.planecorners(possibleSPR_obstruct(:,2),:),planedata.corners,planedata.ncornersperplanevec(possibleSPR_obstruct(:,2)));
 
-    obstructlist = possibleSPR_obstruct(hitplanes,:);
-    directsoundOK(obstructlist(:,3),obstructlist(:,1))=0;
+    obstructlist = possibleSPR_obstruct(hitplanes,:);    
+    iv = sub2ind([nreceivers,nsources],obstructlist(:,3),obstructlist(:,1));    
+    directsoundOK(iv)=0;
     
     if ~isempty(edgehits)
         edgehitlist = possibleSPR_obstruct(edgehits,:);
-        directsoundOK(edgehitlist(:,3),edgehitlist(:,1))=0.5;
+        iv = sub2ind([nreceivers,nsources],edgehitlist(:,3),edgehitlist(:,1));  
+        directsoundOK(iv)=0.5;
     end
     if ~isempty(cornerhits)
         cornerhitlist = possibleSPR_obstruct(cornerhits,:);
-        directsoundOK(cornerhitlist(:,3),cornerhitlist(:,1))=0.75;
+        iv = sub2ind([nreceivers,nsources],cornerhitlist(:,3),cornerhitlist(:,1));  
+        directsoundOK(iv)=0.75;
     end
 end
 

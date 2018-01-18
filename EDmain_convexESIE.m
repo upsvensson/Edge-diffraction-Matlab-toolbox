@@ -69,7 +69,9 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % 17 Jan 2018 Added the handling of the planecornertype input field.
 % 17 Jan. 2018 Added the showtext input parameter to the "findGA..." and
 % "makefirstordertfs".
-% 18 Jan 2018 Changed input parameters to EDmakefirstordertfs
+% 18 Jan 2018 Changed input parameters to EDmakefirstordertfs. 
+% 18 Jan 2018 Changed the order of the blocks, so that GA and diff1 comes
+% before ESIE/HOD.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -237,6 +239,66 @@ if filehandlingparameters.savelogfile == 1
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Find the paths for direct sound, first-order specular, and first-order
+% diffraction paths.
+
+if filehandlingparameters.showtext >= 1	
+	disp('   Find the (first-order) GA paths')
+end
+
+% The output struct firstorderpathdata has the fields
+%   .validIScoords          matrix, [nIS,3] with IS coordinates
+%   .validsounumber         vector, [nIS,1] with original source number
+%   .validrecnumber         vector, [nIS,1] with original receiver number
+%   .diffpaths              matrix, [nreceivers,nsources,nedges] with
+%                           logical 0 or 1
+%   .edgeisactive           vector, [nedges,1] with logical 0 or 1
+%   .directsoundOK          matrix, [nreceivers,nsources] with 0 or 1
+%   .ncomponents            vector, [1,3], with number of direct sound,
+%                           specrefl and diffr components.
+
+
+t00 = clock;
+firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
+    Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
+    Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr,...
+    controlparameters.difforder,filehandlingparameters.showtext);
+t01 = etime(clock,t00);
+timingstruct.findpaths = t01;
+if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   EDfindconvexGApaths (',int2str(nfrequencies),' frequencies)',lineending],'char');
+    fwrite(fid,['                                Total time: ',num2str(t01),' s',lineending],'char');
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Generate the first-order specular, and first-order
+% diffraction tfs.
+
+if filehandlingparameters.showtext >= 1	
+	disp('   Generate the (first-order) GA and diff tfs.')
+end
+
+t00 = clock;
+[tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpathdata,...
+    controlparameters,envdata,Sindata,Rdata.receivers,...
+    edgedata,filehandlingparameters.showtext);
+t01 = etime(clock,t00);
+timingstruct.maketfs = [t01 timingdata];
+
+desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
+eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct EDversionnumber geofiledata Sindata Rindata envdata controlparameters filehandlingparameters'])
+
+if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   EDmakefirstordertfs (',int2str(nfrequencies),' frequencies)',lineending],'char');
+    fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for all frequencies, as below',lineending],'char');
+    fwrite(fid,['                                Generate the direct sound: ',num2str(timingdata(1)),' s',lineending],'char');
+    fwrite(fid,['                                Generate the specular reflections: ',num2str(timingdata(2)),' s',lineending],'char');
+    fwrite(fid,['                                Generate the first-order diffraction: ',num2str(timingdata(3)),' s',lineending],'char');
+end
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Add edge-to-edge visibility data
 
 if controlparameters.difforder > 1
@@ -349,65 +411,9 @@ else
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Find the paths for direct sound, first-order specular, and first-order
-% diffraction paths.
-
-if filehandlingparameters.showtext >= 1	
-	disp('   Find the (first-order) GA paths')
-end
-
-% The output struct firstorderpathdata has the fields
-%   .validIScoords          matrix, [nIS,3] with IS coordinates
-%   .validsounumber         vector, [nIS,1] with original source number
-%   .validrecnumber         vector, [nIS,1] with original receiver number
-%   .diffpaths              matrix, [nreceivers,nsources,nedges] with
-%                           logical 0 or 1
-%   .edgeisactive           vector, [nedges,1] with logical 0 or 1
-%   .directsoundOK          matrix, [nreceivers,nsources] with 0 or 1
-%   .ncomponents            vector, [1,3], with number of direct sound,
-%                           specrefl and diffr components.
-
-
-t00 = clock;
-firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
-    Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
-    Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr,...
-    controlparameters.difforder,filehandlingparameters.showtext);
-t01 = etime(clock,t00);
-timingstruct.findpaths = t01;
-if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDfindconvexGApaths (',int2str(nfrequencies),' frequencies)',lineending],'char');
-    fwrite(fid,['                                Total time: ',num2str(t01),' s',lineending],'char');
-end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Generate the first-order specular, and first-order
-% diffraction tfs.
-
-if filehandlingparameters.showtext >= 1	
-	disp('   Generate the (first-order) GA and diff tfs.')
-end
-
-t00 = clock;
-[tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpathdata,...
-    controlparameters,envdata,Sindata,Rdata.receivers,...
-    edgedata,filehandlingparameters.showtext);
-t01 = etime(clock,t00);
-timingstruct.maketfs = [t01 timingdata];
-
-desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
-eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct EDversionnumber geofiledata Sindata Rindata envdata controlparameters filehandlingparameters'])
 
 if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDmakefirstordertfs (',int2str(nfrequencies),' frequencies)',lineending],'char');
-    fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for all frequencies, as below',lineending],'char');
-    fwrite(fid,['                                Generate the direct sound: ',num2str(timingdata(1)),' s',lineending],'char');
-    fwrite(fid,['                                Generate the specular reflections: ',num2str(timingdata(2)),' s',lineending],'char');
-    fwrite(fid,['                                Generate the first-order diffraction: ',num2str(timingdata(3)),' s',lineending],'char');
     fclose(fid);
 end
-
 
 

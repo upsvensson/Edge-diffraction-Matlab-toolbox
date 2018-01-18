@@ -40,7 +40,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 17 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 18 Jan. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -69,6 +69,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % 17 Jan 2018 Added the handling of the planecornertype input field.
 % 17 Jan. 2018 Added the showtext input parameter to the "findGA..." and
 % "makefirstordertfs".
+% 18 Jan 2018 Changed input parameters to EDmakefirstordertfs
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -367,6 +368,7 @@ end
 %   .ncomponents            vector, [1,3], with number of direct sound,
 %                           specrefl and diffr components.
 
+
 t00 = clock;
 firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
     Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
@@ -390,7 +392,7 @@ end
 
 t00 = clock;
 [tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpathdata,...
-    controlparameters,envdata,Sindata.doaddsources,Sdata.sources,Rdata.receivers,...
+    controlparameters,envdata,Sindata,Rdata.receivers,...
     edgedata,filehandlingparameters.showtext);
 t01 = etime(clock,t00);
 timingstruct.maketfs = [t01 timingdata];

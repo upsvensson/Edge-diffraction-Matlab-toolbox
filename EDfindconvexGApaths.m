@@ -46,7 +46,7 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 18 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 19 Jan. 2018
 %
 % firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,difforder,showtext)
@@ -61,6 +61,8 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 % diffraction, if wanted.
 % 18 Jan 2018 Fixed an important bug for the direct sound, which happened
 % when there were many sources and many receivers.
+% 19 Jan 2018 Fixed a bug: error occured if there were no specular
+% reflections.
 
 if nargin < 10
    showtext = 0; 
@@ -173,7 +175,8 @@ if npotentialIS > 0
 else
     validIScoords = [];
     validsounumber = [];
-    validrecnumber = [];    
+    validrecnumber = [];  
+    specreflamp = [];
 end
     
     

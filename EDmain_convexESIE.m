@@ -310,7 +310,7 @@ if controlparameters.difforder > 1
         disp('   Creating the edgetoedgedata struct ')
     end
     t00 = clock;
-    edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,1,2,controlparameters.nedgepoints_visibility,filehandlingparameters.showtext);    
+    edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,1,2,2,filehandlingparameters.showtext);    
     if filehandlingparameters.saveeddatafile == 1
         desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_eddata.mat'];
         eval(['save ',desiredname,' planedata edgedata edgetoedgedata'])

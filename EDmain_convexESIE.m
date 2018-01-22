@@ -109,7 +109,7 @@ if filehandlingparameters.savelogfile == 1
 end
 
 if filehandlingparameters.savesetupfile == 1
-    varlist = 'geofiledata Sindata Rindata envdata controlparameters filehandlingparameters';
+    varlist = 'geofiledata Sindata Rindata envdata controlparameters filehandlingparameters EDversionnumber';
     eval(['save ',filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_setup.mat ',varlist])
 end
 

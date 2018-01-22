@@ -34,7 +34,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .ngauss              (default: 16)
 %   filehandlingparameters    .outputdirectory  (default: the folder of the geoinputfile)  
 %                       .filestem        (default: name of the cad-file, with an underscore + running integer)
-%                       .savesetupfile       (default: 0)
+%                       .savesetupfile       (default: 1)
 %                       .savecadgeofile      (default: 0)
 %                       .saveSRdatafiles     (default: 0)
 %                       .saveeddatafile      (default: 0)
@@ -259,7 +259,7 @@ if ~isfield(filehandlingparameters,'filestem')
     end
 end
 if ~isfield(filehandlingparameters,'savesetupfile')
-    filehandlingparameters.savesetupfile = 0;
+    filehandlingparameters.savesetupfile = 1;
 end
 if ~isfield(filehandlingparameters,'showtext')
     filehandlingparameters.showtext = 1;

@@ -131,9 +131,11 @@ function [edgedata,planedata] = EDedgeo(planedata,firstcornertoskip,listofcorner
 %               saved. Changed name for one parameter to firstcornertoskip
 %               (from firstskipcorner).
 % 28 Nov. 2017  Introduced the non-global showtext parameter. Made some
-% code improvements.
+%               code improvements.
 % 29 Nov. 2017  Small correction with findstr( and modeltype. Changed call,
-% from ESIE2checkobstrpaths to ED
+%               from ESIE2checkobstrpaths to ED
+% 22 Jan 2018 The output parameters ismodelconvex and ismodelthinplate were
+%               removed (weren't used other places).
 
 geomacc = 1e-10;
 
@@ -1380,25 +1382,27 @@ for ii = 1:length(closwedangvec)
     edgerelatedcoordsysmatrices(ii,:) = reshape(Bmatrix,1,9);   
 end
 
-%-------------------------------------------------------------------
-% Add some fields
-
-ismodelconvex = 1;
-if any(any(edgeseesplane+2)) 
-    ismodelconvex = 0;
-end
-if any(planedata.planehasindents)
-    ismodelconvex = 0;
-end
-
-if prod(planeisthin) == 1
-    ismodelthinplate = 1;
-   if any(any(sign(edgeseesplane)+1))
-       ismodelthinplate = 0;        
-   end
-else
-    ismodelthinplate = 0;
-end
+% The section below was removed 22 Jan 2018
+% 
+% % % %-------------------------------------------------------------------
+% % % % Add some fields
+% % % 
+% % % ismodelconvex = 1;
+% % % if any(any(edgeseesplane+2)) 
+% % %     ismodelconvex = 0;
+% % % end
+% % % if any(planedata.planehasindents)
+% % %     ismodelconvex = 0;
+% % % end
+% % % 
+% % % if prod(planeisthin) == 1
+% % %     ismodelthinplate = 1;
+% % %    if any(any(sign(edgeseesplane)+1))
+% % %        ismodelthinplate = 0;        
+% % %    end
+% % % else
+% % %     ismodelthinplate = 0;
+% % % end
 
 %----------------------------------------------------------------------------
 %
@@ -1432,7 +1436,8 @@ edgedata = struct('edgecorners',edgecorners,'planesatedge',planesatedge,...
     'edgeendcoords',edgeendcoords,'edgenvecs',edgenvecs,...
     'edgesatplane',edgesatplane,'edgelengthvec',edgelengthvec,...
     'offedges',offedges,'edgerelatedcoordsysmatrices',edgerelatedcoordsysmatrices,...
-    'edgenormvecs',edgenormvecs,'ismodelconvex',ismodelconvex,'ismodelthinplate',ismodelthinplate,...
+    'edgenormvecs',edgenormvecs,...
+%     'edgenormvecs',edgenormvecs,'ismodelconvex',ismodelconvex,'ismodelthinplate',ismodelthinplate,...
     'edgestartcoordsnudge',edgestartcoordsnudge,'edgeendcoordsnudge',edgeendcoordsnudge);
 
 planedata.planeisthin = planeisthin;

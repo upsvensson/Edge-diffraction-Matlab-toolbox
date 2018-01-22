@@ -76,6 +76,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % 22 Jan 2018 Removed the input parameter nedgepoints_visibility. It is
 % forced to the value 2 at the input to EDSorRgeo (but it should preferrably
 % be avoided altogether for convex geometries.
+% 22 Jan 2018 Corrected the handling of docalctf
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -279,28 +280,37 @@ end
 % Generate the first-order specular, and first-order
 % diffraction tfs.
 
-if filehandlingparameters.showtext >= 1	
-	disp('   Generate the (first-order) GA and diff tfs.')
+if controlparameters.docalctf == 1
+    if filehandlingparameters.showtext >= 1	
+        disp('   Generate the (first-order) GA and diff tfs.')
+    end
+
+    t00 = clock;
+    [tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpathdata,...
+        controlparameters,envdata,Sindata,Rdata.receivers,...
+        edgedata,filehandlingparameters.showtext);
+    t01 = etime(clock,t00);
+    timingstruct.maketfs = [t01 timingdata];
+
+    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
+    eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct EDversionnumber geofiledata Sindata Rindata envdata controlparameters filehandlingparameters'])
+
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   EDmakefirstordertfs (',int2str(nfrequencies),' frequencies)',lineending],'char');
+        fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for all frequencies, as below',lineending],'char');
+        fwrite(fid,['                                Generate the direct sound: ',num2str(timingdata(1)),' s',lineending],'char');
+        fwrite(fid,['                                Generate the specular reflections: ',num2str(timingdata(2)),' s',lineending],'char');
+        fwrite(fid,['                                Generate the first-order diffraction: ',num2str(timingdata(3)),' s',lineending],'char');
+    end
+else
+    if filehandlingparameters.showtext >= 1	
+        disp('   First-order GA and diff tfs are not generated because docalctf was set to 0')
+    end
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   EDmakefirstordertfs was not run because docalctf was set to 0',lineending],'char');
+    end
+    timingstruct.maketfs = 0;
 end
-
-t00 = clock;
-[tfdirect,tfgeom,tfdiff,timingdata] = EDmakefirstordertfs(firstorderpathdata,...
-    controlparameters,envdata,Sindata,Rdata.receivers,...
-    edgedata,filehandlingparameters.showtext);
-t01 = etime(clock,t00);
-timingstruct.maketfs = [t01 timingdata];
-
-desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
-eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct EDversionnumber geofiledata Sindata Rindata envdata controlparameters filehandlingparameters'])
-
-if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDmakefirstordertfs (',int2str(nfrequencies),' frequencies)',lineending],'char');
-    fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for all frequencies, as below',lineending],'char');
-    fwrite(fid,['                                Generate the direct sound: ',num2str(timingdata(1)),' s',lineending],'char');
-    fwrite(fid,['                                Generate the specular reflections: ',num2str(timingdata(2)),' s',lineending],'char');
-    fwrite(fid,['                                Generate the first-order diffraction: ',num2str(timingdata(3)),' s',lineending],'char');
-end
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Add edge-to-edge visibility data
@@ -333,7 +343,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Prepare for the integral equation: set up the submatrix structure
 
-if controlparameters.difforder > 1
+if controlparameters.difforder > 1 && controlparameters.docalctf == 1
     if filehandlingparameters.showtext >= 1	
         disp('   Creating the integral equation Hsubmatrixdata struct ')
     end
@@ -371,7 +381,7 @@ if controlparameters.difforder > 1
     end
 else
     if filehandlingparameters.showtext >= 1	
-        disp(['   Skipping the integral equation Hsubmatrixdata struct, since difforder = ',int2str(controlparameters.difforder)])
+        disp(['   Skipping the integral equation Hsubmatrixdata struct, since difforder = ',int2str(controlparameters.difforder),' (or docalctf was set to 0)'])
         timingstruct.submatrixdata = 0;
     end    
     if filehandlingparameters.savelogfile >= 1	        
@@ -382,7 +392,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate the HOD contribution with the integral equation
 
-if controlparameters.difforder > 1
+if controlparameters.difforder > 1 && controlparameters.docalctf == 1
     if filehandlingparameters.showtext >= 1	
         disp('   Calculating the HOD contribution with the FD integral equation')
         disp(['      ',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',int2str(controlparameters.difforder)])
@@ -406,7 +416,7 @@ if controlparameters.difforder > 1
     end
 else
     if filehandlingparameters.showtext >= 1	
-        disp(['   Skipping the FD integral equation, since difforder = ',int2str(controlparameters.difforder)])
+        disp(['   Skipping the FD integral equation, since difforder = ',int2str(controlparameters.difforder),' (or docalctf was set to 0)'])
     end
     timingstruct.integralequation = [0 0 0 0 0];
     if filehandlingparameters.savelogfile == 1

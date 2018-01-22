@@ -184,9 +184,12 @@ if EDmaincase == 1
     if ~isfield(controlparameters,'Rstart')
         controlparameters.Rstart = 0;
     end
-    if isfield(controlparameters,'frequencies') == 0 && controlparameters.docalctf == 1
-       disp('ERROR: The frequencies were not specified')
-       return
+    if isfield(controlparameters,'frequencies') == 0 
+        if controlparameters.docalctf == 1
+            error('ERROR: The frequencies were not specified')
+        else
+           controlparameters.frequencies = []; 
+        end
     end
     if ~isfield(controlparameters,'discretizationtype')
         controlparameters.discretizationtype = 2;

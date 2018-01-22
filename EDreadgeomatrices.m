@@ -1,4 +1,4 @@
-function planedata = EDreadgeomatrices(corners,planecorners,planecornerstype)
+function planedata = EDreadgeomatrices(corners,planecorners)
 % EDreadgeomatrices - Reads the geometrydata (corners and planecorners) from
 % two input matrices, and builds the planedata from these. Rigid surfaces
 % are assumed.
@@ -8,8 +8,6 @@ function planedata = EDreadgeomatrices(corners,planecorners,planecornerstype)
 %                   the ncorners corners.
 %   planecorners    A matrix of size [nplanes,nmaxnumberofcorners] with the
 %                   corner numbers of the nplanes plane definitions.
-%  planecornerstype (optional) Could have the value 'zero' or 'circ'.Default: 'circ'.
-%               	Affects the matrix planecorners, see below.
 %
 % Output parameters:
 %	planedata       Structwith fields:
@@ -34,19 +32,18 @@ function planedata = EDreadgeomatrices(corners,planecorners,planecornerstype)
 %
 % Uses the functions EDinfrontofplane
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 12 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 22 Jan. 2018
 %
-% planedata = EDreadgeomatrices(corners,planecorners,planecornerstype);
+% planedata = EDreadgeomatrices(corners,planecorners);
 
 % 29 Nov. 2017 First version
 % 12 Jan. 2018 Increased the bounding boxes a bit - doesn't hurt to make
 % them a bit bigger.
+% 22 Jan 2018 Removed the input parameter planecornerstype since it is not
+% used anywhere.
 
-if nargin < 3
-    planecornerstype = 'circ';
-    if nargin < 2
-        error('ERROR: the corners and planecorners matrices must be specified')
-    end
+if nargin < 2
+    error('ERROR: the corners and planecorners matrices must be specified')
 end
    
 % geomacc is only used to make the bounding boxes a bit bigger than the
@@ -72,36 +69,38 @@ if max(max(planecorners)) > ncorners
     error('ERROR: One plane definition in the input matrix planecorners used a higher corner number than was defined in the corners input matrix')
 end
 
-%---------------------------------------------------------------
-% Go through all planes. If there is a plane definition including
-% zeros, and planecornerstype == 'circ', expand it repeating the
-% same corner order again.
-
-if isempty(planecornerstype)
-	planecornerstype = 'circ';
-else
-	planecornerstype = char(lower(planecornerstype(1)));
-	if planecornerstype(1) == 'z'
-		planecornerstype = 'zero';
-    else
-		planecornerstype = 'circ';
-	end
-end
-
-if strcmp(planecornerstype,'circ') == 1
-	for ii = 1:nplanes
-		iv = find( planecorners(ii,:) ~= 0);
-		ncornersatplane = length(iv);
-		if ncornersatplane ~= maxcornersperplane
-			pattern = planecorners(ii,iv);
-			nrepeatings = ceil(ncornersperplane/ncornersatplane);
-			for jj = 1:nrepeatings-1
-				pattern = [pattern planecorners(ii,iv)];
-			end
-			planecorners(ii,:) = pattern(1:ncornersperplane);
-		end
-	end
-end
+% The section below was removed on 22 Jan 2018
+%
+% % % %---------------------------------------------------------------
+% % % % Go through all planes. If there is a plane definition including
+% % % % zeros, and planecornerstype == 'circ', expand it repeating the
+% % % % same corner order again.
+% % % 
+% % % if isempty(planecornerstype)
+% % % 	planecornerstype = 'circ';
+% % % else
+% % % 	planecornerstype = char(lower(planecornerstype(1)));
+% % % 	if planecornerstype(1) == 'z'
+% % % 		planecornerstype = 'zero';
+% % %     else
+% % % 		planecornerstype = 'circ';
+% % % 	end
+% % % end
+% % % 
+% % % if strcmp(planecornerstype,'circ') == 1
+% % % 	for ii = 1:nplanes
+% % % 		iv = find( planecorners(ii,:) ~= 0);
+% % % 		ncornersatplane = length(iv);
+% % % 		if ncornersatplane ~= maxcornersperplane
+% % % 			pattern = planecorners(ii,iv);
+% % % 			nrepeatings = ceil(ncornersperplane/ncornersatplane);
+% % % 			for jj = 1:nrepeatings-1
+% % % 				pattern = [pattern planecorners(ii,iv)];
+% % % 			end
+% % % 			planecorners(ii,:) = pattern(1:ncornersperplane);
+% % % 		end
+% % % 	end
+% % % end
 
 %---------------------------------------------------------------
 % Find the normal vectors to the planes using the cross products

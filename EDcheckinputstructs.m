@@ -10,8 +10,6 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                                             requires that filehandlingparameters.outputdirectory and .filestem are specified)
 %                       .planecorners        (optional; alternative to
 %                                             .geoinputfile)
-%                       .planecornertype     (optional; 'circ' or 'zero'.
-%                                             default: 'circ')
 %                       .firstcornertoskip   (default: 1e6)
 %   Sindata             .coordinates         (obligatory)
 %                       .doaddsources        (default: 0 = no)
@@ -47,7 +45,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .showtext             (default: 1)
 %   EDmaincase          1, if convexESIE
 % 
-% Peter Svensson 18 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 22 Jan. 2018 (peter.svensson@ntnu.no)
 % 
 % [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -69,6 +67,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 % 17 Jan 2018  Added the input field planecornertype
 % 18 Jan 2018  Fixed a bug with the sourceamplitudes; they were forced to
 % one by mistake. Changed default for savelogfile to 1.
+% 22 Jan 2018 Removed the field planecornertype in the struct geofiledata
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -108,9 +107,6 @@ else
             filehandlingparameters.outputdirectory = infilepath;
         end    
     else
-        if ~isfield(geofiledata,'planecornertype')
-           geofiledata.planecornertype = 'circ';
-        end
         if isfield(filehandlingparameters,'outputdirectory') == 0 || isfield(filehandlingparameters,'filestem') == 0
             error('ERROR: When you give the geometry input in the form of data matrices, you must specify filehandlingparameters.outputdirectory and .filestem')            
         end

@@ -8,8 +8,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % Input parameters are six structs with fields as specified below:
 %   geofiledata         .geoinputfile        (obligatory)
 %                       As an alternative to specifying geoinputfile, it is
-%                       possible to specify .corners, .planecorners, and
-%                       optionally .planecornertype.
+%                       possible to specify .corners, .planecorners.
 %                       .firstcornertoskip   (default: 1e6)
 %   Sindata             .coordinates         (obligatory)
 %                       .doaddsources        (default: 0 = no)
@@ -40,7 +39,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 18 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 22 Jan. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -72,6 +71,8 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % 18 Jan 2018 Changed input parameters to EDmakefirstordertfs. 
 % 18 Jan 2018 Changed the order of the blocks, so that GA and diff1 comes
 % before ESIE/HOD.
+% 22 Jan 2018 Adapted to the removal of parameter planecornertype in
+% EDreadcad and EDreadgeomatrices.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -110,7 +111,7 @@ end
 
 if filehandlingparameters.showtext >= 1
 	disp('    ');disp('####################################################################')
-              disp('#  EDmain_convexESIE, v. 0.1 (17 Jan. 2018)')
+              disp('#  EDmain_convexESIE, v. 0.1 (22 Jan. 2018)')
               disp(['#  filestem for results: ',filehandlingparameters.filestem])
               disp(' ')
 end
@@ -121,7 +122,7 @@ if filehandlingparameters.savelogfile == 1
     	return
     end
     fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['#  EDmain_convexESIE, v. 0.1 (17 Jan. 2018)',lineending],'char');
+    fwrite(fid,['#  EDmain_convexESIE, v. 0.1 (22 Jan. 2018)',lineending],'char');
     fwrite(fid,['#  filestem for results: ',filehandlingparameters.filestem,lineending],'char');
     fwrite(fid,[' ',lineending],'char');
 end
@@ -136,7 +137,7 @@ if isfield(geofiledata,'geoinputfile')
         disp('   Creating the planedata struct from the CAD file')
     end
     t00 = clock;
-    [planedata,extraCATTdata] = EDreadcad(geofiledata.geoinputfile,'circ',0);
+    [planedata,extraCATTdata] = EDreadcad(geofiledata.geoinputfile,0);
     if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
         error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
     end
@@ -158,7 +159,7 @@ else
         disp('   Creating the planedata struct from the input geometry matrices')
     end
     t00 = clock;
-    planedata = EDreadgeomatrices(geofiledata.corners,geofiledata.planecorners,geofiledata.planecornertype);    
+    planedata = EDreadgeomatrices(geofiledata.corners,geofiledata.planecorners);    
     ncorners = size(planedata.corners,1);
     nplanes = size(planedata.planecorners,1);
     t01 = etime(clock,t00);

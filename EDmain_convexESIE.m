@@ -73,6 +73,9 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % before ESIE/HOD.
 % 22 Jan 2018 Adapted to the removal of parameter planecornertype in
 % EDreadcad and EDreadgeomatrices.
+% 22 Jan 2018 Removed the input parameter nedgepoints_visibility. It is
+% forced to the value 2 at the input to EDSorRgeo (but it should preferrably
+% be avoided altogether for convex geometries.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -205,7 +208,7 @@ if filehandlingparameters.showtext >= 1
 	disp('   Creating the Sdata struct ')
 end
 t00 = clock;
-Sdata = EDSorRgeo(planedata,edgedata,Sindata.coordinates,'S',controlparameters.nedgepoints_visibility,filehandlingparameters.showtext);
+Sdata = EDSorRgeo(planedata,edgedata,Sindata.coordinates,'S',2,filehandlingparameters.showtext);
 if filehandlingparameters.saveSRdatafiles == 1
     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_Sdata.mat'];
     eval(['save ',desiredname,' Sdata'])    
@@ -224,7 +227,7 @@ if filehandlingparameters.showtext >= 1
 	disp('   Creating the Rdata struct ')
 end
 t00 = clock;
-Rdata = EDSorRgeo(planedata,edgedata,Rindata.coordinates,'R',controlparameters.nedgepoints_visibility,filehandlingparameters.showtext);
+Rdata = EDSorRgeo(planedata,edgedata,Rindata.coordinates,'R',2,filehandlingparameters.showtext);
 if filehandlingparameters.saveSRdatafiles == 1
     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_Rdata.mat'];
     eval(['save ',desiredname,' Rdata'])    

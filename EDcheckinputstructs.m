@@ -19,12 +19,15 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %   Rindata             .coordinates         (obligatory)
 %   envdata             .cair                (default: 344)
 %                       .rhoair              (default: 1.21)
-%   controlparameters   .fs                  (default: 44100)
+%   controlparameters   .fs                  (default: 44100) Irrelevant for
+%                                            EDmain_convexESIE
 %                       .directsound         (default: 1 = yes)
 %                       .difforder           (default: 15)
-%                       .nedgepoints_visibility (default: 2)
+%                       .nedgepoints_visibility (default: 2) Irrelevant for
+%                                            EDmain_convexESIE
 %                       .docalctf            (default: 1)
-%                       .docalcir            (default: 0)
+%                       .docalcir            (default: 0) Irrelevant for
+%                                            EDmain_convexESIE
 %                       .Rstart              (default: 0)
 %                       .frequencies         (obligatory)
 %                       .discretizationtype  (default: 2 = G-L)
@@ -43,7 +46,8 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .savelogfile          (default: 1)
 %                       .savediff2result      (default: 0)
 %                       .showtext             (default: 1)
-%   EDmaincase          1, if convexESIE
+%   EDmaincase          1, if convexESIE (frequency domain)
+%                       2, if convexESIE (time domain)
 % 
 % Peter Svensson 22 Jan. 2018 (peter.svensson@ntnu.no)
 % 
@@ -68,6 +72,8 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 % 18 Jan 2018  Fixed a bug with the sourceamplitudes; they were forced to
 % one by mistake. Changed default for savelogfile to 1.
 % 22 Jan 2018 Removed the field planecornertype in the struct geofiledata
+% 22 Jan 2018 Moved some controlparameter fields away from the convex TF
+% case: fs, nedgepoints_visibility, docalcir, specorder.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -162,30 +168,18 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct controlparameters
 
+if ~isstruct(controlparameters)
+     error('ERROR: the struct controlparameters was not specified')           
+end
+if ~isfield(controlparameters,'directsound')
+    controlparameters.directsound = 1;
+end
 if EDmaincase == 1
-    if ~isstruct(controlparameters)
-         error('ERROR: the struct controlparameters was not specified')           
-    end
-    if ~isfield(controlparameters,'fs')
-        controlparameters.fs = 44100;
-    end
-    if ~isfield(controlparameters,'directsound')
-        controlparameters.directsound = 1;
-    end
-%     if ~isfield(controlparameters,'specorder')
-%         controlparameters.specorder = 1;
-%     end
     if ~isfield(controlparameters,'difforder')
         controlparameters.difforder = 15;
     end
-    if ~isfield(controlparameters,'nedgepoints_visibility')
-        controlparameters.nedgepoints_visibility = 2;
-    end
     if ~isfield(controlparameters,'docalctf')
         controlparameters.docalctf = 1;
-    end
-    if ~isfield(controlparameters,'docalcir')
-        controlparameters.docalcir = 0;
     end
     if ~isfield(controlparameters,'Rstart')
         controlparameters.Rstart = 0;
@@ -212,6 +206,24 @@ if EDmaincase == 1
         end
     end
     
+end
+
+if EDmaincase == 2
+    if ~isfield(controlparameters,'fs')
+        controlparameters.fs = 44100;
+    end    
+    if ~isfield(controlparameters,'docalcir')
+        controlparameters.docalcir = 1;
+    end
+end
+
+if EDmaincase > 2
+     if ~isfield(controlparameters,'nedgepoints_visibility')
+        controlparameters.nedgepoints_visibility = 2;
+     end   
+    if ~isfield(controlparameters,'specorder')
+        controlparameters.specorder = 1;
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

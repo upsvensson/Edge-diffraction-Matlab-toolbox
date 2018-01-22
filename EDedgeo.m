@@ -107,7 +107,7 @@ function [edgedata,planedata] = EDedgeo(planedata,firstcornertoskip,listofcorner
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 22 Jan. 2018
 %
 % [edgedata,planedata,outputfile] = EDedgeo(planedata,firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,showtext);
 

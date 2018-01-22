@@ -403,7 +403,7 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
         envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,Sindata.doaddsources,Sindata.sourceamplitudes,...
             Rdata,controlparameters);
     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
-    eval(['save ',desiredname,' tfinteqdiff extraoutputdata'])
+    eval(['save ',desiredname,' tfinteqdiff extraoutputdata '])
     t01 = etime(clock,t00);
     timingstruct.integralequation = [t01 timingdata];
     if filehandlingparameters.savelogfile == 1

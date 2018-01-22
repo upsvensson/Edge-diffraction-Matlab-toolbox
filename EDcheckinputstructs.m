@@ -32,12 +32,12 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .frequencies         (obligatory)
 %                       .discretizationtype  (default: 2 = G-L)
 %                       .ngauss              (default: 16)
-%   filehandlingparameters    .outputdirectory  (default: /result, in the folder of the geoinputfile)  
+%   filehandlingparameters    .outputdirectory  (default: the folder of the geoinputfile)  
 %                       .filestem        (default: name of the cad-file, with an underscore + running integer)
-%                       .savesetupfile       (default: 1)
+%                       .savesetupfile       (default: 0)
 %                       .savecadgeofile      (default: 0)
-%                       .saveSRdatafiles     (default: 1)
-%                       .saveeddatafile      (default: 1)
+%                       .saveSRdatafiles     (default: 0)
+%                       .saveeddatafile      (default: 0)
 %                       .savesubmatrixdata   (default: 0)
 %                       .saveinteqsousigs     (default: 0)
 %                       .loadinteqsousigs     (default: 0)
@@ -74,6 +74,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 % 22 Jan 2018 Removed the field planecornertype in the struct geofiledata
 % 22 Jan 2018 Moved some controlparameter fields away from the convex TF
 % case: fs, nedgepoints_visibility, docalcir, specorder.
+% 22 Jan 2018 Changed the defaults for saving files.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -258,7 +259,7 @@ if ~isfield(filehandlingparameters,'filestem')
     end
 end
 if ~isfield(filehandlingparameters,'savesetupfile')
-    filehandlingparameters.savesetupfile = 1;
+    filehandlingparameters.savesetupfile = 0;
 end
 if ~isfield(filehandlingparameters,'showtext')
     filehandlingparameters.showtext = 1;
@@ -267,10 +268,10 @@ if ~isfield(filehandlingparameters,'savecadgeofile')
     filehandlingparameters.savecadgeofile = 0;
 end
 if ~isfield(filehandlingparameters,'saveSRdatafiles')
-    filehandlingparameters.saveSRdatafiles = 1;
+    filehandlingparameters.saveSRdatafiles = 0;
 end
 if ~isfield(filehandlingparameters,'saveeddatafile')
-    filehandlingparameters.saveeddatafile = 1;
+    filehandlingparameters.saveeddatafile = 0;
 end
 if ~isfield(filehandlingparameters,'savesubmatrixdata')
     filehandlingparameters.savesubmatrixdata = 0;

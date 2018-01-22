@@ -1,4 +1,4 @@
-function [planedata,extraCATTdata] = EDreadcad(CADfile,planecornerstype,checkgeom)
+function [planedata,extraCATTdata] = EDreadcad(CADfile,checkgeom)
 % EDreadcad - Reads a file of type .CAD (made by e.g. CATT-Acoustic) and returns all the geometry data 
 %  + extra geometrical data based on planes, in two structs.
 % CAD-files v6,v7,v8 are read.
@@ -6,8 +6,6 @@ function [planedata,extraCATTdata] = EDreadcad(CADfile,planecornerstype,checkgeo
 % Input parameters:
 %  CADfile     	(optional) The input file, with or without the .CAD extension.
 %					If this file is not specified, a file opening window will appear.
-%  planecornerstype (optional) Could have the value 'zero' or 'circ'.Default: 'circ'.
-%               	Affects the matrix planecorners, see below.
 %  checkgeom		(optional) If this parameter is given the value 'check', then a few checks
 %                   of the geometry consistency will be done: a check for duplicate corners
 %                   for redundant corners and for corners that are connected to only one plane.
@@ -65,9 +63,9 @@ function [planedata,extraCATTdata] = EDreadcad(CADfile,planecornerstype,checkgeo
 %
 % Uses the functions EDextrnums EDinfrontofplane
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 12 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 22 Jan. 2018
 %
-% [planedata,extraCATTdata] = EDreadcad(CADfile,planecornerstype,checkgeom);
+% [planedata,extraCATTdata] = EDreadcad(CADfile,checkgeom);
 
 % 18 July 2009 Last previous fix
 % 29 Oct. 2014 Fixed a bug for planes with indents, which gave the message
@@ -83,15 +81,13 @@ function [planedata,extraCATTdata] = EDreadcad(CADfile,planecornerstype,checkgeo
 % an infinite loop happened, around line 460.
 % 12 Jan. 2018 Increased the bounding boxes a bit - doesn't hurt to make
 % them a bit bigger.
+% 22 Jan 2018 Retired the input parameter planecornerstype since it is
+% actually not used anywhere.
 
 if nargin == 0
 	CADfile = '';
-	planecornerstype = '';
 	checkgeom = '';
 elseif nargin == 1
-	planecornerstype = '';
-	checkgeom = '';
-elseif nargin == 2
 	checkgeom = '';
 end
 
@@ -445,39 +441,41 @@ cornercrossref(cornernumbers) = (1:ncorners);
 iv = find(planecorners~=0);
 planecorners(iv) = full(cornercrossref(planecorners(iv)));
 
-%---------------------------------------------------------------
-% Go through all planes. If there is a plane definition including
-% zeros, and planecornerstype == 'circ', expand it repeating the
-% same corner order again.
-
-if isempty(planecornerstype)
-	planecornerstype = 'circ';
-else
-	planecornerstype = char(lower(planecornerstype(1)));
-	if planecornerstype(1) == 'z'
-		planecornerstype = 'zero';
-    else
-		planecornerstype = 'circ';
-	end
-end
-
-% In the next loop, before the && ~isempty(iv) was inserted, an infinite
-% loop was generated if a plane definition had all zeros.
-
-if strcmp(planecornerstype,'circ') == 1
-	for ii = 1:nplanes
-		iv = find( planecorners(ii,:) ~= 0);
-		ncornersatplane = length(iv);
-		if (ncornersatplane ~= ncornersperplane) && ~isempty(iv)
-			pattern = planecorners(ii,iv);
-			nrepeatings = ceil(ncornersperplane/ncornersatplane);
-			for jj = 1:nrepeatings-1
-				pattern = [pattern planecorners(ii,iv)];
-			end
-			planecorners(ii,:) = pattern(1:ncornersperplane);
-		end
-	end
-end
+% The section below was removed on 22 Jan 2018
+% 
+% % % % %---------------------------------------------------------------
+% % % % % Go through all planes. If there is a plane definition including
+% % % % % zeros, and planecornerstype == 'circ', expand it repeating the
+% % % % % same corner order again.
+% % % % 
+% % % % if isempty(planecornerstype)
+% % % % 	planecornerstype = 'circ';
+% % % % else
+% % % % 	planecornerstype = char(lower(planecornerstype(1)));
+% % % % 	if planecornerstype(1) == 'z'
+% % % % 		planecornerstype = 'zero';
+% % % %     else
+% % % % 		planecornerstype = 'circ';
+% % % % 	end
+% % % % end
+% % % % 
+% % % % % In the next loop, before the && ~isempty(iv) was inserted, an infinite
+% % % % % loop was generated if a plane definition had all zeros.
+% % % % 
+% % % % if strcmp(planecornerstype,'circ') == 1
+% % % % 	for ii = 1:nplanes
+% % % % 		iv = find( planecorners(ii,:) ~= 0);
+% % % % 		ncornersatplane = length(iv);
+% % % % 		if (ncornersatplane ~= ncornersperplane) && ~isempty(iv)
+% % % % 			pattern = planecorners(ii,iv);
+% % % % 			nrepeatings = ceil(ncornersperplane/ncornersatplane);
+% % % % 			for jj = 1:nrepeatings-1
+% % % % 				pattern = [pattern planecorners(ii,iv)];
+% % % % 			end
+% % % % 			planecorners(ii,:) = pattern(1:ncornersperplane);
+% % % % 		end
+% % % % 	end
+% % % % end
 
 %---------------------------------------------------------------
 % Find the normal vectors to the planes using the cross products
@@ -784,11 +782,6 @@ else
     ncornersperplanevec = uint16(ncornersperplanevec);
     planehasindents = uint16(planehasindents);
 end
-
-% Varlist = [' planedata cornernumbers planenames '];
-% Varlist = [Varlist,' planenumbers cornercrossref Snumbers Snames Sdirectivitynames Sdelays'];
-% Varlist = [Varlist,' Scoords Sdirections Srotations Slevels Rnumbers Rcoords CATTversionnumber'];
-% Varlist = [Varlist,' planenvecs   planesatcorners nplanespercorners cornerinfrontofplane modeltype'];
 
 planenames = sparse(planenames+1-1);
 planeabstypes = sparse(planeabstypes+1-1);

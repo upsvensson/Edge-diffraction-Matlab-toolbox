@@ -107,7 +107,7 @@ function [edgedata,planedata] = EDedgeo(planedata,firstcornertoskip,listofcorner
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 22 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 23 Jan. 2018
 %
 % [edgedata,planedata,outputfile] = EDedgeo(planedata,firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,showtext);
 
@@ -136,6 +136,8 @@ function [edgedata,planedata] = EDedgeo(planedata,firstcornertoskip,listofcorner
 %               from ESIE2checkobstrpaths to ED
 % 22 Jan 2018 The output parameters ismodelconvex and ismodelthinplate were
 %               removed (weren't used other places).
+% 23 Jan 2018 Error from yesterday's change: a long line with ... at the
+%             end can not be followed by a commented out line!
 
 geomacc = 1e-10;
 
@@ -1437,7 +1439,6 @@ edgedata = struct('edgecorners',edgecorners,'planesatedge',planesatedge,...
     'edgesatplane',edgesatplane,'edgelengthvec',edgelengthvec,...
     'offedges',offedges,'edgerelatedcoordsysmatrices',edgerelatedcoordsysmatrices,...
     'edgenormvecs',edgenormvecs,...
-%     'edgenormvecs',edgenormvecs,'ismodelconvex',ismodelconvex,'ismodelthinplate',ismodelthinplate,...
     'edgestartcoordsnudge',edgestartcoordsnudge,'edgeendcoordsnudge',edgeendcoordsnudge);
 
 planedata.planeisthin = planeisthin;

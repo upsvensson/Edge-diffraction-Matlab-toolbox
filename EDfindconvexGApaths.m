@@ -46,7 +46,7 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 19 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 23 Jan. 2018
 %
 % firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,difforder,showtext)
@@ -63,6 +63,8 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 % when there were many sources and many receivers.
 % 19 Jan 2018 Fixed a bug: error occured if there were no specular
 % reflections.
+% 23 Jan 2018 Fixed a bug with the direct sound amplitude. See explanation
+% in source code.
 
 if nargin < 10
    showtext = 0; 
@@ -233,12 +235,22 @@ if npotentialobstruct > 0
     if ~isempty(edgehits)
         edgehitlist = possibleSPR_obstruct(edgehits,:);
         iv = sub2ind([nreceivers,nsources],edgehitlist(:,3),edgehitlist(:,1));  
-        directsoundOK(iv)=0.5;
+        % Before 23 Jan 2018, the first line was  used. This lead to that a
+        % completely obscured receiver (which got marked by hitplanes)
+        % might get a non-zero direct sound if there was an additional
+        % edgehit, unrelated to the obscuring plane.
+        %         directsoundOK(iv)=0.5;        
+        directsoundOK(iv)=0.5*directsoundOK(iv);        
     end
     if ~isempty(cornerhits)
         cornerhitlist = possibleSPR_obstruct(cornerhits,:);
         iv = sub2ind([nreceivers,nsources],cornerhitlist(:,3),cornerhitlist(:,1));  
-        directsoundOK(iv)=0.75;
+        % Before 23 Jan 2018, the first line was  used. This lead to that a
+        % completely obscured receiver (which got marked by hitplanes)
+        % might get a non-zero direct sound if there was an additional
+        % cornerhit, unrelated to the obscuring plane.
+%         directsoundOK(iv)=0.75;
+        directsoundOK(iv)=0.75*directsoundOK(iv);
     end
 end
 

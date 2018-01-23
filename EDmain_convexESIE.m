@@ -79,6 +79,9 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % 22 Jan 2018 Corrected the handling of docalctf
 % 23 Jan 2018 Split up the compstr == 'sun' || .... into two if-s. Hint
 % from Jan Slechta.
+% 23 Jan 2018 Added the savepathsfile handling; the parameter was already
+% in place, but its handling was not implemented until now.
+% 23 Jan 2018 Version 0.101 because of a bug in EDfindconvexGApaths
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -119,7 +122,7 @@ end
 
 if filehandlingparameters.showtext >= 1
 	disp('    ');disp('####################################################################')
-              disp('#  EDmain_convexESIE, v. 0.1 (22 Jan. 2018)')
+              disp(['#  EDmain_convexESIE, v. ',num2str(EDversionnumber),' (',lastsavedate,')'])
               disp(['#  filestem for results: ',filehandlingparameters.filestem])
               disp(' ')
 end
@@ -130,7 +133,7 @@ if filehandlingparameters.savelogfile == 1
     	return
     end
     fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['#  EDmain_convexESIE, v. 0.1 (22 Jan. 2018)',lineending],'char');
+    fwrite(fid,['#  EDmain_convexESIE, v. ',num2str(EDversionnumber),' (',lastsavedate,')',lineending],'char');
     fwrite(fid,['#  filestem for results: ',filehandlingparameters.filestem,lineending],'char');
     fwrite(fid,[' ',lineending],'char');
 end
@@ -273,6 +276,10 @@ firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
     Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
     Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr,...
     controlparameters.difforder,filehandlingparameters.showtext);
+if filehandlingparameters.savepathsfile == 1
+    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_paths.mat'];
+    eval(['save ',desiredname,' firstorderpathdata'])    
+end
 t01 = etime(clock,t00);
 timingstruct.findpaths = t01;
 if filehandlingparameters.savelogfile == 1

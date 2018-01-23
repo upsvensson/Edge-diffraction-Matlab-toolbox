@@ -39,7 +39,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 22 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 23 Jan. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -77,6 +77,8 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % forced to the value 2 at the input to EDSorRgeo (but it should preferrably
 % be avoided altogether for convex geometries.
 % 22 Jan 2018 Corrected the handling of docalctf
+% 23 Jan 2018 Split up the compstr == 'sun' || .... into two if-s. Hint
+% from Jan Slechta.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -94,7 +96,9 @@ compstr = computer;
 compstr = lower(compstr(1:3));
 if compstr == 'mac'  
 	lineending = 13;
-elseif compstr == 'sun' || compstr == 'sol'            
+elseif compstr == 'sun' 
+	lineending = 10;    
+elseif compstr == 'sol'            
 	lineending = 10;
 elseif compstr == 'pcw'
 	lineending = [13,10];

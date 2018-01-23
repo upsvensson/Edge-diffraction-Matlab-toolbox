@@ -26,7 +26,7 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 % Uses functions EDdistelements, EDcalcedgeinteqmatrixsub2_mex, EDinteg_souterm, EDcalcpropagatematrix
 % EDcoordtrans1
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  19 Jan 2018  
+% Peter Svensson (peter.svensson@ntnu.no)  23 Jan 2018  
 %                       
 % [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
 %    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,sourceamplitudes,...
@@ -67,6 +67,8 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 
 % 10 Dec. 2017 TODO: finish the timingdata for the CASE2 : addsources
 % 19 Jan 2018 The TODO above is probably done
+% 23 Jan 2018 Changed to "~strcmp(computer, 'MACI64')" after hint from Jan
+%             Slechta.
 
 showtext = filehandlingparameters.showtext;
 
@@ -214,7 +216,8 @@ for ifreq = 1:nfrequencies
 
            if n1 ~= n1prev || n2 ~= n2prev || n3 ~= n3prev
 
-               if computer ~= 'MACI64'
+%                if computer ~= 'MACI64'
+               if ~strcmp(computer, 'MACI64')
                    if n3 <= 255
                        n3vertmat = uint8(1:n3);
                    else

@@ -270,13 +270,13 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                           plot([beta1 beta2],'-o')
                           disp('iv1')
                           sum(iv1)
-                          pause
+%                           pause
                        end
                        if sum(iv2) > 0                       
                           plot([beta1 beta2],'-o')
                           disp('iv2')
                           sum(iv2)
-                          pause
+%                           pause
                        end
             else
                 
@@ -299,25 +299,25 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                           plot([beta1 beta2 beta3 beta4],'-o')
                           disp('iv1')
                           sum(iv1)
-                          pause
+%                           pause
                        end
                        if sum(iv2) > 0                       
                           plot([beta1 beta2 beta3 beta4],'-o')
                           disp('iv2')
                           sum(iv2)
-                          pause
+%                           pause
                        end
                       if sum(iv3) > 0                       
                           plot([beta1 beta2 beta3 beta4],'-o')
                           disp('iv3')
                           sum(iv3)
-                          pause
+%                           pause
                        end
                        if sum(iv2) > 0                       
                           plot([beta1 beta2 beta3 beta4],'-o')
                           disp('iv4')
                           sum(iv4)
-                          pause
+%                           pause
                        end
                          
                 else

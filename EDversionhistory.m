@@ -25,6 +25,12 @@ versiontext{2} = ['A bug was fixed in EDfindconvexGApaths, which gave the wrong 
 'unrelated to the obscuring plane. EDverify failed for tests 1,2,4 (did not test 6), so ',...
 'some error has sneaked into EDwedge1st_fd.'];
 
+versionnumbers{2} = '0.102';
+versiondate{2} = '24 Jan 2018';
+versiontext{2} = ['In EDwedge1st_fd, the analytical integration was turned off for now, ',...
+'because there seems to be a bug. Using the previous brute-force numerical integration ',...
+'instead, EDverify passes tests 1,3-6 again.'];
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

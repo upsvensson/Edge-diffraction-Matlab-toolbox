@@ -14,7 +14,7 @@ Get the package EDexamples, which has a few examples to get you started.
 
 Inside the folder EDexamples, you find some example script files which execute various simple examples. In Matlab, you can, e.g., execute the file called EDexample_LspKessel_minimal.m, which should run the function EDmain_convexESIE and present a resulting frequency response in a plot window, and the geometrical model in another plot window.
 
-### Prerequisites
+## Prerequisites
 
 You'll need Matlab.
 
@@ -22,6 +22,14 @@ You'll need Matlab.
 ## Running an example
 
 Inside the folder EDexamples, you find some example script files which execute various simple examples.
+
+## Documentation
+
+The file EDtoolbox_manual.pdf gives some details about the EDtoolbox. Also, the m-file EDversionhistory displays, in the Matlab command window, some documentation on changes in the toolbox.
+
+## Version numbering
+
+A new version number is given whenever some change is made that affects the numerical results, for all or some cases. If there are just minor changes, e.g., to what is printed out on the screen, or some internal code improvement, then there will just be a date/time change. 
 
 ## Authors
 

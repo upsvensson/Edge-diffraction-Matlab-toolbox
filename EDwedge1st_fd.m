@@ -44,7 +44,7 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (svensson@iet.ntnu.no) 24 Jan. 2018
+% Peter Svensson (svensson@iet.ntnu.no) 25 Jan. 2018
 %
 % [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc);
 
@@ -61,15 +61,17 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 % 17 Jan. 2018 Made some experiments with the zrelrange.
 % 24 Jan 2018 Inserted a local switch for debugging: select analytical
 % integration or not. Set the analytical integration to 0 for now.
+% 25 Jan 2018 New implementation of the analytical integration, where only
+% the cosh-factor is seen as a varying part of the integrand.
 
-localshowtext = 0;
+% localshowtext = 0;
 
-localselectanalytical = 0;
+localselectanalytical = 1;
 
-if localshowtext
-    disp(' ')
-    disp('Reference solution for wedge 1st')
-end
+% if localshowtext >= 2
+%     disp(' ')
+%     disp('Reference solution for wedge 1st')
+% end
 
 if nargin < 12
 	Rstart = 0;
@@ -110,24 +112,29 @@ tol = 1e-11;                         % The relative accuracy for the numerical i
                                     % substantial error for some cases (PC
                                     % 041129)
 
-zrelmax = 0.1;                    % The part of the edge that should use the analyt. approx.
-% zrelmax = 0.00006;                    % The part of the edge that should use the analyt. approx.
+zrelmax = 0.001;                    % The part of the edge that should use the analyt. approx.
+                                    % Some simple tests indicated that
+                                    % 0.001 => rel.errors smaller than 4e-7
+                                    % 0.005 => rel. errors smaller than 3e-6
+                                    % 
 
 za = (rs*zr+rr*zs)/(rs+rr);         % The apex point: the point on the edge with the shortest path
 
 % Move the z-values so that za ends up in z = 0.
 
-Dz = abs(zs-zr);
+% Dz = abs(zs-zr);
 zs = zs - za;
 zr = zr - za;
 zw = zw - za;                       % zw is a two-element vector
-za = 0;
+% za = 0;
 % disp(['Positive edge-end z-value is ',num2str(zw(2))])
 
-rs2 = rs^2;
-rr2 = rr^2;
+% rs2 = rs^2;
+% rr2 = rr^2;
 
 R0 = sqrt( (rs+rr)^2 + (zr-zs)^2 );
+m0 = sqrt(rs^2 + zs^2);
+l0 = sqrt(rr^2 + zr^2);
 
 % Calculate the sinnyfi and cosnyfi values for use in the four beta-terms
 % later
@@ -139,63 +146,22 @@ absnyfivec = abs(ny*fivec);
 sinnyfivec = sin(ny*fivec);
 cosnyfivec = cos(ny*fivec);
 
-if localshowtext
-    disp(' ')
-    disp(['      absnyfivec = ',num2str(absnyfivec)])
-    disp(['      cosnyfivec = ',num2str(cosnyfivec)])
-end
+% if localshowtext >= 2
+%     disp(' ')
+%     disp(['      absnyfivec = ',num2str(absnyfivec)])
+%     disp(['      cosnyfivec = ',num2str(cosnyfivec)])
+% end
 
 %------------------------------------------------------------------
 % Check which category we have.
 %
 % Is the apex point inside the physical wedge or not? We want to use an
 % analytic approximation for a small part of the apex section (and
-% possibly an ordinary numerical integration for the rest of the apex
-% section. The ordinary numerical integration will be needed if the apex
-% section extends further than what allows the analytic approximation to
-% be used.)
+% an ordinary numerical integration for the rest of the wedge).
 %
 %       apexincluded        0 or 1
 %
 %
-% In addition to this choice, we also want to check if we have a
-% perpendicular case or a symmetrical case because these two cases can use
-% a slightly simpler anaytical approximation.
-%
-% We call it a perpendicular case when zs = zr (which can happen only if
-% apexincluded = 1!)
-%
-%       perpcase           0 or 1
-%
-% We call it a symmetrical case when rs = rr (which could also be a
-% perpendicular case. A symmetrical case might not necessarily
-% include the apex point. If the apex point is not included then we are not
-% really interested in whether we have a symmetrical case or not since the
-% analytic approximation is used only for the apex section!)
-%
-%       symmcase            0 or 1
-%
-% Since both the perpendicular case and the symmetric case can use the same
-% simpler analytic approximation, we also denote those cases that are
-% neither "skew cases". Again, this is relevant only when the apex is
-% included.
-%
-%       skewcase            0 or 1
-
-perpcase = 0;
-if zs == zr
-    perpcase = 1;    
-end
-
-symmcase = 0;
-if rs == rr
-    symmcase = 1;    
-end
-
-skewcase = 0;
-if perpcase == 0 && symmcase == 0
-     skewcase = 1;
-end
 
 apexincluded = 1;
 if sign( zw(1)*zw(2) ) == 1
@@ -212,14 +178,44 @@ if apexincluded == 1
 	% or whatever is specified as zrelmax for the analytic approximation
 
 	zrangespecial = zrelmax*min([rs,rr]);
+    
+    if zw(1) > 0
+       error('ERROR! Problem: zw(1) > 0') 
+    end
+    
+    zanalyticalstart = zrangespecial;
+    zanalyticalend = zrangespecial;
+    if zw(1) < -zrangespecial
+        includepart1 = 1;
+    else
+        includepart1 = 0;
+        zanalyticalstart = -zw(1); % NB! zanalyticalstart gets a pos.value
+    end
+    if zw(2) > zrangespecial
+        includepart2 = 1;
+    else
+        includepart2 = 0;
+        zanalyticalend = zw(2);
+    end
+    if zw(1) == 0 || zw(2) == 0
+       exacthalf = 1;
+    else
+        exacthalf = 0;
+    end
 
+    if includepart1*includepart2 == 0 && exacthalf == 0
+       analyticalsymmetry = 0;
+    else
+       analyticalsymmetry = 1;        
+    end
+        
 end
 
 %----------------------------------------------------------------
 % Compute the transfer function by carrying out a numerical integration for
 % the entire wedge extension. 
 
-singularterm = [0 0 0 0];
+% singularterm = [0 0 0 0];
 
 singularterm = absnyfivec < 10*eps | abs(absnyfivec - 2*pi) < 10*eps;
 useterm = 1 - singularterm;
@@ -253,90 +249,63 @@ else
             if localselectanalytical == 0
                 tf(ii) = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi)*exp(-1i*k*Rextra);
             else
-                tf1 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol);
-                tf1 = tf1*(-ny/4/pi);
-                tf3 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol);
-                tf3 = tf3*(-ny/4/pi);
-
+                if includepart1 == 1
+                    tf1 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol);
+                    tf1 = tf1*(-ny/4/pi);
+                else
+                   tf1 = 0; 
+                end
+                if includepart2 == 1
+                    tf3 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol);
+                    tf3 = tf3*(-ny/4/pi);
+                else
+                   tf3 = 0; 
+                end
 
                 %-----------------------------------------------------------
-                % First the analytical approximation
-
-                rho = rr/rs;
-                sinpsi = (rs+rr)/R0;
-                cospsi = (zr-zs)/R0;
-
-                tempfact = (1+rho)^2*sinpsi^2 - 2*rho;        
+                % The analytical approximation
 
                 useserialexp1 = absnyfivec < 0.01;
                 useserialexp2 = abs(absnyfivec - 2*pi) < 0.01;
+                if useserialexp2 == 1
+                   error('ERROR: Time to fix the useserialexp2');
+                end
                 useserialexp = (useserialexp1 | useserialexp2) & (~singularterm);
 
-                sqrtB1vec    = ( sqrt( 2*(1-cosnyfivec) )*R0*rho/(1+rho)^2/ny    ).*(useserialexp==0) + ...
-                                   ( fivec.*sqrt(1-(ny*fivec).^2/12)*R0*rho/(1+rho)^2 ).*(useserialexp1==1) + ...
-                                   ( (fivec-2*pi/ny).*sqrt(1-(ny*fivec-2*pi).^2/12)*R0*rho/(1+rho)^2 ).*(useserialexp2==1);
-
-                if skewcase == 0               % Use the slightly simpler formulation of the analytical approx.
-
-                    sqrtB3 = sqrt(2)*R0*rho/(1+rho)/sqrt(tempfact);
-
-                    usespecialcase = abs(sqrtB3 - sqrtB1vec) < 1e-14;
-
-                    fifactvec    = ( (1-cosnyfivec)./ny^2             ).*(useserialexp==0) + ...
-                                   ( fivec.^2/2.*(1-(ny*fivec).^2/12) ).*(useserialexp1==1) + ...
-                                   ( (fivec-2*pi/ny).^2/2.*(1-(ny*fivec-2*pi).^2/12) ).*(useserialexp2==1);
-
-                    temp1vec = sinnyfivec./( (1+rho)^2 - tempfact.*fifactvec + eps*10);
-
-
-                    temp1_2vec = (sinnyfivec+ 10*eps)./( (1+rho)^2 - tempfact.*fifactvec)./(sqrtB1vec+10*eps).*atan( zrangespecial./(sqrtB1vec+eps) );
-
-                    temp3vec = -1./sqrtB3.*atan( zrangespecial./sqrtB3 );
-
-                    approxintvalvec = 2/ny^2*rho*(temp1_2vec + temp1vec*temp3vec);	
-                    approxintvalvec = approxintvalvec.*(sinnyfivec~=0).*(usespecialcase==0);
-
-                    if any(usespecialcase)
-    %                     disp('SPECIAL CASE!')
-                        specialcasevalue = 1/(2*sqrtB3*sqrtB3).*( zrangespecial./(zrangespecial^2 + sqrtB3*sqrtB3) + 1./sqrtB3.*atan(zrangespecial./(sqrtB3+eps)) );
-                        approxintvalvec = approxintvalvec + 4*R0*R0*rho*rho*rho*sinnyfivec/ny/ny/(1+rho)^4./tempfact.*specialcasevalue.*(usespecialcase==1);
+                if ~any(singularterm)
+                    cosnyfifactor = ny./sqrt(2*(1-cosnyfivec)).*(useserialexp==0) + ...
+                                1./abs(fivec).*(useserialexp1==1);
+                    sinovercosnyfifactor =  sinnyfivec./sqrt(2*(1-cosnyfivec)).*(useserialexp==0) + ...          
+                                sign(fivec).*(1- (ny*fivec).^2/6).*(useserialexp1==1);
+                    if analyticalsymmetry == 1
+                        tf2 = -sinovercosnyfifactor/pi/R0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
+                        if exacthalf == 1
+                            tf2 = tf2/2;
+                        end
+                    else
+                        tf2 = -sinovercosnyfifactor/pi/R0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;        
                     end
-
-
-                else                           % Use the more general formulation of the analytical approx.
-                    B3 = 2*R0*R0*rho*rho/(1+rho)/(1+rho)/tempfact;
-                    B1vec = sqrtB1vec.^2;
-                    B2 = -2*R0*(1-rho)*rho*cospsi/(1+rho)/tempfact;
-                    E1vec = 4*R0^2*rho^3*sinnyfivec./ny^2/(1+rho)^4./tempfact;
-            % Error found 050117 by PS. The line below is wrong and should be
-            % replaced by the next one.
-            %         multfact = E1vec.*B2./(B1vec*B2^2 + B1vec.^2 - B3.^2);
-                    multfact = -E1vec.*B2./(B1vec*B2^2 + (B1vec - B3).^2);
-
-            % Error found 050118 by PS: the abs in the P1 equation were missing!
-                    P1 = 0.5*log( abs(B3)*abs(zrangespecial^2 + B1vec)./abs(B1vec)./abs(zrangespecial^2 + B2*zrangespecial + B3 ) );
-                    P2 = (B1vec-B3)./(sqrtB1vec+10*eps)./B2.*atan(zrangespecial./(sqrtB1vec+10*eps));
-                    q = 4*B3-B2^2;
-
-                    if q > 0
-                        sqrtq = sqrt(q);
-                        F = 2/sqrtq*( atan( (2*zrangespecial+B2)/sqrtq ) - atan( B2/sqrtq ) );  
-                    elseif q < 0
-                        sqrtminq = sqrt(-q);
-            % Error found 050118 by PS: the abs in the F equation were missing!
-                        F = 1./sqrtminq.*log( abs(2*zrangespecial+B2-sqrtminq).*abs(B2+sqrtminq)./abs(2*zrangespecial+B2+sqrtminq)./abs(B2-sqrtminq) );            
-                    else   % q = 0
-                        F = 4*zrangespecial./B2./(2*zrangespecial+B2);
-                    end
-                    P3 = (2*(B3-B1vec)-B2^2)/2/B2.*F;
-
-            % Error found 050118 by PC. The line below is wrong and should be replaced
-            % by the one after.
-            %        approxintvalvec = sum(multfact.*(P1+P2+P3))      
-                    approxintvalvec = multfact.*(P1+P2+P3);      
+                else
+                   tf2 = zeros(1,4); 
+                   for jj = 1:4
+                       if ~singularterm(jj)
+                        cosnyfifactor = ny./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...
+                                    1./abs(fivec(jj)).*(useserialexp1(jj)==1);
+                        sinovercosnyfifactor =  sinnyfivec(jj)./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...          
+                                    sign(fivec(jj)).*(1- (ny*fivec(jj)).^2/6).*(useserialexp1(jj)==1);
+                        if analyticalsymmetry == 1  
+                            tf2(jj) = -sinovercosnyfifactor/pi/R0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
+                            if exacthalf == 1
+                                tf2 = tf2/2;
+                            end
+                        else
+                            tf2(jj) = -sinovercosnyfifactor/pi/R0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;                            
+                        end
+                       end   
+                   end
                 end
 
-                tf2 = sum(approxintvalvec.*(1-singularterm)*(-ny/2/pi));
+                tf2 = sum(tf2);
 
                 tf(ii) = (tf1+tf2+tf3)*exp(-1i*k*Rextra);
 
@@ -344,13 +313,13 @@ else
         end
     else
         error('ERROR: Not implemented the integration properly for the Dirichlet wedge yet');
-        for ii = 1:nfrequencies
-            k = 2*pi*frequencies(ii)/cair;
-            tf1 = quadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol)*(-ny/4/pi);
-            tf2 = 0;
-            tf3 = quadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol)*(-ny/4/pi);
-            tf(ii) = (tf1+tf2+tf3)*exp(-1i*k*Rextra);
-        end        
+%         for ii = 1:nfrequencies
+%             k = 2*pi*frequencies(ii)/cair;
+%             tf1 = quadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol)*(-ny/4/pi);
+%             tf2 = 0;
+%             tf3 = quadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol)*(-ny/4/pi);
+%             tf(ii) = (tf1+tf2+tf3)*exp(-1i*k*Rextra);
+%         end        
     end
 end
 

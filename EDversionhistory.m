@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 24 Jan 2018
+% Peter Svensson (peter.svensson@ntnu.no) 25 Jan 2018
 
 % 24 Jan 2018 First version, just after version 0.101
 
@@ -22,14 +22,19 @@ versiondate{2} = '23 Jan 2018';
 versiontext{2} = ['A bug was fixed in EDfindconvexGApaths, which gave the wrong ',...
 'amplitude of the direct sound for obscured receivers. This happened only in ',...
 'special cases where there happened to be an extra edge or corner hit which was ',...
-'unrelated to the obscuring plane. EDverify failed for tests 1,2,4 (did not test 6), so ',...
+'unrelated to the obscuring plane. EDverify failed for tests 1,2,4 (did not try test 6), so ',...
 'some error has sneaked into EDwedge1st_fd.'];
 
-versionnumbers{2} = '0.102';
-versiondate{2} = '24 Jan 2018';
-versiontext{2} = ['In EDwedge1st_fd, the analytical integration was turned off for now, ',...
+versionnumbers{3} = '0.102';
+versiondate{3} = '24 Jan 2018';
+versiontext{3} = ['In EDwedge1st_fd, the analytical integration was turned off for now, ',...
 'because there seems to be a bug. Using the previous brute-force numerical integration ',...
 'instead, EDverify passes tests 1,3-6 again.'];
+
+versionnumbers{4} = '0.103';
+versiondate{4} = '25 Jan 2018';
+versiontext{4} = ['A new version of EDwedge1st_fd, with a much simplified analytical integration, ',...
+'which seems to give accurate results. EDverify passes tests 1,3-6.'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

@@ -829,7 +829,7 @@ if runtest(6) == 1
     fwrite(fid,['Cube w internal, non-centered monopole.',lineending],'char');
     fwrite(fid,['Entire cube surface gets sources.',lineending],'char');
     fwrite(fid,['Radiated field should be within [0.996,1.008] around a circle of receivers',lineending],'char');
-    fwrite(fid,['Computed results are within [',num2str(minval),',',num2str(maxval),lineending],'char');
+    fwrite(fid,['Computed results are within [',num2str(minval),',',num2str(maxval),']',lineending],'char');
     fwrite(fid,[' ',lineending],'char');
     if passtest(itest) == 1
         fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');

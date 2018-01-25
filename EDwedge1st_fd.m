@@ -219,9 +219,9 @@ end
 
 singularterm = absnyfivec < 10*eps | abs(absnyfivec - 2*pi) < 10*eps;
 useterm = 1 - singularterm;
-if any(singularterm) && localshowtext
-     disp(['      Singularity for term ',int2str(find(singularterm))])   
-end
+% if any(singularterm) && localshowtext
+%      disp(['      Singularity for term ',int2str(find(singularterm))])   
+% end
 
 tf = zeros(nfrequencies,1);
 

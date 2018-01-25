@@ -82,6 +82,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % 23 Jan 2018 Added the savepathsfile handling; the parameter was already
 % in place, but its handling was not implemented until now.
 % 23 Jan 2018 Version 0.101 because of a bug in EDfindconvexGApaths
+% 25 Jan 2018 Version 0.103: new version of EDwedge1st_fd.m
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 

@@ -86,6 +86,8 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % 25 Jan 2018 Version 0.104: new version of ED_submatrixstructure, to
 % enforce at least two edge points per edge (it could be one for very short
 % edges before).
+% 25 Jan 2018 Verson 0.105: new version of EDfindconvexGApaths. Previously,
+% the direct sound was computed even if .directsound = 0.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -264,22 +266,22 @@ if filehandlingparameters.showtext >= 1
 end
 
 % The output struct firstorderpathdata has the fields
-%   .validIScoords          matrix, [nIS,3] with IS coordinates
-%   .validsounumber         vector, [nIS,1] with original source number
-%   .validrecnumber         vector, [nIS,1] with original receiver number
-%   .diffpaths              matrix, [nreceivers,nsources,nedges] with
-%                           logical 0 or 1
-%   .edgeisactive           vector, [nedges,1] with logical 0 or 1
-%   .directsoundOK          matrix, [nreceivers,nsources] with 0 or 1
-%   .ncomponents            vector, [1,3], with number of direct sound,
-%                           specrefl and diffr components.
-
+%   .specreflIScoords   matrix, [nIS,3] with IS coordinates
+%   .specrefllist       matrix, [nIS,3] with [source number,rec.number, 
+%                       spec.reflection amplitude] in each row.
+%   .diffpaths          matrix, [nreceivers,nsources,nedges] with
+%                       logical 0 or 1
+%   .edgeisactive       vector, [nedges,1] with logical 0 or 1
+%   .directsoundlist    matrix, [ndir,3] with [source number, rec.number,
+%                       directsound amplitude] in each row.
+%   .ncomponents        vector, [1,3], with number of direct sound,
+%                       specrefl and diffr components.
 
 t00 = clock;
 firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
     Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
     Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr,...
-    controlparameters.difforder,filehandlingparameters.showtext);
+    controlparameters.difforder,controlparameters.directsound,filehandlingparameters.showtext);
 if filehandlingparameters.savepathsfile == 1
     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_paths.mat'];
     eval(['save ',desiredname,' firstorderpathdata'])    

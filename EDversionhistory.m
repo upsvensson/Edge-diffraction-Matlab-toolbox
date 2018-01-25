@@ -40,6 +40,10 @@ versionnumbers{5} = '0.104';
 versiondate{5} = '25 Jan 2018';
 versiontext{5} = ['A new version of EDsubmatrixstructure, to ensure that there are at least two points per edge.'];
 
+versionnumbers{6} = '0.105';
+versiondate{6} = '25 Jan 2018';
+versiontext{6} = ['A new version of EDfindconvexGApaths. Previously, the direct sound was computed even if .directsound was set to 0.'];
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

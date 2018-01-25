@@ -44,7 +44,7 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 15 Dec. 2017 
+% Peter Svensson (peter.svensson@ntnu.no) 25 Jan 2018 
 %
 % Hsubmatrixdata = ...
 %    EDinteg_submatrixstructure(edgelengthvec,closwedangvec,edgetoedgedata,planesatedge,showtext)
@@ -65,6 +65,7 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 % 5 Dec. 2017 Allow odd numbers of edge points. Stored one extra field:
 %               nuniquesubmatrices
 % 15 Dec. 2017 Turned off the code which suppresses symmetrycompressions
+% 25 Jan 2018 Made sure there are at least 2 edge elements per edge.
 
 if nargin < 7
     showtext = 0;
@@ -125,6 +126,10 @@ end
 % Before 5 Dec. 2017: only even numbers of edge points were used
 %  nedgeelems = ceil(inteq_ngauss*(edgelengthvec/max(edgelengthvec))/2)*2;
 nedgeelems = ceil(inteq_ngauss*(edgelengthvec/max(edgelengthvec)));
+
+% 25 Jan 2018: Make sure there are at least 2 edge elements per edge.
+iv = (nedgeelems == 1);
+nedgeelems(iv) = 2;
 
 [~,sortvec] = sortrows([nedgeelems(edgepairlist(:,1)) nedgeelems(edgepairlist(:,2))]);
 edgepairlist = [edgepairlist(sortvec,1) edgepairlist(sortvec,2)];

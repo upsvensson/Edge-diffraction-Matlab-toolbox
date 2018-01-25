@@ -36,6 +36,10 @@ versiondate{4} = '25 Jan 2018';
 versiontext{4} = ['A new version of EDwedge1st_fd, with a much simplified analytical integration, ',...
 'which seems to give accurate results. EDverify passes tests 1,3-6.'];
 
+versionnumbers{5} = '0.104';
+versiondate{5} = '25 Jan 2018';
+versiontext{5} = ['A new version of EDsubmatrixstructure, to ensure that there are at least two points per edge.'];
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

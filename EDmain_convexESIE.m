@@ -39,7 +39,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 23 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 25 Jan. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -83,6 +83,9 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % in place, but its handling was not implemented until now.
 % 23 Jan 2018 Version 0.101 because of a bug in EDfindconvexGApaths
 % 25 Jan 2018 Version 0.103: new version of EDwedge1st_fd.m
+% 25 Jan 2018 Version 0.104: new version of ED_submatrixstructure, to
+% enforce at least two edge points per edge (it could be one for very short
+% edges before).
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 

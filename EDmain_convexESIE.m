@@ -39,7 +39,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 25 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 26 Jan. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -88,6 +88,11 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % edges before).
 % 25 Jan 2018 Verson 0.105: new version of EDfindconvexGApaths. Previously,
 % the direct sound was computed even if .directsound = 0.
+% 26 Jan 2018 Version 0.106: fixed bug: when HOD was not calculated, an
+% empty tfinteqdiff should have been saved, but that was not the case.
+% Fixed now. Also, in EDwedge1st_fd, the case useserialexp2 had not been
+% implemented. Fixed now.
+% 
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -436,6 +441,14 @@ else
         disp(['   Skipping the FD integral equation, since difforder = ',int2str(controlparameters.difforder),' (or docalctf was set to 0)'])
     end
     timingstruct.integralequation = [0 0 0 0 0];
+    if Sindata.doaddsources == 1 || nsources == 1
+        tfinteqdiff = zeros(nfrequencies,nreceivers);
+    else
+        tfinteqdiff = zeros(nfrequencies,nreceivers,nsources);        
+    end
+    extraoutputdata = [];
+    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
+    eval(['save ',desiredname,' tfinteqdiff extraoutputdata '])    
     if filehandlingparameters.savelogfile == 1
         fwrite(fid,['   The integral equation stage was not run',lineending],'char');
     end

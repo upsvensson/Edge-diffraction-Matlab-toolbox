@@ -63,10 +63,13 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 % integration or not. Set the analytical integration to 0 for now.
 % 25 Jan 2018 New implementation of the analytical integration, where only
 % the cosh-factor is seen as a varying part of the integrand.
+% 26 Jan 2018 Fixed bug: the case useserialexp2 had not been implemented.
 
-% localshowtext = 0;
+localshowtext = 0;
 
-localselectanalytical = 1;
+localselectanalytical = 0;
+
+% doublecheck = 1;
 
 % if localshowtext >= 2
 %     disp(' ')
@@ -208,7 +211,11 @@ if apexincluded == 1
     else
        analyticalsymmetry = 1;        
     end
-        
+
+%     if localshowtext
+%          disp(['      Analyticalsymmetry =  ',int2str(analyticalsymmetry),' and exacthalf = ',int2str(exacthalf)])   
+%     end
+    
 end
 
 %----------------------------------------------------------------
@@ -219,9 +226,9 @@ end
 
 singularterm = absnyfivec < 10*eps | abs(absnyfivec - 2*pi) < 10*eps;
 useterm = 1 - singularterm;
-% if any(singularterm) && localshowtext
-%      disp(['      Singularity for term ',int2str(find(singularterm))])   
-% end
+if any(singularterm) && localshowtext
+     disp(['      Singularity for term ',int2str(find(singularterm))])   
+end
 
 tf = zeros(nfrequencies,1);
 
@@ -254,29 +261,42 @@ else
                     tf1 = tf1*(-ny/4/pi);
                 else
                    tf1 = 0; 
+                   if localshowtext
+                       disp('   Part1 not included');
+                   end
                 end
                 if includepart2 == 1
                     tf3 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol);
                     tf3 = tf3*(-ny/4/pi);
                 else
                    tf3 = 0; 
+                   if localshowtext
+                       disp('   Part2 not included');
+                   end
                 end
-
+%                 if doublecheck == 1
+%                     tf2orig = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),-zrangespecial,zrangespecial,'RelTol',tol);
+%                     tf2orig = tf2orig*(-ny/4/pi);                    
+%                 end
+                
+                
                 %-----------------------------------------------------------
                 % The analytical approximation
 
                 useserialexp1 = absnyfivec < 0.01;
                 useserialexp2 = abs(absnyfivec - 2*pi) < 0.01;
-                if useserialexp2 == 1
-                   error('ERROR: Time to fix the useserialexp2');
-                end
                 useserialexp = (useserialexp1 | useserialexp2) & (~singularterm);
+                 if localshowtext && useserialexp
+                       disp('   Using serial expansion for the cosnyfivec');
+                   end
 
                 if ~any(singularterm)
                     cosnyfifactor = ny./sqrt(2*(1-cosnyfivec)).*(useserialexp==0) + ...
-                                1./abs(fivec).*(useserialexp1==1);
+                                1./abs(fivec).*(useserialexp1==1) + ...
+                                1./sqrt( (fivec-2*pi/ny).^2 ).*(useserialexp2==1);
                     sinovercosnyfifactor =  sinnyfivec./sqrt(2*(1-cosnyfivec)).*(useserialexp==0) + ...          
-                                sign(fivec).*(1- (ny*fivec).^2/6).*(useserialexp1==1);
+                                sign(fivec).*(1- (ny*fivec).^2/6).*(useserialexp1==1) + ...
+                                sign(ny*fivec-2*pi) .*(1- (ny*fivec-2*pi).^2/6).*(useserialexp2==1);
                     if analyticalsymmetry == 1
                         tf2 = -sinovercosnyfifactor/pi/R0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
                         if exacthalf == 1
@@ -286,7 +306,10 @@ else
                         tf2 = -sinovercosnyfifactor/pi/R0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;        
                     end
                 else
-                   tf2 = zeros(1,4); 
+                  if localshowtext 
+                       disp('   Some term is zero due to singularity');
+                   end
+                  tf2 = zeros(1,4); 
                    for jj = 1:4
                        if ~singularterm(jj)
                         cosnyfifactor = ny./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...
@@ -306,6 +329,13 @@ else
                 end
 
                 tf2 = sum(tf2);
+                
+%                 if doublecheck 
+%                    relerr = abs(tf2-tf2orig)/abs(tf2orig);
+%                    if relerr > 1e-4
+%                        disp(['   Rel err = ',num2str(relerr)]) 
+%                        end
+%                 end
 
                 tf(ii) = (tf1+tf2+tf3)*exp(-1i*k*Rextra);
 

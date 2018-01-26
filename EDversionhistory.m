@@ -44,6 +44,12 @@ versionnumbers{6} = '0.105';
 versiondate{6} = '25 Jan 2018';
 versiontext{6} = ['A new version of EDfindconvexGApaths. Previously, the direct sound was computed even if .directsound was set to 0.'];
 
+versionnumbers{7} = '0.106';
+versiondate{7} = '26 Jan 2018';
+versiontext{7} = ['A new version of EDmain_convextf. When HOD was not calculated, an ',...
+    'empty tfinteqdiff should have been saved, but that was not the case. Fixed now. Also, ',...
+    'EDwedge1st_fd was fixed. The case useserialexp2 had not implemented.'];
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

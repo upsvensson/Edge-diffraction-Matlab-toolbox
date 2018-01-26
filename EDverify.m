@@ -28,7 +28,7 @@ function passtest = EDverify(runtest,showtext,plotdiagrams)
 % Diff1 test.
 % 6. Replicate a non-centered internal monopole, at 0.1 Hz.
 % 
-% Peter Svensson 18 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 26 Jan. 2018 (peter.svensson@ntnu.no)
 % 
 % passtest = EDverify(runtest,showtext,plotdiagrams);
 
@@ -41,6 +41,8 @@ function passtest = EDverify(runtest,showtext,plotdiagrams)
 %              Added the plotdiagrams parameter.
 % 17 Jan 2018 Added test 5
 % 18 Jan 2018 Added test6
+% 26 Jan 2018 Removed the "results" from the loading of results file, to
+% update to version 0.107.
 
 ntests = 6;
 
@@ -81,7 +83,7 @@ end
 
 mfile = mfilename('fullpath');
 [infilepath,filestem] = fileparts(mfile);
-logfilename = [infilepath,filesep,'results',filesep,'EDverify_v',NN,'_',datetimevec,'.txt'];
+logfilename = [infilepath,filesep,'EDverify_v',NN,'_',datetimevec,'.txt'];
 
 fid = fopen(logfilename,'w');
 if fid == -1
@@ -154,8 +156,8 @@ if runtest(1) == 1
 
     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
 
-    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
-    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
+    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
+    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
     tftot = tfdirect + tfgeom + tfdiff + tfinteqdiff;
     tftot = tftot*norm(Sindata.coordinates);
@@ -249,7 +251,7 @@ if runtest(2) == 1
 
     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
 
-    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
+    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
     tftot = tfdirect + tfgeom + tfdiff;
 
@@ -367,7 +369,7 @@ if runtest(3) == 1
 
     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
 
-    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
+    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
     tftot = tfdirect + tfgeom + tfdiff;
 
@@ -494,8 +496,8 @@ if runtest(4) == 1
 
     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
 
-    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
-    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
+    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
+    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
 
     tftot = tfdirect + tfgeom + tfdiff;
 
@@ -598,7 +600,7 @@ if runtest(5) == 1
 
     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
 
-    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
+    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
     tftot = soudist*(tfdirect + tfgeom + tfdiff);
     
@@ -788,8 +790,8 @@ if runtest(6) == 1
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Load and present the results
 
-    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
-    eval(['load ',infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'])
+    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
+    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat'])
 
     tftot = tfinteqdiff + tfdiff + tfdirect + tfgeom;
 

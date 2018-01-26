@@ -10,7 +10,9 @@ function EDplotmodel(eddatafile,varargin)
 %                           if bit1 = 1 (= 2) => plot Rdata.receivers
 %                           if bit2 = 1 (= 4) => plot plane normal vectors
 %                           if bit3 = 1 (= 8) => print plane numbers
-%                           if bit4 = 1 (=16) => print edge numbers
+%                           if bit4 = 1 (=16) => print edge numbers (and
+%                           indicate start end each edge with a little
+%                           circle)
 %                           if bit5 = 1 (=32) => print corner numbers
 %                           if bit6 = 1 (=64) => print plane numbers using the
 %                                                CAD file numbering
@@ -51,7 +53,7 @@ function EDplotmodel(eddatafile,varargin)
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 18 Jan 2018
+% Peter Svensson (peter.svensson@ntnu.no) 26 Jan 2018
 
 % 29 April 2016 Completed the use of structs planedata and edgedata
 % 1 Nov 2017 Added EDstrpblnk for the sdata etc file names. Also skipped the
@@ -60,6 +62,9 @@ function EDplotmodel(eddatafile,varargin)
 % 17 Nov. 2017 Implemented the inputParser functionality
 % 30 Nov. 2017 Removed a remaining "plotoptions2"
 % 18 Jan 2018 Copied from ESIE2toolbox
+% 26 Jan 2018 Small fix: Sdata and Rdata filenames were wrong (but still
+% worked??). Also removed the little circles on edges if edgenumbers are
+% not plotted.
 
 p = inputParser;
 
@@ -135,7 +140,7 @@ end
     
 ncornersperplanevec = double(planedata.ncornersperplanevec);
 if plotsources
-    sdatafile = EDstrpblnk([eddatafilepath,Filestem,'_sdata.mat']);
+    sdatafile = EDstrpblnk([eddatafilepath,Filestem,'_Sdata.mat']);
     if exist(sdatafile) == 2
         eval(['load ',sdatafile])
     else
@@ -143,7 +148,7 @@ if plotsources
     end
 end
 if plotreceivers
-    rdatafile = EDstrpblnk([eddatafilepath,Filestem,'_rdata.mat']);
+    rdatafile = EDstrpblnk([eddatafilepath,Filestem,'_Rdata.mat']);
     if exist(rdatafile) == 2
         eval(['load ',rdatafile])
     else
@@ -193,8 +198,10 @@ for ii = 1:nedges
         view(viewpos)
         hold on
     end
-    costart = planedata.corners(co1,:) + 0.1*(planedata.corners(co2,:)-planedata.corners(co1,:));
-	h = plot3(costart(1),costart(2),costart(3),'ko');    
+    if plotednumbers
+        costart = planedata.corners(co1,:) + 0.1*(planedata.corners(co2,:)-planedata.corners(co1,:));
+        h = plot3(costart(1),costart(2),costart(3),'ko');    
+    end
 end
 
 if plotnvecs

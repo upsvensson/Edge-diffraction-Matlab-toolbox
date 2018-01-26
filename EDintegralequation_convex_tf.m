@@ -1,6 +1,6 @@
 function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
     envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,doaddsources,sourceamplitudes,...
-        Rdata,controlparameters)
+        doallSRcombinations,Rdata,controlparameters)
 % EDintegralequation_convex_tf calculates the sound pressure representing second-
 % and higher-order diffraction, for a convex scattering object
 %
@@ -10,6 +10,7 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 %   Sdata                   Struct 
 %   doaddsources            0 or 1
 %   sourceamplitudes
+%   doallSRcombinations     0 or 1
 %   Rdata                   Struct
 %   controlparameters       Struct
 %
@@ -26,7 +27,7 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 % Uses functions EDdistelements, EDcalcedgeinteqmatrixsub2_mex, EDinteg_souterm, EDcalcpropagatematrix
 % EDcoordtrans1
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  23 Jan 2018  
+% Peter Svensson (peter.svensson@ntnu.no)  26 Jan 2018  
 %                       
 % [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
 %    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,sourceamplitudes,...
@@ -69,6 +70,7 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 % 19 Jan 2018 The TODO above is probably done
 % 23 Jan 2018 Changed to "~strcmp(computer, 'MACI64')" after hint from Jan
 %             Slechta.
+% 26 Jan 2018 Implemented the handling of doallSRcombinations = 0.
 
 showtext = filehandlingparameters.showtext;
 
@@ -570,6 +572,8 @@ for ifreq = 1:nfrequencies
     %
     % CASE 2: doaddsources = 0  and we have several sources
     % There will be an outer loop over sources
+    %     
+    % Here, we might also have the case that doallSRcombinations = 0.
 
     elseif doaddsources == 0   % This means we have several sources, and they should not be added
         if ifreq==1
@@ -661,9 +665,35 @@ for ifreq = 1:nfrequencies
             
 %             if inteqsettings.handlepropagation < 3
             
-            for irec = 1:nreceivers
+            if doallSRcombinations == 1
+                for irec = 1:nreceivers
 
-                 if showtext >=2
+                     if showtext >=2
+                        disp(['Receiver number ',int2str(irec)]) 
+                     end
+                     [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,...
+                        Rdata.vispartedgesfromr(:,irec),frequency,controlparameters.Rstart,...
+                        Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),...
+                        Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext);
+
+                    if ifreq == 1 && ~isempty(ivproblematic)
+                        existinglength = size(ivproblematicmatrix,2);
+                        newlength = length(ivproblematic);
+                        if newlength > existinglength
+                            ivproblematicmatrix = [ivproblematicmatrix zeros(nreceivers,newlength-existinglength)];
+                        end
+                        ivproblematicmatrix(irec,1:newlength) = ivproblematic;
+                    end
+
+                     P_receiver(ifreq,irec,isou) = Fmatrix*Qfinal;
+                     if filehandlingparameters.savediff2result == 1
+                         extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec,isou) = Fmatrix*(Qfinal-Q_firstterm);
+                     end
+
+                end %  for irec = 1:nreceivers
+            else
+                irec = isou;
+                  if showtext >=2
                     disp(['Receiver number ',int2str(irec)]) 
                  end
                  [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,...
@@ -684,9 +714,8 @@ for ifreq = 1:nfrequencies
                  if filehandlingparameters.savediff2result == 1
                      extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec,isou) = Fmatrix*(Qfinal-Q_firstterm);
                  end
-                    
-            end %  for irec = 1:nreceivers
-                       
+               
+            end
         end
 
     end

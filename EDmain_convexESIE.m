@@ -92,7 +92,10 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % empty tfinteqdiff should have been saved, but that was not the case.
 % Fixed now. Also, in EDwedge1st_fd, the case useserialexp2 had not been
 % implemented. Fixed now.
-% 
+% 26 Jan 2018 Change: "results" is not added to the outputdirectory in this
+% function; it was added to the outputdirectory path as default.
+% 26 Jan 2018 V 0.107: introduced the parameter doallSRcombinations, for
+% backscatter cases.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -123,12 +126,14 @@ end
 [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,1);
 
 if filehandlingparameters.savelogfile == 1
-    logfilename = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_log.txt'];
+%     logfilename = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_log.txt'];
+    logfilename = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_log.txt'];
 end
 
 if filehandlingparameters.savesetupfile == 1
     varlist = 'geofiledata Sindata Rindata envdata controlparameters filehandlingparameters EDversionnumber';
-    eval(['save ',filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_setup.mat ',varlist])
+%     eval(['save ',filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_setup.mat ',varlist])
+    eval(['save ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_setup.mat ',varlist])
 end
 
 if filehandlingparameters.showtext >= 1
@@ -164,7 +169,8 @@ if isfield(geofiledata,'geoinputfile')
         error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
     end
     if filehandlingparameters.savecadgeofile == 1
-        desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
+%         desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
+        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
         eval(['save ',desiredname,' planedata extraCATTdata'])
     end
     t01 = etime(clock,t00);
@@ -204,7 +210,8 @@ end
 t00 = clock;
 [edgedata,planedata] = EDedgeo(planedata,geofiledata.firstcornertoskip,[],0,filehandlingparameters.showtext);
 if filehandlingparameters.saveeddatafile == 1
-    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_eddata.mat'];
+%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_eddata.mat'];
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_eddata.mat'];
     eval(['save ',desiredname,' planedata edgedata'])
 end
 nedges = size(edgedata.edgecorners,1);
@@ -229,7 +236,8 @@ end
 t00 = clock;
 Sdata = EDSorRgeo(planedata,edgedata,Sindata.coordinates,'S',2,filehandlingparameters.showtext);
 if filehandlingparameters.saveSRdatafiles == 1
-    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_Sdata.mat'];
+%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_Sdata.mat'];
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Sdata.mat'];
     eval(['save ',desiredname,' Sdata'])    
 end
 nsources = size(Sdata.sources,1);
@@ -248,7 +256,8 @@ end
 t00 = clock;
 Rdata = EDSorRgeo(planedata,edgedata,Rindata.coordinates,'R',2,filehandlingparameters.showtext);
 if filehandlingparameters.saveSRdatafiles == 1
-    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_Rdata.mat'];
+%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_Rdata.mat'];
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Rdata.mat'];
     eval(['save ',desiredname,' Rdata'])    
 end
 nreceivers = size(Rdata.receivers,1);
@@ -286,9 +295,10 @@ t00 = clock;
 firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
     Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
     Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr,...
-    controlparameters.difforder,controlparameters.directsound,filehandlingparameters.showtext);
+    controlparameters.difforder,controlparameters.directsound,Sindata.doallSRcombinations,filehandlingparameters.showtext);
 if filehandlingparameters.savepathsfile == 1
-    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_paths.mat'];
+%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_paths.mat'];
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
     eval(['save ',desiredname,' firstorderpathdata'])    
 end
 t01 = etime(clock,t00);
@@ -314,7 +324,8 @@ if controlparameters.docalctf == 1
     t01 = etime(clock,t00);
     timingstruct.maketfs = [t01 timingdata];
 
-    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
+%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat'];
     eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct EDversionnumber geofiledata Sindata Rindata envdata controlparameters filehandlingparameters'])
 
     if filehandlingparameters.savelogfile == 1
@@ -344,7 +355,8 @@ if controlparameters.difforder > 1
     t00 = clock;
     edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,1,2,2,filehandlingparameters.showtext);    
     if filehandlingparameters.saveeddatafile == 1
-        desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_eddata.mat'];
+%         desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_eddata.mat'];
+        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_eddata.mat'];
         eval(['save ',desiredname,' planedata edgedata edgetoedgedata'])
     end
     t01 = etime(clock,t00);
@@ -373,7 +385,8 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
     Hsubmatrixdata = EDinteg_submatrixstructure(edgedata.edgelengthvec,edgedata.closwedangvec,...
         controlparameters.ngauss,controlparameters.discretizationtype,edgetoedgedata,edgedata.planesatedge,filehandlingparameters.showtext);
     if filehandlingparameters.savesubmatrixdata == 1
-        desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
+%         desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
+        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
         eval(['save ',desiredname,' Hsubmatrixdata'])
     end
     
@@ -422,9 +435,10 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
 
     t00 = clock;
     [tfinteqdiff,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
-        envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,Sindata.doaddsources,Sindata.sourceamplitudes,...
+        envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,Sindata.doaddsources,Sindata.sourceamplitudes,Sindata.doallSRcombinations,...
             Rdata,controlparameters);
-    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
+%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
     eval(['save ',desiredname,' tfinteqdiff extraoutputdata '])
     t01 = etime(clock,t00);
     timingstruct.integralequation = [t01 timingdata];
@@ -447,7 +461,8 @@ else
         tfinteqdiff = zeros(nfrequencies,nreceivers,nsources);        
     end
     extraoutputdata = [];
-    desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
+%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
     eval(['save ',desiredname,' tfinteqdiff extraoutputdata '])    
     if filehandlingparameters.savelogfile == 1
         fwrite(fid,['   The integral equation stage was not run',lineending],'char');

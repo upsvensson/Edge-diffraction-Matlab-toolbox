@@ -1,6 +1,6 @@
 function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
     sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,...
-    vispartedgesfromR,difforder,directsound,showtext)
+    vispartedgesfromR,difforder,directsound,doallSRcombinations,showtext)
 % EDfindconvexGApaths - Finds all the first-order specular and (possibly)
 % first-order diffraction paths for a convex object.
 %
@@ -12,6 +12,7 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 % 	visplanesfromR, vispartedgesfromR       From the Rdata struct
 %   difforder
 %   directsound
+%   doallSRcombinations
 %   showtext                (optional) Default: 0
 %
 % Output parameters:
@@ -47,10 +48,11 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 25 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 26 Jan. 2018
 %
 % firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
-% sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,difforder,showtext)
+% sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,...
+% difforder,directsound,doallSRcombinations,showtext)
 
 % 27 Dec. 2017 First start
 % 28 Dec. 2017 Functioning version for diff
@@ -68,8 +70,9 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 % in source code.
 % 25 Jan 2018 Fixed a bug: preciously, the direct sound was calculated even if
 % .directsound = 0.
+% 26 Jan 2018: V 0.107: introduced the doallSRcombinations parameter
 
-if nargin < 10
+if nargin < 13
    showtext = 0; 
 end
 
@@ -94,11 +97,17 @@ if difforder > 0
     edgeisactive = zeros(nedges,1,'uint8');
 
     for ii = 1:nreceivers
-        for jj = 1:nsources
-            tempvec = vispartedgesfromR(:,ii).*vispartedgesfromS(:,jj);
-
-            edgeisactive = edgeisactive + tempvec;        
-            diffpaths(ii,jj,:)=( tempvec>0 );
+        if doallSRcombinations == 1
+            for jj = 1:nsources
+                tempvec = vispartedgesfromR(:,ii).*vispartedgesfromS(:,jj);
+                edgeisactive = edgeisactive + tempvec;        
+                diffpaths(ii,jj,:)=( tempvec>0 );
+            end
+        else
+           jj = ii; 
+           tempvec = vispartedgesfromR(:,ii).*vispartedgesfromS(:,jj);
+           edgeisactive = edgeisactive + tempvec;        
+           diffpaths(ii,jj,:)=( tempvec>0 );
         end
     end
 
@@ -146,6 +155,12 @@ else
             possibleSPR = [possibleSPR;[ Snumber_potentialIS  Pnumber_potentialIS ii*ones(npotentialIS,1)]];
         end
     end
+end
+
+if doallSRcombinations == 0
+    iv = find(possibleSPR(:,1) ~= possibleSPR(:,3));
+    possibleSPR(iv,:) = [];
+    npotentialIS = size(possibleSPR,1);
 end
 
 if npotentialIS > 0
@@ -222,7 +237,16 @@ if directsound ~= 0
         end
     end
 
-    directsoundOK = ones(nreceivers,nsources);
+    if doallSRcombinations == 0
+        iv = find(possibleSPR_obstruct(:,1) ~= possibleSPR_obstruct(:,3));
+        possibleSPR_obstruct(iv,:) = [];
+        npotentialIS = size(possibleSPR,1);
+        directsoundOK = eye(nreceivers);
+        npotentialobstruct = size(possibleSPR_obstruct,1);
+    else
+        directsoundOK = ones(nreceivers,nsources);        
+    end
+
 
     if npotentialobstruct > 0
 

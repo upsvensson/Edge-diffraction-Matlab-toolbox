@@ -16,6 +16,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .sourceamplitudes    Only used if doaddsources = 1
 %                                            (default:
 %                                             ones(nsources,nfrequencies))
+%                       .doallSRcombinations  (default: 1 = yes)
 %   Rindata             .coordinates         (obligatory)
 %   envdata             .cair                (default: 344)
 %                       .rhoair              (default: 1.21)
@@ -36,8 +37,8 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                       .filestem        (default: name of the cad-file, with an underscore + running integer)
 %                       .savesetupfile       (default: 1)
 %                       .savecadgeofile      (default: 0)
-%                       .saveSRdatafiles     (default: 0)
-%                       .saveeddatafile      (default: 0)
+%                       .saveSRdatafiles     (default: 1)
+%                       .saveeddatafile      (default: 1)
 %                       .savesubmatrixdata   (default: 0)
 %                       .saveinteqsousigs     (default: 0)
 %                       .loadinteqsousigs     (default: 0)
@@ -49,7 +50,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %   EDmaincase          1, if convexESIE (frequency domain)
 %                       2, if convexESIE (time domain)
 % 
-% Peter Svensson 22 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 26 Jan. 2018 (peter.svensson@ntnu.no)
 % 
 % [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -75,6 +76,9 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 % 22 Jan 2018 Moved some controlparameter fields away from the convex TF
 % case: fs, nedgepoints_visibility, docalcir, specorder.
 % 22 Jan 2018 Changed the defaults for saving files.
+% 26 Jan 2018 Changed the defaults for saving files. Also changed the
+% default output directory to include "results" in the path.
+% 26 Jan 2018 Introduced Sindata.doallSRcombinations. Default value 1.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -94,13 +98,13 @@ if ~isstruct(geofiledata)
 
     [infilepath,CADfilestem] = fileparts(geofiledata.geoinputfile);
     if ~isfield(filehandlingparameters,'outputdirectory')
-        filehandlingparameters.outputdirectory = infilepath;
+        filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
     end    
 end
 if isfield(geofiledata,'geoinputfile')
     [infilepath,CADfilestem] = fileparts(geofiledata.geoinputfile);
     if ~isfield(filehandlingparameters,'outputdirectory')
-        filehandlingparameters.outputdirectory = infilepath;
+        filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
     end    
 else
     if ~isfield(geofiledata,'corners') || ~isfield(geofiledata,'planecorners')
@@ -111,7 +115,7 @@ else
         geofiledata.geoinputfile = CADfile;
         [infilepath,CADfilestem] = fileparts(geofiledata.geoinputfile);        
         if ~isfield(filehandlingparameters,'outputdirectory')
-            filehandlingparameters.outputdirectory = infilepath;
+            filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
         end    
     else
         if isfield(filehandlingparameters,'outputdirectory') == 0 || isfield(filehandlingparameters,'filestem') == 0
@@ -122,6 +126,17 @@ end
 if ~isfield(geofiledata,'firstcornertoskip')
     geofiledata.firstcornertoskip = 1e6;
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Check the struct Rindata
+
+if ~isstruct(Rindata)
+    error('ERROR 1: receiver coordinates were not specified')
+end
+if ~isfield(Rindata,'coordinates')
+    error('ERROR 2: receiver coordinates were not specified')
+end
+nreceivers = size(Rindata.coordinates,1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct Sindata
@@ -142,15 +157,12 @@ nsources = size(Sindata.coordinates,1);
 if nsources == 1
     Sindata.doaddsources = 1;
 end    
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check the struct Rindata
-
-if ~isstruct(Rindata)
-    error('ERROR 1: receiver coordinates were not specified')
-end
-if ~isfield(Rindata,'coordinates')
-    error('ERROR 2: receiver coordinates were not specified')
+if ~isfield(Sindata,'doallSRcombinations')
+    Sindata.doallSRcombinations = 1;
+else
+    if Sindata.doallSRcombinations == 0 && nsources~=nreceivers
+       error('ERROR: doallSRcombinations was set to 0, but the number of sources was not the same as the number of receivers'); 
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -268,10 +280,10 @@ if ~isfield(filehandlingparameters,'savecadgeofile')
     filehandlingparameters.savecadgeofile = 0;
 end
 if ~isfield(filehandlingparameters,'saveSRdatafiles')
-    filehandlingparameters.saveSRdatafiles = 0;
+    filehandlingparameters.saveSRdatafiles = 1;
 end
 if ~isfield(filehandlingparameters,'saveeddatafile')
-    filehandlingparameters.saveeddatafile = 0;
+    filehandlingparameters.saveeddatafile = 1;
 end
 if ~isfield(filehandlingparameters,'savesubmatrixdata')
     filehandlingparameters.savesubmatrixdata = 0;

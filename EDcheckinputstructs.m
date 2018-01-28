@@ -1,56 +1,63 @@
-function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase)
+function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
+    EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase)
 % EDcheckinputstructs checks the input data structs to the various EDmain
 % versions and sets default values.
 % 
 % Input parameters:
-%   geofiledata         .geoinputfile        (specified or file open
-%                                             window - unless the fields .corners and .planecorners are given)
-%                       .corners             (optional; alternative to
+%   geofiledata     .geoinputfile        (specified, or a file open
+%                                             window is given - unless the fields .corners and .planecorners are given)
+%                   .corners             (optional; alternative to
 %                                             .geoinputfile. But, the use of this option
 %                                             requires that filehandlingparameters.outputdirectory and .filestem are specified)
-%                       .planecorners        (optional; alternative to
+%                   .planecorners        (optional; alternative to
 %                                             .geoinputfile)
-%                       .firstcornertoskip   (default: 1e6)
-%   Sindata             .coordinates         (obligatory)
-%                       .doaddsources        (default: 0 = no)
-%                       .sourceamplitudes    Only used if doaddsources = 1
-%                                            (default:
-%                                             ones(nsources,nfrequencies))
-%                       .doallSRcombinations  (default: 1 = yes)
-%   Rindata             .coordinates         (obligatory)
-%   envdata             .cair                (default: 344)
-%                       .rhoair              (default: 1.21)
-%   controlparameters   .fs                  (default: 44100) Irrelevant for
-%                                            EDmain_convexESIE
-%                       .directsound         (default: 1 = yes)
-%                       .difforder           (default: 15)
-%                       .nedgepoints_visibility (default: 2) Irrelevant for
-%                                            EDmain_convexESIE
-%                       .docalctf            (default: 1)
-%                       .docalcir            (default: 0) Irrelevant for
-%                                            EDmain_convexESIE
-%                       .Rstart              (default: 0)
-%                       .frequencies         (obligatory)
-%                       .discretizationtype  (default: 2 = G-L)
-%                       .ngauss              (default: 16)
+%                   .firstcornertoskip   (default: 1e6)
+%   Sindata         .coordinates         (obligatory)
+%                   .doaddsources        (default: 0 = no)
+%                   .sourceamplitudes    Only used if doaddsources = 1
+%                                        (default:
+%                                         ones(nsources,nfrequencies))
+%                   .doallSRcombinations  (default: 1 = yes)
+%   Rindata         .coordinates         (obligatory)
+%   envdata         .cair                (default: 344)
+%                   .rhoair              (default: 1.21)
+%   controlparameters   .fs              (default: 44100) Ignored for
+%                                        EDmain_convexESIE, but used by
+%                                        EDmain_convexESIE_ir
+%                   .directsound         (default: 1 = yes)
+%                   .specorder           (ignored by EDmain_convexESIE and 
+%                                        by EDmain_convexESIE_ir)
+%                   .difforder           (default: 15)
+%                   .nedgepoints_visibility (default: 2) Ignored by
+%                                        EDmain_convexESIE and by
+%                                        EDmain_convexESIE_ir
+%                   .docalctf            (default: 1 for EDmain_convexESIE,
+%                                                  0 for EDmain_convexESIE_ir)
+%                   .docalcir            (default: 0 for EDmain_convexESIE,
+%                                                  1 for EDMain_convexESIEtime)
+%                   .Rstart              (default: 0)
+%                   .frequencies         (obligatory for EDmain_convexESIE,
+%                                         ignored by EDmain_convexESIE_ir)
+%                   .discretizationtype  (default: 2 = G-L)
+%                   .ngauss              (default: 16)
 %   filehandlingparameters    .outputdirectory  (default: the folder of the geoinputfile)  
-%                       .filestem        (default: name of the cad-file, with an underscore + running integer)
-%                       .savesetupfile       (default: 1)
-%                       .savecadgeofile      (default: 0)
-%                       .saveSRdatafiles     (default: 1)
-%                       .saveeddatafile      (default: 1)
-%                       .savesubmatrixdata   (default: 0)
-%                       .saveinteqsousigs     (default: 0)
-%                       .loadinteqsousigs     (default: 0)
-%                       .savepathsfile        (default: 0)
-%                       .saveISEStree         (default: 0)
-%                       .savelogfile          (default: 1)
-%                       .savediff2result      (default: 0)
-%                       .showtext             (default: 1)
-%   EDmaincase          1, if convexESIE (frequency domain)
-%                       2, if convexESIE (time domain)
+%                   .filestem        (default: name of the cad-file, with an underscore + running integer)
+%                   .savesetupfile       (default: 1)
+%                   .savecadgeofile      (default: 0)
+%                   .saveSRdatafiles     (default: 1)
+%                   .saveeddatafile      (default: 1)
+%                   .savesubmatrixdata   (default: 0)
+%                   .saveinteqsousigs     (default: 0)
+%                   .loadinteqsousigs     (default: 0)
+%                   .savepathsfile        (default: 0)
+%                   .saveISEStree         (default: 0)
+%                   .savelogfile          (default: 1)
+%                   .savediff2result      (default: 0)
+%                   .showtext             (default: 1)
+%   EDmaincase      1, for EDmain_convexESIE (frequency domain)
+%                   2, for EDmain_convexESIE_ir (time domain)
 % 
-% Peter Svensson 26 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 28 Jan. 2018 (peter.svensson@ntnu.no)
 % 
 % [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -79,6 +86,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 % 26 Jan 2018 Changed the defaults for saving files. Also changed the
 % default output directory to include "results" in the path.
 % 26 Jan 2018 Introduced Sindata.doallSRcombinations. Default value 1.
+% 28 Jan 2018 First version for EDmain_convexESIE_ir
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -147,13 +155,13 @@ end
 if ~isfield(Sindata,'coordinates')
     error('ERROR 2: source coordinates were not specified')
 end
+nsources = size(Sindata.coordinates,1);
 if ~isfield(Sindata,'doaddsources')
     Sindata.doaddsources = 0;
 end
 if ~isfield(Sindata,'sourceamplitudes')
-    Sindata.sourceamplitudes = 1;
+    Sindata.sourceamplitudes = ones(1,nsources);
 end
-nsources = size(Sindata.coordinates,1);
 if nsources == 1
     Sindata.doaddsources = 1;
 end    
@@ -187,15 +195,22 @@ end
 if ~isfield(controlparameters,'directsound')
     controlparameters.directsound = 1;
 end
+if ~isfield(controlparameters,'difforder')
+    controlparameters.difforder = 15;
+end
+if ~isfield(controlparameters,'Rstart')
+    controlparameters.Rstart = 0;
+end
+if ~isfield(controlparameters,'discretizationtype')
+    controlparameters.discretizationtype = 2;
+end
+if ~isfield(controlparameters,'ngauss')
+    controlparameters.ngauss = 16;
+end
+
 if EDmaincase == 1
-    if ~isfield(controlparameters,'difforder')
-        controlparameters.difforder = 15;
-    end
     if ~isfield(controlparameters,'docalctf')
         controlparameters.docalctf = 1;
-    end
-    if ~isfield(controlparameters,'Rstart')
-        controlparameters.Rstart = 0;
     end
     if isfield(controlparameters,'frequencies') == 0 
         if controlparameters.docalctf == 1
@@ -203,12 +218,6 @@ if EDmaincase == 1
         else
            controlparameters.frequencies = []; 
         end
-    end
-    if ~isfield(controlparameters,'discretizationtype')
-        controlparameters.discretizationtype = 2;
-    end
-    if ~isfield(controlparameters,'ngauss')
-        controlparameters.ngauss = 16;
     end
       
     nfrequencies = length(controlparameters.frequencies);
@@ -220,8 +229,7 @@ if EDmaincase == 1
         else
             error(['ERROR: The Sindata.sourceamplitudes input parameter must have the size [1,1] or [nsources,nfrequencies], but it had the size ',int2str(n1),' by ',int2str(n2)])
         end
-    end
-    
+    end   
 end
 
 if EDmaincase == 2

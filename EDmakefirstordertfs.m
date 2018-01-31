@@ -102,9 +102,13 @@ if firstorderpathdata.ncomponents(1) > 0
         end
     else
        for ii = 1:ncomponents 
-            alltfs = exp(-1i*kvec*(alldists(ii)-controlparameters.Rstart))./alldists(ii)...
-                .*firstorderpathdata.directsoundlist(ii,3).*(Sindata.sourceamplitudes( firstorderpathdata.directsoundlist(ii,1),: ).');
-            
+            if nfrequencies > 1
+                alltfs = exp(-1i*kvec*(alldists(ii)-controlparameters.Rstart))./alldists(ii)...
+                    .*firstorderpathdata.directsoundlist(ii,3).*(Sindata.sourceamplitudes( firstorderpathdata.directsoundlist(ii,1),: ).');
+            else
+                alltfs = exp(-1i*kvec*(alldists(ii)-controlparameters.Rstart))./alldists(ii)...
+                    .*firstorderpathdata.directsoundlist(ii,3).*(Sindata.sourceamplitudes( firstorderpathdata.directsoundlist(ii,1),: ));                
+            end            
            if Sindata.doaddsources == 1
               tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) = ...
                   tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) + alltfs;
@@ -150,8 +154,13 @@ if firstorderpathdata.ncomponents(2) > 0
 
     if ncomponents > nfrequencies && Sindata.doaddsources == 1
         for ii = 1:nfrequencies    
-            alltfs = exp(-1i*kvec(ii)*(alldists-controlparameters.Rstart))./alldists...
-                .*firstorderpathdata.specrefllist(:,3).*(Sindata.sourceamplitudes( firstorderpathdata.specrefllist(:,1),: ).');
+            if nfrequencies > 1
+                alltfs = exp(-1i*kvec(ii)*(alldists-controlparameters.Rstart))./alldists...
+                    .*firstorderpathdata.specrefllist(:,3).*(Sindata.sourceamplitudes( firstorderpathdata.specrefllist(:,1),: ).');
+            else
+                alltfs = exp(-1i*kvec(ii)*(alldists-controlparameters.Rstart))./alldists...
+                    .*firstorderpathdata.specrefllist(:,3).*(Sindata.sourceamplitudes( firstorderpathdata.specrefllist(:,1),: ));                
+            end
 %             if Sindata.doaddsources == 1
                 tfgeom(ii,1:maxrecnumber) = accumarray(firstorderpathdata.specrefllist(:,2),alltfs);
 %             else

@@ -28,7 +28,7 @@ function passtest = EDverify(runtest,showtext,plotdiagrams)
 % Diff1 test.
 % 6. Replicate a non-centered internal monopole, at 0.1 Hz.
 % 
-% Peter Svensson 26 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 31 Jan. 2018 (peter.svensson@ntnu.no)
 % 
 % passtest = EDverify(runtest,showtext,plotdiagrams);
 
@@ -43,6 +43,7 @@ function passtest = EDverify(runtest,showtext,plotdiagrams)
 % 18 Jan 2018 Added test6
 % 26 Jan 2018 Removed the "results" from the loading of results file, to
 % update to version 0.107.
+% 31 Jan 2018 Added "results" to the default output directory.
 
 ntests = 6;
 
@@ -145,7 +146,7 @@ if runtest(1) == 1
     Rindata = struct('coordinates',[0 0 0.00001;0 0 -0.32001]);
     controlparameters = struct('frequencies',0);
     controlparameters.difforder = 20;
-    filehandlingparameters = struct('outputdirectory',infilepath);
+    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
     filehandlingparameters.filestem = filestem;
     filehandlingparameters.savelogfile = 1;
     filehandlingparameters.showtext = 0;
@@ -156,8 +157,8 @@ if runtest(1) == 1
 
     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
 
-    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
-    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
+    eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
+    eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
     tftot = tfdirect + tfgeom + tfdiff + tfinteqdiff;
     tftot = tftot*norm(Sindata.coordinates);
@@ -240,7 +241,7 @@ if runtest(2) == 1
     Rindata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 1;
-    filehandlingparameters = struct('outputdirectory',infilepath);
+    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
     filehandlingparameters.filestem = filestem;
     filehandlingparameters.savelogfile = 1;
     filehandlingparameters.savelogfile = 1;
@@ -251,7 +252,7 @@ if runtest(2) == 1
 
     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
 
-    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
+    eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
     tftot = tfdirect + tfgeom + tfdiff;
 
@@ -358,7 +359,7 @@ if runtest(3) == 1
     Rindata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 1;
-    filehandlingparameters = struct('outputdirectory',infilepath);
+    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
     filehandlingparameters.filestem = filestem;
     filehandlingparameters.savelogfile = 1;
     filehandlingparameters.savelogfile = 1;
@@ -369,7 +370,7 @@ if runtest(3) == 1
 
     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
 
-    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
+    eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
     tftot = tfdirect + tfgeom + tfdiff;
 
@@ -486,7 +487,7 @@ if runtest(4) == 1
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 4;
     controlparameters.ngauss = 32;
-    filehandlingparameters = struct('outputdirectory',infilepath);
+    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
     filehandlingparameters.filestem = filestem;
     filehandlingparameters.savelogfile = 1;
     filehandlingparameters.showtext = 1;
@@ -496,8 +497,8 @@ if runtest(4) == 1
 
     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
 
-    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
-    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
+    eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
+    eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
 
     tftot = tfdirect + tfgeom + tfdiff;
 
@@ -590,7 +591,7 @@ if runtest(5) == 1
     Rindata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',[0.1 ]);
     controlparameters.difforder = 1;
-    filehandlingparameters = struct('outputdirectory',infilepath);
+    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
     filehandlingparameters.filestem = filestem;
     filehandlingparameters.savelogfile = 1;
     filehandlingparameters.showtext = 0;
@@ -600,7 +601,7 @@ if runtest(5) == 1
 
     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
 
-    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
+    eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
     tftot = soudist*(tfdirect + tfgeom + tfdiff);
     
@@ -781,7 +782,7 @@ if runtest(6) == 1
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Filehandling
 
-    filehandlingparameters = struct('outputdirectory',infilepath);
+    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
     filehandlingparameters.filestem = filestem;
     filehandlingparameters.showtext = 1;
 
@@ -790,8 +791,8 @@ if runtest(6) == 1
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Load and present the results
 
-    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
-    eval(['load ',infilepath,filesep,filehandlingparameters.filestem,'_tf.mat'])
+    eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
+    eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat'])
 
     tftot = tfinteqdiff + tfdiff + tfdirect + tfgeom;
 

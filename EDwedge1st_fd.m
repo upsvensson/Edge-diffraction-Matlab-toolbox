@@ -67,7 +67,7 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 
 localshowtext = 0;
 
-localselectanalytical = 0;
+localselectanalytical = 1;
 
 % doublecheck = 1;
 

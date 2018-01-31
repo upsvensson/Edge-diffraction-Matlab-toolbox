@@ -39,7 +39,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 26 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 31 Jan. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -96,6 +96,8 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % function; it was added to the outputdirectory path as default.
 % 26 Jan 2018 V 0.107: introduced the parameter doallSRcombinations, for
 % backscatter cases.
+% 31 Jan 2018 v0.108: Corrected the handling of sourceamplitudes
+% (frequency dependence had not been implemented)
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 

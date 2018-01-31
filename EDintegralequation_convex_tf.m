@@ -27,7 +27,7 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 % Uses functions EDdistelements, EDcalcedgeinteqmatrixsub2_mex, EDinteg_souterm, EDcalcpropagatematrix
 % EDcoordtrans1
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  26 Jan 2018  
+% Peter Svensson (peter.svensson@ntnu.no)  31 Jan 2018  
 %                       
 % [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
 %    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,sourceamplitudes,...
@@ -71,6 +71,7 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 % 23 Jan 2018 Changed to "~strcmp(computer, 'MACI64')" after hint from Jan
 %             Slechta.
 % 26 Jan 2018 Implemented the handling of doallSRcombinations = 0.
+% 31 Jan 2018 Had not implemented sourceamplitudes for case 2.
 
 showtext = filehandlingparameters.showtext;
 
@@ -593,7 +594,9 @@ for ifreq = 1:nfrequencies
                     controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
                     Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
                     Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
-                 
+ 
+                Q_firstterm = Q_firstterm*sourceamplitudes(isou,ifreq);
+                
                 %-----------------------------------------------------------------
                 %-----------------------------------------------------------------
                 % CASE 2: The first term of the edge source signals has been computed. 

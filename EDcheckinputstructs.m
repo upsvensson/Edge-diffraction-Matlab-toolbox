@@ -57,7 +57,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %   EDmaincase      1, for EDmain_convexESIE (frequency domain)
 %                   2, for EDmain_convexESIE_ir (time domain)
 % 
-% Peter Svensson 28 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 31 Jan. 2018 (peter.svensson@ntnu.no)
 % 
 % [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -87,6 +87,8 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 % default output directory to include "results" in the path.
 % 26 Jan 2018 Introduced Sindata.doallSRcombinations. Default value 1.
 % 28 Jan 2018 First version for EDmain_convexESIE_ir
+% 31 Jan 2018 Corrected the handling of sourceamplitudes (the freq.
+% dependence was not implemented correctly.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -149,6 +151,8 @@ nreceivers = size(Rindata.coordinates,1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct Sindata
 
+sourceamplitudes_default = 0;
+
 if ~isstruct(Sindata)
     error('ERROR 1: source coordinates were not specified')
 end
@@ -160,7 +164,8 @@ if ~isfield(Sindata,'doaddsources')
     Sindata.doaddsources = 0;
 end
 if ~isfield(Sindata,'sourceamplitudes')
-    Sindata.sourceamplitudes = ones(1,nsources);
+    Sindata.sourceamplitudes = ones(1,nsources);    
+    sourceamplitudes_default = 1;
 end
 if nsources == 1
     Sindata.doaddsources = 1;
@@ -224,7 +229,7 @@ if EDmaincase == 1
     nsources = size(Sindata.coordinates,1);
     [n1,n2] = size(Sindata.sourceamplitudes);
     if  n1 ~= nsources || n2 ~= nfrequencies
-        if n1 == 1 && n2 == 1
+        if (n1 == 1 && n2 == 1) || sourceamplitudes_default == 1
             Sindata.sourceamplitudes = ones(nsources,nfrequencies);
         else
             error(['ERROR: The Sindata.sourceamplitudes input parameter must have the size [1,1] or [nsources,nfrequencies], but it had the size ',int2str(n1),' by ',int2str(n2)])

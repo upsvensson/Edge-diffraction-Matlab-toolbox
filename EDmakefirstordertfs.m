@@ -154,13 +154,13 @@ if firstorderpathdata.ncomponents(2) > 0
 
     if ncomponents > nfrequencies && Sindata.doaddsources == 1
         for ii = 1:nfrequencies    
-            if nfrequencies > 1
+%             if nfrequencies > 1
+%                 alltfs = exp(-1i*kvec(ii)*(alldists-controlparameters.Rstart))./alldists...
+%                     .*firstorderpathdata.specrefllist(:,3).*(Sindata.sourceamplitudes( firstorderpathdata.specrefllist(:,1),ii ).');
+%             else
                 alltfs = exp(-1i*kvec(ii)*(alldists-controlparameters.Rstart))./alldists...
-                    .*firstorderpathdata.specrefllist(:,3).*(Sindata.sourceamplitudes( firstorderpathdata.specrefllist(:,1),: ).');
-            else
-                alltfs = exp(-1i*kvec(ii)*(alldists-controlparameters.Rstart))./alldists...
-                    .*firstorderpathdata.specrefllist(:,3).*(Sindata.sourceamplitudes( firstorderpathdata.specrefllist(:,1),: ));                
-            end
+                    .*firstorderpathdata.specrefllist(:,3).*(Sindata.sourceamplitudes( firstorderpathdata.specrefllist(:,1),ii ));                
+%             end
 %             if Sindata.doaddsources == 1
                 tfgeom(ii,1:maxrecnumber) = accumarray(firstorderpathdata.specrefllist(:,2),alltfs);
 %             else

@@ -1,0 +1,228 @@
+% EDdebug runs EDtoolbox for several defined tests, to check its handling of
+% different numbers of sources, receivers, and frequencies
+% as well as values of difforder = 0,1,2, doaddsources = 0,1
+% sourceamplitudes = 1 or ones(nfrequencies,nsources)
+% 
+% Peter Svensson 31 Jan. 2018 (peter.svensson@ntnu.no)
+
+% 31 Jan 2018 First version
+
+[EDversionnumber,changedate,changetime] = EDgetversion;
+
+% Two sources, three receivers, four frequencies
+% doaddsources = 0 or 1
+
+sources = [0 0 0.00001;0 0 -0.32001];
+receivers = [0 0 2;0 0 -2; 1 1 1];
+frequencies = [1 10 20 40];
+
+
+
+mfile = mfilename('fullpath');
+[infilepath,filestem] = fileparts(mfile);
+
+corners = [     -0.2000   -0.4400   -0.3200
+    0.2000   -0.4400   -0.3200
+    0.2000    0.2000   -0.3200
+   -0.2000    0.2000   -0.3200
+   -0.2000   -0.4400         0
+    0.2000   -0.4400         0
+    0.2000    0.2000         0
+   -0.2000    0.2000         0];
+
+planecorners = [   1     4     3     2
+     5     6     7     8
+     1     2     6     5
+     3     4     8     7
+     2     3     7     6
+     1     5     8     4];
+
+geofiledata = struct('corners',corners,'planecorners',planecorners);
+
+filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
+filehandlingparameters.filestem = filestem;
+filehandlingparameters.savelogfile = 0;
+filehandlingparameters.showtext = 0;
+controlparameters = struct('ngauss',8);
+controlparameters.discretizationtype = 2;
+controlparameters.Rstart = 0;
+envdata.cair = 344;
+Sindata = struct;
+
+souvar = [1 size(sources,1)];
+recvar = [1 size(receivers,1)];
+freqvar = [1 length(frequencies)];
+addsouvar = [0 1];
+diffordervar = [0 1 2];
+souamp = [1 2];
+
+casecounter = 0;
+for ii = 1:length(souvar)
+    Sindata.coordinates = sources(1:souvar(ii),:);
+    nsources = size(Sindata.coordinates,1);
+    for jj = 1:length(recvar)
+        Rindata.coordinates = receivers(1:recvar(jj),:);
+        for kk = 1:length(freqvar)
+            controlparameters.frequencies = frequencies(1:freqvar(kk));
+            nfrequencies = length(controlparameters.frequencies);
+            for ll = 1:length(diffordervar)
+                controlparameters.difforder = diffordervar(ll);
+                for mm = 1:length(addsouvar)
+                    Sindata.doaddsources = addsouvar(mm);   
+                    for nn = 1:length(souamp)
+                        if nn == 1
+                            Sindata.sourceamplitudes = 1;
+                        else
+                           Sindata.sourceamplitudes = ones(nsources,nfrequencies); 
+                        end
+                        
+                        casecounter = casecounter + 1;
+                        disp(['Case no. ',int2str(casecounter)])
+                        EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+                        eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
+                        eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat tfinteqdiff'])
+
+                        if any(any(any(tfdiff))) && controlparameters.difforder == 0
+                            error('ERROR: difforder was set to zero but tfdiff got some result')
+                        end
+                        if ~any(any(any(tfdiff))) && controlparameters.difforder > 0
+                            error('ERROR: difforder was set > 0 but tfdiff got no result')
+                        end
+                        if any(any(any(tfinteqdiff))) && controlparameters.difforder <2
+                            error('ERROR: difforder was set <2 but tfinteqdiff got some result')
+                        end
+                        if ~any(any(any(tfinteqdiff))) && controlparameters.difforder > 1
+                            error('ERROR: difforder was set > 1 but tfinteqdiff got no result')
+                        end
+                    end
+                end                
+
+            end
+        end
+    end
+end
+
+
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % % Test 1: results should be 4 * 3 * 2
+% % % 
+% % % No diffraction at all
+% % 
+% % 
+% %     Sindata.doaddsources = 0;
+% %     controlparameters.difforder = 0;
+% %     
+% %     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+% % 
+% %     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
+% % 
+% %     if ndims(tfdirect) < 3
+% %         error('Test 1: ERROR 1')
+% %     else
+% %         if size(tfdirect,1) ~= 4
+% %            error('Test 1: ERROR 2') 
+% %         end
+% %         if size(tfdirect,2) ~= 3
+% %            error('Test 1: ERROR 3') 
+% %         end
+% %     end
+% %     
+% %     
+% %     
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % % Test 2: results should be 4 * 3 
+% % % 
+% % % difforder = 1
+% % 
+% % 
+% %     Sindata = struct('coordinates',sources);
+% %     Sindata.doaddsources = 1;
+% %     Rindata = struct('coordinates',receivers);
+% %     controlparameters.frequencies = frequencies;
+% %     controlparameters.difforder = 1;
+% %     
+% %     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+% % 
+% %     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
+% % 
+% %     if ndims(tfdirect) > 2
+% %         error('Test 2: ERROR 1')
+% %     else
+% %         if size(tfdirect,1) ~= 4
+% %            error('Test 2: ERROR 2') 
+% %         end
+% %         if size(tfdirect,2) ~= 3
+% %            error('Test 2: ERROR 3') 
+% %         end
+% %     end
+% %     
+% %     
+% %     
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % % Test 3: results should be of size 4 
+% % % 
+% % % difforder = 1
+% % 
+% % 
+% %     Sindata = struct('coordinates',sources);
+% %     Sindata.doaddsources = 1;
+% %     Rindata = struct('coordinates',receivers(1,:));
+% %     controlparameters.frequencies = frequencies;
+% %     controlparameters.difforder = 1;
+% %     
+% %     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+% % 
+% %     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
+% % 
+% %     if ndims(tfdirect) > 2
+% %         error('Test 3: ERROR 1')
+% %     else
+% %         if size(tfdirect,1) ~= 4
+% %            error('Test 3: ERROR 2') 
+% %         end
+% %         if size(tfdirect,2) ~= 1
+% %            error('Test 3: ERROR 3') 
+% %         end
+% %     end
+% %     
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % % Test 4: results should be of size 4 * 3 
+% % % 
+% % % difforder = 1
+% % 
+% % 
+% %     Sindata = struct('coordinates',sources(1,:));
+% %     Sindata.doaddsources = 1;
+% %     Rindata = struct('coordinates',receivers);
+% %     controlparameters.frequencies = frequencies;
+% %     controlparameters.difforder = 1;
+% %     
+% %     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+% % 
+% %     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
+% % 
+% %     if ndims(tfdirect) > 2
+% %         error('Test 4: ERROR 1')
+% %     else
+% %         if size(tfdirect,1) ~= 4
+% %            error('Test 4: ERROR 2') 
+% %         end
+% %         if size(tfdirect,2) ~= 3
+% %            error('Test 4: ERROR 3') 
+% %         end
+% %     end
+% %     
+% %     
+% %     
+
+
+
+

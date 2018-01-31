@@ -72,8 +72,9 @@ versiontext{icounter} = ['Implemented a new input parameter: Sindata.doallSRcomb
 icounter = icounter + 1;
 versionnumbers{icounter} = '0.108';
 versiondate{icounter} = '31 Jan 2018';
-versiontext{icounter} = ['Corrected the handling of sourceamplitudes; the frequency-. ',...
-                  'dependence was not handled before. '];
+versiontext{icounter} = ['Corrected the handling of sourceamplitudes; the frequency- ',...
+                  'dependence was not handled before. Developed EDdebug to run through ',...
+                  'many combinations of nsource, nreceivers, nfrequencies etc.'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

@@ -4,7 +4,7 @@ function EDversionhistory
 %
 % Peter Svensson (peter.svensson@ntnu.no) 31 Jan 2018
 
-% 24 Jan 2018 First version, just after version 0.101
+% 2 Feb 2018 First version, just after version 0.101
 
 versionnumbers = cell(1);
 versiontext = cell(1);
@@ -71,10 +71,11 @@ versiontext{icounter} = ['Implemented a new input parameter: Sindata.doallSRcomb
 
 icounter = icounter + 1;
 versionnumbers{icounter} = '0.108';
-versiondate{icounter} = '31 Jan 2018';
+versiondate{icounter} = '2 Feb 2018';
 versiontext{icounter} = ['Corrected the handling of sourceamplitudes; the frequency- ',...
                   'dependence was not handled before. Developed EDdebug to run through ',...
-                  'many combinations of nsource, nreceivers, nfrequencies etc.'];
+                  'many combinations of nsource, nreceivers, nfrequencies etc. ',...
+                  'Added timingstruct as output data in the tfinteq file.'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

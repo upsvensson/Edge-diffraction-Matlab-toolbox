@@ -12,11 +12,15 @@
 % Two sources, three receivers, four frequencies
 % doaddsources = 0 or 1
 
-sources = [0 0 0.00001;0 0 -0.32001];
-receivers = [0 0 2;0 0 -2; 1 1 1];
+% sources = [0.04 0 0.00001;0 0 -0.32001];
+sources = [0.04 0 0.00001;0 0 0.0001;-0.04 0 0.0001];%0 0 -0.32001];
+receivers = [0 0 -2; 1 1 1];
 frequencies = [1 10 20 40];
 
+sources = EDcirclepoints(0.1,2);
+sources(:,3) = 0.00001;
 
+% sources = sources(1:2,:);
 
 mfile = mfilename('fullpath');
 [infilepath,filestem] = fileparts(mfile);
@@ -77,7 +81,7 @@ for ii = 1:length(souvar)
                         end
                         
                         casecounter = casecounter + 1;
-                        disp(['Case no. ',int2str(casecounter)])
+                        disp(['Case no. ',int2str(casecounter),': ',int2str(ii),' ',int2str(jj),' ',int2str(kk),' ',int2str(ll),' ',int2str(mm),' ',int2str(nn)])
                         EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
                         eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
                         eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat tfinteqdiff'])
@@ -86,7 +90,7 @@ for ii = 1:length(souvar)
                             error('ERROR: difforder was set to zero but tfdiff got some result')
                         end
                         if ~any(any(any(tfdiff))) && controlparameters.difforder > 0
-                            error('ERROR: difforder was set > 0 but tfdiff got no result')
+                            disp('WARNING: difforder was set > 0 but tfdiff got no result. Check if this is as expected')
                         end
                         if any(any(any(tfinteqdiff))) && controlparameters.difforder <2
                             error('ERROR: difforder was set <2 but tfinteqdiff got some result')

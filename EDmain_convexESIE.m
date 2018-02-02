@@ -39,7 +39,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 31 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 2 Feb. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -98,6 +98,8 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % backscatter cases.
 % 31 Jan 2018 v0.108: Corrected the handling of sourceamplitudes
 % (frequency dependence had not been implemented)
+% 2 Feb 2018 v0.108: The timingstruct wasn't saved anywhere. Now it
+% is saved in the tfinteq output file.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -441,7 +443,7 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
             Rdata,controlparameters);
 %     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
-    eval(['save ',desiredname,' tfinteqdiff extraoutputdata '])
+    eval(['save ',desiredname,' tfinteqdiff extraoutputdata timingstruct'])
     t01 = etime(clock,t00);
     timingstruct.integralequation = [t01 timingdata];
     if filehandlingparameters.savelogfile == 1
@@ -465,7 +467,7 @@ else
     extraoutputdata = [];
 %     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
-    eval(['save ',desiredname,' tfinteqdiff extraoutputdata '])    
+    eval(['save ',desiredname,' tfinteqdiff extraoutputdata timingstruct'])    
     if filehandlingparameters.savelogfile == 1
         fwrite(fid,['   The integral equation stage was not run',lineending],'char');
     end

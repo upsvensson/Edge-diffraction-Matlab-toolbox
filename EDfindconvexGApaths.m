@@ -48,7 +48,7 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 26 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 1 Feb. 2018
 %
 % firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,...
@@ -71,6 +71,8 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 % 25 Jan 2018 Fixed a bug: preciously, the direct sound was calculated even if
 % .directsound = 0.
 % 26 Jan 2018: V 0.107: introduced the doallSRcombinations parameter
+% 1 Feb 2018 Fixed a bug; the directsoundlist sometimes got a horizontal
+% format.
 
 if nargin < 13
    showtext = 0; 
@@ -299,8 +301,8 @@ end
 
 firstorderpathdata = struct;
 firstorderpathdata.specreflIScoords = validIScoords;
-firstorderpathdata.specrefllist     = [validsounumber validrecnumber specreflamp];
+firstorderpathdata.specrefllist     = [validsounumber(:) validrecnumber(:) specreflamp(:)];
 firstorderpathdata.diffpaths        = diffpaths;
 firstorderpathdata.edgeisactive     = edgeisactive;
-firstorderpathdata.directsoundlist  = [Snumber_directsoundOK Rnumber_directsoundOK dirsoundamp];
+firstorderpathdata.directsoundlist  = [Snumber_directsoundOK(:) Rnumber_directsoundOK(:) dirsoundamp(:)];
 firstorderpathdata.ncomponents      = numberofcomponents;

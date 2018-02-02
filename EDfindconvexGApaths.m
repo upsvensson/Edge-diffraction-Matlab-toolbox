@@ -48,7 +48,7 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 1 Feb. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 2 Feb. 2018
 %
 % firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,...
@@ -73,6 +73,9 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 % 26 Jan 2018: V 0.107: introduced the doallSRcombinations parameter
 % 1 Feb 2018 Fixed a bug; the directsoundlist sometimes got a horizontal
 % format.
+% 2 Feb 2018 Fixed a small bug: if doaddsources was set to 0, and no
+% direct sound obstructions were possible, or no specular reflection was possible,
+% then an error occurred.
 
 if nargin < 13
    showtext = 0; 
@@ -160,9 +163,13 @@ else
 end
 
 if doallSRcombinations == 0
-    iv = find(possibleSPR(:,1) ~= possibleSPR(:,3));
-    possibleSPR(iv,:) = [];
-    npotentialIS = size(possibleSPR,1);
+    if ~isempty(possibleSPR)
+        iv = find(possibleSPR(:,1) ~= possibleSPR(:,3));
+        possibleSPR(iv,:) = [];
+        npotentialIS = size(possibleSPR,1);
+    else
+        npotentialIS = 0;
+    end
 end
 
 if npotentialIS > 0
@@ -240,15 +247,18 @@ if directsound ~= 0
     end
 
     if doallSRcombinations == 0
-        iv = find(possibleSPR_obstruct(:,1) ~= possibleSPR_obstruct(:,3));
-        possibleSPR_obstruct(iv,:) = [];
-        npotentialIS = size(possibleSPR,1);
         directsoundOK = eye(nreceivers);
-        npotentialobstruct = size(possibleSPR_obstruct,1);
+        if ~isempty(possibleSPR_obstruct)
+            iv = find(possibleSPR_obstruct(:,1) ~= possibleSPR_obstruct(:,3));
+            possibleSPR_obstruct(iv,:) = [];
+            npotentialIS = size(possibleSPR,1);
+            npotentialobstruct = size(possibleSPR_obstruct,1);
+        else
+            npotentialobstruct = 0;
+        end
     else
         directsoundOK = ones(nreceivers,nsources);        
     end
-
 
     if npotentialobstruct > 0
 

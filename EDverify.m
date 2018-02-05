@@ -1,8 +1,13 @@
-function passtest = EDverify(runtest,showtext,plotdiagrams)
+function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % EDverify runs EDtoolbox for one or several defined tests,
 % and compares the results to expected results. A logfile is written.
 %
 % Input parameters:
+%   outputdirectory (optional) The directory were the logfile will be
+%                   stored. If this parameter is not given any value, no
+%                   logfile will be written, but the user will get a window
+%                   to specify a directory where the temporary calculation
+%                   results will be stored.
 %   runtest         (optional) A vector of 0 or 1, which for each position n
 %                   tells if test n should be run. Default value: all 1.
 %   showtext        (optional) 0 or 1; determines if the results should be printed on
@@ -27,10 +32,11 @@ function passtest = EDverify(runtest,showtext,plotdiagrams)
 % 5. Field continuity for receivers close to a single edge, 100 Hz.
 % Diff1 test.
 % 6. Replicate a non-centered internal monopole, at 0.1 Hz.
+% 7. Direct sound obscuring for a corner-on hit of an octahedron.
 % 
-% Peter Svensson 31 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 5 Feb. 2018 (peter.svensson@ntnu.no)
 % 
-% passtest = EDverify(runtest,showtext,plotdiagrams);
+% passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams);
 
 % 15 Jan. 2018 First version
 % 15 Jan. 2018 Cleaned up the EDversion/EDversionnumber confusion. Added a
@@ -44,18 +50,30 @@ function passtest = EDverify(runtest,showtext,plotdiagrams)
 % 26 Jan 2018 Removed the "results" from the loading of results file, to
 % update to version 0.107.
 % 31 Jan 2018 Added "results" to the default output directory.
+% 5 Feb 2018  Added test 7, after that problem was discovered with v 0.108.
+% Made the logfile optional, via the specification of an outputdirectory. 
 
-ntests = 6;
+ntests = 7;
 
-if nargin < 1
-    runtest = ones(1,ntests);
+if nargin < 1 
+    outputdirectory = [];
+    savelogfile = 0;
+else
+    savelogfile = 1;
 end
 if nargin < 2
-    showtext = 0;
+    runtest = ones(1,ntests);
 end
 if nargin < 3
+    showtext = 0;
+end
+if nargin < 4
     plotdiagrams = 0;
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+outputdirectory = uigetdir('', 'Select the directory for temporary calculation results');
 
 passtest = zeros(1,ntests);
 
@@ -70,28 +88,30 @@ datetimevec = [datevec,'_',sprintf('%02d',clockvec(4)),'h', sprintf('%02d',clock
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create a logfile and open it
 
-compstr = computer;
-compstr = lower(compstr(1:3));
-if compstr == 'mac'  
-	lineending = 13;
-elseif compstr == 'sun' || compstr == 'sol'            
-	lineending = 10;
-elseif compstr == 'pcw'
-	lineending = [13,10];
-else
-    error('ERROR: Not implemented for this computer type yet')	
-end
+if savelogfile ==1
+    compstr = computer;
+    compstr = lower(compstr(1:3));
+    if compstr == 'mac'  
+        lineending = 13;
+    elseif compstr == 'sun' || compstr == 'sol'            
+        lineending = 10;
+    elseif compstr == 'pcw'
+        lineending = [13,10];
+    else
+        error('ERROR: Not implemented for this computer type yet')	
+    end
 
-mfile = mfilename('fullpath');
-[infilepath,filestem] = fileparts(mfile);
-logfilename = [infilepath,filesep,'EDverify_v',NN,'_',datetimevec,'.txt'];
+    mfile = mfilename('fullpath');
+    [infilepath,filestem] = fileparts(mfile);
+    logfilename = [infilepath,filesep,'EDverify_v',NN,'_',datetimevec,'.txt'];
 
-fid = fopen(logfilename,'w');
-if fid == -1
-    disp('The logfile is not possible to open - check that it isn''t opened by any program!')
-    return
+    fid = fopen(logfilename,'w');
+    if fid == -1
+        disp('The logfile is not possible to open - check that it isn''t opened by any program!')
+        return
+    end
+    fwrite(fid,['EDverify, EDtoolbox v. ',NN,' (last change on ',changedate,'), run on ',datetimevec,lineending],'char');
 end
-fwrite(fid,['EDverify, EDtoolbox v. ',NN,' (last change on ',changedate,'), run on ',datetimevec,lineending],'char');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -146,9 +166,9 @@ if runtest(1) == 1
     Rindata = struct('coordinates',[0 0 0.00001;0 0 -0.32001]);
     controlparameters = struct('frequencies',0);
     controlparameters.difforder = 20;
-    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
+    filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
-    filehandlingparameters.savelogfile = 1;
+    filehandlingparameters.savelogfile = 0;
     filehandlingparameters.showtext = 0;
     controlparameters.ngauss = 96;    
     controlparameters.discretizationtype = 2;
@@ -184,21 +204,22 @@ if runtest(1) == 1
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['Test ',II,': EDmain_convexESIE, DC response at surface, plane wave incidence',lineending],'char');
-    fwrite(fid,['Expected rel. errors for receiver positions 1 (in front, at surface) and 2 (behind, at surface), with',lineending],'char');
-    fwrite(fid,['Gauss-Legendre quadrature, and 96 points for the longest edge, and diffraction order 20, are',lineending],'char');
-    fwrite(fid,['1.3e-5 and 1.5e-5, respectively.',lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['Computed results are: ',num2str(relerr(1)),' and ',num2str(relerr(2)),lineending],'char');
-    if relerr(1) < 0.14e-4 && relerr(2) < 0.16e-4
-        fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
-    else
-        fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
-        fwrite(fid,['Make sure these settings were set in this script: difforder = 2, ngauss = 96, discretizationtype = 2',lineending],'char');
+    if savelogfile == 1
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['####################################################################',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convexESIE, DC response at surface, plane wave incidence',lineending],'char');
+        fwrite(fid,['Expected rel. errors for receiver positions 1 (in front, at surface) and 2 (behind, at surface), with',lineending],'char');
+        fwrite(fid,['Gauss-Legendre quadrature, and 96 points for the longest edge, and diffraction order 20, are',lineending],'char');
+        fwrite(fid,['1.3e-5 and 1.5e-5, respectively.',lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['Computed results are: ',num2str(relerr(1)),' and ',num2str(relerr(2)),lineending],'char');
+        if relerr(1) < 0.14e-4 && relerr(2) < 0.16e-4
+            fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
+        else
+            fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+            fwrite(fid,['Make sure these settings were set in this script: difforder = 2, ngauss = 96, discretizationtype = 2',lineending],'char');
+        end
     end
-
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -241,7 +262,7 @@ if runtest(2) == 1
     Rindata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 1;
-    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
+    filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
     filehandlingparameters.savelogfile = 1;
     filehandlingparameters.savelogfile = 1;
@@ -302,21 +323,23 @@ if runtest(2) == 1
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz',lineending],'char');
-    fwrite(fid,['Single edge; receivers distributed at, and very near, zone boundaries',lineending],'char');
-    fwrite(fid,['Perpendicular edge hit.',lineending],'char');
-    fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
-    fwrite(fid,['surrounding responses (< 1e-5)',lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
-    fwrite(fid,['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec),lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-    if passtest(4) == 1
-        fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
-    else
-        fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+    if savelogfile == 1
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['####################################################################',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz',lineending],'char');
+        fwrite(fid,['Single edge; receivers distributed at, and very near, zone boundaries',lineending],'char');
+        fwrite(fid,['Perpendicular edge hit.',lineending],'char');
+        fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
+        fwrite(fid,['surrounding responses (< 1e-5)',lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
+        fwrite(fid,['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec),lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        if passtest(4) == 1
+            fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
+        else
+            fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+        end
     end
 end
 
@@ -359,10 +382,9 @@ if runtest(3) == 1
     Rindata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 1;
-    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
+    filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
-    filehandlingparameters.savelogfile = 1;
-    filehandlingparameters.savelogfile = 1;
+    filehandlingparameters.savelogfile = 0;
     filehandlingparameters.showtext = 0;
     controlparameters.Rstart = 0;
 
@@ -420,21 +442,23 @@ if runtest(3) == 1
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz',lineending],'char');
-    fwrite(fid,['Single edge; receivers distributed at, and very near, zone boundaries',lineending],'char');
-    fwrite(fid,['Skewed edge hit.',lineending],'char');
-    fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
-    fwrite(fid,['surrounding responses (< 1e-5)',lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
-    fwrite(fid,['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec),lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-    if passtest(4) == 1
-        fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
-    else
-        fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+    if savelogfile == 1
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['####################################################################',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz',lineending],'char');
+        fwrite(fid,['Single edge; receivers distributed at, and very near, zone boundaries',lineending],'char');
+        fwrite(fid,['Skewed edge hit.',lineending],'char');
+        fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
+        fwrite(fid,['surrounding responses (< 1e-5)',lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['Computed results at the direct sound ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
+        fwrite(fid,['Computed results at the specular reflection ZB differ by: ',num2str(relerrZBspec),lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        if passtest(4) == 1
+            fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
+        else
+            fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+        end
     end
 end
 
@@ -487,10 +511,10 @@ if runtest(4) == 1
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 4;
     controlparameters.ngauss = 32;
-    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
+    filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
-    filehandlingparameters.savelogfile = 1;
-    filehandlingparameters.showtext = 1;
+    filehandlingparameters.savelogfile = 0;
+    filehandlingparameters.showtext = 0;
     controlparameters.Rstart = 0;
 
     envdata.cair = 344;
@@ -534,20 +558,22 @@ if runtest(4) == 1
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across corner zone boundary, at 100 Hz',lineending],'char');
-    fwrite(fid,['Two edges meat at 90 deg.; several receivers exactly at, and very near zone boundaries',lineending],'char');
-    fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
-    fwrite(fid,['surrounding responses (< 1e-3)',lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['Computed results at the direct sound corner ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
-    fwrite(fid,['Computed results at the specular reflection corner ZB differ by: ',num2str(relerrZBspec),lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-    if relerrZBdirect < 1e-3 & relerrZBspec < 1e-3
-        fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
-    else
-        fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+    if savelogfile == 1
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['####################################################################',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across corner zone boundary, at 100 Hz',lineending],'char');
+        fwrite(fid,['Two edges meat at 90 deg.; several receivers exactly at, and very near zone boundaries',lineending],'char');
+        fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
+        fwrite(fid,['surrounding responses (< 1e-3)',lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['Computed results at the direct sound corner ZB differ by: ',num2str(relerrZBdirect),lineending],'char');
+        fwrite(fid,['Computed results at the specular reflection corner ZB differ by: ',num2str(relerrZBspec),lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        if relerrZBdirect < 1e-3 & relerrZBspec < 1e-3
+            fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
+        else
+            fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+        end
     end
 end
 
@@ -591,9 +617,9 @@ if runtest(5) == 1
     Rindata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',[0.1 ]);
     controlparameters.difforder = 1;
-    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
+    filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
-    filehandlingparameters.savelogfile = 1;
+    filehandlingparameters.savelogfile = 0;
     filehandlingparameters.showtext = 0;
     controlparameters.Rstart = soudist;
 
@@ -638,18 +664,20 @@ if runtest(5) == 1
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across edge, for very low frequencies',lineending],'char');
-    fwrite(fid,['Single edge; receivers very near the edge, in front and in back',lineending],'char');
-    fwrite(fid,['Far source, perp. incidence and skewed incidence.',lineending],'char');
-    fwrite(fid,['Computed values in front and in back should be within 1.5e-3 for the three frequencies',lineending],'char');
-    fwrite(fid,['Computed results differ by max: ',num2str(max(pressurediff)),lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-    if passtest(itest) == 1
-        fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
-    else
-        fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+    if savelogfile == 1
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['####################################################################',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across edge, for very low frequencies',lineending],'char');
+        fwrite(fid,['Single edge; receivers very near the edge, in front and in back',lineending],'char');
+        fwrite(fid,['Far source, perp. incidence and skewed incidence.',lineending],'char');
+        fwrite(fid,['Computed values in front and in back should be within 1.5e-3 for the three frequencies',lineending],'char');
+        fwrite(fid,['Computed results differ by max: ',num2str(max(pressurediff)),lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        if passtest(itest) == 1
+            fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
+        else
+            fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+        end
     end
 end
 
@@ -782,9 +810,10 @@ if runtest(6) == 1
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Filehandling
 
-    filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
+    filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
-    filehandlingparameters.showtext = 1;
+    filehandlingparameters.showtext = 0;
+    filehandlingparameters.savelogfile = 0;
 
     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
 
@@ -825,30 +854,220 @@ if runtest(6) == 1
         end
     end
     
-    
-    fwrite(fid,[' ',lineending],'char');
-    fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['Test ',II,': EDmain_convexESIE, replicate internal monopole, at 0.1 Hz.',lineending],'char');
-    fwrite(fid,['Cube w internal, non-centered monopole.',lineending],'char');
-    fwrite(fid,['Entire cube surface gets sources.',lineending],'char');
-    fwrite(fid,['Radiated field should be within [0.996,1.008] around a circle of receivers',lineending],'char');
-    fwrite(fid,['Computed results are within [',num2str(minval),',',num2str(maxval),']',lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-    if passtest(itest) == 1
-        fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
-    else
-        fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
-    end
-    
+    if savelogfile == 1
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['####################################################################',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convexESIE, replicate internal monopole, at 0.1 Hz.',lineending],'char');
+        fwrite(fid,['Cube w internal, non-centered monopole.',lineending],'char');
+        fwrite(fid,['Entire cube surface gets sources.',lineending],'char');
+        fwrite(fid,['Radiated field should be within [0.996,1.008] around a circle of receivers',lineending],'char');
+        fwrite(fid,['Computed results are within [',num2str(minval),',',num2str(maxval),']',lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        if passtest(itest) == 1
+            fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
+        else
+            fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+        end
+    end    
 end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  Test 7 EDmain_convexESIE, make sure the direct sound is obscured for a
+%  corner-on hit, for an octahedron
+%
 
-fclose(fid);
+if runtest(7) == 1
+    itest = 7;
+    II = int2str(itest);
+    
+    if showtext > 0
+        disp(' ')
+        disp('*********************************************************************')
+        disp(['Test ',II,': EDmain_convexESIE, make sure the direct sound is obscured for a']);
+        disp('corner-on hit, for an octahedron')
+    else
+        disp(['Test ',II,': EDmain_convexESIE, direct sound obscuring for corner-on hit, octahedron']);    
+    end
+
+    mfile = mfilename('fullpath');
+    [infilepath,filestem] = fileparts(mfile);
+
+    corners = [
+       0.707106781 0 0
+        0	0.707106781	0
+        -0.707106781	0	0
+        0	-0.707106781	0
+        0	0	0.707106781
+        0	0	-0.707106781];
+
+    planecorners = [
+    1 2 5
+    2 3 5
+    3 4 5
+    4 1 5
+    2 1 6
+    3 2 6
+    4 3 6
+    1 4 6 ];
+
+    geofiledata = struct('corners',corners,'planecorners',planecorners);
+    geofiledata.firstcornertoskip = 1e6;
+    Sindata = struct('coordinates',[2 0 0]);
+    receivers = [-2 0 0];
+    Rindata = struct('coordinates',receivers);
+    controlparameters = struct('frequencies',100);
+    controlparameters.difforder = 0;
+    filehandlingparameters = struct('outputdirectory',outputdirectory);
+    filehandlingparameters.filestem = filestem;
+    filehandlingparameters.savelogfile = 0;
+    filehandlingparameters.showtext = 0;
+    controlparameters.Rstart = 0;
+
+    envdata.cair = 344;
+
+    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+
+    eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect'])
+%     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
+
+    if abs(tfdirect) == 0
+       passtest(itest) = 1; 
+    else
+        passtest(itest) = -1;        
+    end
+
+    if showtext > 0
+         disp(' ')
+        disp(['The direct sound should be zero. The computed direct sound had the value ',num2str(abs(tfdirect))])
+        disp(['   '])
+        if passtest(itest) == 1
+            disp(['So, verification test ',II,' was passed'])
+        else
+            disp(['So, verification test ',II,' was not passed. Please check the code'])   
+        end
+    end
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    if savelogfile == 1
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['####################################################################',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convexESIE, make sure the direct sound is obscured for a',lineending],'char');
+        fwrite(fid,['corner-on hit, for an octahedron',lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['The direct sound should be zero. The computed direct sound had the value ',num2str(abs(tfdirect)),lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        if passtest(itest) == 1
+            fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
+        else
+            fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+        end
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  Test 8 EDmain_convexESIE, make sure the direct sound is obscured for an
+%  edge-on hit, for a cube
+%
+
+if runtest(8) == 1
+    itest = 8;
+    II = int2str(itest);
+    
+    if showtext > 0
+        disp(' ')
+        disp('*********************************************************************')
+        disp(['Test ',II,': EDmain_convexESIE, make sure the direct sound is obscured for an']);
+        disp('edge-on hit, for a cube')
+    else
+        disp(['Test ',II,': EDmain_convexESIE, direct sound obscuring for edge-on hit, cube']);    
+    end
+
+
+    mfile = mfilename('fullpath');
+    [infilepath,filestem] = fileparts(mfile);
+
+    corners = [     -0.5000   -0.500   -0.500
+        0.5000   -0.50   -0.500
+        0.5000    0.5000   -0.500
+       -0.5000    0.5000   -0.500
+       -0.5000   -0.500         0.5
+        0.5000   -0.500         0.5
+        0.5000    0.5000         0.5
+       -0.5000    0.5000         0.5];
+
+    planecorners = [   1     4     3     2
+         5     6     7     8
+         1     2     6     5
+         3     4     8     7
+         2     3     7     6
+         1     5     8     4];
+
+    geofiledata = struct('corners',corners,'planecorners',planecorners);
+    sources = [1 1 0];
+    Sindata = struct('coordinates',sources);
+    receivers = [-1 -1 0];
+    Rindata = struct('coordinates',receivers);
+    controlparameters = struct('frequencies',100);
+    controlparameters.difforder = 0;
+    filehandlingparameters = struct('outputdirectory',outputdirectory);
+    filehandlingparameters.filestem = filestem;
+    filehandlingparameters.savelogfile = 0;
+    filehandlingparameters.showtext = 0;
+    controlparameters.Rstart = 0;
+
+    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Load and present the results
+
+    eval(['load ',outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect'])
+
+    tfdirect
+    
+   if abs(tfdirect) == 0
+       passtest(itest) = 1; 
+    else
+        passtest(itest) = -1;        
+    end
+
+    if showtext > 0
+         disp(' ')
+        disp(['The direct sound should be zero. The computed direct sound had the value ',num2str(abs(tfdirect))])
+        disp(['   '])
+        if passtest(itest) == 1
+            disp(['So, verification test ',II,' was passed'])
+        else
+            disp(['So, verification test ',II,' was not passed. Please check the code'])   
+        end
+    end
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    if savelogfile == 1
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['####################################################################',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convexESIE, make sure the direct sound is obscured for an',lineending],'char');
+        fwrite(fid,['edge-on hit, for a cube',lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        fwrite(fid,['The direct sound should be zero. The computed direct sound had the value ',num2str(abs(tfdirect)),lineending],'char');
+        fwrite(fid,[' ',lineending],'char');
+        if passtest(itest) == 1
+            fwrite(fid,['So, verification test ',II,' was passed',lineending],'char');
+        else
+            fwrite(fid,['So, verification test ',II,' was not passed. Please check the code'   ,lineending],'char');
+        end
+    end
+
+end
 
 
 
-
-
+if savelogfile == 1
+    fclose(fid);
+end
 

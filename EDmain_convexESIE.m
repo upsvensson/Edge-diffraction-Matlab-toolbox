@@ -39,7 +39,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 2 Feb. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 5 Feb. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -100,6 +100,8 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % (frequency dependence had not been implemented)
 % 2 Feb 2018 v0.108: The timingstruct wasn't saved anywhere. Now it
 % is saved in the tfinteq output file.
+% 5 Feb. 2018 Moved the saving for the tfinteq file so that it could
+% include the last timingdata.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -130,13 +132,11 @@ end
 [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,1);
 
 if filehandlingparameters.savelogfile == 1
-%     logfilename = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_log.txt'];
     logfilename = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_log.txt'];
 end
 
 if filehandlingparameters.savesetupfile == 1
     varlist = 'geofiledata Sindata Rindata envdata controlparameters filehandlingparameters EDversionnumber';
-%     eval(['save ',filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_setup.mat ',varlist])
     eval(['save ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_setup.mat ',varlist])
 end
 
@@ -173,7 +173,6 @@ if isfield(geofiledata,'geoinputfile')
         error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
     end
     if filehandlingparameters.savecadgeofile == 1
-%         desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
         eval(['save ',desiredname,' planedata extraCATTdata'])
     end
@@ -214,7 +213,6 @@ end
 t00 = clock;
 [edgedata,planedata] = EDedgeo(planedata,geofiledata.firstcornertoskip,[],0,filehandlingparameters.showtext);
 if filehandlingparameters.saveeddatafile == 1
-%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_eddata.mat'];
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_eddata.mat'];
     eval(['save ',desiredname,' planedata edgedata'])
 end
@@ -240,7 +238,6 @@ end
 t00 = clock;
 Sdata = EDSorRgeo(planedata,edgedata,Sindata.coordinates,'S',2,filehandlingparameters.showtext);
 if filehandlingparameters.saveSRdatafiles == 1
-%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_Sdata.mat'];
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Sdata.mat'];
     eval(['save ',desiredname,' Sdata'])    
 end
@@ -260,7 +257,6 @@ end
 t00 = clock;
 Rdata = EDSorRgeo(planedata,edgedata,Rindata.coordinates,'R',2,filehandlingparameters.showtext);
 if filehandlingparameters.saveSRdatafiles == 1
-%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_Rdata.mat'];
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Rdata.mat'];
     eval(['save ',desiredname,' Rdata'])    
 end
@@ -283,25 +279,12 @@ if filehandlingparameters.showtext >= 1
 	disp('   Find the (first-order) GA paths')
 end
 
-% The output struct firstorderpathdata has the fields
-%   .specreflIScoords   matrix, [nIS,3] with IS coordinates
-%   .specrefllist       matrix, [nIS,3] with [source number,rec.number, 
-%                       spec.reflection amplitude] in each row.
-%   .diffpaths          matrix, [nreceivers,nsources,nedges] with
-%                       logical 0 or 1
-%   .edgeisactive       vector, [nedges,1] with logical 0 or 1
-%   .directsoundlist    matrix, [ndir,3] with [source number, rec.number,
-%                       directsound amplitude] in each row.
-%   .ncomponents        vector, [1,3], with number of direct sound,
-%                       specrefl and diffr components.
-
 t00 = clock;
 firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
     Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
     Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr,...
     controlparameters.difforder,controlparameters.directsound,Sindata.doallSRcombinations,filehandlingparameters.showtext);
 if filehandlingparameters.savepathsfile == 1
-%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_paths.mat'];
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
     eval(['save ',desiredname,' firstorderpathdata'])    
 end
@@ -328,7 +311,6 @@ if controlparameters.docalctf == 1
     t01 = etime(clock,t00);
     timingstruct.maketfs = [t01 timingdata];
 
-%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tf.mat'];
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat'];
     eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct EDversionnumber geofiledata Sindata Rindata envdata controlparameters filehandlingparameters'])
 
@@ -359,7 +341,6 @@ if controlparameters.difforder > 1
     t00 = clock;
     edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,1,2,2,filehandlingparameters.showtext);    
     if filehandlingparameters.saveeddatafile == 1
-%         desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_eddata.mat'];
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_eddata.mat'];
         eval(['save ',desiredname,' planedata edgedata edgetoedgedata'])
     end
@@ -389,7 +370,6 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
     Hsubmatrixdata = EDinteg_submatrixstructure(edgedata.edgelengthvec,edgedata.closwedangvec,...
         controlparameters.ngauss,controlparameters.discretizationtype,edgetoedgedata,edgedata.planesatedge,filehandlingparameters.showtext);
     if filehandlingparameters.savesubmatrixdata == 1
-%         desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
         eval(['save ',desiredname,' Hsubmatrixdata'])
     end
@@ -441,11 +421,10 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
     [tfinteqdiff,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
         envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,Sindata.doaddsources,Sindata.sourceamplitudes,Sindata.doallSRcombinations,...
             Rdata,controlparameters);
-%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
-    eval(['save ',desiredname,' tfinteqdiff extraoutputdata timingstruct'])
     t01 = etime(clock,t00);
     timingstruct.integralequation = [t01 timingdata];
+    eval(['save ',desiredname,' tfinteqdiff extraoutputdata timingstruct'])
     if filehandlingparameters.savelogfile == 1
         fwrite(fid,['   EDintegralequation_convex_tf (',int2str(nfrequencies),' frequencies. Diffraction order: ',int2str(controlparameters.difforder),')',lineending],'char');
         fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for one freq, as below)',lineending],'char');
@@ -465,7 +444,6 @@ else
         tfinteqdiff = zeros(nfrequencies,nreceivers,nsources);        
     end
     extraoutputdata = [];
-%     desiredname = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
     eval(['save ',desiredname,' tfinteqdiff extraoutputdata timingstruct'])    
     if filehandlingparameters.savelogfile == 1

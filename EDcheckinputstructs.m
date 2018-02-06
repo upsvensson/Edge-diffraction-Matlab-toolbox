@@ -57,7 +57,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %   EDmaincase      1, for EDmain_convexESIE (frequency domain)
 %                   2, for EDmain_convexESIE_ir (time domain)
 % 
-% Peter Svensson 31 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 6 Feb 2018 (peter.svensson@ntnu.no)
 % 
 % [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -89,6 +89,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 % 28 Jan 2018 First version for EDmain_convexESIE_ir
 % 31 Jan 2018 Corrected the handling of sourceamplitudes (the freq.
 % dependence was not implemented correctly.
+% 6 Feb 2018 Introduced a check if number of receivers/sources was zero
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -147,6 +148,9 @@ if ~isfield(Rindata,'coordinates')
     error('ERROR 2: receiver coordinates were not specified')
 end
 nreceivers = size(Rindata.coordinates,1);
+if nreceivers == 0
+     error('ERROR 3: receiver coordinates were not specified')            
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct Sindata
@@ -160,6 +164,9 @@ if ~isfield(Sindata,'coordinates')
     error('ERROR 2: source coordinates were not specified')
 end
 nsources = size(Sindata.coordinates,1);
+if nsources == 0
+     error('ERROR 3: source coordinates were not specified')            
+end
 if ~isfield(Sindata,'doaddsources')
     Sindata.doaddsources = 0;
 end

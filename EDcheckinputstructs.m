@@ -28,6 +28,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                   .specorder           (ignored by EDmain_convexESIE and 
 %                                        by EDmain_convexESIE_ir)
 %                   .difforder           (default: 15)
+%                   .skipfirstorder      (default: 0)
 %                   .nedgepoints_visibility (default: 2) Ignored by
 %                                        EDmain_convexESIE and by
 %                                        EDmain_convexESIE_ir
@@ -57,7 +58,7 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %   EDmaincase      1, for EDmain_convexESIE (frequency domain)
 %                   2, for EDmain_convexESIE_ir (time domain)
 % 
-% Peter Svensson 6 Feb 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 8 Feb 2018 (peter.svensson@ntnu.no)
 % 
 % [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -90,6 +91,8 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 % 31 Jan 2018 Corrected the handling of sourceamplitudes (the freq.
 % dependence was not implemented correctly.
 % 6 Feb 2018 Introduced a check if number of receivers/sources was zero
+% 8 Feb 2018 v 0.109 Introduced a new parameter:
+% controlparameters.skipfirstorder (default = 0).
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -218,6 +221,9 @@ if ~isfield(controlparameters,'discretizationtype')
 end
 if ~isfield(controlparameters,'ngauss')
     controlparameters.ngauss = 16;
+end
+if ~isfield(controlparameters,'skipfirstorder')
+    controlparameters.skipfirstorder = 0;
 end
 
 if EDmaincase == 1

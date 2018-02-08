@@ -22,6 +22,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .difforder           (default: 15)
 %                       .docalctf            (default: 1)
 %                       .docalcir            (default: 0)
+%                       .skipfirstorder      (default: 0)
 %                       .Rstart              (default: 0)
 %                       .frequencies         (obligatory, if docalcftf = 1)
 %                       .discretizationtype  (default: 2 = G-L)
@@ -39,7 +40,7 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
-% Peter Svensson 5 Feb. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 8 Feb. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters);
 
@@ -102,6 +103,8 @@ function EDmain_convexESIE(geofiledata,Sindata,Rindata,envdata,controlparameters
 % is saved in the tfinteq output file.
 % 5 Feb. 2018 Moved the saving for the tfinteq file so that it could
 % include the last timingdata.
+% 8 Feb 2018 v0.109: Introduced a new parameter:
+% controlparameters.skipfirstorder (default = 0).
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -275,31 +278,41 @@ end
 % Find the paths for direct sound, first-order specular, and first-order
 % diffraction paths.
 
-if filehandlingparameters.showtext >= 1	
-	disp('   Find the (first-order) GA paths')
-end
+if controlparameters.skipfirstorder == 0
+    if filehandlingparameters.showtext >= 1	
+        disp('   Find the (first-order) GA paths')
+    end
 
-t00 = clock;
-firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
-    Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
-    Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr,...
-    controlparameters.difforder,controlparameters.directsound,Sindata.doallSRcombinations,filehandlingparameters.showtext);
-if filehandlingparameters.savepathsfile == 1
-    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
-    eval(['save ',desiredname,' firstorderpathdata'])    
-end
-t01 = etime(clock,t00);
-timingstruct.findpaths = t01;
-if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDfindconvexGApaths (',int2str(nfrequencies),' frequencies)',lineending],'char');
-    fwrite(fid,['                                Total time: ',num2str(t01),' s',lineending],'char');
+    t00 = clock;
+    firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
+        Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
+        Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr,...
+        controlparameters.difforder,controlparameters.directsound,Sindata.doallSRcombinations,filehandlingparameters.showtext);
+    if filehandlingparameters.savepathsfile == 1
+        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
+        eval(['save ',desiredname,' firstorderpathdata'])    
+    end
+    t01 = etime(clock,t00);
+    timingstruct.findpaths = t01;
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   EDfindconvexGApaths (',int2str(nfrequencies),' frequencies)',lineending],'char');
+        fwrite(fid,['                                Total time: ',num2str(t01),' s',lineending],'char');
+    end
+else
+    if filehandlingparameters.showtext >= 1	
+        disp('   The first-order GA and diff paths are not identified because skipfirstorder was set to 1')
+    end
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   EDfindconvexGApaths was not run because skipfirstorder was set to 1',lineending],'char');
+    end
+    timingstruct.findpaths = 0;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Generate the first-order specular, and first-order
 % diffraction tfs.
 
-if controlparameters.docalctf == 1
+if controlparameters.docalctf == 1 && controlparameters.skipfirstorder == 0
     if filehandlingparameters.showtext >= 1	
         disp('   Generate the (first-order) GA and diff tfs.')
     end
@@ -323,10 +336,10 @@ if controlparameters.docalctf == 1
     end
 else
     if filehandlingparameters.showtext >= 1	
-        disp('   First-order GA and diff tfs are not generated because docalctf was set to 0')
+        disp('   First-order GA and diff tfs are not generated because docalctf was set to 0, or skipfirstorder was set to 1')
     end
     if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDmakefirstordertfs was not run because docalctf was set to 0',lineending],'char');
+        fwrite(fid,['   EDmakefirstordertfs was not run because docalctf was set to 0, or skipfirstorder was set to 1',lineending],'char');
     end
     timingstruct.maketfs = 0;
 end

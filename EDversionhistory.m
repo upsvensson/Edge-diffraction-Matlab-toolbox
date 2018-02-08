@@ -4,7 +4,7 @@ function EDversionhistory
 %
 % Peter Svensson (peter.svensson@ntnu.no) 31 Jan 2018
 
-% 2 Feb 2018 First version, just after version 0.101
+% 8 Feb 2018 First version, just after version 0.101
 
 versionnumbers = cell(1);
 versiontext = cell(1);
@@ -78,6 +78,13 @@ versiontext{icounter} = ['Corrected the handling of sourceamplitudes; the freque
                   'Added timingstruct as output data in the tfinteq file. Fixed ',...
                   'small bugs in EDfindconvexGApaths'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.109';
+versiondate{icounter} = '9 Feb 2018';
+versiontext{icounter} = ['Introduced a new parameter: controlparameters.'...
+                        'skipfirstorder (default = 0).'];
+
+              
 nversions = size(versiontext,2);
 txtwidth = 80;
 

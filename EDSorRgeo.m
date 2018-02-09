@@ -1,4 +1,5 @@
-function outputstruct = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,nedgesubs,showtext)
+function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoords,...
+    typeofcoords,EDversionnumber,nedgesubs,showtext)
 % EDSorRgeo - Calculates some source- or receiver-related geometrical parameters.
 % Calculates some source- or receiver-related geometrical parameters,
 % based on corners,edges and planes in an eddata-file,
@@ -12,6 +13,7 @@ function outputstruct = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,ne
 %   typeofcoords            'S' or 'R' - specifying if the point coordinates are sources
 %                           or receivers. This determines what the output data in the output
 %                           file will be called.
+%   EDversionnumber
 %	nedgesubs (optional)	The number of subdivisions that each edge will be
 %							subdivided into for visibility/obstruction tests. Default: 2
 %							NB! When nedgesubs = 2, the two end points will be checked.
@@ -42,11 +44,20 @@ function outputstruct = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,ne
 %                                           values of radius for sources/receivers relative to the the edges.
 %       thetaSsho/thetaRsho
 %       zSsho/zRsho
+%   EDinputdatahash      This is a string of characters which is
+%                           uniquely representing the input data planedata, edgedata, 
+%                           pointcoords, nedgesubs.
+%                           Before calling EDSorRgeo, you can load this hash
+%                           variable from all existing files, and if you
+%                           find a match with the hash generated from your
+%                           calculation settings, you can load the file
+%                           instead of running EDSorRgeo.
 %
 % NB! The text on the screeen, and in the code refers to 'R' or 'receivers' but it should be S or R.
 %
 % Uses the functions 	EDinfrontofplane, EDpoinpla, EDcompress3
-%                       EDcoordtrans1 EDgetedgepoints, EDcheckobstr_pointtoedge
+% EDcoordtrans1 EDgetedgepoints, EDcheckobstr_pointtoedge from EDtoolbox
+% Uses the function DataHash from Matlab Central
 %
 % ----------------------------------------------------------------------------------------------
 %   This file is part of the Edge Diffraction Toolbox by Peter Svensson.                       
@@ -62,9 +73,9 @@ function outputstruct = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,ne
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 17 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 8 Feb 2018
 %
-% outputstruct = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,nedgesubs,showtext);
+% [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,EDversionnumber,nedgesubs,showtext);
 
 %  1 June 2006 Functioning version
 %  2 Dec 2014  Introduced new output parameters in the file: reftoshortlistR,rRsho,thetaRsho,zRsho
@@ -81,12 +92,13 @@ function outputstruct = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,ne
 %               difforder, and removed the file saving.
 % 17 Jan 2018 Turned off the check if an S/R is very close to a thin plane.
 % 17 Jan 2018 Turned off some text printouts
+% 8 Feb 2018 Introduced the EDinputdatahash
 
 % geomacc = 1e-10;
 
-if nargin < 6
+if nargin < 7
     showtext = 0;
-    if nargin < 5
+    if nargin < 6
         nedgesubs = 2;
     end
 end
@@ -98,6 +110,10 @@ typeofcoords = lower(typeofcoords(1));
 if typeofcoords~='r' && typeofcoords~='s'
     error('ERROR: The input parameter typeofcoords must have the value S or R')    
 end
+
+EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata, 'pointcoords',pointcoords,...
+    'nedgesubs',nedgesubs,'EDversionnumber',EDversionnumber);
+EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
 

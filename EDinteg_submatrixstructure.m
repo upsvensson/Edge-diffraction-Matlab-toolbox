@@ -1,5 +1,5 @@
-function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec,...
-    inteq_ngauss,inteq_discretizationtype,edgetoedgedata,planesatedge,showtext)
+function [Hsubmatrixdata,EDinputdatahash] = EDinteg_submatrixstructure(edgelengthvec,closwedangvec,...
+    inteq_ngauss,inteq_discretizationtype,edgetoedgedata,planesatedge,EDversionnumber,showtext)
 % EDinteg_submatrixstructure - Develop the edge-to-edge matrix structure for the ED int.eq.
 %
 % Input parameters:
@@ -10,6 +10,7 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 %   inteq_discretizationtype    [0,1,2]
 %   edgetoedgedata      struct
 %   planesatedge        A matrix, size [nedges,nplanes] 
+%   EDversionnumber
 %   showtext (optional) 0 -> No text displayed on screen. Default: 0
 %
 % Output parameters:
@@ -26,8 +27,10 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 %       shortlist
 %       reftoshortlist
 %       isthinplanetriplet
+%   EDinputdatahash
 %
-% Uses the subroutine  EDdistelements
+% Uses the function  EDdistelements from EDtoolbox
+% Uses the function DataHash from Matlab Central
 %
 % ----------------------------------------------------------------------------------------------
 %   This file is part of the Edge Diffraction Toolbox by Peter Svensson.                       
@@ -44,11 +47,12 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 25 Jan 2018 
+% Peter Svensson (peter.svensson@ntnu.no) 8 Feb 2018 
 %
-% Hsubmatrixdata = ...
-%    EDinteg_submatrixstructure(edgelengthvec,closwedangvec,edgetoedgedata,planesatedge,showtext)
-
+% [Hsubmatrixdata,EDinputdatahash] = ...
+%    EDinteg_submatrixstructureedgelengthvec,closwedangvec,...
+%     inteq_ngauss,inteq_discretizationtype,edgetoedgedata,planesatedge,EDversionnumber,showtext
+% 
 % 29-1-2013 Cleaned up quite much and avoided looping through all the
 %           empty combinations. Exported much more data. Introduced
 %           edgepairlist and edgetripletlist
@@ -66,10 +70,16 @@ function Hsubmatrixdata = EDinteg_submatrixstructure(edgelengthvec,closwedangvec
 %               nuniquesubmatrices
 % 15 Dec. 2017 Turned off the code which suppresses symmetrycompressions
 % 25 Jan 2018 Made sure there are at least 2 edge elements per edge.
+% 8 Feb 2018 Introduced the EDinputdatahash
 
 if nargin < 7
     showtext = 0;
 end
+
+EDinputdatastruct = struct('edgelengthvec',edgelengthvec,'closwedangvec',closwedangvec,...
+    'inteq_ngauss',inteq_ngauss,'inteq_discretizationtype',inteq_discretizationtype,...
+    'edgetoedgedata',edgetoedgedata,'planesatedge',planesatedge,'EDversionnumber',EDversionnumber);
+EDinputdatahash = DataHash(EDinputdatastruct);
 
 % ----------------------------------------------------------------------------------------------
 % Create the two-index list for the edge-source column matrix.

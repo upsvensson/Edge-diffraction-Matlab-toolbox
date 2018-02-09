@@ -1,4 +1,5 @@
-function edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,specorder,difforder,nedgesubs,ndiff2batches,showtext)
+function [edgetoedgedata,EDinputdatahash] = EDed2geo(edgedata,planedata,Sdata,...
+    Rdata,specorder,difforder,EDversionnumber,nedgesubs,ndiff2batches,showtext)
 % EDed2geo - Calculates 2nd- and higher-order edge-related geom. parameters.
 % EDed2geo calculates some plane- and edge-related geometrical parameters,
 % based on corners and planes from a EDreadcad,
@@ -13,6 +14,7 @@ function edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,specorder,diff
 %   specorder               The highest order of any reflection kind (specular and/or diffraction).
 %	difforder 	            The highest order of diffraction. If it is 0 or 1 then the parameter
 %							edgeseespartialedge is not calculated. Default: 1
+%   EDversionnumber
 %   nedgesubs (optional)            Default: 2
 %   ndiff2batches (optional)        Default: 1
 %   showtext (optional)     0 -> no text displayed. Default: 0
@@ -55,9 +57,11 @@ function edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,specorder,diff
 %       thetae1sho, thetae2sho
 %       ze1sho, ze2sho
 %       examplecombE	
+%   EDinputdatahash
 %
 % Uses the functions EDcoordtrans2, EDinfrontofplane, EDcompress7,
-%                    EDcheckobstr_edgetoedge EDgetedgepoints
+%                    EDcheckobstr_edgetoedge EDgetedgepoints in EDtoolbox
+% Uses the function DataHash from Matlab Central
 %
 % ----------------------------------------------------------------------------------------------
 %   This file is part of the Edge Diffraction Toolbox by Peter Svensson.                       
@@ -73,10 +77,10 @@ function edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,specorder,diff
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 15 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 8 Feb 2018
 %
-% [edgetoedgedata,outputfile] = EDed2geo(edgedata,planedata,Sdata,Rdata,...
-% specorder,difforder,nedgesubs,ndiff2batches,showtext);
+% [edgetoedgedata,EDinputdatahash] = EDed2geo(edgedata,planedata,Sdata,Rdata,...
+% specorder,difforder,EDversionnumber,nedgesubs,ndiff2batches,showtext);
 
 % 27.5.2011  Stable version
 % 13.3.2013  Fixed a problem with thin folded planes. Two edges with the
@@ -100,16 +104,22 @@ function edgetoedgedata = EDed2geo(edgedata,planedata,Sdata,Rdata,specorder,diff
 % 29 Nov. 2017 Changed call from ESIE2getedgepoints to ED
 % 15 Jan. 2018 Little modification; edge-to-edge obstruction test was
 % active before, for a single plate.
+% 8 Feb 2018 Introduced the EDinputdatahash
 
-if nargin < 9
+if nargin < 10
     showtext = 0;
-    if nargin < 8
+    if nargin < 9
         ndiff2batches = 1;
-        if nargin < 7
+        if nargin < 8
             nedgesubs = 2;
         end
     end
 end
+
+EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata,...
+    'Sdata',Sdata,'Rdata',Rdata,'specorder',specorder,'difforder',difforder,...
+    'nedgesubs',nedgesubs,'ndiff2batches',ndiff2batches,'EDversionnumber',EDversionnumber);
+EDinputdatahash = DataHash(EDinputdatastruct);
 
 % geomacc = 1e-10;
 

@@ -84,6 +84,12 @@ versiondate{icounter} = '9 Feb 2018';
 versiontext{icounter} = ['Introduced a new parameter: controlparameters.'...
                         'skipfirstorder (default = 0).'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.110';
+versiondate{icounter} = '9 Feb 2018';
+versiontext{icounter} = ['Introduced inputdatahash in many functions, which makes it',...
+                         'it possible to recycle result files. Uses the function DataHash ',...
+                         'from Matlab Central.'];
               
 nversions = size(versiontext,2);
 txtwidth = 80;

@@ -1,6 +1,6 @@
-function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
+function [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequation_convex_tf(filehandlingparameters,...
     envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,doaddsources,sourceamplitudes,...
-        doallSRcombinations,Rdata,controlparameters)
+        doallSRcombinations,Rdata,controlparameters,EDversionnumber)
 % EDintegralequation_convex_tf calculates the sound pressure representing second-
 % and higher-order diffraction, for a convex scattering object
 %
@@ -13,6 +13,7 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 %   doallSRcombinations     0 or 1
 %   Rdata                   Struct
 %   controlparameters       Struct
+%   EDversionnumber
 %
 % Output parameters
 %   P_receiver      Matrix with the diffracted pressure
@@ -23,15 +24,17 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 %                       [nfrequencies,nreceivers,nsources]
 %   timingdata
 %   extraoutputdata
+%   EDinputdatahash
 %
 % Uses functions EDdistelements, EDcalcedgeinteqmatrixsub2_mex, EDinteg_souterm, EDcalcpropagatematrix
-% EDcoordtrans1
+% EDcoordtrans1 from EDtoolbox
+% Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  31 Jan 2018  
+% Peter Svensson (peter.svensson@ntnu.no)  9 Feb 2018  
 %                       
-% [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(filehandlingparameters,...
+% [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequation_convex_tf(filehandlingparameters,...
 %    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,sourceamplitudes,...
-%    Rdata,controlparameters)
+%    Rdata,controlparameters,EDversionnumber)
 
 % 31 March 2015 Introduced detailed timing, also as output parameter.
 % 8 April 2015 Substantial speeding up by saving Hsubdata instead of Hsub
@@ -72,8 +75,16 @@ function [P_receiver,timingdata,extraoutputdata] = EDintegralequation_convex_tf(
 %             Slechta.
 % 26 Jan 2018 Implemented the handling of doallSRcombinations = 0.
 % 31 Jan 2018 Had not implemented sourceamplitudes for case 2.
+% 9 Feb 2018 Introduced EDinputdatahash
 
 showtext = filehandlingparameters.showtext;
+
+EDinputdatastruct = struct('envdata',envdata,...
+    'planedata',planedata,'edgedata',edgedata,'edgetoedgedata',edgetoedgedata,...
+    'Hsubmatrixdata',Hsubmatrixdata,'Sdata',Sdata,'doaddsources',doaddsources,...
+    'sourceamplitudes',sourceamplitudes,'doallSRcombinations',doallSRcombinations,...
+    'Rdata',Rdata,'controlparameters',controlparameters,'EDversionnumber',EDversionnumber);
+EDinputdatahash = DataHash(EDinputdatastruct);
 
 extraoutputdata = struct('tfinteqdiff_nodiff2',[]);
 

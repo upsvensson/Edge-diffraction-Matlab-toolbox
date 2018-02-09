@@ -1,6 +1,6 @@
-function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
+function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,edgedata,...
     sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,...
-    vispartedgesfromR,difforder,directsound,doallSRcombinations,showtext)
+    vispartedgesfromR,difforder,directsound,doallSRcombinations,EDversionnumber,showtext)
 % EDfindconvexGApaths - Finds all the first-order specular and (possibly)
 % first-order diffraction paths for a convex object.
 %
@@ -13,6 +13,7 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 %   difforder
 %   directsound
 %   doallSRcombinations
+%   EDversionnumber
 %   showtext                (optional) Default: 0
 %
 % Output parameters:
@@ -31,8 +32,19 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 %                           the receiver number.
 %   .ncomponents            vector, [1,3], with the number of components
 %                           for the direct sound, specular reflections, diffraction.
+%   EDinputdatahash         This is a string of characters which is
+%                           uniquely representing the input data planedata, edgedata, 
+%                           sources,visplanesfroms,vispartedgesfroms,
+%                           receivers,visplanesfromr,vispartedgesfromr,
+%                           difforder,directsound,doallSRcombinations.
+%                           Before calling EDfindconvexGApaths, you can load this hash
+%                           variable from all existing files, and if you
+%                           find a match with the hash generated from your
+%                           calculation settings, you can load the file
+%                           instead of running EDfindconvexGApaths.
 %
-% Uses functions  EDfindis EDchkISvisible 
+% Uses functions  EDfindis EDchkISvisible from EDtoolbox
+% Uses function DataHash from Matlab Central
 %
 % ----------------------------------------------------------------------------------------------
 %   This file is part of the Edge Diffraction Toolbox by Peter Svensson.                       
@@ -48,11 +60,11 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 2 Feb. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 8 Feb 2018
 %
-% firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
+% [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,...
-% difforder,directsound,doallSRcombinations,showtext)
+% difforder,directsound,doallSRcombinations,EDversionnumber,showtext)
 
 % 27 Dec. 2017 First start
 % 28 Dec. 2017 Functioning version for diff
@@ -76,10 +88,18 @@ function firstorderpathdata = EDfindconvexGApaths(planedata,edgedata,...
 % 2 Feb 2018 Fixed a small bug: if doaddsources was set to 0, and no
 % direct sound obstructions were possible, or no specular reflection was possible,
 % then an error occurred.
+% 8 Feb 2018 Introduced the EDinputdatahash
 
 if nargin < 13
    showtext = 0; 
 end
+
+EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata,...
+    'sources',sources,'visplanesfromS',visplanesfromS,'vispartedgesfromS',vispartedgesfromS,...
+    'receivers',receivers,'visplanesfromR',visplanesfromR,'vispartedgesfromR',vispartedgesfromR,...
+    'difforder',difforder,'directsound',directsound,'doallSRcombinations',doallSRcombinations,...
+    'EDversionnumber',EDversionnumber);
+EDinputdatahash = DataHash(EDinputdatastruct);
 
 % planedata.corners = size(planedata.corners,1);
 nplanes = length(planedata.planeisthin);

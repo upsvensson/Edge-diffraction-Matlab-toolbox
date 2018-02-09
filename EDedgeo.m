@@ -1,9 +1,11 @@
-function [edgedata,planedata] = EDedgeo(planedata,firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,showtext)
+function [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,...
+    firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,showtext)
 % EDedgeo - Calculates some plane- and edge-related geometrical
 % parameters, based on corners and planes in the planedata struct.
 %
 % Input parameters:
 %	planedata               A struct with the corners and plane data.			
+%   EDversionnumber 
 %	firstcornertoskip (optional)	All edges including at least one corner with this number or
 %                   		higher will be excluded from the calculations. Default: 1e6
 %   listofcornerstoskip (optional) All edges including at least one corner
@@ -90,9 +92,18 @@ function [edgedata,planedata] = EDedgeo(planedata,firstcornertoskip,listofcorner
 %       rearsideplane
 %       canplaneobstruct
 %       reflfactors
+%   EDinputdatahash        This is a string of characters which is
+%                           uniquely representing the input data planedata, firstcornertoskip, 
+%                           listofcornerstoskip, planeseesplanestrategy.
+%                           Before calling EDedgeo, you can load this hash
+%                           variable from all existing files, and if you
+%                           find a match with the hash generated form your
+%                           calculation settings, you can load the file
+%                           instead of running EDedgeo.
 % 
-% Uses the functions EDcoordtrans1, EDinfrontofplane
-%
+% Uses the functions EDcoordtrans1, EDinfrontofplane from EDtoolbox
+% Uses the function Datahash from Matlab Central
+% 
 % ----------------------------------------------------------------------------------------------
 %   This file is part of the Edge Diffraction Toolbox by Peter Svensson.                       
 %                                                                                              
@@ -107,9 +118,10 @@ function [edgedata,planedata] = EDedgeo(planedata,firstcornertoskip,listofcorner
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 23 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 8 Feb 2018
 %
-% [edgedata,planedata,outputfile] = EDedgeo(planedata,firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,showtext);
+% [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,...
+% firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,showtext);
 
 % 9 July 2009   Stable version
 % 28 Sep. 2014  Added the optional input parameter listofcornerstoskip
@@ -138,16 +150,17 @@ function [edgedata,planedata] = EDedgeo(planedata,firstcornertoskip,listofcorner
 %               removed (weren't used other places).
 % 23 Jan 2018 Error from yesterday's change: a long line with ... at the
 %             end can not be followed by a commented out line!
+% 8 Feb 2018 Introduced the EDinputdatahash
 
 geomacc = 1e-10;
 
-if nargin < 5
+if nargin < 6
     showtext = 0;
-    if nargin < 4
+    if nargin < 5
         planeseesplanestrategy = 0;
-        if nargin < 3
+        if nargin < 4
             listofcornerstoskip = [];
-            if nargin < 2
+            if nargin < 3
                 firstcornertoskip = 1e6;
             end
         end
@@ -159,6 +172,10 @@ end
 if isempty(firstcornertoskip)
     firstcornertoskip = 1e6;
 end
+
+EDinputdatastruct = struct('planedata',planedata,'firstcornertoskip',firstcornertoskip,...
+    'listofcornerstoskip',listofcornerstoskip,'planeseesplanestrategy',planeseesplanestrategy,'EDversionnumber',EDversionnumber);
+EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc)
+function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc)
 % EDwedge1st_fd - Gives the 1st order diffraction transfer function.
 % Gives the 1st order diffraction transfer function
 % for a point source irradiating a finite wedge. A free-field tf amplitude
@@ -12,6 +12,15 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 %                   If there is one or more elements with the value 1, the
 %                   direct sound or a specular reflection needs to be given
 %                   half its specular value.
+%   zfirst          A value between 0 and L, which tells which point along
+%                   the edge gives the first arrival. A value of 0 or L 
+%                   implies that the apex point is outside the finite edge,
+%                   and one of the edge end points causes the first arrival. 
+%                   A value between 0 and L is the value of the apex point
+%                   position along the finite edge. zfirst could also be
+%                   empty, in case the tf doesn't exist (for an edge of
+%                   zero length). L is the length of the edge =
+%                   abs(zw(2)-zw(1))
 % 
 % Input parameters:
 %   cair            the speed of sound
@@ -44,7 +53,7 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (svensson@iet.ntnu.no) 25 Jan. 2018
+% Peter Svensson (svensson@iet.ntnu.no) 12 Feb 2018
 %
 % [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc);
 
@@ -64,6 +73,9 @@ function [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas
 % 25 Jan 2018 New implementation of the analytical integration, where only
 % the cosh-factor is seen as a varying part of the integrand.
 % 26 Jan 2018 Fixed bug: the case useserialexp2 had not been implemented.
+% 12 Feb 2018 Introduced new output parameter: zfirst. This is a value
+% between 0 and L, which tells which point along the edge gives the first
+% arrival. 
 
 localshowtext = 0;
 
@@ -93,6 +105,7 @@ end
 if zw(2)-zw(1) == 0
 	tf = zeros(size(frequencies));
     singularterm = [0 0 0 0];
+    zfirst = [];
 	return
 end
 
@@ -176,6 +189,8 @@ end
 
 if apexincluded == 1
 
+    zfirst = za;
+    
     % Finally the endpoint of the integral of the analytical approximation
 	% (=zrangespecial) should be only up to z = 0.01
 	% or whatever is specified as zrelmax for the analytic approximation
@@ -249,6 +264,16 @@ if apexincluded == 0
             tf(ii) = tf(ii)*exp(-1i*k*Rextra);
         end        
     end
+    
+    Rend1  = sqrt( rs^2 + (zw(1)-zs)^2 ) + sqrt( rr^2 + (zw(1)-zr)^2 );
+    Rend2  = sqrt( rs^2 + (zw(2)-zs)^2 ) + sqrt( rr^2 + (zw(2)-zr)^2 );
+
+    if Rend1 < Rend2
+        zfirst = 0;
+    else
+       zfirst = zw(2)-zw(1); 
+    end
+    
 else
     if bc(1) == 1
         for ii = 1:nfrequencies

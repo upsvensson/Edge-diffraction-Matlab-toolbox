@@ -30,7 +30,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordert
 % Uses functions EDcoordtrans2, EDwedge1st_fd from EDtoolbox
 % Uses function DataHash form Matlab Central
 % 
-% Peter Svensson 8 Feb 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 12 Feb 2018 (peter.svensson@ntnu.no)
 %
 % [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordertfs(firstorderpathdata,...
 %     frequencies,Rstart,difforder,envdata,Sindata,receivers,edgedata,EDversionnumber,showtext)
@@ -52,6 +52,8 @@ function [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordert
 % dependence was not handled before).
 % 8 Feb 2018 Introduced the EDinputdatastruct. Changed input parameter from
 % controlparameters to three of its fields.
+% 12 Feb 2018 Adapted to a change in the EDwedge1st_fd (new output
+% parameter).
 
 if nargin < 10
    showtext = 0; 
@@ -244,7 +246,7 @@ if difforder > 0
         cylcoordR(ivR,:) = [rr thetar zr];
 
         for jj = 1:length(iv2)
-            [tfnew,singularterm] = EDwedge1st_fd(envdata.cair,frequencies,edgedata.closwedangvec(edgenumber),...
+            [tfnew,singularterm,zfirst] = EDwedge1st_fd(envdata.cair,frequencies,edgedata.closwedangvec(edgenumber),...
                 cylcoordS(Snumber(jj),1),cylcoordS(Snumber(jj),2),cylcoordS(Snumber(jj),3),...
                 cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
                 edgedata.edgelengthvec(edgenumber)*[0 1],'n',Rstart,[1 1]);  

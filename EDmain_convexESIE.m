@@ -120,6 +120,8 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % of Rindata.
 % 14 Feb 2018 Small change to the log file text, indicating that three
 % edge points per wavelength is needed.
+% 14 Feb 2018 Added an error message: if no S/R could see any planes, then
+% the program stopped, with a warning sign.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -290,6 +292,10 @@ end
 nsources = size(Sdata.sources,1);
 t01 = etime(clock,t00);
 timingstruct.Sdata = t01;
+if any(any(Sdata.visplanesfroms)) == 0
+   error('ERROR: No source can see any of the planes of the scattering object. Please check your geometry.') 
+end
+
 if filehandlingparameters.showtext >= 1
     if foundmatch == 1
         disp(['      Recycled and duplicated ',existingfilename])
@@ -328,6 +334,10 @@ end
 nreceivers = size(Rdata.receivers,1);
 t01 = etime(clock,t00);
 timingstruct.Rdata = t01;
+if any(any(Rdata.visplanesfromr)) == 0
+   error('ERROR: No receiver can see any of the planes of the scattering object. Please check your geometry.') 
+end
+
 if filehandlingparameters.showtext >= 1
     if foundmatch == 1
         disp(['      Recycled and duplicated ',existingfilename])

@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 31 Jan 2018
+% Peter Svensson (peter.svensson@ntnu.no) 13 Feb 2018
 
 % 8 Feb 2018 First version, just after version 0.101
 
@@ -60,7 +60,7 @@ versiontext{icounter} = ['A new version of EDmain_convextf. When HOD was not cal
 icounter = icounter + 1;
 versionnumbers{icounter} = '0.107';
 versiondate{icounter} = '26 Jan 2018';
-versiontext{icounter} = ['Implemented a new input parameter: Sindata.doallSRcombinations. ',...
+versiontext{icounter} = ['Implemented a new input parameter: Sinputdata.doallSRcombinations. ',...
                   'By setting this to zero, only S1 to R1, S2 to R2, etc will be ',...
                   'computed. Also, changed defaults for saving so that saveeddatafile ',...
                   'and saveSRdatafiles = 1, if not specified. Finally, removed the ',...
@@ -91,6 +91,19 @@ versiontext{icounter} = ['Introduced inputdatahash in many functions, which make
                          'it possible to recycle result files. Uses the function DataHash ',...
                          'from Matlab Central.'];
               
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.111';
+versiondate{icounter} = '13 Feb 2018';
+versiontext{icounter} = ['Introduced the function lgwt from Matlab Central, for Gauss-Legendre weights, ',...
+                         'in EDdistelements. Replaced the quad_gauss.];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.112';
+versiondate{icounter} = '14 Feb 2018';
+versiontext{icounter} = ['Modified the recycling of results files so that the tf and tfinteq files always contain data, ',...
+                         'instead of pointing at another file. Also changed the input struct names to geoinputdata, ',...
+                         'Sinputdata, and Rinputdata'];
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

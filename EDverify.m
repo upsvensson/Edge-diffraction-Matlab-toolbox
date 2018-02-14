@@ -161,9 +161,9 @@ if runtest(1) == 1
          2     3     7     6
          1     5     8     4];
 
-    geofiledata = struct('corners',corners,'planecorners',planecorners);
-    Sindata = struct('coordinates',1e8*[1 1 1]/sqrt(3));
-    Rindata = struct('coordinates',[0 0 0.00001;0 0 -0.32001]);
+    geoinputdata = struct('corners',corners,'planecorners',planecorners);
+    Sinputdata = struct('coordinates',1e8*[1 1 1]/sqrt(3));
+    Rinputdata = struct('coordinates',[0 0 0.00001;0 0 -0.32001]);
     controlparameters = struct('frequencies',0);
     controlparameters.difforder = 20;
     filehandlingparameters = struct('outputdirectory',outputdirectory);
@@ -172,16 +172,16 @@ if runtest(1) == 1
     filehandlingparameters.showtext = 0;
     controlparameters.ngauss = 96;    
     controlparameters.discretizationtype = 2;
-    controlparameters.Rstart = norm(Sindata.coordinates);
+    controlparameters.Rstart = norm(Sinputdata.coordinates);
     envdata.cair = 344;
 
-    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
     tftot = tfdirect + tfgeom + tfdiff + tfinteqdiff;
-    tftot = tftot*norm(Sindata.coordinates);
+    tftot = tftot*norm(Sinputdata.coordinates);
 
     relerr = abs(tftot-1);
     if relerr(1) < 0.14e-4 && relerr(2) < 0.16e-4
@@ -254,12 +254,12 @@ if runtest(2) == 1
 
     planecorners = [4 3 2 1 ;1 2 3 4];
 
-    geofiledata = struct('corners',corners,'planecorners',planecorners);
-    % geofiledata.firstcornertoskip = 3;
-    Sindata = struct('coordinates',[-1 1 0]/sqrt(2));
+    geoinputdata = struct('corners',corners,'planecorners',planecorners);
+    % geoinputdata.firstcornertoskip = 3;
+    Sinputdata = struct('coordinates',[-1 1 0]/sqrt(2));
     phivecd = [45.05 45.01 45.001 45.0 44.999 44.99 44.95 315.05 315.01 315.001 315.0 314.999 314.99 314.95].';
     receivers = [cosd(phivecd) sind(phivecd) 0*phivecd];
-    Rindata = struct('coordinates',receivers);
+    Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 1;
     filehandlingparameters = struct('outputdirectory',outputdirectory);
@@ -271,7 +271,7 @@ if runtest(2) == 1
 
     envdata.cair = 344;
 
-    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
@@ -374,12 +374,12 @@ if runtest(3) == 1
 
     planecorners = [4 3 2 1 ;1 2 3 4];
 
-    geofiledata = struct('corners',corners,'planecorners',planecorners);
-    % geofiledata.firstcornertoskip = 3;
-    Sindata = struct('coordinates',[-1 1 0]/sqrt(2));
+    geoinputdata = struct('corners',corners,'planecorners',planecorners);
+    % geoinputdata.firstcornertoskip = 3;
+    Sinputdata = struct('coordinates',[-1 1 0]/sqrt(2));
     phivecd = [45.05 45.01 45.001 45.0 44.999 44.99 44.95 315.05 315.01 315.001 315.0 314.999 314.99 314.95].';
     receivers = [cosd(phivecd) sind(phivecd) 1*ones(size(phivecd))];
-    Rindata = struct('coordinates',receivers);
+    Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 1;
     filehandlingparameters = struct('outputdirectory',outputdirectory);
@@ -390,7 +390,7 @@ if runtest(3) == 1
 
     envdata.cair = 344;
 
-    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
@@ -494,9 +494,9 @@ if runtest(4) == 1
 
     planecorners = [4 3 2 1 ;1 2 3 4];
 
-    geofiledata = struct('corners',corners,'planecorners',planecorners);
-    geofiledata.firstcornertoskip = 4;
-    Sindata = struct('coordinates',[-1 -1 0]);
+    geoinputdata = struct('corners',corners,'planecorners',planecorners);
+    geoinputdata.firstcornertoskip = 4;
+    Sinputdata = struct('coordinates',[-1 -1 0]);
     receivers =[0.99 -1 1.98;
                 0.995 -1 1.99; 
                 1 -1 2; 
@@ -507,7 +507,7 @@ if runtest(4) == 1
                 1 1 2; 
                 1.005 1 2.01
                 1.01 1 2.02];
-    Rindata = struct('coordinates',receivers);
+    Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 4;
     controlparameters.ngauss = 32;
@@ -519,7 +519,7 @@ if runtest(4) == 1
 
     envdata.cair = 344;
 
-    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
@@ -608,13 +608,13 @@ if runtest(5) == 1
 
     planecorners = [4 3 2 1 ;1 2 3 4];
 
-    geofiledata = struct('corners',corners,'planecorners',planecorners);
-    geofiledata.firstcornertoskip = 3;
+    geoinputdata = struct('corners',corners,'planecorners',planecorners);
+    geoinputdata.firstcornertoskip = 3;
     soudist = 1e3;
     sources = [[-1 -1 0]*soudist/sqrt(2);[-1 -1 1]*soudist/sqrt(3)];
-    Sindata = struct('coordinates',sources);
+    Sinputdata = struct('coordinates',sources);
     receivers = [-0.000001 -0.00000001 0;-0.000001 0.00000001 0];
-    Rindata = struct('coordinates',receivers);
+    Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',[0.1 ]);
     controlparameters.difforder = 1;
     filehandlingparameters = struct('outputdirectory',outputdirectory);
@@ -625,7 +625,7 @@ if runtest(5) == 1
 
     envdata.cair = 344;
 
-    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfgeom tfdiff EDversionnumber'])
 
@@ -718,9 +718,9 @@ if runtest(6) == 1
          3     4     8     7
          2     3     7     6
          1     5     8     4];
-    geofiledata = struct('corners',corners);
-    geofiledata.planecorners = planecorners;
-    planedata = EDreadgeomatrices(geofiledata.corners,geofiledata.planecorners);
+    geoinputdata = struct('corners',corners);
+    geoinputdata.planecorners = planecorners;
+    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Controlparameters
@@ -790,11 +790,11 @@ if runtest(6) == 1
         umono_normal_patch = umono_normal_patch + quadweights(ii+5)*umono_radial_patch.*cosfi;    
     end
 
-    Sindata = struct('coordinates',patchpoints);
-    nsources = size(Sindata.coordinates,1);
-    Sindata.sourceamplitudes = patchareas.*umono_normal_patch...
+    Sinputdata = struct('coordinates',patchpoints);
+    nsources = size(Sinputdata.coordinates,1);
+    Sinputdata.sourceamplitudes = patchareas.*umono_normal_patch...
          .*1i*2*pi*controlparameters.frequencies*envdata.rhoair/4/pi;
-    Sindata.doaddsources = 1;
+    Sinputdata.doaddsources = 1;
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Receivers
@@ -805,7 +805,7 @@ if runtest(6) == 1
     nreceivers = size(receivers,1);
     receivers = receivers + internalmonopole(ones(nreceivers,1),:);
 
-    Rindata = struct('coordinates',receivers);
+    Rinputdata = struct('coordinates',receivers);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Filehandling
@@ -815,7 +815,7 @@ if runtest(6) == 1
     filehandlingparameters.showtext = 0;
     filehandlingparameters.savelogfile = 0;
 
-    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Load and present the results
@@ -912,11 +912,11 @@ if runtest(7) == 1
     4 3 6
     1 4 6 ];
 
-    geofiledata = struct('corners',corners,'planecorners',planecorners);
-    geofiledata.firstcornertoskip = 1e6;
-    Sindata = struct('coordinates',[2 0 0]);
+    geoinputdata = struct('corners',corners,'planecorners',planecorners);
+    geoinputdata.firstcornertoskip = 1e6;
+    Sinputdata = struct('coordinates',[2 0 0]);
     receivers = [-2 0 0];
-    Rindata = struct('coordinates',receivers);
+    Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 0;
     filehandlingparameters = struct('outputdirectory',outputdirectory);
@@ -927,7 +927,7 @@ if runtest(7) == 1
 
     envdata.cair = 344;
 
-    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect'])
 %     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
@@ -1007,11 +1007,11 @@ if runtest(8) == 1
          2     3     7     6
          1     5     8     4];
 
-    geofiledata = struct('corners',corners,'planecorners',planecorners);
+    geoinputdata = struct('corners',corners,'planecorners',planecorners);
     sources = [1 1 0];
-    Sindata = struct('coordinates',sources);
+    Sinputdata = struct('coordinates',sources);
     receivers = [-1 -1 0];
-    Rindata = struct('coordinates',receivers);
+    Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 0;
     filehandlingparameters = struct('outputdirectory',outputdirectory);
@@ -1020,7 +1020,7 @@ if runtest(8) == 1
     filehandlingparameters.showtext = 0;
     controlparameters.Rstart = 0;
 
-    EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Load and present the results

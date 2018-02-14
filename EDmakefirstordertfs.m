@@ -1,5 +1,5 @@
 function [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordertfs(firstorderpathdata,...
-    frequencies,Rstart,difforder,envdata,Sindata,receivers,edgedata,EDversionnumber,showtext)
+    frequencies,Rstart,difforder,envdata,Sinputdata,receivers,edgedata,EDversionnumber,showtext)
 % EDmakefirstordertfs calculates the direct sound, specular reflection, and
 % first-order diffraction.
 %
@@ -9,7 +9,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordert
 %   Rstart
 %   difforder  
 %   envdata                 Input struct; field .cair is used here
-%   Sindata                 Struct with the fields
+%   Sinputdata                 Struct with the fields
 %   .coordinates            [nsources,3]
 %   .doaddsources           0 or 1
 %   .sourceamplitudes       [nsources,nfrequencies]: multiplication factor
@@ -33,7 +33,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordert
 % Peter Svensson 12 Feb 2018 (peter.svensson@ntnu.no)
 %
 % [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordertfs(firstorderpathdata,...
-%     frequencies,Rstart,difforder,envdata,Sindata,receivers,edgedata,EDversionnumber,showtext)
+%     frequencies,Rstart,difforder,envdata,Sinputdata,receivers,edgedata,EDversionnumber,showtext)
 
 % 12 Jan. 2018 First complete version. Much simplified version of the
 %                           previous ESIE2maketfs. Edgehits not handled
@@ -45,7 +45,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordert
 % 17 Jan. 2018 Took the input parameter difforder into account
 % 17 Jan 2018 Added showtext as input parameter. Fixed a bug which gave the
 % wrong specular reflection amplitude.
-% 18 Jan 2018 Changed input parameter to the Sindata struct, to also get
+% 18 Jan 2018 Changed input parameter to the Sinputdata struct, to also get
 % the .sourceamplitudes field. Implemented the sourceamplitudes scale
 % factor.
 % 31 Jan 2018 Corrected the handling of sourceamplitudes (the frequency
@@ -60,7 +60,7 @@ if nargin < 10
 end
 
 EDinputdatastruct = struct('firstorderpathdata',firstorderpathdata,'edgedata',edgedata,...
-    'frequencies',frequencies,'Rstart',Rstart,'difforder',difforder,'envdata',envdata,'Sindata',Sindata,...
+    'frequencies',frequencies,'Rstart',Rstart,'difforder',difforder,'envdata',envdata,'Sinputdata',Sinputdata,...
     'receivers',receivers,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
@@ -68,7 +68,7 @@ timingdata = zeros(1,3);
 
 nfrequencies = length(frequencies);
 nreceivers = size(receivers,1);
-nsources = size(Sindata.coordinates,1);
+nsources = size(Sinputdata.coordinates,1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Direct sound
@@ -78,7 +78,7 @@ if showtext >= 2
 end
 t00 = clock;
 
-if Sindata.doaddsources == 1
+if Sinputdata.doaddsources == 1
     tfdirect = zeros(nfrequencies,nreceivers);
 else
     tfdirect = zeros(nfrequencies,nreceivers,nsources);
@@ -91,7 +91,7 @@ kvec = 2*pi*frequencies(:)/envdata.cair;
 if firstorderpathdata.ncomponents(1) > 0
     ncomponents = size(firstorderpathdata.directsoundlist(:,1),1);
 
-    distvecs = Sindata.coordinates(firstorderpathdata.directsoundlist(:,1),:) - ...
+    distvecs = Sinputdata.coordinates(firstorderpathdata.directsoundlist(:,1),:) - ...
         receivers(firstorderpathdata.directsoundlist(:,2),:);
 
     if ncomponents == 1
@@ -102,11 +102,11 @@ if firstorderpathdata.ncomponents(1) > 0
     
     maxrecnumber = max( firstorderpathdata.directsoundlist(:,2) );   
 
-    if ncomponents > nfrequencies && Sindata.doaddsources == 1
+    if ncomponents > nfrequencies && Sinputdata.doaddsources == 1
         for ii = 1:nfrequencies   
            alltfs = exp(-1i*kvec(ii)*(alldists-Rstart))./alldists...
-               .*firstorderpathdata.directsoundlist(:,3).*Sindata.sourceamplitudes( firstorderpathdata.directsoundlist(:,1),ii );
-%            if Sindata.doaddsources == 1
+               .*firstorderpathdata.directsoundlist(:,3).*Sinputdata.sourceamplitudes( firstorderpathdata.directsoundlist(:,1),ii );
+%            if Sinputdata.doaddsources == 1
                tfdirect(ii,1:maxrecnumber) = accumarray(firstorderpathdata.directsoundlist(:,2),alltfs);
 %            else
 %               tfdirect(ii,firstorderpathdata.directsoundlist(:,2),firstorderpathdata.directsoundlist(:,1)) = alltfs;
@@ -117,12 +117,12 @@ if firstorderpathdata.ncomponents(1) > 0
        for ii = 1:ncomponents 
             if nfrequencies > 1
                 alltfs = exp(-1i*kvec*(alldists(ii)-Rstart))./alldists(ii)...
-                    .*firstorderpathdata.directsoundlist(ii,3).*(Sindata.sourceamplitudes( firstorderpathdata.directsoundlist(ii,1),: ).');
+                    .*firstorderpathdata.directsoundlist(ii,3).*(Sinputdata.sourceamplitudes( firstorderpathdata.directsoundlist(ii,1),: ).');
             else
                 alltfs = exp(-1i*kvec*(alldists(ii)-Rstart))./alldists(ii)...
-                    .*firstorderpathdata.directsoundlist(ii,3).*(Sindata.sourceamplitudes( firstorderpathdata.directsoundlist(ii,1),: ));                
+                    .*firstorderpathdata.directsoundlist(ii,3).*(Sinputdata.sourceamplitudes( firstorderpathdata.directsoundlist(ii,1),: ));                
             end            
-           if Sindata.doaddsources == 1
+           if Sinputdata.doaddsources == 1
               tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) = ...
                   tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) + alltfs;
            else
@@ -144,7 +144,7 @@ end
 
 t00 = clock;
 
-if Sindata.doaddsources == 1
+if Sinputdata.doaddsources == 1
     tfgeom = zeros(nfrequencies,nreceivers);
 else
     tfgeom = zeros(nfrequencies,nreceivers,nsources);
@@ -165,16 +165,16 @@ if firstorderpathdata.ncomponents(2) > 0
 
     maxrecnumber = max( firstorderpathdata.specrefllist(:,2) );
 
-    if ncomponents > nfrequencies && Sindata.doaddsources == 1
+    if ncomponents > nfrequencies && Sinputdata.doaddsources == 1
         for ii = 1:nfrequencies    
 %             if nfrequencies > 1
 %                 alltfs = exp(-1i*kvec(ii)*(alldists-Rstart))./alldists...
-%                     .*firstorderpathdata.specrefllist(:,3).*(Sindata.sourceamplitudes( firstorderpathdata.specrefllist(:,1),ii ).');
+%                     .*firstorderpathdata.specrefllist(:,3).*(Sinputdata.sourceamplitudes( firstorderpathdata.specrefllist(:,1),ii ).');
 %             else
                 alltfs = exp(-1i*kvec(ii)*(alldists-Rstart))./alldists...
-                    .*firstorderpathdata.specrefllist(:,3).*(Sindata.sourceamplitudes( firstorderpathdata.specrefllist(:,1),ii ));                
+                    .*firstorderpathdata.specrefllist(:,3).*(Sinputdata.sourceamplitudes( firstorderpathdata.specrefllist(:,1),ii ));                
 %             end
-%             if Sindata.doaddsources == 1
+%             if Sinputdata.doaddsources == 1
                 tfgeom(ii,1:maxrecnumber) = accumarray(firstorderpathdata.specrefllist(:,2),alltfs);
 %             else
 %                 tfgeom(ii,firstorderpathdata.specrefllist(:,2),firstorderpathdata.specrefllist(:,1)) = alltfs;
@@ -183,9 +183,9 @@ if firstorderpathdata.ncomponents(2) > 0
     else
         for ii = 1:ncomponents 
             alltfs = exp(-1i*kvec*(alldists(ii)-Rstart))./alldists(ii)...
-                .*firstorderpathdata.specrefllist(ii,3).*(Sindata.sourceamplitudes( firstorderpathdata.specrefllist(ii,1),: ).');
+                .*firstorderpathdata.specrefllist(ii,3).*(Sinputdata.sourceamplitudes( firstorderpathdata.specrefllist(ii,1),: ).');
             
-           if Sindata.doaddsources == 1
+           if Sinputdata.doaddsources == 1
               tfgeom(:,firstorderpathdata.specrefllist(ii,2)) = ...
                   tfgeom(:,firstorderpathdata.specrefllist(ii,2)) + alltfs;
            else
@@ -210,7 +210,7 @@ if difforder > 0
         disp(['      Generating first-order diffraction components']) 
     end
     
-    if Sindata.doaddsources == 1
+    if Sinputdata.doaddsources == 1
         tfdiff = zeros(nfrequencies,nreceivers);
     else
         tfdiff = zeros(nfrequencies,nreceivers,nsources);
@@ -240,7 +240,7 @@ if difforder > 0
 
         ivS = find(sou_vs_edges(:,edgenumber));
         ivR = find(rec_vs_edges(:,edgenumber));
-        [rs,thetas,zs,rr,thetar,zr] = EDcoordtrans2(Sindata.coordinates(ivS,:),receivers(ivR,:),edgecoords,edgedata.edgenvecs(edgenumber,:));
+        [rs,thetas,zs,rr,thetar,zr] = EDcoordtrans2(Sinputdata.coordinates(ivS,:),receivers(ivR,:),edgecoords,edgedata.edgenvecs(edgenumber,:));
 
         cylcoordS(ivS,:) = [rs thetas zs];
         cylcoordR(ivR,:) = [rr thetar zr];
@@ -251,8 +251,8 @@ if difforder > 0
                 cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
                 edgedata.edgelengthvec(edgenumber)*[0 1],'n',Rstart,[1 1]);  
 
-            tfnew = tfnew.*(Sindata.sourceamplitudes( Snumber(jj),: ).');
-            if Sindata.doaddsources == 1
+            tfnew = tfnew.*(Sinputdata.sourceamplitudes( Snumber(jj),: ).');
+            if Sinputdata.doaddsources == 1
                 tfdiff(:,Rnumber(jj)) =  tfdiff(:,Rnumber(jj)) + tfnew;                       
             else
                 tfdiff(:,Rnumber(jj),Snumber(jj)) =  tfdiff(:,Rnumber(jj),Snumber(jj)) + tfnew;           

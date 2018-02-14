@@ -41,7 +41,7 @@ planecorners = [   1     4     3     2
      2     3     7     6
      1     5     8     4];
 
-geofiledata = struct('corners',corners,'planecorners',planecorners);
+geoinputdata = struct('corners',corners,'planecorners',planecorners);
 
 filehandlingparameters = struct('outputdirectory',[infilepath,filesep,'results']);
 filehandlingparameters.filestem = filestem;
@@ -51,7 +51,7 @@ controlparameters = struct('ngauss',8);
 controlparameters.discretizationtype = 2;
 controlparameters.Rstart = 0;
 envdata.cair = 344;
-Sindata = struct;
+Sinputdata = struct;
 
 souvar = [1 size(sources,1)];
 recvar = [1 size(receivers,1)];
@@ -62,27 +62,27 @@ souamp = [1 2];
 
 casecounter = 0;
 for ii = 1:length(souvar)
-    Sindata.coordinates = sources(1:souvar(ii),:);
-    nsources = size(Sindata.coordinates,1);
+    Sinputdata.coordinates = sources(1:souvar(ii),:);
+    nsources = size(Sinputdata.coordinates,1);
     for jj = 1:length(recvar)
-        Rindata.coordinates = receivers(1:recvar(jj),:);
+        Rinputdata.coordinates = receivers(1:recvar(jj),:);
         for kk = 1:length(freqvar)
             controlparameters.frequencies = frequencies(1:freqvar(kk));
             nfrequencies = length(controlparameters.frequencies);
             for ll = 1:length(diffordervar)
                 controlparameters.difforder = diffordervar(ll);
                 for mm = 1:length(addsouvar)
-                    Sindata.doaddsources = addsouvar(mm);   
+                    Sinputdata.doaddsources = addsouvar(mm);   
                     for nn = 1:length(souamp)
                         if nn == 1
-                            Sindata.sourceamplitudes = 1;
+                            Sinputdata.sourceamplitudes = 1;
                         else
-                           Sindata.sourceamplitudes = ones(nsources,nfrequencies); 
+                           Sinputdata.sourceamplitudes = ones(nsources,nfrequencies); 
                         end
                         
                         casecounter = casecounter + 1;
                         disp(['Case no. ',int2str(casecounter),': ',int2str(ii),' ',int2str(jj),' ',int2str(kk),' ',int2str(ll),' ',int2str(mm),' ',int2str(nn)])
-                        EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+                        EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
                         eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
                         eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat tfinteqdiff'])
 
@@ -115,10 +115,10 @@ end
 % % % No diffraction at all
 % % 
 % % 
-% %     Sindata.doaddsources = 0;
+% %     Sinputdata.doaddsources = 0;
 % %     controlparameters.difforder = 0;
 % %     
-% %     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+% %     EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 % % 
 % %     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
 % % 
@@ -143,13 +143,13 @@ end
 % % % difforder = 1
 % % 
 % % 
-% %     Sindata = struct('coordinates',sources);
-% %     Sindata.doaddsources = 1;
-% %     Rindata = struct('coordinates',receivers);
+% %     Sinputdata = struct('coordinates',sources);
+% %     Sinputdata.doaddsources = 1;
+% %     Rinputdata = struct('coordinates',receivers);
 % %     controlparameters.frequencies = frequencies;
 % %     controlparameters.difforder = 1;
 % %     
-% %     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+% %     EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 % % 
 % %     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
 % % 
@@ -174,13 +174,13 @@ end
 % % % difforder = 1
 % % 
 % % 
-% %     Sindata = struct('coordinates',sources);
-% %     Sindata.doaddsources = 1;
-% %     Rindata = struct('coordinates',receivers(1,:));
+% %     Sinputdata = struct('coordinates',sources);
+% %     Sinputdata.doaddsources = 1;
+% %     Rinputdata = struct('coordinates',receivers(1,:));
 % %     controlparameters.frequencies = frequencies;
 % %     controlparameters.difforder = 1;
 % %     
-% %     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+% %     EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 % % 
 % %     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
 % % 
@@ -203,13 +203,13 @@ end
 % % % difforder = 1
 % % 
 % % 
-% %     Sindata = struct('coordinates',sources(1,:));
-% %     Sindata.doaddsources = 1;
-% %     Rindata = struct('coordinates',receivers);
+% %     Sinputdata = struct('coordinates',sources(1,:));
+% %     Sinputdata.doaddsources = 1;
+% %     Rinputdata = struct('coordinates',receivers);
 % %     controlparameters.frequencies = frequencies;
 % %     controlparameters.difforder = 1;
 % %     
-% %     EDmain_convexESIE(geofiledata,Sindata,Rindata,struct,controlparameters,filehandlingparameters);
+% %     EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 % % 
 % %     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
 % % 

@@ -66,7 +66,7 @@ function [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequ
 % 28 Nov. 2017 Cleaned up code a bit. Added timingdata.
 % 29 Nov. 2017 Cleaned up: removed the old timingdata code. Reduced the
 %              no. of displayed frequencies.
-% 13 Dec. 2017 Added the sourceamplitudes to the Sindata struct
+% 13 Dec. 2017 Added the sourceamplitudes to the Sinputdata struct
 % 19 Jan 2018 Renamed the ESIE2...mex to ED...mex
 
 % 10 Dec. 2017 TODO: finish the timingdata for the CASE2 : addsources

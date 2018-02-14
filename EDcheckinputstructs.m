@@ -1,10 +1,10 @@
-function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
-    EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase)
+function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
+    EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase)
 % EDcheckinputstructs checks the input data structs to the various EDmain
 % versions and sets default values.
 % 
 % Input parameters:
-%   geofiledata     .geoinputfile        (specified, or a file open
+%   geoinputdata     .geoinputfile        (specified, or a file open
 %                                             window is given - unless the fields .corners and .planecorners are given)
 %                   .corners             (optional; alternative to
 %                                             .geoinputfile. But, the use of this option
@@ -12,13 +12,13 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 %                   .planecorners        (optional; alternative to
 %                                             .geoinputfile)
 %                   .firstcornertoskip   (default: 1e6)
-%   Sindata         .coordinates         (obligatory)
+%   Sinputdata         .coordinates         (obligatory)
 %                   .doaddsources        (default: 0 = no)
 %                   .sourceamplitudes    Only used if doaddsources = 1
 %                                        (default:
 %                                         ones(nsources,nfrequencies))
 %                   .doallSRcombinations  (default: 1 = yes)
-%   Rindata         .coordinates         (obligatory)
+%   Rinputdata         .coordinates         (obligatory)
 %   envdata         .cair                (default: 344)
 %                   .rhoair              (default: 1.21)
 %   controlparameters   .fs              (default: 44100) Ignored for
@@ -60,13 +60,13 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 % 
 % Peter Svensson 8 Feb 2018 (peter.svensson@ntnu.no)
 % 
-% [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters] = ...
-% EDcheckinputstructs(geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingparameters,EDmaincase);
+% [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
+% EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
 
 % 24 Nov. 2017 First version
 % 28 Nov. 2017 Cleaned code a bit
 % 29 Nov. 2017 Corrected mistake: saveSRdatafiles was called
-%              saveSRindatafiles. Adjusted to the new indata option:
+%              saveSRinputdatafiles. Adjusted to the new indata option:
 %              specified corners and planecorners matrices instead of a CAD
 %              file.
 % 30 Nov. 2017 Fixed a bug where docalctf, instead of docalcir, was set to
@@ -80,13 +80,13 @@ function [geofiledata,Sindata,Rindata,envdata,controlparameters,filehandlingpara
 % 17 Jan 2018  Added the input field planecornertype
 % 18 Jan 2018  Fixed a bug with the sourceamplitudes; they were forced to
 % one by mistake. Changed default for savelogfile to 1.
-% 22 Jan 2018 Removed the field planecornertype in the struct geofiledata
+% 22 Jan 2018 Removed the field planecornertype in the struct geoinputdata
 % 22 Jan 2018 Moved some controlparameter fields away from the convex TF
 % case: fs, nedgepoints_visibility, docalcir, specorder.
 % 22 Jan 2018 Changed the defaults for saving files.
 % 26 Jan 2018 Changed the defaults for saving files. Also changed the
 % default output directory to include "results" in the path.
-% 26 Jan 2018 Introduced Sindata.doallSRcombinations. Default value 1.
+% 26 Jan 2018 Introduced Sinputdata.doallSRcombinations. Default value 1.
 % 28 Jan 2018 First version for EDmain_convexESIE_ir
 % 31 Jan 2018 Corrected the handling of sourceamplitudes (the freq.
 % dependence was not implemented correctly.
@@ -100,34 +100,34 @@ if nargin < 7
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check the struct geofiledata
+% Check the struct geoinputdata
 
-if ~isstruct(geofiledata)
+if ~isstruct(geoinputdata)
 
 	[CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
     [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
 
     CADfile = [CADfilepath,CADfile];
-    geofiledata = struct ('geoinputfile',CADfile);
+    geoinputdata = struct ('geoinputfile',CADfile);
 
-    [infilepath,CADfilestem] = fileparts(geofiledata.geoinputfile);
+    [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
     if ~isfield(filehandlingparameters,'outputdirectory')
         filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
     end    
 end
-if isfield(geofiledata,'geoinputfile')
-    [infilepath,CADfilestem] = fileparts(geofiledata.geoinputfile);
+if isfield(geoinputdata,'geoinputfile')
+    [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
     if ~isfield(filehandlingparameters,'outputdirectory')
         filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
     end    
 else
-    if ~isfield(geofiledata,'corners') || ~isfield(geofiledata,'planecorners')
+    if ~isfield(geoinputdata,'corners') || ~isfield(geoinputdata,'planecorners')
     	[CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
         [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
 
         CADfile = [CADfilepath,CADfile];
-        geofiledata.geoinputfile = CADfile;
-        [infilepath,CADfilestem] = fileparts(geofiledata.geoinputfile);        
+        geoinputdata.geoinputfile = CADfile;
+        [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);        
         if ~isfield(filehandlingparameters,'outputdirectory')
             filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
         end    
@@ -137,53 +137,53 @@ else
         end
     end
 end
-if ~isfield(geofiledata,'firstcornertoskip')
-    geofiledata.firstcornertoskip = 1e6;
+if ~isfield(geoinputdata,'firstcornertoskip')
+    geoinputdata.firstcornertoskip = 1e6;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check the struct Rindata
+% Check the struct Rinputdata
 
-if ~isstruct(Rindata)
+if ~isstruct(Rinputdata)
     error('ERROR 1: receiver coordinates were not specified')
 end
-if ~isfield(Rindata,'coordinates')
+if ~isfield(Rinputdata,'coordinates')
     error('ERROR 2: receiver coordinates were not specified')
 end
-nreceivers = size(Rindata.coordinates,1);
+nreceivers = size(Rinputdata.coordinates,1);
 if nreceivers == 0
      error('ERROR 3: receiver coordinates were not specified')            
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check the struct Sindata
+% Check the struct Sinputdata
 
 sourceamplitudes_default = 0;
 
-if ~isstruct(Sindata)
+if ~isstruct(Sinputdata)
     error('ERROR 1: source coordinates were not specified')
 end
-if ~isfield(Sindata,'coordinates')
+if ~isfield(Sinputdata,'coordinates')
     error('ERROR 2: source coordinates were not specified')
 end
-nsources = size(Sindata.coordinates,1);
+nsources = size(Sinputdata.coordinates,1);
 if nsources == 0
      error('ERROR 3: source coordinates were not specified')            
 end
-if ~isfield(Sindata,'doaddsources')
-    Sindata.doaddsources = 0;
+if ~isfield(Sinputdata,'doaddsources')
+    Sinputdata.doaddsources = 0;
 end
-if ~isfield(Sindata,'sourceamplitudes')
-    Sindata.sourceamplitudes = ones(1,nsources);    
+if ~isfield(Sinputdata,'sourceamplitudes')
+    Sinputdata.sourceamplitudes = ones(1,nsources);    
     sourceamplitudes_default = 1;
 end
 if nsources == 1
-    Sindata.doaddsources = 1;
+    Sinputdata.doaddsources = 1;
 end    
-if ~isfield(Sindata,'doallSRcombinations')
-    Sindata.doallSRcombinations = 1;
+if ~isfield(Sinputdata,'doallSRcombinations')
+    Sinputdata.doallSRcombinations = 1;
 else
-    if Sindata.doallSRcombinations == 0 && nsources~=nreceivers
+    if Sinputdata.doallSRcombinations == 0 && nsources~=nreceivers
        error('ERROR: doallSRcombinations was set to 0, but the number of sources was not the same as the number of receivers'); 
     end
 end
@@ -239,13 +239,13 @@ if EDmaincase == 1
     end
       
     nfrequencies = length(controlparameters.frequencies);
-    nsources = size(Sindata.coordinates,1);
-    [n1,n2] = size(Sindata.sourceamplitudes);
+    nsources = size(Sinputdata.coordinates,1);
+    [n1,n2] = size(Sinputdata.sourceamplitudes);
     if  n1 ~= nsources || n2 ~= nfrequencies
         if (n1 == 1 && n2 == 1) || sourceamplitudes_default == 1
-            Sindata.sourceamplitudes = ones(nsources,nfrequencies);
+            Sinputdata.sourceamplitudes = ones(nsources,nfrequencies);
         else
-            error(['ERROR: The Sindata.sourceamplitudes input parameter must have the size [1,1] or [nsources,nfrequencies], but it had the size ',int2str(n1),' by ',int2str(n2)])
+            error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have the size [1,1] or [nsources,nfrequencies], but it had the size ',int2str(n1),' by ',int2str(n2)])
         end
     end   
 end

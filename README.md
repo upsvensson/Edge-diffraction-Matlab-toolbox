@@ -10,13 +10,16 @@ Copy all these m-files to a folder ("EDtoolbox" could be a good name for that fo
 ```
 >>addpath <path to the folder where you installed the m files>
 ```
+
+Get two files from Mathworks (Matlab File Exchange): lgwt.m and DataHash.m. Store them somewhere, where Matlab finds them.
+
 Get the package EDexamples, which has a few examples to get you started.
 
 Inside the folder EDexamples, you find some example script files which execute various simple examples. In Matlab, you can, e.g., execute the file called EDexample_LspKessel_minimal.m, which should run the function EDmain_convexESIE and present a resulting frequency response in a plot window, and the geometrical model in another plot window.
 
 ## Prerequisites
 
-You'll need Matlab.
+You'll need Matlab, and those two files mentioned above, from Matlab File Exchange.
 
 
 ## Running an example
@@ -38,7 +41,7 @@ A new version number is given whenever some change is made that affects the nume
 
 ## License
 
-This project is licensed under the GNU License - see the [LICENSE.md](LICENSE.md) file for details
+This project is licensed under the XX License - see the [LICENSE.md](LICENSE.md) file for details
 
 ## Acknowledgments
 

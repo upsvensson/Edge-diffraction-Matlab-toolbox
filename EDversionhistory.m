@@ -95,7 +95,7 @@ icounter = icounter + 1;
 versionnumbers{icounter} = '0.111';
 versiondate{icounter} = '13 Feb 2018';
 versiontext{icounter} = ['Introduced the function lgwt from Matlab Central, for Gauss-Legendre weights, ',...
-                         'in EDdistelements. Replaced the quad_gauss.];
+                         'in EDdistelements. Replaced the quad_gauss,compute_gauss,r_jacobi,gauss files.'];
 
 icounter = icounter + 1;
 versionnumbers{icounter} = '0.112';

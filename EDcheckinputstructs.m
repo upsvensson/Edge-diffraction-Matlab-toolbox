@@ -97,6 +97,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % it was not given.
 % 14 Feb 2018 Added a check if the functions 'DataHash.m' and 'lgwt.m' are
 % available.
+% 14 Feb 2018 Added a test if the source and receiver coordinates has the
+% right number of columns (3).
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -175,6 +177,10 @@ nreceivers = size(Rinputdata.coordinates,1);
 if nreceivers == 0
      error('ERROR 3: receiver coordinates were not specified')            
 end
+ncolumns = size(Rinputdata.coordinates,2);
+if ncolumns ~= 2
+   error(['ERROR: check your receiver coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct Sinputdata
@@ -208,6 +214,11 @@ else
        error('ERROR: doallSRcombinations was set to 0, but the number of sources was not the same as the number of receivers'); 
     end
 end
+ncolumns = size(Sinputdata.coordinates,2);
+if ncolumns ~= 2
+   error(['ERROR: check your source coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
+end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct envdata

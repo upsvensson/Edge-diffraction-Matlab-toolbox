@@ -95,11 +95,24 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % controlparameters.skipfirstorder (default = 0).
 % 14 Feb 2018 v0.112 Small change, assigning a default value to filestem if
 % it was not given.
+% 14 Feb 2018 Added a check if the functions 'DataHash.m' and 'lgwt.m' are
+% available.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
     return
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Check if the needed non-EDtoolbox functions are available.
+
+if exist('DataHash.m','file') ~= 2
+   error('ERROR: Matlab can not find the function DataHash.m. Please download it from Mathworks') 
+end
+if exist('lgwt.m','file') ~= 2
+   error('ERROR: Matlab can not find the function lgwt.m. Please download it from Mathworks') 
+end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct geoinputdata

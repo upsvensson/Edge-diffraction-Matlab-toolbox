@@ -178,7 +178,7 @@ if nreceivers == 0
      error('ERROR 3: receiver coordinates were not specified')            
 end
 ncolumns = size(Rinputdata.coordinates,2);
-if ncolumns ~= 2
+if ncolumns ~= 3
    error(['ERROR: check your receiver coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
 end
 
@@ -215,7 +215,7 @@ else
     end
 end
 ncolumns = size(Sinputdata.coordinates,2);
-if ncolumns ~= 2
+if ncolumns ~= 3
    error(['ERROR: check your source coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
 end
 

@@ -118,6 +118,8 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % to another file. Also changed name for the input structs to geoinputdata,
 % instead of geofiledata; Sinputdata instead of Sindata; Rinputdata instead
 % of Rindata.
+% 14 Feb 2018 Small change to the log file text, indicating that three
+% edge points per wavelength is needed.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -533,7 +535,7 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
     nsubmatrices = size(Hsubmatrixdata.edgetripletlist,1);
     edgeelemsizes = edgedata.edgelengthvec./Hsubmatrixdata.nedgeelems;
     meanelemsize = mean(edgeelemsizes);
-    maxfreq = envdata.cair/(2.8*meanelemsize);
+    maxfreq = envdata.cair/(3*meanelemsize);
     minedgeelemnumber = min(Hsubmatrixdata.nedgeelems);
     maxedgeelemnumber = max(Hsubmatrixdata.nedgeelems);
     nonzeroelements = sum(prod(Hsubmatrixdata.nedgeelems(Hsubmatrixdata.edgetripletlist),2));
@@ -545,7 +547,7 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
          end
          disp(['      ',int2str(nsubmatrices),' submatrices; ',int2str(Hsubmatrixdata.nuniquesubmatrices),' unique will be computed due to symmetry']) 
          disp(['      Discretizing the edges with ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discret. points, giving an avg. "edge element" length of ',num2str(meanelemsize),' m'])
-         disp(['      This discretization has an upper frequency limit of ',num2str(round(maxfreq)),' Hz (2.8 discret. points per wavelength)'])
+         disp(['      This discretization has an upper frequency limit of ',num2str(round(maxfreq)),' Hz (3 edge points per wavelength)'])
          disp(['      ',int2str(nsousigs),' edge source signals to compute'])
          disp(['      The IE matrix has ',int2str(nonzeroelements),' non-zero elements, but many may be identical due to symmetries'])
     end
@@ -555,7 +557,7 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
                 fwrite(fid,['      by recycling ',existingfilename,lineending],'char');        
         end
         fwrite(fid,['                               (Edges discretized with: ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discretization points)',lineending],'char');
-        fwrite(fid,['                               (Avg. "edge element" size: ',num2str(meanelemsize),' m. OK up to ',num2str(round(maxfreq)),' Hz (2.8 discret. points per wavelength))',lineending],'char');
+        fwrite(fid,['                               (Avg. "edge element" size: ',num2str(meanelemsize),' m. OK up to ',num2str(round(maxfreq)),' Hz (3 edge points per wavelength))',lineending],'char');
         fwrite(fid,['                               (',int2str(nsousigs),' edge source signals to compute)',lineending],'char');
         fwrite(fid,['                               (',int2str(nonzeroelements),' non-zero elements in the IE matrix)',lineending],'char');
     end

@@ -608,7 +608,7 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
         recycledresultsfile =  '';
         t01 = etime(clock,t00);
         timingstruct.integralequation = [t01 timingdata];
-        eval(['save ',desiredname,' tfinteqdiff  extraoutputdata timingstruct EDinputdatahash'])
+        eval(['save ',desiredname,' tfinteqdiff  extraoutputdata timingstruct recycledresultsfile EDinputdatahash'])
     end
     if filehandlingparameters.showtext >= 1 && foundmatch == 1
         disp(['      Recycled ',recycledresultsfile])

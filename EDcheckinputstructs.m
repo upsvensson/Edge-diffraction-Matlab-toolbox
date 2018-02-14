@@ -58,7 +58,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %   EDmaincase      1, for EDmain_convexESIE (frequency domain)
 %                   2, for EDmain_convexESIE_ir (time domain)
 % 
-% Peter Svensson 8 Feb 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 14 Feb 2018 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -93,6 +93,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 6 Feb 2018 Introduced a check if number of receivers/sources was zero
 % 8 Feb 2018 v 0.109 Introduced a new parameter:
 % controlparameters.skipfirstorder (default = 0).
+% 14 Feb 2018 v0.112 Small change, assigning a default value to filestem if
+% it was not given.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -113,13 +115,19 @@ if ~isstruct(geoinputdata)
     [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
     if ~isfield(filehandlingparameters,'outputdirectory')
         filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
-    end    
+    end   
+    if ~isfield(filehandlingparameters,'filestem')
+        filehandlingparameters.filestem = CADfilestem;
+    end
 end
 if isfield(geoinputdata,'geoinputfile')
     [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
     if ~isfield(filehandlingparameters,'outputdirectory')
         filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
     end    
+    if ~isfield(filehandlingparameters,'filestem')
+        filehandlingparameters.filestem = CADfilestem;
+    end
 else
     if ~isfield(geoinputdata,'corners') || ~isfield(geoinputdata,'planecorners')
     	[CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');

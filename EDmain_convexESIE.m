@@ -6,15 +6,15 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % higher-order diffraction.
 %
 % Input parameters are six structs with fields as specified below:
-%   geoinputdata         .geoinputfile        (obligatory)
+%   geoinputdata        .geoinputfile        (obligatory)
 %                       As an alternative to specifying geoinputfile, it is
 %                       possible to specify .corners, .planecorners.
 %                       .firstcornertoskip   (default: 1e6)
-%   Sinputdata             .coordinates         (obligatory)
+%   Sinputdata          .coordinates         (obligatory)
 %                       .doaddsources        (default: 0 = no)
 %                       .sourceamplitudes    (default:
 %                        ones(nsources,nfrequencies)
-%   Rinputdata             .coordinates         (obligatory)
+%   Rinputdata          .coordinates         (obligatory)
 %   envdata             .cair                (default: 344)
 %                       .rhoair              (default: 1.21)
 %   controlparameters   .fs                  (default: 44100)
@@ -30,13 +30,13 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 %   filehandlingparameters (optional)    
 %                       .outputdirectory  (default: /result, in the folder of the geoinputfile)  
 %                       .filestem        (default: name of the cad-file, with an underscore + running integer)
-%                       .savesetupfile       (default: 1)
 %                       .showtext            (default: 1)
+%                       .suppressresultrecycling   (default: 0)
 %                       .savecadgeofile      (default: 0)
 %                       .saveSRdatafiles     (default: 1)
 %                       .saveeddatafile      (default: 1)
-%                       .savepathsfile       (default: 0)
-%                       .saveISEStree        (default: 0)
+%                       .saveed2datafile     (default: 1)
+%                       .savepathsfile       (default: 1)
 %                       .savelogfile         (default: 1)
 %                       .savediff2result      (default: 0)
 % 
@@ -45,7 +45,7 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 14 Feb. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 15 Feb. 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -122,6 +122,13 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % edge points per wavelength is needed.
 % 14 Feb 2018 Added an error message: if no S/R could see any planes, then
 % the program stopped, with a warning sign.
+% 15 Feb 2018 Removed the setupfile. Instead, introduced a master setting
+% variable: EDsettings, a cell variable with all the 6 input structs +
+% EDtoolbox version number. EDsettings will be saved in the tf and tfinteq 
+% files. Also, stopped the automatic saving, with
+% inputdatahash, if the corresponding savexxxxfile = 0. Introduced the
+% parameter .suppressresultrecycling with default = 0, and implemented th
+% corresponding suppressing of the result recycling.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -151,14 +158,23 @@ end
 
 [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,1);
 
+EDsettings = cell(7,1);
+EDsettings{1} = geoinputdata;
+EDsettings{2} = Sinputdata;
+EDsettings{3} = Rinputdata;
+EDsettings{4} = envdata;
+EDsettings{5} = controlparameters;
+EDsettings{6} = filehandlingparameters;
+EDsettings{7} = EDversionnumber;
+
 if filehandlingparameters.savelogfile == 1
     logfilename = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_log.txt'];
 end
 
-if filehandlingparameters.savesetupfile == 1
-    varlist = 'geoinputdata Sinputdata Rinputdata envdata controlparameters filehandlingparameters EDversionnumber';
-    eval(['save ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_setup.mat ',varlist])
-end
+% if filehandlingparameters.savesetupfile == 1
+%     varlist = 'geoinputdata Sinputdata Rinputdata envdata controlparameters filehandlingparameters EDversionnumber';
+%     eval(['save ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_setup.mat ',varlist])
+% end
 
 if filehandlingparameters.showtext >= 1
 	disp('    ');disp('####################################################################')
@@ -231,12 +247,14 @@ if filehandlingparameters.showtext >= 1
 end
 
 t00 = clock;
-EDedgeoinputstruct = struct('planedata',planedata,'firstcornertoskip',geoinputdata.firstcornertoskip,...
-    'listofcornerstoskip',[],'planeseesplanestrategy',0,'EDversionnumber',EDversionnumber);
-EDedgeoinputhash = DataHash(EDedgeoinputstruct);
-
-[foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_eddata',EDedgeoinputhash);
-
+if filehandlingparameters.suppressresultrecycling == 1
+    foundmatch = 0;
+else
+    EDedgeoinputstruct = struct('planedata',planedata,'firstcornertoskip',geoinputdata.firstcornertoskip,...
+        'listofcornerstoskip',[],'planeseesplanestrategy',0,'EDversionnumber',EDversionnumber);
+    EDedgeoinputhash = DataHash(EDedgeoinputstruct);
+    [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_eddata',EDedgeoinputhash);
+end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_eddata.mat'];
 if foundmatch == 1
     eval(['load ',existingfilename])
@@ -245,7 +263,9 @@ if foundmatch == 1
     end
 else
     [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,geoinputdata.firstcornertoskip,[],0,filehandlingparameters.showtext);
-    eval(['save ',desiredname,' planedata edgedata EDinputdatahash'])
+    if filehandlingparameters.saveeddatafile == 1
+        eval(['save ',desiredname,' planedata edgedata EDinputdatahash'])
+    end
 end
 nedges = size(edgedata.edgecorners,1);
 t01 = etime(clock,t00);
@@ -273,12 +293,14 @@ if filehandlingparameters.showtext >= 1
 	disp('   Creating the Sdata struct ')
 end
 t00 = clock;
-EDSorRgeoinputstruct = struct('planedata',planedata,'edgedata',edgedata, 'pointcoords',Sinputdata.coordinates,...
-    'nedgesubs',2,'EDversionnumber',EDversionnumber);
-EDSorRgeoinputhash = DataHash(EDSorRgeoinputstruct);
-
-[foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_Sdata',EDSorRgeoinputhash);
-
+if filehandlingparameters.suppressresultrecycling == 1
+    foundmatch = 0;
+else
+    EDSorRgeoinputstruct = struct('planedata',planedata,'edgedata',edgedata, 'pointcoords',Sinputdata.coordinates,...
+        'nedgesubs',2,'EDversionnumber',EDversionnumber);
+    EDSorRgeoinputhash = DataHash(EDSorRgeoinputstruct);
+    [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_Sdata',EDSorRgeoinputhash);
+end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Sdata.mat'];
 if foundmatch == 1
     eval(['load ',existingfilename])
@@ -287,7 +309,9 @@ if foundmatch == 1
     end
 else
     [Sdata,EDinputdatahash] = EDSorRgeo(planedata,edgedata,Sinputdata.coordinates,'S',EDversionnumber,2,filehandlingparameters.showtext);
-    eval(['save ',desiredname,' Sdata EDinputdatahash'])
+    if filehandlingparameters.saveSRdatafiles == 1
+        eval(['save ',desiredname,' Sdata EDinputdatahash'])
+    end    
 end
 nsources = size(Sdata.sources,1);
 t01 = etime(clock,t00);
@@ -315,12 +339,15 @@ if filehandlingparameters.showtext >= 1
 	disp('   Creating the Rdata struct ')
 end
 t00 = clock;
-EDSorRgeoinputstruct = struct('planedata',planedata,'edgedata',edgedata, 'pointcoords',Rinputdata.coordinates,...
-    'nedgesubs',2,'EDversionnumber',EDversionnumber);
-EDSorRgeoinputhash = DataHash(EDSorRgeoinputstruct);
+if filehandlingparameters.suppressresultrecycling == 1
+    foundmatch = 0;
+else
+    EDSorRgeoinputstruct = struct('planedata',planedata,'edgedata',edgedata, 'pointcoords',Rinputdata.coordinates,...
+        'nedgesubs',2,'EDversionnumber',EDversionnumber);
+    EDSorRgeoinputhash = DataHash(EDSorRgeoinputstruct);
 
-[foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_Rdata',EDSorRgeoinputhash);
-
+    [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_Rdata',EDSorRgeoinputhash);
+end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Rdata.mat'];
 if foundmatch == 1
     eval(['load ',existingfilename])
@@ -329,7 +356,9 @@ if foundmatch == 1
     end
 else
     [Rdata,EDinputdatahash] = EDSorRgeo(planedata,edgedata,Rinputdata.coordinates,'R',EDversionnumber,2,filehandlingparameters.showtext);
-    eval(['save ',desiredname,' Rdata EDinputdatahash'])
+    if filehandlingparameters.saveSRdatafiles == 1
+        eval(['save ',desiredname,' Rdata EDinputdatahash'])
+    end
 end
 nreceivers = size(Rdata.receivers,1);
 t01 = etime(clock,t00);
@@ -362,16 +391,17 @@ if controlparameters.skipfirstorder == 0
     end
 
     t00 = clock;
-    
-    EDfindconvGApathsinputstruct = struct('planedata',planedata,'edgedata',edgedata,...
-        'sources',Sdata.sources,'visplanesfromS',Sdata.visplanesfroms,'vispartedgesfromS',Sdata.vispartedgesfroms,...
-        'receivers',Rdata.receivers,'visplanesfromR',Rdata.visplanesfromr,'vispartedgesfromR',Rdata.vispartedgesfromr,...
-        'difforder',controlparameters.difforder,'directsound',controlparameters.directsound,...
-        'doallSRcombinations',Sinputdata.doallSRcombinations,'EDversionnumber',EDversionnumber);
-    EDfindconvGApathsinputhash = DataHash(EDfindconvGApathsinputstruct);
-
-    [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_paths',EDfindconvGApathsinputhash);
-
+    if filehandlingparameters.suppressresultrecycling == 1
+        foundmatch = 0;
+    else    
+        EDfindconvGApathsinputstruct = struct('planedata',planedata,'edgedata',edgedata,...
+            'sources',Sdata.sources,'visplanesfromS',Sdata.visplanesfroms,'vispartedgesfromS',Sdata.vispartedgesfroms,...
+            'receivers',Rdata.receivers,'visplanesfromR',Rdata.visplanesfromr,'vispartedgesfromR',Rdata.vispartedgesfromr,...
+            'difforder',controlparameters.difforder,'directsound',controlparameters.directsound,...
+            'doallSRcombinations',Sinputdata.doallSRcombinations,'EDversionnumber',EDversionnumber);
+        EDfindconvGApathsinputhash = DataHash(EDfindconvGApathsinputstruct);
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_paths',EDfindconvGApathsinputhash);
+    end
     if foundmatch == 1
         eval(['load ',existingfilename])
     else
@@ -381,7 +411,9 @@ if controlparameters.skipfirstorder == 0
             controlparameters.difforder,controlparameters.directsound,Sinputdata.doallSRcombinations,...
             EDversionnumber,filehandlingparameters.showtext);
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
-        eval(['save ',desiredname,' firstorderpathdata EDinputdatahash'])    
+        if filehandlingparameters.savepathsfile == 1
+            eval(['save ',desiredname,' firstorderpathdata EDinputdatahash'])   
+        end
     end
     t01 = etime(clock,t00);
     timingstruct.findpaths = t01;
@@ -415,15 +447,16 @@ if controlparameters.docalctf == 1 && controlparameters.skipfirstorder == 0
     end
 
     t00 = clock;
-
-    EDfirstordertfsinputstruct = struct('firstorderpathdata',firstorderpathdata,'edgedata',edgedata,...
-        'frequencies',controlparameters.frequencies,'Rstart',controlparameters.Rstart,...
-        'difforder',controlparameters.difforder,'envdata',envdata,'Sinputdata',Sinputdata,...
-        'receivers',Rdata.receivers,'EDversionnumber',EDversionnumber);
-    EDfirstordertfsinputhash = DataHash(EDfirstordertfsinputstruct);
-
-    [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_tf',EDfirstordertfsinputhash);
-
+    if filehandlingparameters.suppressresultrecycling == 1
+        foundmatch = 0;
+    else
+        EDfirstordertfsinputstruct = struct('firstorderpathdata',firstorderpathdata,'edgedata',edgedata,...
+            'frequencies',controlparameters.frequencies,'Rstart',controlparameters.Rstart,...
+            'difforder',controlparameters.difforder,'envdata',envdata,'Sinputdata',Sinputdata,...
+            'receivers',Rdata.receivers,'EDversionnumber',EDversionnumber);
+        EDfirstordertfsinputhash = DataHash(EDfirstordertfsinputstruct);
+        [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_tf',EDfirstordertfsinputhash);
+    end
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat'];    
     if foundmatch == 1
         currenttimingstruct = timingstruct;
@@ -432,7 +465,7 @@ if controlparameters.docalctf == 1 && controlparameters.skipfirstorder == 0
         t01 = etime(clock,t00);
         currenttimingstruct.maketfs = [t01 timingstruct.maketfs(2:4)];
         timingstruct = currenttimingstruct;
-        eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDinputdatahash'])
+        eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     else
         [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordertfs(firstorderpathdata,...
             controlparameters.frequencies,controlparameters.Rstart,controlparameters.difforder,envdata,Sinputdata,Rdata.receivers,...
@@ -440,7 +473,7 @@ if controlparameters.docalctf == 1 && controlparameters.skipfirstorder == 0
         recycledresultsfile = '';
         t01 = etime(clock,t00);
         timingstruct.maketfs = [t01 timingdata];
-         eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDinputdatahash'])
+        eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     end
     if filehandlingparameters.showtext >= 1 && foundmatch == 1
         disp(['      Recycled ',recycledresultsfile])
@@ -476,21 +509,23 @@ if controlparameters.difforder > 1
     end
     t00 = clock;
 
-    EDed2geoinputstruct = struct('planedata',planedata,'edgedata',edgedata,...
-        'Sdata',Sdata,'Rdata',Rdata,'specorder',1,'difforder',2,...
-        'nedgesubs',2,'ndiff2batches',1,'EDversionnumber',EDversionnumber);
- 
-    EDed2geoinputhash = DataHash(EDed2geoinputstruct);
-
-    [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_ed2data',EDed2geoinputhash);
-    
+    if filehandlingparameters.suppressresultrecycling == 1
+        foundmatch = 0;
+    else
+        EDed2geoinputstruct = struct('planedata',planedata,'edgedata',edgedata,...
+            'Sdata',Sdata,'Rdata',Rdata,'specorder',1,'difforder',2,...
+            'nedgesubs',2,'ndiff2batches',1,'EDversionnumber',EDversionnumber);
+        EDed2geoinputhash = DataHash(EDed2geoinputstruct);
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_ed2data',EDed2geoinputhash);
+    end    
     if foundmatch == 1
         eval(['load ',existingfilename])
     else 
         [edgetoedgedata,EDinputdatahash] = EDed2geo(edgedata,planedata,Sdata,Rdata,1,2,EDversionnumber,2,1,filehandlingparameters.showtext);    
-
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_ed2data.mat'];
-        eval(['save ',desiredname,' planedata edgedata edgetoedgedata EDinputdatahash'])
+        if filehandlingparameters.saveed2datafile == 1
+            eval(['save ',desiredname,' planedata edgedata edgetoedgedata EDinputdatahash'])
+        end
     end
     t01 = etime(clock,t00);
     timingstruct.edgetoedgedata = t01;
@@ -522,16 +557,17 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
     end
     t00 = clock;
     
-    EDsubmatrixinputstruct = struct();
-    EDsubmatrixinputhash = DataHash(EDsubmatrixinputstruct);
-    
-    EDsubmatrixinputstruct = struct('edgelengthvec',edgedata.edgelengthvec,'closwedangvec',edgedata.closwedangvec,...
-    'inteq_ngauss',controlparameters.ngauss,'inteq_discretizationtype',controlparameters.discretizationtype,...
-    'edgetoedgedata',edgetoedgedata,'planesatedge',edgedata.planesatedge,'EDversionnumber',EDversionnumber);
-    EDsubmatrixinputhash = DataHash(EDsubmatrixinputstruct);
-    
-    [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_submatrixdata',EDsubmatrixinputhash);
-
+    if filehandlingparameters.suppressresultrecycling == 1
+        foundmatch = 0;
+    else
+        EDsubmatrixinputstruct = struct();
+        EDsubmatrixinputhash = DataHash(EDsubmatrixinputstruct);
+        EDsubmatrixinputstruct = struct('edgelengthvec',edgedata.edgelengthvec,'closwedangvec',edgedata.closwedangvec,...
+        'inteq_ngauss',controlparameters.ngauss,'inteq_discretizationtype',controlparameters.discretizationtype,...
+        'edgetoedgedata',edgetoedgedata,'planesatedge',edgedata.planesatedge,'EDversionnumber',EDversionnumber);
+        EDsubmatrixinputhash = DataHash(EDsubmatrixinputstruct);
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_submatrixdata',EDsubmatrixinputhash);
+    end
     if foundmatch == 1
         eval(['load ',existingfilename])
     else
@@ -539,7 +575,9 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
         controlparameters.ngauss,controlparameters.discretizationtype,edgetoedgedata,edgedata.planesatedge,EDversionnumber,filehandlingparameters.showtext);
     
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
-        eval(['save ',desiredname,' Hsubmatrixdata EDinputdatahash'])
+        if filehandlingparameters.savesubmatrixdata == 1
+            eval(['save ',desiredname,' Hsubmatrixdata EDinputdatahash'])
+        end
     end
     nsousigs = Hsubmatrixdata.bigmatrixendnums(end);
     nsubmatrices = size(Hsubmatrixdata.edgetripletlist,1);
@@ -590,17 +628,18 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
         disp(['      ',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',int2str(controlparameters.difforder)])
     end
 
-    t00 = clock;
-    
-    EDinteqinputstruct = struct('envdata',envdata,...
-        'planedata',planedata,'edgedata',edgedata,'edgetoedgedata',edgetoedgedata,...
-        'Hsubmatrixdata',Hsubmatrixdata,'Sdata',Sdata,'doaddsources',Sinputdata.doaddsources,...
-        'sourceamplitudes',Sinputdata.sourceamplitudes,'doallSRcombinations',Sinputdata.doallSRcombinations,...
-        'Rdata',Rdata,'controlparameters',controlparameters,'EDversionnumber',EDversionnumber);
-    EDinteqinputhash = DataHash(EDinteqinputstruct);
-
-    [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_tfinteq',EDinteqinputhash);
-    
+    t00 = clock;    
+    if filehandlingparameters.suppressresultrecycling == 1
+        foundmatch = 0;
+    else
+        EDinteqinputstruct = struct('envdata',envdata,...
+            'planedata',planedata,'edgedata',edgedata,'edgetoedgedata',edgetoedgedata,...
+            'Hsubmatrixdata',Hsubmatrixdata,'Sdata',Sdata,'doaddsources',Sinputdata.doaddsources,...
+            'sourceamplitudes',Sinputdata.sourceamplitudes,'doallSRcombinations',Sinputdata.doallSRcombinations,...
+            'Rdata',Rdata,'controlparameters',controlparameters,'EDversionnumber',EDversionnumber);
+        EDinteqinputhash = DataHash(EDinteqinputstruct);
+        [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_tfinteq',EDinteqinputhash);
+    end    
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
     
     if foundmatch == 1
@@ -610,7 +649,7 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
         t01 = etime(clock,t00);
         currenttimingstruct.integralequation = [t01 timingstruct.integralequation(2:5)];
         timingstruct = currenttimingstruct;
-        eval(['save ',desiredname,'  tfinteqdiff extraoutputdata recycledresultsfile timingstruct EDinputdatahash'])        
+        eval(['save ',desiredname,'  tfinteqdiff extraoutputdata recycledresultsfile timingstruct EDsettings EDinputdatahash'])        
     else
         [tfinteqdiff,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequation_convex_tf(filehandlingparameters,...
             envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Sinputdata.doallSRcombinations,...
@@ -618,7 +657,7 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
         recycledresultsfile =  '';
         t01 = etime(clock,t00);
         timingstruct.integralequation = [t01 timingdata];
-        eval(['save ',desiredname,' tfinteqdiff  extraoutputdata timingstruct recycledresultsfile EDinputdatahash'])
+        eval(['save ',desiredname,' tfinteqdiff  extraoutputdata timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     end
     if filehandlingparameters.showtext >= 1 && foundmatch == 1
         disp(['      Recycled ',recycledresultsfile])

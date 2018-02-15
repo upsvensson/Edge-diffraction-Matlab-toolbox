@@ -43,22 +43,23 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   .ngauss              (default: 16)
 %   filehandlingparameters    .outputdirectory  (default: the folder of the geoinputfile)  
 %                   .filestem        (default: name of the cad-file, with an underscore + running integer)
-%                   .savesetupfile       (default: 1)
 %                   .savecadgeofile      (default: 0)
 %                   .saveSRdatafiles     (default: 1)
 %                   .saveeddatafile      (default: 1)
-%                   .savesubmatrixdata   (default: 0)
+%                   .saveed2datafile      (default: 1)
+%                   .savesubmatrixdata    (default: 1)
 %                   .saveinteqsousigs     (default: 0)
 %                   .loadinteqsousigs     (default: 0)
-%                   .savepathsfile        (default: 0)
-%                   .saveISEStree         (default: 0)
+%                   .savepathsfile        (default: 1)
+%                   .saveISEStree         (default: 0) Not used by
+%                                         EDmain_convexESIE
 %                   .savelogfile          (default: 1)
 %                   .savediff2result      (default: 0)
 %                   .showtext             (default: 1)
 %   EDmaincase      1, for EDmain_convexESIE (frequency domain)
 %                   2, for EDmain_convexESIE_ir (time domain)
 % 
-% Peter Svensson 14 Feb 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 15 Feb 2018 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -99,6 +100,10 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % available.
 % 14 Feb 2018 Added a test if the source and receiver coordinates has the
 % right number of columns (3).
+% 15 Feb 2018 Removed the savesetupfile. Introduced the saveed2datafile,
+% default = 1. Changed defaults for savepathsfile and savesubmatrixdata to
+% 1. Stopped assigning default value to saveISEStree. Introduced the
+% parameter suppressresultrecycling, default = 0.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -328,8 +333,11 @@ if ~isfield(filehandlingparameters,'filestem')
        filehandlingparameters.filestem = Filestem;        
     end
 end
-if ~isfield(filehandlingparameters,'savesetupfile')
-    filehandlingparameters.savesetupfile = 1;
+% if ~isfield(filehandlingparameters,'savesetupfile')
+%     filehandlingparameters.savesetupfile = 1;
+% end
+if ~isfield(filehandlingparameters,'suppressresultrecycling')
+    filehandlingparameters.suppressresultrecycling = 0;
 end
 if ~isfield(filehandlingparameters,'showtext')
     filehandlingparameters.showtext = 1;
@@ -343,8 +351,11 @@ end
 if ~isfield(filehandlingparameters,'saveeddatafile')
     filehandlingparameters.saveeddatafile = 1;
 end
+if ~isfield(filehandlingparameters,'saveed2datafile')
+    filehandlingparameters.saveed2datafile = 1;
+end
 if ~isfield(filehandlingparameters,'savesubmatrixdata')
-    filehandlingparameters.savesubmatrixdata = 0;
+    filehandlingparameters.savesubmatrixdata = 1;
 end
 if ~isfield(filehandlingparameters,'saveinteqsousigs')
     filehandlingparameters.saveinteqsousigs = 0;
@@ -353,10 +364,12 @@ if ~isfield(filehandlingparameters,'loadinteqsousigs')
     filehandlingparameters.loadinteqsousigs = 0;
 end
 if ~isfield(filehandlingparameters,'savepathsfile')
-    filehandlingparameters.savepathsfile = 0;
+    filehandlingparameters.savepathsfile = 1;
 end
-if ~isfield(filehandlingparameters,'saveISEStree')
-    filehandlingparameters.saveISEStree = 0;
+if EDmaincase > 2
+    if ~isfield(filehandlingparameters,'saveISEStree')
+        filehandlingparameters.saveISEStree = 0;
+    end
 end
 if ~isfield(filehandlingparameters,'savediff2result')
     filehandlingparameters.savediff2result = 0;

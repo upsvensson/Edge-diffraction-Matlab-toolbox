@@ -33,8 +33,9 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % Diff1 test.
 % 6. Replicate a non-centered internal monopole, at 0.1 Hz.
 % 7. Direct sound obscuring for a corner-on hit of an octahedron.
+% 8. Direct sound obscuring for an edge-on hit of a cube.
 % 
-% Peter Svensson 5 Feb. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 15 Feb 2018 (peter.svensson@ntnu.no)
 % 
 % passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams);
 
@@ -52,6 +53,7 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 31 Jan 2018 Added "results" to the default output directory.
 % 5 Feb 2018  Added test 7, after that problem was discovered with v 0.108.
 % Made the logfile optional, via the specification of an outputdirectory. 
+% 15 Feb 2018 Added the description of test 8.
 
 ntests = 7;
 

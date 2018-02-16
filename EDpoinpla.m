@@ -31,20 +31,6 @@ function [hitvec,edgehit,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxval
 %
 % Uses no special subroutines
 %
-% ----------------------------------------------------------------------------------------------
-%   This file is part of the Edge Diffraction Toolbox by Peter Svensson.                       
-%                                                                                              
-%   The Edge Diffraction Toolbox is free software: you can redistribute it and/or modify       
-%   it under the terms of the GNU General Public License as published by the Free Software     
-%   Foundation, either version 3 of the License, or (at your option) any later version.        
-%                                                                                              
-%   The Edge Diffraction Toolbox is distributed in the hope that it will be useful,       
-%   but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS  
-%   FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.             
-%                                                                                              
-%   You should have received a copy of the GNU General Public License along with the           
-%   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
-% ----------------------------------------------------------------------------------------------
 % Peter Svensson (peter.svensson@ntnu.no) 15 Jan. 2018
 % 
 % [hitvec,edgehit] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs);

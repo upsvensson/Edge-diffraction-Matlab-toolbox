@@ -30,7 +30,7 @@ function [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequ
 % EDcoordtrans1 from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  9 Feb 2018  
+% Peter Svensson (peter.svensson@ntnu.no)  28 Feb 2018  
 %                       
 % [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequation_convex_tf(filehandlingparameters,...
 %    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,sourceamplitudes,...
@@ -76,6 +76,8 @@ function [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequ
 % 26 Jan 2018 Implemented the handling of doallSRcombinations = 0.
 % 31 Jan 2018 Had not implemented sourceamplitudes for case 2.
 % 9 Feb 2018 Introduced EDinputdatahash
+% 28 Feb 2018 The saving of sousig files had an extra "results"
+% subdirectory.
 
 showtext = filehandlingparameters.showtext;
 
@@ -540,12 +542,12 @@ for ifreq = 1:nfrequencies
             % Possibly save to a file
             
             if filehandlingparameters.saveinteqsousigs == 1
-               filename_sousigs = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_f',int2str(ifreq),'_sousigs.mat'];  
+               filename_sousigs = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_f',int2str(ifreq),'_sousigs.mat'];  
                eval(['save ',filename_sousigs,' Qfinal Q_firstterm doesQsegmenthavevalues'])             
             end
 
         else    % This 'else' part implies that controlparameters.loadinteqsousig = 1
-            filename_sousigs = [filehandlingparameters.outputdirectory,filesep,'results',filesep,filehandlingparameters.filestem,'_f',int2str(ifreq),'_sousigs.mat'];  
+            filename_sousigs = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_f',int2str(ifreq),'_sousigs.mat'];  
             eval(['load ',filename_sousigs]) 
 			disp(['      Using existing edgesourcesignalsfile: ',filename_sousigs])
         end

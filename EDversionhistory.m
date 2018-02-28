@@ -2,9 +2,9 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 13 Feb 2018
+% Peter Svensson (peter.svensson@ntnu.no) 28 Feb 2018
 
-% 8 Feb 2018 First version, just after version 0.101
+% 28 Feb 2018 First version, just after version 0.101
 
 versionnumbers = cell(1);
 versiontext = cell(1);
@@ -106,6 +106,12 @@ versiontext{icounter} = ['Modified the recycling of results files so that the tf
                          'in the tf and tfinteq files, with all the settings stored. Introduced the possibility to suppress ',...
                          'the result recycling, with a new input parameter .suppressresultrecycling.'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.113';
+versiondate{icounter} = '28 Feb 2018';
+versiontext{icounter} = ['Added a new main function: EDmain_convexESIEtime (and functions that it calls), '...
+                         'which generates impulse responses. So far, only first-order impulse responses are generated.'];
+                     
 nversions = size(versiontext,2);
 txtwidth = 80;
 

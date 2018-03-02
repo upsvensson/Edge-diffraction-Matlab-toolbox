@@ -48,7 +48,7 @@ function EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,control
 % EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 1 March 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 2 March 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -136,6 +136,7 @@ function EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,control
 % 2 Mar 2018 Fixed two things, which gave expected results. First: the
 % free-field component must be added to the surface-propagated pressure.
 % Second: if Rstart must be taken into account in the free-field component.
+% 2 Mar 2018 Completed the info printing, for the ESIEBEM part.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -264,12 +265,14 @@ EDsettings{5} = controlparameters;
 EDsettings{6} = filehandlingparameters;
 EDsettings{7} = EDversionnumber;
 
-% if filehandlingparameters.savelogfile == 1
-%     fwrite(fid,['   EDedgeo, (',int2str(nedges),' edges), time: ',num2str(t01),' s',lineending],'char');
-%     if foundmatch == 1
-%         fwrite(fid,['      by recycling and duplicating ',existingfilename,lineending],'char');        
-%     end
-% end
+if filehandlingparameters.showtext >= 1
+     disp(['       Created ',int2str(size(Rinputdata.coordinates,1)),' surface receiver positions'])
+end
+
+if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   Created ',int2str(size(Rinputdata.coordinates,1)),' surface ',...
+        'receiver positions. Time: ',num2str(t01),' s',lineending],'char');
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Use the planedata struct and create an edgedata struct
@@ -734,6 +737,12 @@ end
 % **free-field** component (not direct sound!), from the original source
 % to the fieldpoints. 
 
+if filehandlingparameters.showtext >= 1	
+    disp('   Propagating the surface pressure to the fieldpoints = original receivers')
+end
+
+t00 = clock;    
+
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat'];
 eval(['load ',desiredname,' tfdirect tfgeom tfdiff']);
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
@@ -768,14 +777,18 @@ if directsound_fieldpoints == 1
    tftot = tftot + exp(-1i*kvec.*(ffdist(:,onesvec)-controlparameters.Rstart))./ffdist(:,onesvec);   
 end
 
+t01 = etime(clock,t00);
+timingstruct.esiebem = t01;
+        
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfesiebem.mat'];
-eval(['save ',desiredname,' tftot']);
+eval(['save ',desiredname,' tftot timingstruct']);
 
+if filehandlingparameters.savelogfile == 1
+    fwrite(fid,['   Propagating the surface pressure to the fieldpoints = original receivers. Time: ',num2str(t01),' s',lineending],'char');
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if filehandlingparameters.savelogfile == 1
     fclose(fid);
 end
-
-

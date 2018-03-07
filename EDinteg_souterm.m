@@ -28,7 +28,7 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 %
 % Uses functions EDdistelements  EDcoordtrans1
 %
-% Peter Svensson 15 Dec. 2017 (peter.svensson@ntnu.no)
+% Peter Svensson 7 Mar 2018 (peter.svensson@ntnu.no)
 %
 % Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,inteq_ngauss,inteq_discretizationtype,...
 %     vispartedgesfroms,vispartedgesfroms_start,vispartedgesfroms_end,frequency,gaussvectors,rSvec,thetaSvec,zSvec,showtext);
@@ -54,6 +54,8 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 % 27 Nov. 2017 Copied from ESIE2toolbox. Trimmed down, used more structs.
 % 28 Nov. 2017 Introduced the non-global input parameter showtext
 % 15 Dec. 2017 Experiments with detecting near singularities
+% 7 Mar 2018 Hid the singularity information printouts behind "if showtext
+% >= 2"
 
 if nargin < 14
     showtext = 0;
@@ -147,11 +149,17 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         singwarning = 0;
         singterm = [0 0 0 0];
         if thetaout == 0 && max([  abs(cos(ny*(pi + thetaS   )))  abs(cos(ny*(pi - thetaS   )))]) > 0.999
-            singwarning = 1 
+            singwarning = 1;
+            if showtext >= 2
+                disp(['      Singularity warning, location 1'])
+            end
         end
         if thetaout ~= 0 && max([ abs(cos(ny*(pi + thetaS + thetaout   )))  abs(cos(ny*(pi + thetaS - thetaout   )))  ...
                           abs(cos(ny*(pi - thetaS + thetaout   )))  abs(cos(ny*(pi - thetaS - thetaout   )))  ]) > 0.999
-            singwarning = 2                       
+            singwarning = 2;                       
+            if showtext >= 2
+                disp(['      Singularity warning, location 2'])
+            end
         end
         
         % Build vertical [n3,n2] matrices and expand them horizontally
@@ -253,15 +261,17 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                        
                        if sum(iv1) > 0                       
                           plot([beta1 beta2],'-o')
-                          disp('iv1')
-                          sum(iv1)
+                          if showtext >= 2
+                            disp(['      sum(iv1) = ',in2str(sum(iv1))])
 %                           pause
+                          end
                        end
                        if sum(iv2) > 0                       
                           plot([beta1 beta2],'-o')
-                          disp('iv2')
-                          sum(iv2)
+                          if showtext >= 2
+                            disp(['      sum(iv2) = ',in2str(sum(iv2))])
 %                           pause
+                          end
                        end
             else
                 
@@ -282,27 +292,31 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                                                     
                       if sum(iv1) > 0                       
                           plot([beta1 beta2 beta3 beta4],'-o')
-                          disp('iv1')
-                          sum(iv1)
+                          if showtext >= 2
+                            disp(['      sum(iv1) = ',in2str(sum(iv1))])
 %                           pause
+                          end
                        end
                        if sum(iv2) > 0                       
                           plot([beta1 beta2 beta3 beta4],'-o')
-                          disp('iv2')
-                          sum(iv2)
+                          if showtext >= 2
+                            disp(['      sum(iv2) = ',in2str(sum(iv2))])
 %                           pause
+                          end
                        end
                       if sum(iv3) > 0                       
                           plot([beta1 beta2 beta3 beta4],'-o')
-                          disp('iv3')
-                          sum(iv3)
+                          if showtext >= 2
+                            disp(['      sum(iv3) = ',in2str(sum(iv3))])
 %                           pause
+                          end
                        end
                        if sum(iv2) > 0                       
                           plot([beta1 beta2 beta3 beta4],'-o')
-                          disp('iv4')
-                          sum(iv4)
+                          if showtext >= 2
+                            disp(['      sum(iv4) = ',in2str(sum(iv4))])
 %                           pause
+                          end
                        end
                          
                 else

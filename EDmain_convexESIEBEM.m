@@ -48,7 +48,7 @@ function EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,control
 % EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 2 March 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 7 March 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -137,6 +137,8 @@ function EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,control
 % free-field component must be added to the surface-propagated pressure.
 % Second: if Rstart must be taken into account in the free-field component.
 % 2 Mar 2018 Completed the info printing, for the ESIEBEM part.
+% 7 Mar 2018 Completed the handling of different numbers of sources,
+% receivers, frequencies in the last ESIEBEM section.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -755,26 +757,64 @@ nsurfacepoints = size(Rinputdata.coordinates,1);
 
 if directsound_fieldpoints == 1
    ffdist = EDcalcdist(fieldpoints,Sinputdata.coordinates);
+   if any(Sinputdata.sourceamplitudes~=1)
+      error(['ERROR: sourceamplitudes have not been implemented yet in EDmain_convexESIEBEM']) 
+   end
 end
 
-tffieldpoints = zeros(nfieldpoints,nfrequencies);
-kvec = 2*pi*controlparameters.frequencies./envdata.cair;
-kvec = kvec(ones(nsurfacepoints,1),:);
+if Sinputdata.doaddsources == 1 || nsources == 1
+    tffieldpoints = zeros(nfrequencies,nfieldpoints);
+else
+    tffieldpoints = zeros(nfrequencies,nfieldpoints,nsources);    
+end
+kvec = 2*pi*controlparameters.frequencies(:)./envdata.cair;
+kvec = kvec(:,ones(1,nsurfacepoints));
 onesvec = ones(1,nfrequencies);
 
-tftot = tftot.';
+if Sinputdata.doaddsources == 1 || nsources == 1
+    % tftot has size [nfreq,nsurfacerec]
+    % tffieldpoints has size [nfreq,nfieldpoints]    
+    %   becomes tftot
+    for ii = 1:nfieldpoints    
+        tfonefp = -tftot.*exp(-1i*kvec.*distances(:,ii*onesvec).')./distances(:,ii*onesvec).'.*(1i*kvec + 1./distances(:,ii*onesvec).').*cosfi(:,ii*onesvec).'.*Rinputdata.weights(:,onesvec).'/4/pi;
+        tffieldpoints(:,ii) = sum(tfonefp.').';
+    end
+    tftot = tffieldpoints;
+    
+    if directsound_fieldpoints == 1
+        kvec = 2*pi*controlparameters.frequencies(:)./envdata.cair;
+        kvec = kvec(:,ones(1,nfieldpoints));
+        for jj = 1:nsources
+            tftot = tftot + exp(-1i*kvec.*(ffdist(:,onesvec*jj).'-controlparameters.Rstart))./ffdist(:,onesvec*jj).';
+        end
+    end
+else
+    % tftot has size [nfreq,nsurfacerec,nsources]
+    % tffieldpoints has size [nfreq,nfieldpoints,nsources]    
+    %   becomes tftot
+    for ii = 1:nfieldpoints    
+        transfermatrix = -exp(-1i*kvec.*distances(:,ii*onesvec).')./distances(:,ii*onesvec).'.*(1i*kvec + 1./distances(:,ii*onesvec).').*cosfi(:,ii*onesvec).'.*Rinputdata.weights(:,onesvec).'/4/pi;
+        for jj = 1:nsources
+            if Sinputdata.doallSRcombinations == 1 || jj == ii
+                tfonefp = squeeze(tftot(:,:,jj)).*transfermatrix;
+                tffieldpoints(:,ii,jj) = sum(tfonefp.').';
+            end
+        end
+    end
+    tftot = tffieldpoints;
 
-for ii = 1:nfieldpoints
-    tfonefp = -tftot.*exp(-1i*kvec.*distances(:,ii*onesvec))./distances(:,ii*onesvec).*(1i*kvec + 1./distances(:,ii*onesvec)).*cosfi(:,ii*onesvec).*Rinputdata.weights(:,onesvec)/4/pi;
-    tffieldpoints(ii,:) = sum(tfonefp);
-end
-tftot = tffieldpoints;
-
-if directsound_fieldpoints == 1
-    kvec = 2*pi*controlparameters.frequencies./envdata.cair;
-    kvec = kvec(ones(nfieldpoints,1),:);
-
-   tftot = tftot + exp(-1i*kvec.*(ffdist(:,onesvec)-controlparameters.Rstart))./ffdist(:,onesvec);   
+    checkvalue = (size(tftot,2)==1) || (size(tftot,3)==1);
+    if directsound_fieldpoints == 1
+        for kk = 1:nfrequencies
+            kvec = 2*pi*controlparameters.frequencies(kk*ones(nfieldpoints,nsources))./envdata.cair;
+            if checkvalue == 1 
+                tftot(kk,:,:) = squeeze(tftot(kk,:,:)).' + exp(-1i*kvec.*(ffdist-controlparameters.Rstart))./ffdist;            
+            else
+                tftot(kk,:,:) = squeeze(tftot(kk,:,:)) + exp(-1i*kvec.*(ffdist-controlparameters.Rstart))./ffdist;                            
+            end
+        end
+    end
+    
 end
 
 t01 = etime(clock,t00);

@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 1 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 8 Mar 2018
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -117,6 +117,11 @@ versionnumbers{icounter} = '0.201';
 versiondate{icounter} = '2 Mar 2018';
 versiontext{icounter} = ['Added a new main function: EDmain_convexESIEBEM (and functions that it calls), '...
                          'which uses the ESIEBEM method. So, far only rectangular surfaces are handled.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.202';
+versiondate{icounter} = '8 Mar 2018';
+versiontext{icounter} = ['Modified the EDgensurfreceivers, receivers are now placed at a distance of 1e-4 rather than 1e-6.'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

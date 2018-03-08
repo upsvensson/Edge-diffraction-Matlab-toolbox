@@ -27,9 +27,12 @@ function [surfacerecs,surfacerecnvecs,surfacerecweights] = EDgensurfreceivers(pl
 %
 % Uses the function lgwt from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 1 March 2018
+% Peter Svensson (peter.svensson@ntnu.no) 8 March 2018
 
 % 1 Mar 2018 First version
+% 8 Mar 2018 Changed the displacement of the surface receivers to 0.1mm
+
+distancefromsurf = 1e-4;
 
 nplanes = size(planedata.planecorners,1);
 if any(planedata.ncornersperplanevec~=4)
@@ -74,7 +77,7 @@ for ii = surfacegaussorder:-1:1
        startpoint = planedata.corners(planedata.planecorners(planenumber,1),:);
        startpoint = startpoint(ones(n2,1),:);
        recs_oneplane = startpoint + xvec(ones(n2,1),:).*xy(:,[1 1 1]) + yvec(ones(n2,1),:).*xy(:,[2 2 2]);
-       recs_oneplane = recs_oneplane + recnvecs_oneplane*1e-6;
+       recs_oneplane = recs_oneplane + recnvecs_oneplane*distancefromsurf;
        
        surfacerecs = [surfacerecs;recs_oneplane];
        surfacerecnvecs = [surfacerecnvecs;recnvecs_oneplane];

@@ -276,6 +276,8 @@ if filehandlingparameters.savelogfile == 1
         'receiver positions. Time: ',num2str(t01),' s',lineending],'char');
 end
 
+% Rinputdata.coordinates
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Use the planedata struct and create an edgedata struct
 

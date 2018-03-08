@@ -8,7 +8,7 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 %   lastchangetime      A string with the time of the last change, 
 %                       on the form '15h35m11'
 %
-% Peter Svensson 7 Mar 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 8 Mar 2018 (peter.svensson@ntnu.no)
 %
 % [versionnumber,lastchangedate,lastchangetime]= EDgetversion;
 
@@ -17,6 +17,6 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % variable name
 % After 16 Jan 2018: Updated date and/or time (and/or version)
 
-versionnumber = 0.201;
-lastchangedate = '7Mar2018';
-lastchangetime = '22h12';
+versionnumber = 0.202;
+lastchangedate = '8Mar2018';
+lastchangetime = '09h33';

@@ -31,7 +31,7 @@ function [hitvec,edgehit,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxval
 %
 % Uses no special subroutines
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 Mar 2018
 % 
 % [hitvec,edgehit] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs);
 
@@ -40,6 +40,8 @@ function [hitvec,edgehit,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxval
 %		 through a vertex, then there was an error. For those rare cases an extra ray is shot in a random direction.
 % 27 Nov. 2017 Copied from ESIE2toolbox
 % 15 Jan. 2018 Added the detection of edge hits and corner hits
+% 15 Mar 2018 Fixed a bug which happened when different planes had
+%             different numbers of corners
 
 if nargin < 9
     showtext = 0;
@@ -53,6 +55,17 @@ if npoints == 1
 	xpoints = xpoints(ones(nplanestotest,1),:);
 end
 
+% Fixed bug 15 Mar 2018. Before, the matrix planecorners could have two
+% columns of zeros at the end, but the repetition of the first corner
+% number happened after those zeros. So, now we remove those zero columns
+% first.
+
+dataincolumns = any(planecorners);
+ncolumnswithdata = sum(double(dataincolumns));
+if ncolumnswithdata < size(planecorners,2)
+   planecorners = planecorners(:,1:ncolumnswithdata);
+end
+% planecorners = [planecorners planecorners(:,1)];
 planecorners = [planecorners planecorners(:,1)];
 
 %------------------------------------------------------------

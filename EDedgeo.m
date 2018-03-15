@@ -139,6 +139,8 @@ function [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumbe
 % 8 Feb 2018 Introduced the EDinputdatahash
 % 15 Mar 2018 Fixed a but that occurred when some plane was TOTABS (in a
 %             cad-file) or SOFT
+% 15 Mar 2018 Fixed a bug which occured if the planecorners matrix had some
+%             zeros; a definition of zeros used type int8 instead of 'int8'
 
 geomacc = 1e-10;
 
@@ -1302,7 +1304,9 @@ if ~isempty(strfind(planedata.modeltype,'convex_ext')) || ~isempty(strfind(plane
 %     canplaneobstruct = ones(1,nplanes,int8);
     canplaneobstruct = int8(reflfactors.'~=0);
 elseif strfind(planedata.modeltype,'convex_int')
-    canplaneobstruct = zeros(1,nplanes,int8);   
+    % Bug fixed 15 Mar 2018
+    % The line below used "nplanes,int8);" instead of "nplanes,'int8');"     
+    canplaneobstruct = zeros(1,nplanes,'int8');   
 end
 
 % For an interior problem we know for sure that if a plane 

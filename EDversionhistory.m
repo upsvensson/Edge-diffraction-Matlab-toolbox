@@ -128,6 +128,11 @@ versionnumbers{icounter} = '0.203';
 versiondate{icounter} = '15 Mar 2018';
 versiontext{icounter} = ['Modified EDedgeo (bug for cases when some plane was TOTABS or SOFT, in the cad-file) and EDSorRgeo (bug when some plane was TOTABS)'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.204';
+versiondate{icounter} = '15 Mar 2018';
+versiontext{icounter} = ['Modified EDedgeo and EDpoinpla (bug for cases when planes had different numbers of corners)'];
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

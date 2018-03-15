@@ -104,7 +104,7 @@ function [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumbe
 % Uses the functions EDcoordtrans1, EDinfrontofplane from EDtoolbox
 % Uses the function Datahash from Matlab Central
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 8 Feb 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 Mar 2018
 %
 % [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,...
 % firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,showtext);
@@ -137,6 +137,8 @@ function [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumbe
 % 23 Jan 2018 Error from yesterday's change: a long line with ... at the
 %             end can not be followed by a commented out line!
 % 8 Feb 2018 Introduced the EDinputdatahash
+% 15 Mar 2018 Fixed a but that occurred when some plane was TOTABS (in a
+%             cad-file) or SOFT
 
 geomacc = 1e-10;
 
@@ -208,8 +210,10 @@ if nchars >= 4
     if ~isempty(ivpotential)
         comptxt = 'oft';
         compmat = comptxt(ones(length(ivpotential),1),:);
-%         ivsoft   = ivpotential(find(prod( (planeabstypes(ivpotential,2:4).*compmat).' ).'));
-        ivsoft   = ivpotential(prod( (planeabstypes(ivpotential,2:4).*compmat).' ).');
+        % Fixed bug 15 Mar 2018: wrong use of logical indexing. Need the
+        % "find"
+%         ivsoft   = ivpotential(prod( (planeabstypes(ivpotential,2:4).*compmat).' ).');
+        ivsoft   = ivpotential(find(prod( (planeabstypes(ivpotential,2:4).*compmat).' ).'));
         reflfactors(ivsoft)   = -1*ones(size(ivsoft));
     end
     
@@ -218,8 +222,10 @@ if nchars >= 4
     if ~isempty(ivpotential)
         comptxt = 'ota';
         compmat = comptxt(ones(length(ivpotential),1),:);
-%         ivtotabs =  ivpotential(find(prod( double(planeabstypes(ivpotential,2:4)==compmat).' ).'));
-        ivtotabs =  ivpotential(prod( double(planeabstypes(ivpotential,2:4)==compmat).' ).');
+        % Fixed bug 15 Mar 2018: wrong use of logical indexing. Need the
+        % "find"
+%         ivtotabs =  ivpotential(prod( double(planeabstypes(ivpotential,2:4)==compmat).' ).');
+        ivtotabs =  ivpotential(find(prod( double(planeabstypes(ivpotential,2:4)==compmat).' ).'));
         reflfactors(ivtotabs) = zeros(size(ivtotabs));
     end
 end

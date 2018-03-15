@@ -59,7 +59,7 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 % EDcoordtrans1 EDgetedgepoints, EDcheckobstr_pointtoedge from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 8 Feb 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 Mar 2018
 %
 % [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,EDversionnumber,nedgesubs,showtext);
 
@@ -79,6 +79,7 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 % 17 Jan 2018 Turned off the check if an S/R is very close to a thin plane.
 % 17 Jan 2018 Turned off some text printouts
 % 8 Feb 2018 Introduced the EDinputdatahash
+% 15 Mar 2018 Fixed a little bug for cases where some plane was TOTABS.
 
 % geomacc = 1e-10;
 
@@ -192,10 +193,12 @@ clear rownumb colnumb
 if ntotabsplanes > 0
 
     % It's unclear why the first uint8 assignment doesn't work!
+    % Bugfix 15 Mar 2018: the line "visplanesfromr(iv) = ..." needed a
+    % "double" for both terms.
         
     colvec = (0:nreceivers-1)*nplanes;
     iv = uint32(totabsplanelist(:,onesvec1R) + colvec(ones(ntotabsplanes,1),:));    
-    visplanesfromr(iv) = uint8(visplanesfromr(iv) + (visplanesfromr(iv)==2));
+    visplanesfromr(iv) = uint8(double(visplanesfromr(iv)) + double(visplanesfromr(iv)==2));
     clear iv colvec
     visplanesfromr = uint8(visplanesfromr);
 end

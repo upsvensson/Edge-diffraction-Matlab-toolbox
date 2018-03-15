@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 8 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 Mar 2018
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -122,6 +122,11 @@ icounter = icounter + 1;
 versionnumbers{icounter} = '0.202';
 versiondate{icounter} = '8 Mar 2018';
 versiontext{icounter} = ['Modified the EDgensurfreceivers, receivers are now placed at a distance of 1e-4 rather than 1e-6.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.203';
+versiondate{icounter} = '15 Mar 2018';
+versiontext{icounter} = ['Modified EDedgeo (bug for cases when some plane was TOTABS or SOFT, in the cad-file) and EDSorRgeo (bug when some plane was TOTABS)'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

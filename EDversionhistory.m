@@ -133,6 +133,11 @@ versionnumbers{icounter} = '0.204';
 versiondate{icounter} = '15 Mar 2018';
 versiontext{icounter} = ['Modified EDedgeo and EDpoinpla (bug for cases when planes had different numbers of corners)'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.205';
+versiondate{icounter} = '15 Mar 2018';
+versiontext{icounter} = ['Modified EDpoinpla (bug-fix for v 0.204 introduced a new bug which was fixed not)'];
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

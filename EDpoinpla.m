@@ -41,7 +41,7 @@ function [hitvec,edgehit,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxval
 % 27 Nov. 2017 Copied from ESIE2toolbox
 % 15 Jan. 2018 Added the detection of edge hits and corner hits
 % 15 Mar 2018 Fixed a bug which happened when different planes had
-%             different numbers of corners
+%             different numbers of corners.
 
 if nargin < 9
     showtext = 0;
@@ -60,7 +60,11 @@ end
 % number happened after those zeros. So, now we remove those zero columns
 % first.
 
-dataincolumns = any(planecorners);
+if nplanestotest == 1
+   dataincolumns = sign(planecorners); 
+else
+    dataincolumns = any(planecorners);
+end
 ncolumnswithdata = sum(double(dataincolumns));
 if ncolumnswithdata < size(planecorners,2)
    planecorners = planecorners(:,1:ncolumnswithdata);

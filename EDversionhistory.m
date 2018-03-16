@@ -138,6 +138,11 @@ versionnumbers{icounter} = '0.205';
 versiondate{icounter} = '15 Mar 2018';
 versiontext{icounter} = ['Modified EDpoinpla (bug-fix for v 0.204 introduced a new bug which was fixed not)'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.206';
+versiondate{icounter} = '16 Mar 2018';
+versiontext{icounter} = ['New: EDmain_convex_time. Seems correct for difforder = 2 but not higher'];
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

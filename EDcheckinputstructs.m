@@ -66,7 +66,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   3, for EDmain_convexESIEBEM (frequency domain)
 %                   4, for EDmain_convex_time (time domain)
 % 
-% Peter Svensson 15 Mar 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 16 Mar 2018 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -115,6 +115,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 1 Mar 2018 Stripped away irrelevant fields; otherwise the DataHash
 % doesn't always recognize what is identical.
 % 15 Mar 2018 Added the field filehandlingparameters.savehodpaths
+% 16 Mar 2018 Combined two error messages
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -124,10 +125,16 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check if the needed non-EDtoolbox functions are available.
 
-if exist('DataHash.m','file') ~= 2
+file1ok = (exist('DataHash.m','file') == 2);
+file2ok = (exist('lgwt.m','file') == 2);
+
+if file1ok == 0 && file2ok == 0
+   error('ERROR: Matlab can not find the functions lgwt.m and DataHash.m. Please download them from Mathworks') 
+end
+if file1ok == 0
    error('ERROR: Matlab can not find the function DataHash.m. Please download it from Mathworks') 
 end
-if exist('lgwt.m','file') ~= 2
+if file2ok == 0
    error('ERROR: Matlab can not find the function lgwt.m. Please download it from Mathworks') 
 end
 

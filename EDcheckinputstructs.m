@@ -40,7 +40,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   .frequencies         (obligatory for EDmain_convexESIE,
 %                                         ignored by EDmain_convexESIE_ir)
 %                   .discretizationtype  (default: 2 = G-L)
-%                   .ngauss              (default: 16)
+%                   .ngauss              (default: 16, but ignored by
+%                                        EDmain_convex_time)
 %                   .surfacegaussorder   (default: 5 for
 %                   EDmain_convexESIEBEM; ignored by other EDmain versions)
 %   filehandlingparameters    .outputdirectory  (default: the folder of the geoinputfile)  
@@ -57,12 +58,15 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                         EDmain_convexESIE
 %                   .savelogfile          (default: 1)
 %                   .savediff2result      (default: 0)
+%                   .savehodpaths         (default: 0) Used only by
+%                   EDmain_convex_time
 %                   .showtext             (default: 1)
 %   EDmaincase      1, for EDmain_convexESIE (frequency domain)
-%                   2, for EDmain_convexESIE_ir (time domain)
+%                   2, for EDmain_convexESIEtime (time domain)
 %                   3, for EDmain_convexESIEBEM (frequency domain)
+%                   4, for EDmain_convex_time (time domain)
 % 
-% Peter Svensson 1 Mar 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 15 Mar 2018 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -110,6 +114,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 1 Mar 2018 Introduced the version 3: EDmain_convexESIEBEM
 % 1 Mar 2018 Stripped away irrelevant fields; otherwise the DataHash
 % doesn't always recognize what is identical.
+% 15 Mar 2018 Added the field filehandlingparameters.savehodpaths
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -260,13 +265,18 @@ end
 if ~isfield(controlparameters,'discretizationtype')
     controlparameters.discretizationtype = 2;
 end
-if ~isfield(controlparameters,'ngauss')
-    controlparameters.ngauss = 16;
-end
 if ~isfield(controlparameters,'skipfirstorder')
     controlparameters.skipfirstorder = 0;
 end
-
+if EDmaincase < 4
+    if ~isfield(controlparameters,'ngauss')
+        controlparameters.ngauss = 16;
+    end
+else
+     if isfield(controlparameters,'ngauss')
+        controlparameters = rmfield(controlparameters,'ngauss');
+     end   
+end
 if EDmaincase == 1 || EDmaincase == 3
     if ~isfield(controlparameters,'docalctf')
         controlparameters.docalctf = 1;
@@ -305,7 +315,7 @@ else
         controlparameters = rmfield(controlparameters,'surfacegaussorder');
     end
 end
-if EDmaincase == 2
+if EDmaincase == 2 || EDmaincase == 4
     if ~isfield(controlparameters,'fs')
         controlparameters.fs = 44100;
     end    
@@ -320,7 +330,7 @@ if EDmaincase == 2
     end    
 end
 
-if EDmaincase > 3
+if EDmaincase > 4
      if ~isfield(controlparameters,'nedgepoints_visibility')
         controlparameters.nedgepoints_visibility = 2;
      end   
@@ -400,6 +410,11 @@ end
 if EDmaincase > 2
     if ~isfield(filehandlingparameters,'saveISEStree')
         filehandlingparameters.saveISEStree = 0;
+    end
+end
+if EDmaincase == 4
+    if ~isfield(filehandlingparameters,'savehodpaths')
+        filehandlingparameters.savehodpaths = 0;
     end
 end
 if ~isfield(filehandlingparameters,'savediff2result')

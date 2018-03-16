@@ -1,7 +1,6 @@
 # Edge diffraction Matlab toolbox
 
-This is a Matlab toolbox for computing sound reflections and diffractions for external and internal scattering problems, in the time- or frequency-domain, for problems with Neumann boundary conditions. Some limited possibilities for Dirichlet problems exist as well. 
-As of version 0.1, only external, convex Neumann scattering problems can be handled, in the frequency-domain.
+This is a Matlab toolbox for computing sound reflections and diffractions for external scattering problems, in the time- or frequency-domain, for problems with Neumann boundary conditions. In version 0.1, only external, convex Neumann scattering problems can be handled, in the frequency-domain. In version 0.2, some time-domain possibilities were introduced.
 
 ## Getting Started
 
@@ -11,11 +10,9 @@ Copy all these m-files to a folder ("EDtoolbox" could be a good name for that fo
 >>addpath <path to the folder where you installed the m files>
 ```
 
-Get two files from Mathworks (Matlab File Exchange): lgwt.m and DataHash.m. Store them somewhere, where Matlab finds them.
+Get two files from Mathworks (Matlab File Exchange): lgwt.m and DataHash.m. Store them somewhere, where Matlab finds them. Don't store them directly in the EDtoolbox folder! The reason is that if you update your EDtoolbox folder with 'pull' from this repository, any extra files that you have put in your EDtoolbox folder will be removed. 
 
-Get the package EDexamples, which has a few examples to get you started.
-
-Inside the folder EDexamples, you find some example script files which execute various simple examples. In Matlab, you can, e.g., execute the file called EDexample_LspKessel_minimal.m, which should run the function EDmain_convexESIE and present a resulting frequency response in a plot window, and the geometrical model in another plot window.
+Get the files in the repository EDexamples, which has a few examples to get you started. In Matlab, you can, e.g., execute the file called EDexample_LspKessel_minimal.m, which should run the function EDmain_convexESIE and present a resulting frequency response in a plot window, and the geometrical model in another plot window.
 
 ## Prerequisites
 
@@ -28,7 +25,7 @@ Inside the folder EDexamples, you find some example script files which execute v
 
 ## Documentation
 
-The file EDtoolbox_manual.pdf gives some details about the EDtoolbox. Also, the m-file EDversionhistory displays, in the Matlab command window, some documentation on changes in the toolbox.
+The file EDtoolbox_manual.pdf gives some details about the EDtoolbox. The manual will be updated to some version of the toolbox, but possibly not the latest one. Also, the m-file EDversionhistory displays, in the Matlab command window, some documentation on changes in the toolbox.
 
 ## Version numbering
 

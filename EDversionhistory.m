@@ -146,8 +146,7 @@ versiontext{icounter} = ['New: EDmain_convex_time. Seems correct for difforder =
 icounter = icounter + 1;
 versionnumbers{icounter} = '0.207';
 versiondate{icounter} = '16 Mar 2018';
-versiontext{icounter} = ['Changed variable name from hodir to irhod. Also implemented doaddsources in EDmakeHODirs'];
-
+versiontext{icounter} = ['Changed variable name from hodir to irhod. Also implemented doaddsources in EDmakeHODirs. Copied a few EDB1 functions to ED'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

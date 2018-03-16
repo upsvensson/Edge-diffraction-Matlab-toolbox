@@ -143,6 +143,12 @@ versionnumbers{icounter} = '0.206';
 versiondate{icounter} = '16 Mar 2018';
 versiontext{icounter} = ['New: EDmain_convex_time. Seems correct for difforder = 2 but not higher'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.207';
+versiondate{icounter} = '16 Mar 2018';
+versiontext{icounter} = ['Changed variable name from hodir to irhod. Also implemented doaddsources in EDmakeHODirs'];
+
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

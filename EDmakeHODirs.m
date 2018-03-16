@@ -1,7 +1,7 @@
-function [hodir,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edgedata,...
-    edgetoedgedata,Sdata,Rdata,cair,fs,Rstart,showtext,EDversionnumber)
-% EDmakeHODirs - Constructs higher-order diffraction impulse responses from a 
-% list of paths in the input struct hodpaths
+function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edgedata,...
+    edgetoedgedata,Sdata,doaddsources,sourceamplitudes,Rdata,cair,fs,Rstart,showtext,EDversionnumber)
+% EDmakeHODirs - Constructs higher-order (two and higher) diffraction impulse
+% responses from a list of paths in the input struct hodpaths.
 %
 % Input parameters:
 %   hodpaths        Cell variable with a list of all the valid edge-combos
@@ -12,12 +12,19 @@ function [hodir,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edge
 %                   Recommended starting values are [1 0.5 0.25 0.125 ...].
 %                   Higher values give more accurate results.
 %   edgedata,edgetoedgedata,Sdata,Rdata     Structs
+%   doaddsources    0 or 1; determines if individual irs for each source
+%                   should be stored, or if they should be summed
+%   sourceamplitudes   the amplitude that will be used when all sources' 
+%                   contributions are added
 %   cair,fs,Rstart  Values from envdata and controlparameters 
 %   showtext        Value from filehandlingparameters
 %   EDversionnumber
 %
 % Output parameters:
-%   hodir           The ir with all the diffraction orders summed up
+%   irhod           The ir with all the higher-order diffraction orders summed up
+%                   Size:
+%                       [nsampels,nreceivers,nsources] (if doaddsources = 0)
+%                       [nsampels,nreceivers,1] (if doaddsources = 1)
 %   EDinputdatahash
 %
 % Uses functions EDB1wedge2nd,EDB1wedgeN, EDB1creindexmatrix from the
@@ -26,8 +33,8 @@ function [hodir,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edge
 %
 % Peter Svensson (peter.svensson@ntnu.no) 16 Mar 2018
 %
-% [hodir,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edgedata,...
-%     edgetoedgedata,Sdata,Rdata,cair,fs,Rstart,showtext);
+% [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edgedata,...
+%     edgetoedgedata,Sdata,doaddsources,sourceamplitudes,Rdata,cair,fs,Rstart,showtext);
     
 % 8 Dec. 2006 First version
 % 1 May 2017 Fixed a bug which gave an erroneous boosting of some
@@ -38,11 +45,13 @@ function [hodir,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edge
 % such cases?
 % 12 Feb 2018 Adapted to the new output parameter of EDB1wedge1st_int.
 % 16 Feb 2018 Condensed version from EDB1makeirs
+% 16 Feb 2018 Renamed to irhod instead of hodir. Introduced the
+% doaddsources and sourceamplitudes input parameters.
 
 global BIGEDGESTEPMATRIX 
 
 EDinputdatastruct = struct('difforder',difforder,'hodpaths',hodpaths,'elemsize',elemsize,...
-'edgedata',edgedata,'Sdata',Sdata,'Rdata',Rdata,'cair',cair,...
+'edgedata',edgedata,'Sdata',Sdata,'doaddsources',doaddsources,'sourceamplitudes',sourceamplitudes,'Rdata',Rdata,'cair',cair,...
 'fs',fs,'Rstart',Rstart,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
@@ -287,16 +296,30 @@ for Ndifforder = 2:difforder
             end
    
             nnew = length(irnew);
+            
             if firstcomponentdone == 0
-               hodir = zeros(nnew,nreceivers,nsources);
-               hodir(:,irec,isou) = irnew;
+               if doaddsources == 0
+                   irhod = zeros(nnew,nreceivers,nsources);
+                   irhod(:,irec,isou) = irnew;
+               else
+                   irhod = zeros(nnew,nreceivers,1);
+                   irhod(:,irec,1) = irnew*sourceamplitudes(isou);                   
+               end
                firstcomponentdone = 1;
             else
-                nold = size(hodir,1);
+                nold = size(irhod,1);
                 if nnew > nold
-                   hodir = [hodir;zeros(nnew-nold,nreceivers,nsources)]; 
+                    if doaddsources == 0
+                       irhod = [irhod;zeros(nnew-nold,nreceivers,nsources)]; 
+                    else
+                       irhod = [irhod;zeros(nnew-nold,nreceivers,1)];                         
+                    end
                 end
-                hodir(1:nnew,irec,isou) = hodir(1:nnew,irec,isou) + irnew;                
+                if doaddsources == 0
+                    irhod(1:nnew,irec,isou) = irhod(1:nnew,irec,isou) + irnew;                
+                else
+                    irhod(1:nnew,irec,1) = irhod(1:nnew,irec,1) + irnew*sourceamplitudes(isou);                                    
+                end
             end
             
         end 

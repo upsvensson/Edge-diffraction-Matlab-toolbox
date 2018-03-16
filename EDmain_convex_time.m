@@ -624,20 +624,21 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
     else
         EDhodirsinputstruct = struct();
         EDhodirinputhash = DataHash(EDhodirsinputstruct);
-        EDhodirinputstruct = struct('difforder',controlparameters.difforder,'hodpaths',hodpaths,'elemsize',elemsize,...
-        'edgedata',edgedata,'Sdata',Sdata,'Rdata',Rdata,'cair',envdata.cair,...
+        EDhodirinputstruct = struct('difforder',controlparameters.difforder,...
+        'hodpaths',hodpaths,'elemsize',elemsize,'edgedata',edgedata,'Sdata',Sdata,...
+        'doaddsources',Sinputdata.doaddsources,'sourceamplitudes',Sinputdata.sourceamplitudes,'Rdata',Rdata,'cair',envdata.cair,...
         'fs',controlparameters.fs,'Rstart',controlparameters.Rstart,'EDversionnumber',EDversionnumber);
         EDhodirinputhash = DataHash(EDhodirinputstruct);
-        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_hodir',EDhodirinputhash);
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_irhod',EDhodirinputhash);
     end
     if foundmatch == 1
         eval(['load ',existingfilename])
     else
-        [hodir,EDinputdatahash] = EDmakeHODirs(hodpaths,controlparameters.difforder,elemsize,edgedata,...
-        edgetoedgedata,Sdata,Rdata,envdata.cair,controlparameters.fs,controlparameters.Rstart,filehandlingparameters.showtext,EDversionnumber);
-        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_hodir.mat'];
+        [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,controlparameters.difforder,elemsize,edgedata,...
+        edgetoedgedata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Rdata,envdata.cair,controlparameters.fs,controlparameters.Rstart,filehandlingparameters.showtext,EDversionnumber);
+        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_irhod.mat'];
 %         if filehandlingparameters.savehodpaths == 1
-            eval(['save ',desiredname,' hodir EDinputdatahash'])
+            eval(['save ',desiredname,' irhod EDinputdatahash'])
 %         end
     end
     t01 = etime(clock,t00);

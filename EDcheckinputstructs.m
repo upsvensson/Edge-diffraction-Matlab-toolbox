@@ -25,13 +25,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                        EDmain_convexESIE, but used by
 %                                        EDmain_convexESIE_ir
 %                   .directsound         (default: 1 = yes)
-%                   .specorder           (ignored by EDmain_convexESIE and 
-%                                        by EDmain_convexESIE_ir)
 %                   .difforder           (default: 15)
 %                   .skipfirstorder      (default: 0)
-%                   .nedgepoints_visibility (default: 2) Ignored by
-%                                        EDmain_convexESIE and by
-%                                        EDmain_convexESIE_ir
 %                   .docalctf            (default: 1 for EDmain_convexESIE,
 %                                                  ignored by EDmain_convexESIE_ir)
 %                   .docalcir            (default: 1 for EDMain_convexESIE_ir,
@@ -58,6 +53,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                         EDmain_convexESIE
 %                   .savelogfile          (default: 1)
 %                   .savediff2result      (default: 0)
+%                   .savealldifforders    (default: 0) Used only by
+%                   EDmain_convex_time
 %                   .savehodpaths         (default: 0) Used only by
 %                   EDmain_convex_time
 %                   .showtext             (default: 1)
@@ -66,7 +63,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   3, for EDmain_convexESIEBEM (frequency domain)
 %                   4, for EDmain_convex_time (time domain)
 % 
-% Peter Svensson 16 Mar 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 21 Mar 2018 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -116,6 +113,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % doesn't always recognize what is identical.
 % 15 Mar 2018 Added the field filehandlingparameters.savehodpaths
 % 16 Mar 2018 Combined two error messages
+% 21 Mar 2018 Made a few changes to the controlparameters: gave default
+% values for docalctf and docalcir. Removed specorder. Introduced the
+% .savealldifforders parameter. 
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -260,42 +260,95 @@ end
 if ~isstruct(controlparameters)
      error('ERROR: the struct controlparameters was not specified')           
 end
+
+% First some parameters that are needed for all EDmain_ functions
+
 if ~isfield(controlparameters,'directsound')
     controlparameters.directsound = 1;
-end
-if ~isfield(controlparameters,'difforder')
-    controlparameters.difforder = 15;
-end
-if ~isfield(controlparameters,'Rstart')
-    controlparameters.Rstart = 0;
-end
-if ~isfield(controlparameters,'discretizationtype')
-    controlparameters.discretizationtype = 2;
 end
 if ~isfield(controlparameters,'skipfirstorder')
     controlparameters.skipfirstorder = 0;
 end
-if EDmaincase < 4
-    if ~isfield(controlparameters,'ngauss')
+if ~isfield(controlparameters,'Rstart')
+    controlparameters.Rstart = 0;
+end
+if ~isfield(controlparameters,'difforder')
+    if EDmaincase == 4
+        error('ERROR: You must specify .difforder for EDmain_convex_time')
+    elseif EDmaincase == 2
+        controlparameters.difforder = 1000;
+    else
+        controlparameters.difforder = 15;
+    end
+end
+
+% Then other parameters 
+
+if ~isfield(controlparameters,'docalctf')
+    if EDmaincase == 1 || EDmaincase == 3
+        controlparameters.docalctf = 1;
+    end
+else
+    if EDmaincase == 2 || EDmaincase == 4
+        controlparameters = rmfield(controlparameters,'docalctf');
+    end    
+end
+if ~isfield(controlparameters,'frequencies')
+    if (EDmaincase == 1 || EDmaincase == 3) && controlparameters.docalctf == 1
+        error('ERROR: .frequencies were not specified')
+    end
+else
+    if EDmaincase == 2 || EDmaincase == 4
+        controlparameters = rmfield(controlparameters,'frequencies');
+    end     
+end
+if ~isfield(controlparameters,'discretizationtype')
+    if EDmaincase <= 3
+        controlparameters.discretizationtype = 2;
+    end
+else
+    if EDmaincase == 4
+        controlparameters = rmfield(controlparameters,'discretizationtype');
+    end    
+end
+if ~isfield(controlparameters,'ngauss')
+    if EDmaincase <= 3
         controlparameters.ngauss = 16;
     end
 else
-     if isfield(controlparameters,'ngauss')
+    if EDmaincase == 4
         controlparameters = rmfield(controlparameters,'ngauss');
-     end   
+    end    
 end
-if EDmaincase == 1 || EDmaincase == 3
-    if ~isfield(controlparameters,'docalctf')
-        controlparameters.docalctf = 1;
+if ~isfield(controlparameters,'surfacegaussorder')
+    if EDmaincase == 3
+        controlparameters.surfacegaussorder = 5;
     end
-    if isfield(controlparameters,'frequencies') == 0 
-        if controlparameters.docalctf == 1
-            error('ERROR: The frequencies were not specified')
-        else
-           controlparameters.frequencies = []; 
-        end
+else
+    if EDmaincase ~= 3
+        controlparameters = rmfield(controlparameters,'surfacegaussorder');
+    end    
+end
+if ~isfield(controlparameters,'docalcir')
+    if EDmaincase == 2 || EDmaincase == 4
+        controlparameters.docalcir = 1;
     end
-      
+else
+    if EDmaincase == 1 || EDmaincase == 3
+        controlparameters = rmfield(controlparameters,'docalcir');
+    end    
+end
+if ~isfield(controlparameters,'fs')
+    if EDmaincase == 2 || EDmaincase == 4
+        controlparameters.fs = 44100;
+    end
+else
+    if EDmaincase == 1 || EDmaincase == 3
+        controlparameters = rmfield(controlparameters,'fs');
+    end    
+end
+
+if EDmaincase == 1 || EDmaincase == 3      
     nfrequencies = length(controlparameters.frequencies);
     nsources = size(Sinputdata.coordinates,1);
     [n1,n2] = size(Sinputdata.sourceamplitudes);
@@ -306,51 +359,6 @@ if EDmaincase == 1 || EDmaincase == 3
             error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have the size [1,1] or [nsources,nfrequencies], but it had the size ',int2str(n1),' by ',int2str(n2)])
         end
     end   
-    if isfield(controlparameters,'fs')
-        controlparameters = rmfield(controlparameters,'fs');
-    end    
-    if isfield(controlparameters,'docalcir')
-        controlparameters = rmfield(controlparameters,'docalcir');
-    end    
-end
-if EDmaincase == 3
-    if ~isfield(controlparameters,'surfacegaussorder')
-        controlparameters.surfacegaussorder = 5;
-    end
-else
-    if isfield(controlparameters,'surfacegaussorder')
-        controlparameters = rmfield(controlparameters,'surfacegaussorder');
-    end
-end
-if EDmaincase == 2 || EDmaincase == 4
-    if ~isfield(controlparameters,'fs')
-        controlparameters.fs = 44100;
-    end    
-    if ~isfield(controlparameters,'docalcir')
-        controlparameters.docalcir = 1;
-    end
-    if isfield(controlparameters,'docalctf')
-        controlparameters = rmfield(controlparameters,'docalctf');
-    end    
-    if isfield(controlparameters,'frequencies')
-        controlparameters = rmfield(controlparameters,'frequencies');
-    end    
-end
-
-if EDmaincase > 4
-     if ~isfield(controlparameters,'nedgepoints_visibility')
-        controlparameters.nedgepoints_visibility = 2;
-     end   
-    if ~isfield(controlparameters,'specorder')
-        controlparameters.specorder = 1;
-    end
-else
-    if isfield(controlparameters,'nedgepoints_visibility')
-        controlparameters = rmfield(controlparameters,'nedgepoints_visibility');
-    end    
-    if isfield(controlparameters,'specorder')
-        controlparameters = rmfield(controlparameters,'specorder');
-    end        
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -426,6 +434,9 @@ if EDmaincase == 4
 end
 if ~isfield(filehandlingparameters,'savediff2result')
     filehandlingparameters.savediff2result = 0;
+end
+if ~isfield(filehandlingparameters,'savealldifforders')
+    filehandlingparameters.savealldifforders = 0;
 end
 if ~isfield(filehandlingparameters,'savelogfile')
     filehandlingparameters.savelogfile = 1;

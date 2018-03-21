@@ -1,5 +1,6 @@
 function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edgedata,...
-    edgetoedgedata,Sdata,doaddsources,sourceamplitudes,Rdata,cair,fs,Rstart,showtext,EDversionnumber)
+    edgetoedgedata,Sdata,doaddsources,sourceamplitudes,Rdata,cair,fs,Rstart,...
+    savealldifforders,showtext,EDversionnumber)
 % EDmakeHODirs - Constructs higher-order (two and higher) diffraction impulse
 % responses from a list of paths in the input struct hodpaths.
 %
@@ -17,12 +18,18 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edge
 %   sourceamplitudes   the amplitude that will be used when all sources' 
 %                   contributions are added
 %   cair,fs,Rstart  Values from envdata and controlparameters 
+%   savealldifforders   0 or 1
 %   showtext        Value from filehandlingparameters
 %   EDversionnumber
 %
 % Output parameters:
 %   irhod           The ir with all the higher-order diffraction orders summed up
-%                   Size:
+%                   Size depends on the value of savealldifforders.
+%                   If savealldifforders = 0:
+%                       [nsampels,nreceivers,nsources] (if doaddsources = 0)
+%                       [nsampels,nreceivers,1] (if doaddsources = 1)
+%                   If savealldifforders = 1: irhod is a cell variable,
+%                   where each irhod{ndifforder} has this size:
 %                       [nsampels,nreceivers,nsources] (if doaddsources = 0)
 %                       [nsampels,nreceivers,1] (if doaddsources = 1)
 %   EDinputdatahash
@@ -30,10 +37,11 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edge
 % Uses functions EDcreindexmatrix,EDwedge2nd,EDwedgeN from the EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 16 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 21 Mar 2018
 %
 % [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edgedata,...
-%     edgetoedgedata,Sdata,doaddsources,sourceamplitudes,Rdata,cair,fs,Rstart,showtext);
+%     edgetoedgedata,Sdata,doaddsources,sourceamplitudes,Rdata,cair,fs,Rstart,...
+%     savealldifforders,showtext,EDversionnumber);
     
 % 8 Dec. 2006 First version
 % 1 May 2017 Fixed a bug which gave an erroneous boosting of some
@@ -47,12 +55,13 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edge
 % 16 Feb 2018 Renamed to irhod instead of hodir. Introduced the
 % doaddsources and sourceamplitudes input parameters. Changed the calls
 % from EDB1 functions to EDfunctions.
+% 21 Mar 2018 Introduced new input parameter: savealldifforders
 
 global BIGEDGESTEPMATRIX 
 
 EDinputdatastruct = struct('difforder',difforder,'hodpaths',hodpaths,'elemsize',elemsize,...
 'edgedata',edgedata,'Sdata',Sdata,'doaddsources',doaddsources,'sourceamplitudes',sourceamplitudes,'Rdata',Rdata,'cair',cair,...
-'fs',fs,'Rstart',Rstart,'EDversionnumber',EDversionnumber);
+'fs',fs,'Rstart',Rstart,'savealldifforders',savealldifforders,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %--------------------------------------------------------------------------
@@ -64,9 +73,10 @@ reftoshortlistE = edgetoedgedata.reftoshortlistE;
 nsources = size(Sdata.sources,1);
 nreceivers = size(Rdata.receivers,1);
 
-firstcomponentdone = 0;
-
 %--------------------------------------------------------------------------
+
+firstcomponentdone = 0;
+cellcounter = 1;
 
 for isou = 1:nsources
     for irec = 1:nreceivers
@@ -80,6 +90,10 @@ for isou = 1:nsources
             end
 
             if ~isempty(hodpaths{Ndifforder})
+                
+                if savealldifforders == 1
+                   cellcounter = Ndifforder; 
+                end
 
                 pathalongplane = ones(1,Ndifforder-1);
                 bc = ones(1,Ndifforder);
@@ -108,6 +122,12 @@ for isou = 1:nsources
                         if round(ii/ceil(ncomponents/10))*ceil(ncomponents/10) == ii
                             disp(['      Combination no. ',int2str(ii),' of ',int2str(ncomponents)]) 
                         end
+                    end
+                    
+                    if savealldifforders == 1
+                        if ii == 1 && isou == 1 && irec == 1
+                            firstcomponentdone = 0; 
+                        end            
                     end
 
                     edgepattern = edgepatternlist(ii,:);
@@ -287,28 +307,32 @@ for isou = 1:nsources
 
                     nnew = length(irnew);
 
-                    if firstcomponentdone == 0
+                    % The case with size(irhod,2) < cellcounter
+                    % could happen if an S/R combo larger than numbers 1/1
+                    % has a higher difforder than S/R = 1/1.
+                    
+                    if firstcomponentdone == 0 || size(irhod,2) < cellcounter
                        if doaddsources == 0
-                           irhod = zeros(nnew,nreceivers,nsources);
-                           irhod(:,irec,isou) = irnew;
+                           irhod{cellcounter} = zeros(nnew,nreceivers,nsources);
+                           irhod{cellcounter}(:,irec,isou) = irnew;
                        else
-                           irhod = zeros(nnew,nreceivers,1);
-                           irhod(:,irec,1) = irnew*sourceamplitudes(isou);                   
+                           irhod{cellcounter} = zeros(nnew,nreceivers,1);
+                           irhod{cellcounter}(:,irec,1) = irnew*sourceamplitudes(isou);                   
                        end
                        firstcomponentdone = 1;
                     else
-                        nold = size(irhod,1);
+                        nold = size(irhod{cellcounter},1);
                         if nnew > nold
                             if doaddsources == 0
-                               irhod = [irhod;zeros(nnew-nold,nreceivers,nsources)]; 
+                               irhod{cellcounter} = [irhod{cellcounter};zeros(nnew-nold,nreceivers,nsources)]; 
                             else
-                               irhod = [irhod;zeros(nnew-nold,nreceivers,1)];                         
+                               irhod{cellcounter} = [irhod{cellcounter};zeros(nnew-nold,nreceivers,1)];                         
                             end
                         end
                         if doaddsources == 0
-                            irhod(1:nnew,irec,isou) = irhod(1:nnew,irec,isou) + irnew;                
+                            irhod{cellcounter}(1:nnew,irec,isou) = irhod{cellcounter}(1:nnew,irec,isou) + irnew;                
                         else
-                            irhod(1:nnew,irec,1) = irhod(1:nnew,irec,1) + irnew*sourceamplitudes(isou);                                    
+                            irhod{cellcounter}(1:nnew,irec,1) = irhod{cellcounter}(1:nnew,irec,1) + irnew*sourceamplitudes(isou);                                    
                         end
                     end
 
@@ -320,4 +344,27 @@ for isou = 1:nsources
 
     end
     
+end
+
+if savealldifforders == 1
+    nirlength = 0;
+   for ii = 2:difforder
+       nnew = size(irhod{ii},1);
+       if nnew > nirlength
+           nirlength = nnew;
+       end
+   end
+   
+   for ii = 2:difforder
+       nnew = size(irhod{ii},1);
+       if nnew < nirlength
+           if doaddsources == 1
+               irhod{ii} = [irhod{ii};zeros(nirlength-nnew,nreceivers)];
+           else
+               irhod{ii} = [irhod{ii};zeros(nirlength-nnew,nreceivers,nsources)];               
+           end
+       end
+   end
+   
+   
 end

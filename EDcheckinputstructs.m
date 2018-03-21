@@ -26,6 +26,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                        EDmain_convexESIE_ir
 %                   .directsound         (default: 1 = yes)
 %                   .difforder           (default: 15)
+%                   .savealldifforders   (default: 0) Used only by
+%                                        EDmain_convex_time
 %                   .skipfirstorder      (default: 0)
 %                   .docalctf            (default: 1 for EDmain_convexESIE,
 %                                                  ignored by EDmain_convexESIE_ir)
@@ -38,7 +40,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   .ngauss              (default: 16, but ignored by
 %                                        EDmain_convex_time)
 %                   .surfacegaussorder   (default: 5 for
-%                   EDmain_convexESIEBEM; ignored by other EDmain versions)
+%                                         EDmain_convexESIEBEM; ignored by other EDmain versions)
 %   filehandlingparameters    .outputdirectory  (default: the folder of the geoinputfile)  
 %                   .filestem        (default: name of the cad-file, with an underscore + running integer)
 %                   .savecadgeofile      (default: 0)
@@ -53,8 +55,6 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                         EDmain_convexESIE
 %                   .savelogfile          (default: 1)
 %                   .savediff2result      (default: 0)
-%                   .savealldifforders    (default: 0) Used only by
-%                   EDmain_convex_time
 %                   .savehodpaths         (default: 0) Used only by
 %                   EDmain_convex_time
 %                   .showtext             (default: 1)
@@ -116,6 +116,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 21 Mar 2018 Made a few changes to the controlparameters: gave default
 % values for docalctf and docalcir. Removed specorder. Introduced the
 % .savealldifforders parameter. 
+% 21 Mar 2018 Changed savealldifforders to controlparameters instead of
+% filehandlingparameters
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -361,6 +363,17 @@ if EDmaincase == 1 || EDmaincase == 3
     end   
 end
 
+if ~isfield(controlparameters,'savealldifforders')
+    if EDmaincase == 4      
+        controlparameters.savealldifforders = 0;
+    end
+else
+    if EDmaincase ~= 4      
+        controlparameters = rmfield(controlparameters,'savealldifforders');
+    end    
+end
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct filehandlingparameters
     
@@ -434,9 +447,6 @@ if EDmaincase == 4
 end
 if ~isfield(filehandlingparameters,'savediff2result')
     filehandlingparameters.savediff2result = 0;
-end
-if ~isfield(filehandlingparameters,'savealldifforders')
-    filehandlingparameters.savealldifforders = 0;
 end
 if ~isfield(filehandlingparameters,'savelogfile')
     filehandlingparameters.savelogfile = 1;

@@ -19,8 +19,7 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 %   controlparameters   .fs                  (default: 44100)
 %                       .directsound         (default: 1 = yes)
 %                       .difforder           (default: 2)
-%                       .hodtype             'ESIE' or 'indorder'. Must be
-%                                            'indorder' for EDmain_convex_time
+%                       .savealldifforders   (default: 0)
 %                       .docalcir            (default: 1)
 %                       .skipfirstorder      (default: 0)
 %                       .Rstart              (default: 0)
@@ -44,7 +43,7 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % EDinteg_submatrixstructure, EDintegralequation_convex_ir from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 15 Mar 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 21 Mar 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -130,6 +129,8 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % corresponding suppressing of the result recycling.
 % 28 Feb 2018 First version of EDmain_convexESIEtime
 % 15 Mar 2018 First version of EDmain_convex_time
+% 21 Mar 2018 Introduced the new parameter .savealldifforders
+% 21 Mar 2018 Removed the parameter .hodtype
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -551,10 +552,7 @@ end
 % Find the higher-order diffraction paths
 
 if controlparameters.difforder > 1 && controlparameters.docalcir == 1
-    if ~strfind(controlparameters.hodtype,'indorder')
-        error('ERROR: The parameter controlparameters.hodtype must be set to ''indorder''')
-    end
-    
+     
     if filehandlingparameters.showtext >= 1	
         disp('   Finding the higher-order diffraction paths ')
     end
@@ -609,10 +607,7 @@ end
 % Calculate the HOD contributions one order at a time
 
 if controlparameters.difforder > 1 && controlparameters.docalcir == 1
-    if ~strfind(controlparameters.hodtype,'indorder')
-        error('ERROR: The parameter controlparameters.hodtype must be set to ''indorder''')
-    end
-    
+     
     if filehandlingparameters.showtext >= 1	
         disp('   Generating the higher-order diffraction irs ')
     end
@@ -626,8 +621,10 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
         EDhodirinputhash = DataHash(EDhodirsinputstruct);
         EDhodirinputstruct = struct('difforder',controlparameters.difforder,...
         'hodpaths',hodpaths,'elemsize',elemsize,'edgedata',edgedata,'Sdata',Sdata,...
-        'doaddsources',Sinputdata.doaddsources,'sourceamplitudes',Sinputdata.sourceamplitudes,'Rdata',Rdata,'cair',envdata.cair,...
-        'fs',controlparameters.fs,'Rstart',controlparameters.Rstart,'EDversionnumber',EDversionnumber);
+        'doaddsources',Sinputdata.doaddsources,'sourceamplitudes',Sinputdata.sourceamplitudes,...
+        'Rdata',Rdata,'cair',envdata.cair,'fs',controlparameters.fs,...
+        'Rstart',controlparameters.Rstart,'savealldifforders',...
+        controlparameters.savealldifforders,'EDversionnumber',EDversionnumber);
         EDhodirinputhash = DataHash(EDhodirinputstruct);
         [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_irhod',EDhodirinputhash);
     end
@@ -635,7 +632,9 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
         eval(['load ',existingfilename])
     else
         [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,controlparameters.difforder,elemsize,edgedata,...
-        edgetoedgedata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Rdata,envdata.cair,controlparameters.fs,controlparameters.Rstart,filehandlingparameters.showtext,EDversionnumber);
+        edgetoedgedata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Rdata,envdata.cair,...
+        controlparameters.fs,controlparameters.Rstart,controlparameters.savealldifforders,...
+        filehandlingparameters.showtext,EDversionnumber);
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_irhod.mat'];
 %         if filehandlingparameters.savehodpaths == 1
             eval(['save ',desiredname,' irhod EDinputdatahash'])

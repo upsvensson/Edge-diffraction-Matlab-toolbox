@@ -131,6 +131,8 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % 15 Mar 2018 First version of EDmain_convex_time
 % 21 Mar 2018 Introduced the new parameter .savealldifforders
 % 21 Mar 2018 Removed the parameter .hodtype
+% 21 Mar 2018 Completed the section around EDmakeHODirs, with recycling
+% result files.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -253,6 +255,7 @@ else
     [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_eddata',EDedgeoinputhash);
 end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_eddata.mat'];
+
 if foundmatch == 1
     eval(['load ',existingfilename])
     if ~strcmp(existingfilename,desiredname)
@@ -613,6 +616,7 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
     end
     t00 = clock;
     elemsize = 2.^(-[0:controlparameters.difforder-1]);
+    elemsize = elemsize*2;
     
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
@@ -626,22 +630,27 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
         'Rstart',controlparameters.Rstart,'savealldifforders',...
         controlparameters.savealldifforders,'EDversionnumber',EDversionnumber);
         EDhodirinputhash = DataHash(EDhodirinputstruct);
-        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_irhod',EDhodirinputhash);
+        [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_irhod',EDhodirinputhash);
     end
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_irhod.mat'];
     if foundmatch == 1
-        eval(['load ',existingfilename])
-    else
+        currenttimingstruct = timingstruct;
+         eval(['load ',recycledresultsfile,' irhod'])
+         EDinputdatahash = EDhodirinputhash;
+        t01 = etime(clock,t00);
+        currenttimingstruct.hodir = t01;
+        timingstruct = currenttimingstruct;
+        eval(['save ',desiredname,'  irhod timingstruct EDsettings EDinputdatahash'])        
+    else        
         [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,controlparameters.difforder,elemsize,edgedata,...
         edgetoedgedata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Rdata,envdata.cair,...
         controlparameters.fs,controlparameters.Rstart,controlparameters.savealldifforders,...
         filehandlingparameters.showtext,EDversionnumber);
-        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_irhod.mat'];
-%         if filehandlingparameters.savehodpaths == 1
-            eval(['save ',desiredname,' irhod EDinputdatahash'])
-%         end
+        recycledresultsfile =  '';
+        t01 = etime(clock,t00);
+        timingstruct.hodir = t01;
+        eval(['save ',desiredname,' irhod timingstruct EDsettings EDinputdatahash'])
     end
-    t01 = etime(clock,t00);
-    timingstruct.hodir = t01;
     if filehandlingparameters.showtext >= 1    
          if foundmatch == 1
             disp(['      Recycled ',existingfilename])

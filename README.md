@@ -1,4 +1,4 @@
-# Edge diffraction Matlab toolbox
+# Edge diffraction Matlab toolbox (EDtoolbox)
 
 EDtoolbox is a Matlab toolbox for computing sound reflections and diffractions for external scattering problems, in the time- or frequency-domain, for problems with Neumann boundary conditions. As of version 0.2, only external, convex Neumann scattering problems can be handled. The frequency-domain version can handle high orders of diffraction, whereas only lower orders of diffraction have been implemented for the time-domain version.
 

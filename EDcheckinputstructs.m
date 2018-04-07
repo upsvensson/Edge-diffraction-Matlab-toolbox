@@ -28,6 +28,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   .difforder           (default: 15)
 %                   .savealldifforders   (default: 0) Used only by
 %                                        EDmain_convex_time
+%                   .saveindividualfirstdiff (default: 0) Used only by
+%                                        EDmain_convex_time
 %                   .skipfirstorder      (default: 0)
 %                   .docalctf            (default: 1 for EDmain_convexESIE,
 %                                                  ignored by EDmain_convexESIE_ir)
@@ -63,7 +65,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   3, for EDmain_convexESIEBEM (frequency domain)
 %                   4, for EDmain_convex_time (time domain)
 % 
-% Peter Svensson 21 Mar 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 7 Apr 2018 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -118,6 +120,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % .savealldifforders parameter. 
 % 21 Mar 2018 Changed savealldifforders to controlparameters instead of
 % filehandlingparameters
+% 7 Apr 2018 Introduced controlparameters.saveindividualfirstdiff
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -373,6 +376,15 @@ else
     end    
 end
 
+if ~isfield(controlparameters,'saveindividualfirstdiff')
+    if EDmaincase == 4      
+        controlparameters.saveindividualfirstdiff = 0;
+    end
+else
+    if EDmaincase ~= 4      
+        controlparameters = rmfield(controlparameters,'saveindividualfirstdiff');
+    end    
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct filehandlingparameters

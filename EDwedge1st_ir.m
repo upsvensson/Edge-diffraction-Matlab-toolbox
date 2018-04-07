@@ -1,4 +1,4 @@
-function [ir,initdelay,singularterm] = EDwedge1st_ir(fs,cair,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,R_irstart,bc)
+function [ir,initdelay,singularterm,zfirst] = EDwedge1st_ir(fs,cair,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,R_irstart,bc)
 % EDwedge1st_ir - Gives the 1st order diffraction impulse response.
 % Gives the 1st order diffraction impulse response
 % for a point source irradiating a finite wedge. A free-field impulse response amplitude
@@ -13,6 +13,15 @@ function [ir,initdelay,singularterm] = EDwedge1st_ir(fs,cair,closwedang,rs,theta
 %                   If there is one or more elements with the value 1, the
 %                   direct sound or a specular reflection needs to be given
 %                   half its specular value.
+%   zfirst          A value between 0 and L, which tells which point along
+%                   the edge gives the first arrival. A value of 0 or L 
+%                   implies that the apex point is outside the finite edge,
+%                   and one of the edge end points causes the first arrival. 
+%                   A value between 0 and L is the value of the apex point
+%                   position along the finite edge. zfirst could also be
+%                   empty, in case the tf doesn't exist (for an edge of
+%                   zero length). L is the length of the edge =
+%                   abs(zw(2)-zw(1))
 % 
 % Input parameters:
 %   fs	  	        sampling frequency
@@ -32,28 +41,15 @@ function [ir,initdelay,singularterm] = EDwedge1st_ir(fs,cair,closwedang,rs,theta
 %
 % Uses the functions EDquadstep and EDbetaoverml for numerical integration.
 %
-% ----------------------------------------------------------------------------------------------
-%   This file is part of the Edge Diffraction Toolbox by Peter Svensson.                       
-%                                                                                              
-%   The Edge Diffraction Toolbox is free software: you can redistribute it and/or modify       
-%   it under the terms of the GNU General Public License as published by the Free Software     
-%   Foundation, either version 3 of the License, or (at your option) any later version.        
-%                                                                                              
-%   The Edge Diffraction Toolbox is distributed in the hope that it will be useful,       
-%   but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS  
-%   FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.             
-%                                                                                              
-%   You should have received a copy of the GNU General Public License along with the           
-%   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
-% ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 28 Jan 2018
+% Peter Svensson (peter.svensson@ntnu.no) 7 Apr 2018
 %
-% [ir,initdelay,singularterm] =
+% [ir,initdelay,singularterm,zfirst] =
 % EDwedge1st_ir(fs,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,R_irstart,bc);
 
 % 7 June 2006 FUnctioning version in EDB toolbox
 % 29 Dec. 2016 Renamed to ESIE2, without making any changes.
 % 28 Jan 2018 Copied from ESIE2wedge1st_int
+% 7 Apr 2018 Introduced the zfirst output parameter
 
 localshowtext = 0;
 
@@ -80,6 +76,7 @@ if zw(2)-zw(1) == 0
 	ir = [0 0].';
 	initdelay = 0;
     singularterm = [0 0 0 0];
+    zfirst = [];
 	return
 end
 
@@ -106,13 +103,15 @@ zrelmax = 0.1;                    % The part of the edge that should use the ana
 
 za = (rs*zr+rr*zs)/(rs+rr);         % The apex point: the point on the edge with the shortest path
 
+zfirst = za;
+
 % Move the z-values so that za ends up in z = 0.
 
 Dz = abs(zs-zr);
 zs = zs - za;
 zr = zr - za;
 zw = zw - za;                       % zw is a two-element vector
-za = 0;
+% za = 0;
 
 rs2 = rs^2;
 rr2 = rr^2;
@@ -246,7 +245,7 @@ end
 % Calculate the integration intervals for the apex section
 
 if apexincluded == 1
-
+    
     % x is the path length (m+l) which corresponds to the end of each
     % integration interval = time sample.
     % This is the part of the edge which is symmetrical around the apex point.
@@ -505,6 +504,17 @@ if apexincluded == 1
 	Q(:,3) = EDquadstep(x(:,5),x(:,7),y(:,5),y(:,6),y(:,7),tol,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec);
 	ir(arrivalsampnumb+[2:length(zrange_apex)]) = ir(arrivalsampnumb+[2:length(zrange_apex)]) + sum(Q.').';
 	ir = ir*(-ny/2/pi);   % Mult by 2 because analyt int. is half the wedge
+
+else
+
+    Rend1  = sqrt( rs^2 + (zw(1)-zs)^2 ) + sqrt( rr^2 + (zw(1)-zr)^2 );
+    Rend2  = sqrt( rs^2 + (zw(2)-zs)^2 ) + sqrt( rr^2 + (zw(2)-zr)^2 );
+
+    if Rend1 < Rend2
+        zfirst = 0;
+    else
+       zfirst = zw(2)-zw(1); 
+    end
     
 end
 

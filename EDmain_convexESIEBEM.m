@@ -48,7 +48,7 @@ function EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,control
 % EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 7 March 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 4 April 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -139,6 +139,7 @@ function EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,control
 % 2 Mar 2018 Completed the info printing, for the ESIEBEM part.
 % 7 Mar 2018 Completed the handling of different numbers of sources,
 % receivers, frequencies in the last ESIEBEM section.
+% 4 Apr 2018 Removed the showtext parameter from the EDgensurfreceivers
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -248,8 +249,10 @@ fieldpoints = Rinputdata.coordinates;
 doallSRcombinations_fieldpoints = Sinputdata.doallSRcombinations;
 directsound_fieldpoints = controlparameters.directsound;
 
+% [surfacerecs,surfacerecnvecs,surfacerecweights] = EDgensurfreceivers(planedata,...
+%     controlparameters.surfacegaussorder,EDversionnumber,filehandlingparameters.showtext);
 [surfacerecs,surfacerecnvecs,surfacerecweights] = EDgensurfreceivers(planedata,...
-    controlparameters.surfacegaussorder,EDversionnumber,filehandlingparameters.showtext);
+    controlparameters.surfacegaussorder,EDversionnumber);
 Rinputdata.coordinates = surfacerecs;
 Rinputdata.nvecs = surfacerecnvecs;
 Rinputdata.weights = surfacerecweights;
@@ -275,8 +278,6 @@ if filehandlingparameters.savelogfile == 1
     fwrite(fid,['   Created ',int2str(size(Rinputdata.coordinates,1)),' surface ',...
         'receiver positions. Time: ',num2str(t01),' s',lineending],'char');
 end
-
-% Rinputdata.coordinates
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Use the planedata struct and create an edgedata struct

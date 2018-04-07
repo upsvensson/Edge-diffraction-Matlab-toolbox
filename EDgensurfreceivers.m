@@ -1,11 +1,11 @@
 function [surfacerecs,surfacerecnvecs,surfacerecweights] = EDgensurfreceivers(planedata,...
-    surfacegaussorder,EDversionnumber,showtext);
+    surfacegaussorder,EDversionnumber)
 % EDgensurfreceivers distributes receivers along all the faces/polygons of
 % a polyhedral object. A Gauss-Legendre distribution is used. The function
 % can handle general quadrilaterals and triangles.
 % The quadrature order is given as an input parameter, and this value will
 % be used for the largest polygon, and then scaled down for smaller
-% polygons.
+% polygons. For triangles, the same quadrature order is used for all.
 % 
 % Input parameters:
 %   planedata           Struct
@@ -24,33 +24,55 @@ function [surfacerecs,surfacerecnvecs,surfacerecweights] = EDgensurfreceivers(pl
 %                       receiver point. These weight factors acts as dS in
 %                       the Helmholtz integral, that is, they have the unit
 %                       m2.
-%
+% References for triangle quadrature:
+% 1. D.A. Dunavant, "High degree efficient symmetrical Gaussian quadrature
+%    rules for the triangle," Int. J. Num. Meth. Eng. 21, pp. 1129-1148
+%    (1985).
+% 2. P. M. Juhl, "The boundary element method for sound field calculations,"
+%    Report nr. 55, The acoustics laboratory, Technical University of Denmark, 1993.
+% 
 % Uses the function lgwt from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 8 March 2018
+% Peter Svensson (peter.svensson@ntnu.no) 5 Apr 2018
 
 % 1 Mar 2018 First version
 % 8 Mar 2018 Changed the displacement of the surface receivers to 0.1mm
+% 4 Apr 2018 Introduced the triangle element quadrature, using gaussTRINEW
+% from OpenBEM
+% 5 Apr 2018 Small error if no triangular elements. Implemented quadrature
+% from the Duvanant paper instead of the gaussTRINEW function.
 
 distancefromsurf = 1e-4;
 
 nplanes = size(planedata.planecorners,1);
-if any(planedata.ncornersperplanevec~=4)
-    error('ERROR: Unfortunately, only quadrilateral surfaces ',...
+if any(planedata.ncornersperplanevec>4)
+    error('ERROR: Unfortunately, only triangular and quadrilateral surfaces ',...
           'can be handled by this version of EDgensurfreceivers');
 end
+
+iv3 = find(planedata.ncornersperplanevec == 3);
+iv4 = find(planedata.ncornersperplanevec == 4);
 
 planeextensions = planedata.maxvals - planedata.minvals;
 planeextensions = max(planeextensions.').';
 planerelsize = planeextensions/max(planeextensions);
 
 gaussorderperplane = ceil(planerelsize*surfacegaussorder);
-
+if ~isempty(iv3)
+    if surfacegaussorder >6 
+       disp('   WARNING: surfacegaussorder is decreased to 6') 
+       surfacegaussorder = 6;
+    end
+    gaussorderperplane(iv3) = 0;
+end
+    
 surfacerecs = [];
 surfacerecnvecs = [];
 surfacerecweights = [];
 
-for ii = surfacegaussorder:-1:1
+% First all quadrilateral elements 
+
+for ii = max(gaussorderperplane):-1:1
    n2 = ii^2;
    iv = find(gaussorderperplane == ii);
    [x,w] = lgwt(ii,0,1);
@@ -85,6 +107,93 @@ for ii = surfacegaussorder:-1:1
    end
 end
 
+% Now all the triangular elements
+
+if ~isempty(iv3)
+%     gaussvalues = gaussTRINEW(surfacegaussorder);
+    switch surfacegaussorder
+        case {0,1}
+           gaussvalues = [1/3 1/3 1]; 
+        case {2}
+            gaussvalues = [2/3 1/6 1/3;...
+                           1/6 2/3 1/3;
+                           1/6 1/6 1/3];
+        case {3}
+            gaussvalues = [1/3 1/3 -9/32; ...
+                0.2 0.6 25/96; ...
+                0.2 0.2 25/96; ...
+                0.6 0.2 25/96];
+        case {4}
+            gaussvalues = [0.108103018168070  0.445948490915965 0.223381589678011; ...
+                           0.445948490915965  0.108103018168070 0.223381589678011; ...
+                           0.445948490915965  0.445948490915965 0.223381589678011; ...
+                           0.816847572980459  0.091576213509771 0.109951743655322; ...
+                           0.091576213509771  0.816847572980459 0.109951743655322; ...
+                           0.091576213509771  0.091576213509771 0.109951743655322];
+        case {5}
+            gaussvalues = [1/3  1/3  0.225;...
+                           0.059715871789770 0.470142064105115 0.132394152788506;...
+                           0.470142064105115 0.059715871789770 0.132394152788506;...
+                           0.470142064105115 0.470142064105115 0.132394152788506;...
+                           0.797426985353087 0.101286507323456 0.125939180544827;...
+                           0.101286507323456 0.797426985353087 0.125939180544827;...
+                           0.101286507323456 0.101286507323456 0.125939180544827];
+        case{6}
+            gaussvalues = [0.501426509658179 0.249286745170910 0.116786275726379;...
+                           0.249286745170910 0.501426509658179 0.116786275726379;...
+                           0.249286745170910 0.249286745170910 0.116786275726379;...
+                           0.873821971016996 0.063089014491502 0.050844906370207;...
+                           0.063089014491502 0.873821971016996 0.050844906370207;...
+                           0.063089014491502 0.063089014491502 0.050844906370207;...                           
+                           0.053145049844817 0.310352451033784 0.082851075618374;...
+                           0.310352451033784 0.053145049844817 0.082851075618374;...
+                           0.053145049844817 0.636502499121399 0.082851075618374;...
+                           0.636502499121399 0.053145049844817 0.082851075618374;...
+                           0.636502499121399 0.310352451033784 0.082851075618374;...
+                           0.310352451033784 0.636502499121399 0.082851075618374];
+                           
+        otherwise
+            error(['ERROR: triangle quadrature not implemented for this number: ',int2str(surfacegaussorder)])
+    end
+    n2 = size(gaussvalues,1);    
+end
+
+for ii = 1:length(iv3)
+    planenumber = iv3(ii);
+    
+    corners_x = planedata.corners(planedata.planecorners(planenumber,1:3),1);
+    corners_y = planedata.corners(planedata.planecorners(planenumber,1:3),2);
+    corners_z = planedata.corners(planedata.planecorners(planenumber,1:3),3);
+    
+    sidelength1 = norm( [corners_x(2)-corners_x(1) corners_y(2)-corners_y(1) corners_z(2)-corners_z(1)]); 
+    sidelength2 = norm( [corners_x(3)-corners_x(2) corners_y(3)-corners_y(2) corners_z(3)-corners_z(2)]); 
+    sidelength3 = norm( [corners_x(1)-corners_x(3) corners_y(1)-corners_y(3) corners_z(1)-corners_z(3)]); 
+    semiperimeter = (sidelength1 + sidelength2 + sidelength3)/2;
+    
+    % Heron's area formula
+    
+    planearea = sqrt( semiperimeter*(semiperimeter-sidelength1)*(semiperimeter-sidelength2)*(semiperimeter-sidelength3) );
+
+    % Convert the normalized triangle coordinates to the 3D coordinates
+    
+    psi=[gaussvalues(:,1) gaussvalues(:,2) 1-gaussvalues(:,1)-gaussvalues(:,2)];
+    
+    xgausspoints = psi*corners_x;
+    ygausspoints = psi*corners_y;
+    zgausspoints = psi*corners_z;
+
+    recnvecs_oneplane = planedata.planeeqs(planenumber,1:3);
+    recnvecs_oneplane = recnvecs_oneplane(ones(n2,1),:);
+    surfacerecnvecs = [surfacerecnvecs;recnvecs_oneplane];
+    
+    recs_oneplane = [xgausspoints ygausspoints zgausspoints];
+    recs_oneplane = recs_oneplane + recnvecs_oneplane*distancefromsurf;
+    surfacerecs = [surfacerecs;recs_oneplane];
+
+    recweights_oneplane = gaussvalues(:,3)*planearea;
+    surfacerecweights = [surfacerecweights;recweights_oneplane];
+    
+end
 
 
 

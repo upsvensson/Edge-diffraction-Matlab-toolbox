@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 5 Apr 2018
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -149,6 +149,11 @@ versiondate{icounter} = '22 Mar 2018';
 versiontext{icounter} = ['Changed variable name from hodir to irhod. Also implemented doaddsources in '...
                          'EDmakeHODirs, and savealldifforders in EDmain_convex_time.m'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.208';
+versiondate{icounter} = '5 Apr 2018';
+versiontext{icounter} = ['Implemented triangular-element quadrature for ESIEBEM'];
+                     
 nversions = size(versiontext,2);
 txtwidth = 80;
 

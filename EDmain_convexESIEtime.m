@@ -433,7 +433,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Generate the first-order specular, and first-order
-% diffraction tfs.
+% diffraction irs.
 
 if controlparameters.docalcir == 1 && controlparameters.skipfirstorder == 0
     if filehandlingparameters.showtext >= 1	

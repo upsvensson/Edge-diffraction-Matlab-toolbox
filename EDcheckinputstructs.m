@@ -230,7 +230,20 @@ end
 if ~isfield(Sinputdata,'sourceamplitudes')
     Sinputdata.sourceamplitudes = ones(1,nsources);    
     sourceamplitudes_default = 1;
+else
+    [n1,n2] = size(Sinputdata.sourceamplitudes);
+    if n2 == 1 && nsources > 1
+        Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes*ones(1,nsources);         
+    else
+        if n2 > 1 && n2 ~= nsources
+            nsources
+            [n1,n2]
+           error('ERROR 4: more then one source amplitude was specified but the number does not match the number of sources'); 
+        end
+    end    
 end
+
+
 if nsources == 1
     Sinputdata.doaddsources = 1;
 end    

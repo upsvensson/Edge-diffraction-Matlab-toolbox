@@ -41,7 +41,7 @@ function [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderi
 % Uses functions EDcoordtrans2, EDwedge1st_fd from EDtoolbox
 % Uses function DataHash from Matlab Central
 % 
-% Peter Svensson 7 Apr 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 9 Apr 2018 (peter.svensson@ntnu.no)
 %
 % [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderirs(firstorderpathdata,...
 %     fs,Rstart,difforder,envdata,Sinputdata,receivers,edgedata,saveindividualfirstdiff,EDversionnumber,showtext)
@@ -62,6 +62,7 @@ function [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderi
 % 28 Jan 2018 First version; modified from EDmakefirstordertfs
 % 28 Feb 2018 Introducing into the EDtoolbox master
 % 7 Apr 2018 Introduced the use of saveindividualfirstdiff
+% 9 Apr 2018 Little bug fixed, on line 358, thanks to Ville Pulkki
 
 if nargin < 11
    showtext = 0; 
@@ -354,7 +355,7 @@ if difforder > 0
                     irdiff{Rnumber(jj),1}.edgenumbers(currentcounter) = edgenumber;
                     irdiff{Rnumber(jj),1}.locations(:,currentcounter) = xyzfirst(:);
                 else
-                    irdiff(Rnumber(jj),Snumber(jj)).irvectors(1:nirlengthnew,currentcounter) =  irnew;           
+                    irdiff{Rnumber(jj),Snumber(jj)}.irvectors(1:nirlengthnew,currentcounter) =  irnew;           
                     irdiff{Rnumber(jj),Snumber(jj)}.edgenumbers(currentcounter) = edgenumber;
                     irdiff{Rnumber(jj),Snumber(jj)}.locations(:,currentcounter) = xyzfirst(:);
                 end                

@@ -32,7 +32,7 @@ function planedata = EDreadgeomatrices(corners,planecorners)
 %
 % Uses the functions EDinfrontofplane
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 22 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 12 Apr 2018
 %
 % planedata = EDreadgeomatrices(corners,planecorners);
 
@@ -41,6 +41,9 @@ function planedata = EDreadgeomatrices(corners,planecorners)
 % them a bit bigger.
 % 22 Jan 2018 Removed the input parameter planecornerstype since it is not
 % used anywhere.
+% 12 Apr 2018 Fixed a problem: with a mix of 3-corner planes, and 4-corner
+% planes, the last zero of the 3-corner planes need to be replaced by a
+% repetition.
 
 if nargin < 2
     error('ERROR: the corners and planecorners matrices must be specified')
@@ -70,6 +73,7 @@ if max(max(planecorners)) > ncorners
 end
 
 % The section below was removed on 22 Jan 2018
+% ... and a part was reactivated on 12 Apr 2018. And modified.
 %
 % % % %---------------------------------------------------------------
 % % % % Go through all planes. If there is a plane definition including
@@ -88,18 +92,18 @@ end
 % % % end
 % % % 
 % % % if strcmp(planecornerstype,'circ') == 1
-% % % 	for ii = 1:nplanes
-% % % 		iv = find( planecorners(ii,:) ~= 0);
-% % % 		ncornersatplane = length(iv);
-% % % 		if ncornersatplane ~= maxcornersperplane
-% % % 			pattern = planecorners(ii,iv);
-% % % 			nrepeatings = ceil(ncornersperplane/ncornersatplane);
-% % % 			for jj = 1:nrepeatings-1
-% % % 				pattern = [pattern planecorners(ii,iv)];
-% % % 			end
-% % % 			planecorners(ii,:) = pattern(1:ncornersperplane);
-% % % 		end
-% % % 	end
+	for ii = 1:nplanes
+		if ncornersperplanevec(ii) ~= maxcornersperplane
+            planecorners(ii,ncornersperplanevec(ii)+1) = planecorners(ii,1);
+%             iv = [1:ncornersperplanevec(ii)];		
+%             pattern = planecorners(ii,iv);
+% 			nrepeatings = ceil(ncornersperplanevec(ii)/ncornersatplane);
+% 			for jj = 1:nrepeatings-1
+% 				pattern = [pattern planecorners(ii,iv)];
+% 			end
+% 			planecorners(ii,:) = pattern(1:ncornersperplane);
+		end
+	end
 % % % end
 
 %---------------------------------------------------------------

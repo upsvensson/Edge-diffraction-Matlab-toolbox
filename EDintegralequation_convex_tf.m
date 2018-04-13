@@ -30,7 +30,7 @@ function [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequ
 % EDcoordtrans1 from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  28 Feb 2018  
+% Peter Svensson (peter.svensson@ntnu.no)  13 Apr 2018  
 %                       
 % [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequation_convex_tf(filehandlingparameters,...
 %    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,sourceamplitudes,...
@@ -78,6 +78,8 @@ function [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequ
 % 9 Feb 2018 Introduced EDinputdatahash
 % 28 Feb 2018 The saving of sousig files had an extra "results"
 % subdirectory.
+% 13 Apr 2018 Fixed a small bug on l143: thinplaneboostvec got the format
+% uint8 but needs to be double. Found by Antoine.
 
 showtext = filehandlingparameters.showtext;
 
@@ -140,7 +142,7 @@ else
     if notripletsthin == 1
         thinplaneboostvec = ones(nsubmatrices,1);
     else
-        thinplaneboostvec = Hsubmatrixdata.isthinplanetriplet(1:nsubmatrices)+1;
+        thinplaneboostvec = double(Hsubmatrixdata.isthinplanetriplet(1:nsubmatrices)+1);
     end
 end
 

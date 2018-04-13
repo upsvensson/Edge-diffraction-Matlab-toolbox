@@ -19,7 +19,7 @@ isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegment
 %
 % Uses EDcoordtrans1. 
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 13 Apr 2018
 %
 % [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
 %     isthinhole,vispartedgesfromr,frequency,Rstart,...
@@ -45,6 +45,8 @@ isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegment
 % 17 Nov. 2017 Fixed a bug; could not handle more than 255 points per edge.
 % 27 Nov. 2017 Copied from ESIE2toolbox
 % 28 Nov. 2017 Introduced the non-global input parameter showtext
+% 13 Apr 2018 Fixed a small bug; thinplaneboostvec got the format uint8 by
+% mistake. Found by Antoine.
 
 if nargin < 13
     showtext = 0;
@@ -98,7 +100,7 @@ for iicounter = 1:length(ivrelevantedgepairs)
             if noedgepairsthin == 1
                 thinplaneboost = 1;
             else
-                thinplaneboost = Hsubmatrixdata.isthinplaneedgepair(ii)+1;
+                thinplaneboost = double(Hsubmatrixdata.isthinplaneedgepair(ii)+1);
             end
         end
 

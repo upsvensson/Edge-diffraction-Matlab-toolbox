@@ -3,11 +3,13 @@
 % as well as values of difforder = 0,1,2, doaddsources = 0,1
 % sourceamplitudes = 1 or ones(nfrequencies,nsources)
 % 
-% Peter Svensson 11 Apr 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 13 Apr 2018 (peter.svensson@ntnu.no)
 
 % 31 Jan 2018 First version
 % 7 Mar 2018 Version for the ESIEBEM
 % 11 Apr 2018 Version for the EDmain_convex_time
+% 13 Apr 2018 Introduced the saveindividualfirstdiff as varied input
+% parameter
 
 [EDversionnumber,changedate,changetime] = EDgetversion;
 
@@ -78,9 +80,8 @@ for ii = 1:length(souvar)
     nsources = size(Sinputdata.coordinates,1);
     for jj = 1:length(recvar)
         Rinputdata.coordinates = receivers(1:recvar(jj),:);
-%         for kk = 1:length(freqvar)
-%             controlparameters.frequencies = frequencies(1:freqvar(kk));
-%             nfrequencies = length(controlparameters.frequencies);
+        for kk = [ 1 2]
+            controlparameters.saveindividualfirstdiff = kk-1;
             for ll = 1:length(diffordervar)
                 controlparameters.difforder = diffordervar(ll);
                 for mm = 1:length(addsouvar)
@@ -97,13 +98,26 @@ for ii = 1:length(souvar)
                         EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
                         eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_ir.mat irdirect irdiff'])
 
-                        if any(any(any(irdiff))) && controlparameters.difforder == 0
-                            error('ERROR: difforder was set to zero but irdiff got some result')
+                        if controlparameters.saveindividualfirstdiff == 0
+                            if any(any(any(irdiff))) && controlparameters.difforder == 0
+                                error('ERROR: difforder was set to zero but irdiff got some result')
+                            end
+                            if ~any(any(any(irdiff))) && controlparameters.difforder > 0
+                                disp('WARNING: difforder was set > 0 but irdiff got no result. Check if this is as expected')
+                            end
+                        else
+                            if controlparameters.difforder == 0
+                                if any(any(any(irdiff))) && controlparameters.difforder == 0
+                                    error('ERROR: difforder was set to zero but irdiff got some result')
+                                end                                
+                            else
+                                if ~any(any(any(irdiff{1,1}.irvectors)))
+                                    disp('WARNING: difforder was set > 0 but irdiff got no result. Check if this is as expected')
+                                end  
+                            end
+                            
+                                                      
                         end
-                        if ~any(any(any(irdiff))) && controlparameters.difforder > 0
-                            disp('WARNING: difforder was set > 0 but irdiff got no result. Check if this is as expected')
-                        end
-                        
                         if controlparameters.difforder > 1
                             eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_irhod.mat irhod'])
                             if any(any(any(irhod{1,1}))) && controlparameters.difforder <2
@@ -117,7 +131,7 @@ for ii = 1:length(souvar)
                 end                
 
             end
-%         end
+        end
     end
 end
 

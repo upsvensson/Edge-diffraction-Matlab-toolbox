@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 5 Apr 2018
+% Peter Svensson (peter.svensson@ntnu.no) 27 Apr 2018
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -159,6 +159,12 @@ versionnumbers{icounter} = '0.209';
 versiondate{icounter} = '7 Apr 2018';
 versiontext{icounter} = ['New controlparam:saveindividualfirstdiff, which means that each '...
                          'first-order diff. ir is saved individually.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.210';
+versiondate{icounter} = '27 Apr 2018';
+versiontext{icounter} = ['New function: EDconvertquadramodel. Also, implemented  '...
+                         'general quadrilaterals for ESIEBEM.'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

@@ -19,4 +19,4 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 
 versionnumber = 0.210;
 lastchangedate = '27Apr2018';
-lastchangetime = '16h38';
+lastchangetime = '23h04';

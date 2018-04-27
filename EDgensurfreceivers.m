@@ -77,30 +77,60 @@ for ii = max(gaussorderperplane):-1:1
    n2 = ii^2;
    iv = find(gaussorderperplane == ii);
    [x,w] = lgwt(ii,0,1);
+   
    x = x(end:-1:1);
    xy = [repmat(x,ii,1) reshape(x(:,ones(1,ii)).',n2,1)];
    ww = prod([repmat(w,ii,1) reshape(w(:,ones(1,ii)).',n2,1)],2);   
+   
    for jj = 1:length(iv)
        planenumber = iv(jj);
-       xvec = planedata.corners(planedata.planecorners(planenumber,2),:) - planedata.corners(planedata.planecorners(planenumber,1),:);
-       yvec = planedata.corners(planedata.planecorners(planenumber,4),:) - planedata.corners(planedata.planecorners(planenumber,1),:);
-       crossvec1 = planedata.corners(planedata.planecorners(planenumber,3),:) - planedata.corners(planedata.planecorners(planenumber,1),:);
-       crossvec2 = planedata.corners(planedata.planecorners(planenumber,4),:) - planedata.corners(planedata.planecorners(planenumber,2),:);
-       if norm(crossvec1) ~= norm(crossvec2)
-          error('ERROR: general quadrilaterals have not been implemented yet') 
-       end
-       length1 = norm(xvec);
-       length2 = norm(yvec);
-       planearea = length1*length2;
-       
+       c1 = planedata.corners(planedata.planecorners(planenumber,1),:);
+       c2 = planedata.corners(planedata.planecorners(planenumber,2),:);
+       c3 = planedata.corners(planedata.planecorners(planenumber,3),:);
+       c4 = planedata.corners(planedata.planecorners(planenumber,4),:);
+       xvec1 = c2 - c1;
+       alen = norm(xvec1);
+       xvec2 = c3 - c4;
+       clen = norm(xvec2);
+       yvec1 = c4 - c1;
+       dlen = norm(yvec1);
+       yvec2 = c3 - c2;
+       blen = norm(yvec2);
+       crossvec1 = c3 - c1;
+       plen = norm(crossvec1);
+       crossvec2 = c4 - c2;
+       qlen = norm(crossvec2);
+%        if norm(crossvec1) ~= norm(crossvec2)
+%           error('ERROR: general quadrilaterals have not been implemented yet') 
+%        end
+% % % % % %        length1 = norm(xvec);
+% % % % % %        length2 = norm(yvec);
+% % % % % %        planearea = length1*length2;
+
+        planearea = sqrt( 4*plen^2*qlen^2 - (blen^2 + dlen^2 - alen^2 - clen^2)^2 )/4;
+
        recnvecs_oneplane = planedata.planeeqs(planenumber,1:3);
        recnvecs_oneplane = recnvecs_oneplane(ones(n2,1),:);
        recweights_oneplane = ww*planearea;
 
-       startpoint = planedata.corners(planedata.planecorners(planenumber,1),:);
-       startpoint = startpoint(ones(n2,1),:);
-       recs_oneplane = startpoint + xvec(ones(n2,1),:).*xy(:,[1 1 1]) + yvec(ones(n2,1),:).*xy(:,[2 2 2]);
-       recs_oneplane = recs_oneplane + recnvecs_oneplane*distancefromsurf;
+       startpointsx = c1(ones(n2,1),:);
+       startpointsx = startpointsx + xvec1(ones(n2,1),:).*xy(:,[1 1 1]);
+
+       endpointsx = c4(ones(n2,1),:);
+       endpointsx = endpointsx + xvec2(ones(n2,1),:).*xy(:,[1 1 1]);
+       
+       startpointsy = c1(ones(n2,1),:);
+       startpointsy = startpointsy + yvec1(ones(n2,1),:).*xy(:,[2 2 2]);
+
+       endpointsy = c2(ones(n2,1),:);
+       endpointsy = endpointsy + yvec2(ones(n2,1),:).*xy(:,[2 2 2]);
+
+       recs_oneplane = startpointsx + (endpointsx - startpointsx).*xy(:,[2 2 2]);
+%        recs_oneplane = startpointsx + (endpointsx - startpointsx).*xy(:,[1 1 1]) + (endpointsy - startpointsy).*xy(:,[2 2 2]);
+       recs_oneplane = recs_oneplane + recnvecs_oneplane*distancefromsurf;       
+%        startpoint = startpoint(ones(n2,1),:);
+%        recs_oneplane = startpoint + xvec(ones(n2,1),:).*xy(:,[1 1 1]) + yvec(ones(n2,1),:).*xy(:,[2 2 2]);
+%        recs_oneplane = recs_oneplane + recnvecs_oneplane*distancefromsurf;
        
        surfacerecs = [surfacerecs;recs_oneplane];
        surfacerecnvecs = [surfacerecnvecs;recnvecs_oneplane];

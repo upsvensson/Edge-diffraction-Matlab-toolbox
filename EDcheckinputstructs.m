@@ -65,7 +65,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   3, for EDmain_convexESIEBEM (frequency domain)
 %                   4, for EDmain_convex_time (time domain)
 % 
-% Peter Svensson 7 Apr 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 21 Apr 2018 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -121,6 +121,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 21 Mar 2018 Changed savealldifforders to controlparameters instead of
 % filehandlingparameters
 % 7 Apr 2018 Introduced controlparameters.saveindividualfirstdiff
+% 21 Apr 2018 Removed the extra "results" directory in the output
+% directory.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -402,8 +404,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct filehandlingparameters
     
-if exist([filehandlingparameters.outputdirectory,filesep,'results'],'dir') ~=7
-      mkdir([filehandlingparameters.outputdirectory,filesep,'results'])
+if exist([filehandlingparameters.outputdirectory],'dir') ~=7
+      mkdir([filehandlingparameters.outputdirectory])
 end
 
 if ~isfield(filehandlingparameters,'filestem')

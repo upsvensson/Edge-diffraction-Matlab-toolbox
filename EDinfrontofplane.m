@@ -25,7 +25,8 @@ function pointinfront = EDinfrontofplane(pointcoords,planenvecs,planecoco,backup
 
 % 24 Nov. 2017 Copied, with minor changes, from ESIE2infrontofplane
 
-geomacc = 1e-6;
+% geomacc = 1e-6;
+geomacc = 1e-3;
 batchsize = 2.5e6;
 
 nplanes = size(planenvecs,1);

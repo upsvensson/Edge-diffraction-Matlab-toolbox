@@ -41,7 +41,7 @@ function [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderi
 % Uses functions EDcoordtrans2, EDwedge1st_fd from EDtoolbox
 % Uses function DataHash from Matlab Central
 % 
-% Peter Svensson 12 Apr 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 6 May 2018 (peter.svensson@ntnu.no)
 %
 % [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderirs(firstorderpathdata,...
 %     fs,Rstart,difforder,envdata,Sinputdata,receivers,edgedata,saveindividualfirstdiff,EDversionnumber,showtext)
@@ -64,6 +64,7 @@ function [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderi
 % 7 Apr 2018 Introduced the use of saveindividualfirstdiff
 % 9 Apr 2018 Little bug fixed, on line 358, thanks to Ville Pulkki
 % 12 Apr 2018 Little bug fixed, around line 334, thanks to Ville Pulkki
+% 6 May 2018 Little bug fixed, around line 331, thanks to Ville Pulkki
 
 if nargin < 11
    showtext = 0; 
@@ -306,7 +307,7 @@ if difforder > 0
 
             irnew = irnew.*Sinputdata.sourceamplitudes( Snumber(jj) );
             nirlengthnew = length(irnew);
-            
+
             if nirlengthnew > nirlength
                 if saveindividualfirstdiff == 0
                     if Sinputdata.doaddsources == 1
@@ -322,8 +323,12 @@ if difforder > 0
                     if Sinputdata.doaddsources == 1
                         irgeom   = [irgeom;  zeros(nirlengthnew-nirlength,nreceivers)];
                         irdirect = [irdirect;zeros(nirlengthnew-nirlength,nreceivers)];
+                        % Bug fixed 6 May 2018: before, the ncolumns in the
+                        % loop was a fixed value 1, which gave errors when
+                        % there was only one source.
                         for kk = 1:nreceivers
-                            irdiff{kk,1}.irvectors = [irdiff{kk,1}.irvectors;zeros(nirlengthnew-nirlength,1)]; 
+                            ncolumns = size(irdiff{kk,1}.irvectors,2);
+                            irdiff{kk,1}.irvectors = [irdiff{kk,1}.irvectors;zeros(nirlengthnew-nirlength,ncolumns)]; 
                         end
                     else
                         irgeom   = [irgeom;  zeros(nirlengthnew-nirlength,nreceivers,nsources)];

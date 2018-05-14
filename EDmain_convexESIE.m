@@ -45,7 +45,7 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 15 Feb. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 14 May 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -129,6 +129,7 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % inputdatahash, if the corresponding savexxxxfile = 0. Introduced the
 % parameter .suppressresultrecycling with default = 0, and implemented th
 % corresponding suppressing of the result recycling.
+% 14 May 2018 Cleaned up the lineending.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -142,18 +143,22 @@ if nargin < 6
     end
 end
 
-compstr = computer;
-compstr = lower(compstr(1:3));
-if compstr == 'mac'  
-	lineending = 13;
-elseif compstr == 'sun' 
-	lineending = 10;    
-elseif compstr == 'sol'            
-	lineending = 10;
-elseif compstr == 'pcw'
-	lineending = [13,10];
-else
-    error('ERROR: Not implemented for this computer type yet')	
+% compstr = computer;
+% compstr = lower(compstr(1:3));
+% if compstr == 'mac'  
+% 	lineending = 13;
+% elseif compstr == 'sun' 
+% 	lineending = 10;    
+% elseif compstr == 'sol'            
+% 	lineending = 10;
+% elseif compstr == 'pcw'
+% 	lineending = [13,10];
+% else
+%     error('ERROR: Not implemented for this computer type yet')	
+% end
+lineending = 10;
+if ispc == 1
+   lineending = [13,10];
 end
 
 [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,1);

@@ -43,7 +43,7 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % EDinteg_submatrixstructure, EDintegralequation_convex_ir from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 21 Mar 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 14 May 2018 (peter.svensson@ntnu.no)
 %
 % EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -133,6 +133,7 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % 21 Mar 2018 Removed the parameter .hodtype
 % 21 Mar 2018 Completed the section around EDmakeHODirs, with recycling
 % result files.
+% 14 May 2018 CLeaned up the lineending
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -146,18 +147,22 @@ if nargin < 6
     end
 end
 
-compstr = computer;
-compstr = lower(compstr(1:3));
-if compstr == 'mac'  
-	lineending = 13;
-elseif compstr == 'sun' 
-	lineending = 10;    
-elseif compstr == 'sol'            
-	lineending = 10;
-elseif compstr == 'pcw'
-	lineending = [13,10];
-else
-    error('ERROR: Not implemented for this computer type yet')	
+% compstr = computer;
+% compstr = lower(compstr(1:3));
+% if compstr == 'mac'  
+% 	lineending = 13;
+% elseif compstr == 'sun' 
+% 	lineending = 10;    
+% elseif compstr == 'sol'            
+% 	lineending = 10;
+% elseif compstr == 'pcw'
+% 	lineending = [13,10];
+% else
+%     error('ERROR: Not implemented for this computer type yet')	
+% end
+lineending = 10;
+if ispc == 1
+   lineending = [13,10];
 end
 
 [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,4);

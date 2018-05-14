@@ -155,7 +155,7 @@ end
 %		visplanesfromr      [nplanes,nrec]  uint8
 %
 %           0 means S/R behind a plane which is reflective or totabs
-%           1 means S/R is aligned with a plane
+%           1 means S/R is aligned with a plane, but not inside the plane
 %           2 means S/R is in front of a plane which is reflective
 %           3 means S/R is in front of a plane which is totabs
 %           4 means S/R is inside a plane which is reflective
@@ -186,7 +186,18 @@ else
     rownumb = uint32(iv - (double(colnumb)-1)*nplanes);     % This is the plane number
 end
 clear iv 
-visplanesfromr = EDinfrontofplane(pointcoords(colnumb,:),planedata.planeeqs(rownumb,1:3),planedata.corners(planedata.planecorners(rownumb,1),:),planedata.corners(planedata.planecorners(rownumb,2),:)) + 1;
+
+% The function EDinfrontofplane returns:
+%   +1  if point is in front of plane
+%    0  if point belongs to (infinite) plane
+%   -1 if point is behind plane
+% The addition of 1 leads to that visplanesfromr is:
+%   +2  if point is in front of plane
+%   +1  if point belongs to (infinite) plane
+%    0 if point is behind plane
+
+visplanesfromr = EDinfrontofplane(pointcoords(colnumb,:),planedata.planeeqs(rownumb,1:3),...
+planedata.corners(planedata.planecorners(rownumb,1),:),planedata.corners(planedata.planecorners(rownumb,2),:)) + 1;
 
 clear rownumb colnumb
 

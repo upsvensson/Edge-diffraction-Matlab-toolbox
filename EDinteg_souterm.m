@@ -20,6 +20,7 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 %                   the external source. All "via-edge" to "to-edge" combos
 %                   are stacked after each other. For each such combo, the
 %                   sequence is:
+%                           (edge3)             (edge2)
 %                       to-edge-element     via-edge-element
 %                            1                      1
 %                            1                      2
@@ -28,7 +29,7 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 %
 % Uses functions EDdistelements  EDcoordtrans1
 %
-% Peter Svensson 7 Mar 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 22 May 2018 (peter.svensson@ntnu.no)
 %
 % Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,inteq_ngauss,inteq_discretizationtype,...
 %     vispartedgesfroms,vispartedgesfroms_start,vispartedgesfroms_end,frequency,gaussvectors,rSvec,thetaSvec,zSvec,showtext);
@@ -56,6 +57,7 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 % 15 Dec. 2017 Experiments with detecting near singularities
 % 7 Mar 2018 Hid the singularity information printouts behind "if showtext
 % >= 2"
+% 22 May 2018 Fixed a mistake "in2str" instead of "int2str".
 
 if nargin < 14
     showtext = 0;
@@ -92,7 +94,8 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
     
     if vispartedgesfroms(edge2) ~= 0
         edge3 = Hsubmatrixdata.edgepairlist(ii,1);
-        if showtext >= 3
+        if showtext >= 2
+%         if showtext >= 1
             disp(' ')
             disp(['         From S via edge ',int2str(edge2),' to edge ',int2str(edge3)])
             disp(['         Startrow in G-matrix   = (',int2str(Hsubmatrixdata.bigmatrixstartnums(ii)),'). Endrow in G-matrix   = (',int2str(Hsubmatrixdata.bigmatrixendnums(ii)),')'])
@@ -107,8 +110,9 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                 
         if size(gaussvectors,1) == n2
             n2vec = gaussvectors(:,1);
+            weight2vec = gaussvectors(:,2);
         else
-           [n2vec,~] = EDdistelements(n2,discretizationtype);
+           [n2vec,weight2vec] = EDdistelements(n2,discretizationtype);
         end
         % New 4 Nov. 2017: here we zero out the edge points that are not
         % visible.
@@ -145,22 +149,9 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         rS = rSvec(edge2);
         thetaS = thetaSvec(edge2);
         zS = zSvec(edge2);
-
-        singwarning = 0;
-        singterm = [0 0 0 0];
-        if thetaout == 0 && max([  abs(cos(ny*(pi + thetaS   )))  abs(cos(ny*(pi - thetaS   )))]) > 0.999
-            singwarning = 1;
-            if showtext >= 2
-                disp(['      Singularity warning, location 1'])
-            end
-        end
-        if thetaout ~= 0 && max([ abs(cos(ny*(pi + thetaS + thetaout   )))  abs(cos(ny*(pi + thetaS - thetaout   )))  ...
-                          abs(cos(ny*(pi - thetaS + thetaout   )))  abs(cos(ny*(pi - thetaS - thetaout   )))  ]) > 0.999
-            singwarning = 2;                       
-            if showtext >= 2
-                disp(['      Singularity warning, location 2'])
-            end
-        end
+        
+%         disp(['   thetaS = ',num2str(thetaS*180/pi),' degrees'])
+%         pause
         
         % Build vertical [n3,n2] matrices and expand them horizontally
         if n3 ~= n3previous || n2 ~= n2previous 
@@ -243,94 +234,186 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
         ch = ( ch + 1./ch)/2;               
             
-            if thetaout == 0
-                beta = 2*( sin(ny*(pi + thetaS  ))./(ch - cos(ny*(pi + thetaS   ))) + ...
-                           sin(ny*(pi - thetaS  ))./(ch - cos(ny*(pi - thetaS   )))); 
+        if thetaout == 0
+           beta = 2*( sin(ny*(pi + thetaS  ))./(ch - cos(ny*(pi + thetaS   ))) + ...
+                       sin(ny*(pi - thetaS  ))./(ch - cos(ny*(pi - thetaS   ))));        
 
-                       beta1 = 2*sin(ny*(pi + thetaS  ))./(ch - cos(ny*(pi + thetaS   )));
-                       beta2 = 2*sin(ny*(pi - thetaS  ))./(ch - cos(ny*(pi - thetaS   )));
-                       iv1 = abs(beta1)>100;
-                       iv2 = abs(beta2)>100;
-                       
-                       if sum(iv1) > 0
-                          singterm(1) = 1; 
-                       end
-                       if sum(iv2) > 0
-                          singterm(2) = 1; 
-                       end
-                       
-                       if sum(iv1) > 0                       
-                          plot([beta1 beta2],'-o')
-                          if showtext >= 2
-                            disp(['      sum(iv1) = ',in2str(sum(iv1))])
-%                           pause
-                          end
-                       end
-                       if sum(iv2) > 0                       
-                          plot([beta1 beta2],'-o')
-                          if showtext >= 2
-                            disp(['      sum(iv2) = ',in2str(sum(iv2))])
-%                           pause
-                          end
-                       end
+         else
+
+            if skewedges == 0
+
+                beta = ( sin(ny*(pi + thetaS + thetaout  ))./(ch - cos(ny*(pi + thetaS + thetaout   ))) + ...
+                         sin(ny*(pi + thetaS - thetaout  ))./(ch - cos(ny*(pi + thetaS - thetaout   ))) + ...
+                         sin(ny*(pi - thetaS + thetaout  ))./(ch - cos(ny*(pi - thetaS + thetaout   ))) + ...
+                         sin(ny*(pi - thetaS - thetaout  ))./(ch - cos(ny*(pi - thetaS - thetaout   ))));  
+                    
             else
-                
-                if skewedges == 0
-                
-                    beta = ( sin(ny*(pi + thetaS + thetaout  ))./(ch - cos(ny*(pi + thetaS + thetaout   ))) + ...
-                             sin(ny*(pi + thetaS - thetaout  ))./(ch - cos(ny*(pi + thetaS - thetaout   ))) + ...
-                             sin(ny*(pi - thetaS + thetaout  ))./(ch - cos(ny*(pi - thetaS + thetaout   ))) + ...
-                             sin(ny*(pi - thetaS - thetaout  ))./(ch - cos(ny*(pi - thetaS - thetaout   ))));           
-                         beta1 = sin(ny*(pi + thetaS + thetaout  ))./(ch - cos(ny*(pi + thetaS + thetaout   )));
-                         beta2 = sin(ny*(pi + thetaS - thetaout  ))./(ch - cos(ny*(pi + thetaS - thetaout   )));
-                         beta3 = sin(ny*(pi - thetaS + thetaout  ))./(ch - cos(ny*(pi - thetaS + thetaout   )));
-                         beta4 = sin(ny*(pi - thetaS - thetaout  ))./(ch - cos(ny*(pi - thetaS - thetaout   )));
-                      iv1 = abs(beta1)>100;
-                       iv2 = abs(beta2)>100;
-                      iv3 = abs(beta3)>100;
-                       iv4 = abs(beta3)>100;
-                                                    
-                      if sum(iv1) > 0                       
-                          plot([beta1 beta2 beta3 beta4],'-o')
-                          if showtext >= 2
-                            disp(['      sum(iv1) = ',in2str(sum(iv1))])
-%                           pause
-                          end
-                       end
-                       if sum(iv2) > 0                       
-                          plot([beta1 beta2 beta3 beta4],'-o')
-                          if showtext >= 2
-                            disp(['      sum(iv2) = ',in2str(sum(iv2))])
-%                           pause
-                          end
-                       end
-                      if sum(iv3) > 0                       
-                          plot([beta1 beta2 beta3 beta4],'-o')
-                          if showtext >= 2
-                            disp(['      sum(iv3) = ',in2str(sum(iv3))])
-%                           pause
-                          end
-                       end
-                       if sum(iv2) > 0                       
-                          plot([beta1 beta2 beta3 beta4],'-o')
-                          if showtext >= 2
-                            disp(['      sum(iv4) = ',in2str(sum(iv4))])
-%                           pause
-                          end
-                       end
-                         
-                else
-                    
-                     beta = ( sin(ny*(pi + thetaS + thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi + thetaS + thetae3_re2(n3vertmat)   ))) + ...
-                     sin(ny*(pi + thetaS - thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi + thetaS - thetae3_re2(n3vertmat)   ))) + ...
-                     sin(ny*(pi - thetaS + thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi - thetaS + thetae3_re2(n3vertmat)   ))) + ...
-                     sin(ny*(pi - thetaS - thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi - thetaS - thetae3_re2(n3vertmat)   )))); 
-                    
-                end
+
+                 beta = ( sin(ny*(pi + thetaS + thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi + thetaS + thetae3_re2(n3vertmat)   ))) + ...
+                 sin(ny*(pi + thetaS - thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi + thetaS - thetae3_re2(n3vertmat)   ))) + ...
+                 sin(ny*(pi - thetaS + thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi - thetaS + thetae3_re2(n3vertmat)   ))) + ...
+                 sin(ny*(pi - thetaS - thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi - thetaS - thetae3_re2(n3vertmat)   )))); 
+             
             end
+        end
                         
-          Gsub = -(2-acrossface_out)*ny/4/pi*beta.*dz_expjkmoverm;
+%         Gsub = -(2-acrossface_out)*ny/4/pi*beta.*dz_expjkm;
+        Gsub = -(2-acrossface_out)*ny/4/pi*beta.*dz_expjkmoverm;
+        
+%         contrastfactor = max(abs(Gsub))/mean(abs(Gsub)); 
+%         
+%         
+%         if contrastfactor  > 22
+%         if contrastfactor  > 1000
+%            disp('   Singularity to take care of')
+           % We have a singularity to take care of 
+
+          % For each value of z1 = the receiver edge point (which there
+          % are n3 values of), select the z2-range (which there are n2
+          % values of). We should integrate numerically over z2.
+          n2countervec = [1:n2].';
+          for jj = 1:n3
+%             ivselect1 = find(n3vertmat==jj);
+            ivselect = (jj-1)*n2 + n2countervec;
+                        
+            dGrel = (diff(abs(Gsub(ivselect)))./abs(Gsub(ivselect(1:end-1))));
+
+            npeaks = 0;
+            ivpeaks = [];
+            dofixsingularity = 0;
+            iv1 = find( abs(dGrel(1)+1) < 2e-3 );
+            iv2 = find( abs(dGrel) > 0.8e3 );
+            if any(iv1) 
+                disp(['Need to take care of singularity, iv1: ',num2str(abs(dGrel(1)+1))])
+                dofixsingularity = 1;
+            end
+            if any(iv2)
+                disp(['Need to take care of singularity, iv2: ',num2str(max(abs(dGrel)))])
+                dofixsingularity = 1;
+            end
+%             if length(iv1) > 1 || length(iv2) > 1
+%                         dGrel
+%                disp('PROBLEM: More than one peak to integrate. Not implemented yet (location 1)')
+%             end
+%             if any(iv1)
+%                 if iv1(1) == 1
+%                     if any(iv2)
+%                         dGrel
+%                         error('PROBLEM: More than one peak to integrate. Not implemented yet (location 2)')
+%                     end
+%                     ivpeaks = 1;
+%                     npeaks = 1;
+%                 end
+%                 if iv1(1) == n2
+%                     if any(iv2)
+%                         error('PROBLEM: More than one peak to integrate. Not implemented yet (location 2)')
+%                     end
+%                     ivpeaks = n2;
+%                     npeaks = 1;                    
+%                 end
+%             end
+%             if any(iv2)
+%                 ivpeaks_candidate = iv2(1)+1; 
+%                 if abs(Gsub(ivselect(ivpeaks_candidate))) == max(abs( Gsub(ivselect )))
+%                     ivpeaks = ivpeaks_candidate;
+%                     npeaks = 1;
+%                 end
+%             end
           
+
+            % Find the problem sample (we assume that we need to take
+            % care of only one), which we will do a local correction
+            % for.
+
+%             ivpeaks = find( (abs(Gsub(ivselect)))/mean(abs(Gsub(ivselect))) > 22);
+%             npeaks = length(ivpeaks);
+
+            
+                        
+            % Now we need to compute Iaccurate = integrate beta from S,
+            % via edge2, to edge3. Integration should be over the
+            % entire edge2, to one point on edge3.
+
+%                         disp(['   Integrate, over via-edge ',int2str(edge2),' from S, to edge ',int2str(edge3),', point number ',int2str(jj),' of ',int2str(n3)])
+%                         disp(['      Number of peaks: ',int2str(length(ivpeaks))])
+%             if npeaks > 1
+%                 disp(['      PROBLEM: More than one peak: ',int2str(npeaks)])
+%             else
+
+%             if npeaks == 1
+            if dofixsingularity == 1
+                [maxval,ivpeaks] = max(abs(Gsub(ivselect)));
+               npeaks = 1;
+               disp(['   Integrating source term, from S, via edge ',int2str(edge2),' to edge ',int2str(edge3)])
+
+               % Source parameters: rS, thetaS, zS
+               % Receiver parameters: re3_re2(jj),
+               % thetaout, ze3_re2(jj)
+               % Edgelength = [0,len2], ny
+               % The function EDwedge1st_fd uses an integrand which is
+               % -nu/(4*pi)*beta*exp(-jkm)/m*exp(-jkl)/l
+               % We want only part of the integrand: beta*exp(-jkm)/m
+               % and call the function EDintegratebetaoverm
+                  
+               [Iaccurate,singularterm] = EDintegratebetaoverm(envdata.cair,...
+                   controlparameters.frequencies,edgedata.closwedangvec(edge2),...
+                   rS,thetaS,zS,re3_re2(jj),thetaout,ze3_re2(jj),...
+                   [0,len2]);
+                Iaccurate = -(2-acrossface_out)*ny/4/pi*Iaccurate;
+                      
+                % Here comes the LCN part:
+                % Iaccurate should be = len2*(w1*Gsub1 + w2*Gsub2 + ... +
+                % wN*GsubN)
+                % but due to the singularity, one term is imprecise: wL*GsubL             
+                % Therefore we replace GsubL by L such that
+                % w1*Gsub1 + ... + wL*L + ... + wN*GsubN = Iaccurate/len2 ->
+                % L = (Iaccurate/len2 - dot(wvector,Gsubvector_mod))/wL
+                % where Gsubvector_mod is [Gsub1,..., 0, ..., GsubN]
+                % that is, with GsubL replaced by zero.
+
+%                 if dofixsingularity == 0
+%                    savetemp
+%                    pause
+%                 end
+
+                Gsubvector_mod = Gsub(ivselect);
+                Gsubvector_mod(ivpeaks) = 0;
+                Lvalue = (Iaccurate/len2 - sum(Gsubvector_mod.*weight2vec))/weight2vec(ivpeaks);
+
+                Gsuborig = Gsub(ivselect);
+%                 disp(['LCN: Old value was ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
+                Gsub(ivselect(ivpeaks)) = Lvalue;
+%                 disp(['LCN: New value is ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
+                Gsubmod = Gsub(ivselect);
+
+%                                figure(1)
+%         semilogy(abs(Gsub(ivselect)),'-o')
+%         grid
+%         if ~isempty(ivpeaks)
+%             title(['ivpeaks = ',num2str(ivpeaks)])
+%         else
+%             title('No peaks')
+%         end 
+% %         figure(2)
+% %         plot(abs(Gsub(ivselect)),'-o')
+% %         grid
+%             pause
+% %                
+
+% % % %                 semilogy(abs([Gsuborig Gsubmod]),'-o')
+% % % %                 grid      
+% % % %                 if ~isempty(ivpeaks)
+% % % %             title(['ivpeaks = ',num2str(ivpeaks)])
+% % % %         else
+% % % %             title('No peaks')
+% % % %         end 
+% % % % 
+% % % %                 pause
+            end
+            
+          end
+%        end
+         
         G(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) =     G(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) + Gsub;
                 
     end

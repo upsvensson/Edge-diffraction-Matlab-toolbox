@@ -605,12 +605,15 @@ for ifreq = 1:nfrequencies
                 
                 ISOU = int2str(isou); 
                 
+                disp(['Source no. ',ISOU,' of ',int2str(nsources)])
+                
                 Q_firstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
                     controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
                     Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
                     Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
  
                 Q_firstterm = Q_firstterm*sourceamplitudes(isou,ifreq);
+                
                 
                 %-----------------------------------------------------------------
                 %-----------------------------------------------------------------

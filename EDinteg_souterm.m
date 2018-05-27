@@ -150,8 +150,21 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         thetaS = thetaSvec(edge2);
         zS = zSvec(edge2);
         
-%         disp(['   thetaS = ',num2str(thetaS*180/pi),' degrees'])
-%         pause
+        singwarning = 0;
+        singterm = [0 0 0 0];
+        if thetaout == 0 && max([  abs(cos(ny*(pi + thetaS   )))  abs(cos(ny*(pi - thetaS   )))]) > 0.999
+            singwarning = 1;
+            if showtext >= 1
+                disp(['      Singularity warning, location 1'])
+            end
+        end
+        if thetaout ~= 0 && max([ abs(cos(ny*(pi + thetaS + thetaout   )))  abs(cos(ny*(pi + thetaS - thetaout   )))  ...
+                          abs(cos(ny*(pi - thetaS + thetaout   )))  abs(cos(ny*(pi - thetaS - thetaout   )))  ]) > 0.999
+            singwarning = 2;                       
+            if showtext >= 1
+                disp(['      Singularity warning, location 2'])
+            end
+        end
         
         % Build vertical [n3,n2] matrices and expand them horizontally
         if n3 ~= n3previous || n2 ~= n2previous 
@@ -341,6 +354,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
 %             else
 
 %             if npeaks == 1
+dofixsingularity = 0;
             if dofixsingularity == 1
                 [maxval,ivpeaks] = max(abs(Gsub(ivselect)));
                npeaks = 1;
@@ -381,11 +395,17 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                 Lvalue = (Iaccurate/len2 - sum(Gsubvector_mod.*weight2vec))/weight2vec(ivpeaks);
 
                 Gsuborig = Gsub(ivselect);
-%                 disp(['LCN: Old value was ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
-                Gsub(ivselect(ivpeaks)) = Lvalue;
-%                 disp(['LCN: New value is ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
+%                 disp(['      LCN: Old value was ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
+                reldiff = abs( Lvalue - Gsuborig(ivpeaks) )/abs( Gsuborig(ivpeaks) );
+                if reldiff < 1e-6
+                    Gsub(ivselect(ivpeaks)) = Lvalue;
+                end
+%                 disp(['      LCN: New value is ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
                 Gsubmod = Gsub(ivselect);
-
+                
+                max(abs(Gsubmod-Gsuborig)./abs(Gsuborig))
+%                 disp(['   LCN: reldiff = ',num2str(reldiff)])
+                
 %                                figure(1)
 %         semilogy(abs(Gsub(ivselect)),'-o')
 %         grid

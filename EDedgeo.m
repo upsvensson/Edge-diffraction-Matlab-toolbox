@@ -104,7 +104,7 @@ function [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumbe
 % Uses the functions EDcoordtrans1, EDinfrontofplane from EDtoolbox
 % Uses the function Datahash from Matlab Central
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 15 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 28 May 2018
 %
 % [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,...
 % firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,showtext);
@@ -141,6 +141,8 @@ function [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumbe
 %             cad-file) or SOFT
 % 15 Mar 2018 Fixed a bug which occured if the planecorners matrix had some
 %             zeros; a definition of zeros used type int8 instead of 'int8'
+% 28 May 2018 Fixed a small bug: planeabstypes = TOTABS or SOFT were not
+%             recognized.
 
 geomacc = 1e-10;
 
@@ -201,12 +203,15 @@ zerosvec2 = zeros(nplanes,nplanes,'int8');
 %	'SOFT' or 'soft'  then reflfactors should be -1.
 %	'TOTA' or 'tota' then reflfactors should be 0 (short for TOTABS)
 %   Otherwise it is assumed to be rigid, so reflfactors = 1.
+% 
+% 28 May 2018 Fixed a bug: planeasbtypes = lower(... didn't work without
+% the lower(setstr(...
 
 nchars = size(planedata.planeabstypes,2);
 reflfactors = ones(nplanes,1);
 if nchars >= 4
-    planeabstypes = lower(full(planedata.planeabstypes(:,1:min([4,nchars]))));
-
+    planeabstypes = lower(setstr(full(planedata.planeabstypes(:,1:min([4,nchars])))));
+    
     comptxt = 'soft';
     ivpotential = find(planeabstypes(:,1)==comptxt(1));
     if ~isempty(ivpotential)

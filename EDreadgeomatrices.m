@@ -56,7 +56,7 @@ if nargin < 3
     nplanes = size(planecorners,1);
     planerefltypes = ones(nplanes,1);
 end
-   
+
 % geomacc is only used to make the bounding boxes a bit bigger than the
 % corner coordinates. Was 1e-10 earlier.
 
@@ -70,7 +70,7 @@ ncorners = size(corners,1);
 %---------------------------------------------------------------
 % planecorners is given as an input matrix
 
-% [nplanes,maxcornersperplane] = size(planecorners);
+[nplanes,maxcornersperplane] = size(planecorners);
 ncornersperplanevec = sum(sign(planecorners),2);
 
 planeabstypes = 'RIGID ';

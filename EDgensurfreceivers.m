@@ -43,7 +43,8 @@ function [surfacerecs,surfacerecnvecs,surfacerecweights] = EDgensurfreceivers(pl
 % from the Duvanant paper instead of the gaussTRINEW function.
 % 10 Apr 2018 Added some quadrature values
 
-distancefromsurf = 1e-4;
+% distancefromsurf = 1e-4;
+distancefromsurf = 1e-3;
 
 nplanes = size(planedata.planecorners,1);
 if any(planedata.ncornersperplanevec>4)

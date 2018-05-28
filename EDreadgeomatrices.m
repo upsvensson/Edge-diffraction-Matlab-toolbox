@@ -1,4 +1,4 @@
-function planedata = EDreadgeomatrices(corners,planecorners)
+function planedata = EDreadgeomatrices(corners,planecorners,planerefltypes)
 % EDreadgeomatrices - Reads the geometrydata (corners and planecorners) from
 % two input matrices, and builds the planedata from these. Rigid surfaces
 % are assumed.
@@ -8,6 +8,8 @@ function planedata = EDreadgeomatrices(corners,planecorners)
 %                   the ncorners corners.
 %   planecorners    A matrix of size [nplanes,nmaxnumberofcorners] with the
 %                   corner numbers of the nplanes plane definitions.
+%   planerefltypes  A vector, [nplanes,1], with values +1,0,-1 specifying
+%                   if the planes should be 'RIGID ','TOTABS','SOFT  '
 %
 % Output parameters:
 %	planedata       Structwith fields:
@@ -16,7 +18,8 @@ function planedata = EDreadgeomatrices(corners,planecorners)
 %                   Since planes can have different numbers of corners, the number of columns is the 
 %                   maximum number of corners that any plane has. NB! The corner numbers are in the
 %                   renumbered system, not in the CAD-file system.
-%       planeabstypes   Matrix [nplanes,nmaxcharacters2] (sparse), with the absorber names in the CAD file. 
+%       planeabstypes   Matrix [nplanes,nmaxcharacters2] (sparse), with the absorber names 'RIGID ','TOTABS',
+%                       'SOFT  ', according to input data planerefltypes.
 %       planeeqs        Matrix [nplanes,4] of the plane equations as derived  from the plane definitions. 
 %                   Each row has the values [A B C D] of the plane equation on the form Ax + By + Cz = D
 %       ncornersperplanevec     Vector [nplanes,1] which gives the number of corners for each plane.
@@ -32,9 +35,9 @@ function planedata = EDreadgeomatrices(corners,planecorners)
 %
 % Uses the functions EDinfrontofplane
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 12 Apr 2018
+% Peter Svensson (peter.svensson@ntnu.no) 28 May 2018
 %
-% planedata = EDreadgeomatrices(corners,planecorners);
+% planedata = EDreadgeomatrices(corners,planecorners,planerefltypes);
 
 % 29 Nov. 2017 First version
 % 12 Jan. 2018 Increased the bounding boxes a bit - doesn't hurt to make
@@ -44,9 +47,14 @@ function planedata = EDreadgeomatrices(corners,planecorners)
 % 12 Apr 2018 Fixed a problem: with a mix of 3-corner planes, and 4-corner
 % planes, the last zero of the 3-corner planes need to be replaced by a
 % repetition.
+% 28 May 2018 Introduced the input parameter planerefltypes
 
 if nargin < 2
     error('ERROR: the corners and planecorners matrices must be specified')
+end
+if nargin < 3
+    nplanes = size(planecorners,1);
+    planerefltypes = ones(nplanes,1);
 end
    
 % geomacc is only used to make the bounding boxes a bit bigger than the
@@ -62,11 +70,25 @@ ncorners = size(corners,1);
 %---------------------------------------------------------------
 % planecorners is given as an input matrix
 
-[nplanes,maxcornersperplane] = size(planecorners);
+% [nplanes,maxcornersperplane] = size(planecorners);
 ncornersperplanevec = sum(sign(planecorners),2);
 
 planeabstypes = 'RIGID ';
 planeabstypes = planeabstypes(ones(nplanes,1),:);
+
+iv = find(planerefltypes == 0);
+if ~isempty(iv)
+   for ii = 1:length(iv)
+       planeabstypes(iv(ii),:) = 'TOTABS';
+   end
+end
+
+iv = find(planerefltypes == -1);
+if ~isempty(iv)
+   for ii = 1:length(iv)
+       planeabstypes(iv(ii),:) = 'SOFT  ';
+   end
+end
 
 if max(max(planecorners)) > ncorners
     error('ERROR: One plane definition in the input matrix planecorners used a higher corner number than was defined in the corners input matrix')

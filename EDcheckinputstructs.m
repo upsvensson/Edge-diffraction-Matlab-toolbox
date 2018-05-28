@@ -11,6 +11,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                             requires that filehandlingparameters.outputdirectory and .filestem are specified)
 %                   .planecorners        (optional; alternative to
 %                                             .geoinputfile)
+%                   .planerefltypes      (optional; gives the reflection
+%                                         factors of the planes: 1,0,-1.
+%                                         default: ones(nplanes,1) )
 %                   .firstcornertoskip   (default: 1e6)
 %   Sinputdata         .coordinates         (obligatory)
 %                   .doaddsources        (default: 0 = no)
@@ -65,7 +68,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   3, for EDmain_convexESIEBEM (frequency domain)
 %                   4, for EDmain_convex_time (time domain)
 % 
-% Peter Svensson 21 Apr 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 28 May 2018 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -123,6 +126,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 7 Apr 2018 Introduced controlparameters.saveindividualfirstdiff
 % 21 Apr 2018 Removed the extra "results" directory in the output
 % directory.
+% 28 May 2018 Added the input field geoinputdata.planerefltypes
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -186,6 +190,10 @@ else
     else
         if isfield(filehandlingparameters,'outputdirectory') == 0 || isfield(filehandlingparameters,'filestem') == 0
             error('ERROR: When you give the geometry input in the form of data matrices, you must specify filehandlingparameters.outputdirectory and .filestem')            
+        end
+        if ~isfield(geoinputdata,'planerefltypes')
+           nplanes = size(geoinputdata.planecorners,1);
+           geoinputdata.planerefltypes = ones(nplanes,1);
         end
     end
 end

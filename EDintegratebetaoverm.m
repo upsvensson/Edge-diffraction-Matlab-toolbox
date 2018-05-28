@@ -1,7 +1,6 @@
 function [tf,singularterm] = EDintegratebetaoverm(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw)
 % EDintegratebetaoverm - Integrates the function beta*exp(-jkm)/m.
-% This is similar to first-order diffraction but lacks the exp(-jkl)/l and
-% some constants.
+% This is similar to first-order diffraction but lacks the exp(-jkl)/l factor.
 % An accurate integration method is used
 % so receivers can be placed right at the zone boundaries.
 %
@@ -23,12 +22,13 @@ function [tf,singularterm] = EDintegratebetaoverm(cair,frequencies,closwedang,rs
 %
 % Uses the built-in function QUADGK and the function EDbetaoverm_fd for numerical integration.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 26 May 2018
+% Peter Svensson (peter.svensson@ntnu.no) 28 May 2018
 %
 % [tf,singularterm] = EDintegratebetaoverm(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw);
 
 % 26 May 2018 Modified the EDwedge1st_fd by removing some parts. Method,
 % Rstart and bc are not used here.
+% 28 May 2018 Did some corrections, switching R0 to m0
 
 localshowtext = 0;
 
@@ -189,7 +189,7 @@ tf = zeros(nfrequencies,1);
 if apexincluded == 0
     for ii = 1:nfrequencies
         k = 2*pi*frequencies(ii)/cair;
-        tf(ii) = quadgk(@(x)EDbetaoverm_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,R0,useterm),zw(1),zw(2),'RelTol',tol)*exp(-1i*k*R0);
+        tf(ii) = quadgk(@(x)EDbetaoverm_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,m0,useterm),zw(1),zw(2),'RelTol',tol)*exp(-1i*k*m0);
 %         *(-ny/4/pi);
 %         tf(ii) = tf(ii)*exp(-1i*k*R0);
     end
@@ -207,11 +207,11 @@ else
     for ii = 1:nfrequencies
         k = 2*pi*frequencies(ii)/cair;
         if localselectanalytical == 0
-            tf(ii) = quadgk(@(x)EDbetaoverm_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,R0,useterm),zw(1),zw(2),'RelTol',tol)*exp(-1i*k*R0);
+            tf(ii) = quadgk(@(x)EDbetaoverm_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,m0,useterm),zw(1),zw(2),'RelTol',tol)*exp(-1i*k*m0);
 %                 *(-ny/4/pi)*exp(-1i*k*Rextra);
         else
             if includepart1 == 1
-                tf1 = quadgk(@(x)EDbetaoverm_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,R0,useterm),zw(1),-zrangespecial,'RelTol',tol);
+                tf1 = quadgk(@(x)EDbetaoverm_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,m0,useterm),zw(1),-zrangespecial,'RelTol',tol);
 %                     tf1 = tf1*(-ny/4/pi);
             else
                tf1 = 0; 
@@ -220,7 +220,7 @@ else
                end
             end
             if includepart2 == 1
-                tf3 = quadgk(@(x)EDbetaoverm_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,R0,useterm),zrangespecial,zw(2),'RelTol',tol);
+                tf3 = quadgk(@(x)EDbetaoverm_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,m0,useterm),zrangespecial,zw(2),'RelTol',tol);
 %                     tf3 = tf3*(-ny/4/pi);
             else
                tf3 = 0; 
@@ -252,12 +252,12 @@ else
                             sign(fivec).*(1- (ny*fivec).^2/6).*(useserialexp1==1) + ...
                             sign(ny*fivec-2*pi) .*(1- (ny*fivec-2*pi).^2/6).*(useserialexp2==1);
                 if analyticalsymmetry == 1
-                    tf2 = -sinovercosnyfifactor/pi/R0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
+                    tf2 = -sinovercosnyfifactor/pi/m0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
                     if exacthalf == 1
                         tf2 = tf2/2;
                     end
                 else
-                    tf2 = -sinovercosnyfifactor/pi/R0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;        
+                    tf2 = -sinovercosnyfifactor/pi/m0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;        
                 end
             else
               if localshowtext 
@@ -271,17 +271,17 @@ else
                     sinovercosnyfifactor =  sinnyfivec(jj)./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...          
                                 sign(fivec(jj)).*(1- (ny*fivec(jj)).^2/6).*(useserialexp1(jj)==1);
                     if analyticalsymmetry == 1  
-                        tf2(jj) = -sinovercosnyfifactor/pi/R0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
+                        tf2(jj) = -sinovercosnyfifactor/pi/m0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
                         if exacthalf == 1
                             tf2 = tf2/2;
                         end
                     else
-                        tf2(jj) = -sinovercosnyfifactor/pi/R0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;                            
+                        tf2(jj) = -sinovercosnyfifactor/pi/m0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;                            
                     end
                    end   
                end
             end
-
+            
             tf2 = sum(tf2);
             tf2 = tf2*(-4*pi/ny);
 
@@ -292,7 +292,7 @@ else
 %                        end
 %                 end
 
-            tf(ii) = (tf1+tf2+tf3)*exp(-1i*k*R0);
+            tf(ii) = (tf1+tf2+tf3)*exp(-1i*k*m0);
 
         end
     end

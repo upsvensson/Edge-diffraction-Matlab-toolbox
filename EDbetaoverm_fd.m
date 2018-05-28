@@ -1,17 +1,19 @@
-function outval = EDbetaoverm_fd(zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm)
+function outval = EDbetaoverm_fd(zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,m0,useterm)
 % EDbetaoverm_fd - Integrand function which is called for num. int. 
+% by EDintegratebetaoverm.
 %
 % Input parameters:
-%  zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm
+%  zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,m0,useterm
 % 
 % Output parameter:
 %  The integral value
 %
-% Peter Svensson 26 May 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 28 May 2018 (peter.svensson@ntnu.no)
 %
-% outval = EDbetaoverm_fd(zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm);
+% outval = EDbetaoverm_fd(zvec,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,m0,useterm);
 
 % 26 May 2018 First version. Copied EDbetaoverml_fd and removed the l-part.
+% 28 May 2018 Some correction: R0 was still used but should be m0.
 
 if any(useterm)
     m = sqrt( (zvec-zs).^2 + rs^2 );
@@ -55,7 +57,7 @@ if any(useterm)
 
     end
 
-    outval = outval./m.*exp(-1i*k*(m-Rstart));
+    outval = outval./m.*exp(-1i*k*(m-m0));
 else
     outval = 0;
 end

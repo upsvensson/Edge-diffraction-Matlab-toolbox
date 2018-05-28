@@ -297,12 +297,16 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             iv1 = find( abs(dGrel(1)+1) < 2e-3 );
             iv2 = find( abs(dGrel) > 0.8e3 );
             if any(iv1) 
-                disp(['Need to take care of singularity, iv1: ',num2str(abs(dGrel(1)+1))])
+%                 disp(['Need to take care of singularity, iv1: ',num2str(abs(dGrel(1)+1))])
                 dofixsingularity = 1;
+            else
+%                 disp(['No need, iv1: ',num2str(abs(dGrel(1)+1))])
             end
             if any(iv2)
-                disp(['Need to take care of singularity, iv2: ',num2str(max(abs(dGrel)))])
+%                 disp(['Need to take care of singularity, iv2: ',num2str(max(abs(dGrel)))])
                 dofixsingularity = 1;
+            else
+%                 disp(['No need, iv2: ',num2str(max(abs(dGrel)))])
             end
 %             if length(iv1) > 1 || length(iv2) > 1
 %                         dGrel
@@ -354,8 +358,9 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
 %             else
 
 %             if npeaks == 1
-dofixsingularity = 0;
+
             if dofixsingularity == 1
+           
                 [maxval,ivpeaks] = max(abs(Gsub(ivselect)));
                npeaks = 1;
                disp(['   Integrating source term, from S, via edge ',int2str(edge2),' to edge ',int2str(edge3)])
@@ -395,28 +400,24 @@ dofixsingularity = 0;
                 Lvalue = (Iaccurate/len2 - sum(Gsubvector_mod.*weight2vec))/weight2vec(ivpeaks);
 
                 Gsuborig = Gsub(ivselect);
-%                 disp(['      LCN: Old value was ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
+                disp(['      LCN: Old value was ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
                 reldiff = abs( Lvalue - Gsuborig(ivpeaks) )/abs( Gsuborig(ivpeaks) );
-                if reldiff < 1e-6
+%                 if reldiff < 1e-6
                     Gsub(ivselect(ivpeaks)) = Lvalue;
-                end
-%                 disp(['      LCN: New value is ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
+%                 end
+                disp(['      LCN: New value is ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
                 Gsubmod = Gsub(ivselect);
                 
-                max(abs(Gsubmod-Gsuborig)./abs(Gsuborig))
-%                 disp(['   LCN: reldiff = ',num2str(reldiff)])
+%                 max(abs(Gsubmod-Gsuborig)./abs(Gsuborig))
+                disp(['         LCN: reldiff = ',num2str(reldiff)])
                 
 %                                figure(1)
 %         semilogy(abs(Gsub(ivselect)),'-o')
 %         grid
-%         if ~isempty(ivpeaks)
-%             title(['ivpeaks = ',num2str(ivpeaks)])
-%         else
-%             title('No peaks')
-%         end 
-% %         figure(2)
-% %         plot(abs(Gsub(ivselect)),'-o')
-% %         grid
+%         title(['ivpeaks = ',num2str(ivpeaks),' (dofixsing = ',int2str(dofixsingularity),')'])
+% % %         figure(2)
+% % %         plot(abs(Gsub(ivselect)),'-o')
+% % %         grid
 %             pause
 % %                
 

@@ -37,7 +37,7 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edge
 % Uses functions EDcreindexmatrix,EDwedge2nd,EDwedgeN from the EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 21 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 29 May 2018
 %
 % [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edgedata,...
 %     edgetoedgedata,Sdata,doaddsources,sourceamplitudes,Rdata,cair,fs,Rstart,...
@@ -56,6 +56,7 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edge
 % doaddsources and sourceamplitudes input parameters. Changed the calls
 % from EDB1 functions to EDfunctions.
 % 21 Mar 2018 Introduced new input parameter: savealldifforders
+% 29 May 2018 Fixed small bug around line 300 for thin planes.
 
 global BIGEDGESTEPMATRIX 
 
@@ -297,7 +298,10 @@ for isou = 1:nsources
 
             %                             if all( nyvec(edgepattern(:)) == 0.5 )
                    boostfactor = 1;
-                   if all( nyvec(edgepattern(:)) == 0.5 ) && pathalongplane                                
+%                    29 May 2018: The line below caused an error for a thin
+%                    plane, so it was replaced by the line below.
+%                    if all( nyvec(edgepattern(:)) == 0.5 ) && pathalongplane==1                                
+                   if all( nyvec(edgepattern(:)) == 0.5 ) && all(pathalongplane==1)                                
                         boostfactor = boostfactor*2^(Ndifforder-1);                        
                     end
 

@@ -301,7 +301,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                if showtext >= 2
                     disp(['   Integrating source term, from S, via edge ',int2str(edge2),' to edge ',int2str(edge3)])
                end
-               
+                              
                % Source parameters: rS, thetaS, zS
                % Receiver parameters: re3_re2(jj),
                % thetaout, ze3_re2(jj)
@@ -312,10 +312,11 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                % and call the function EDintegratebetaoverm
                   
                [Iaccurate,singularterm] = EDintegratebetaoverm(envdata.cair,...
-                   controlparameters.frequencies,edgedata.closwedangvec(edge2),...
+                   frequency,edgedata.closwedangvec(edge2),...
                    rS,thetaS,zS,re3_re2(jj),thetaout,ze3_re2(jj),...
                    [0,len2]);
                 Iaccurate = -(2-acrossface_out)*ny/4/pi*Iaccurate;
+                
                       
                 % Here comes the LCN part, but with a single sample
                 % replacement.

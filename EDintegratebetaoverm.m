@@ -34,7 +34,7 @@ localshowtext = 0;
 
 localselectanalytical = 1;
 
-% doublecheck = 1;
+% doublecheck = 0;
 
 % if localshowtext >= 2
 %     disp(' ')
@@ -210,6 +210,7 @@ else
             tf(ii) = quadgk(@(x)EDbetaoverm_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,m0,useterm),zw(1),zw(2),'RelTol',tol)*exp(-1i*k*m0);
 %                 *(-ny/4/pi)*exp(-1i*k*Rextra);
         else
+             
             if includepart1 == 1
                 tf1 = quadgk(@(x)EDbetaoverm_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,m0,useterm),zw(1),-zrangespecial,'RelTol',tol);
 %                     tf1 = tf1*(-ny/4/pi);
@@ -228,11 +229,9 @@ else
                    disp('   Part2 not included');
                end
             end
-%                 if doublecheck == 1
-%                     tf2orig = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),-zrangespecial,zrangespecial,'RelTol',tol);
-%                     tf2orig = tf2orig*(-ny/4/pi);                    
-%                 end
-
+%             if doublecheck == 1
+%                 tf2orig = quadgk(@(x)EDbetaoverm_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,m0,useterm),-zrangespecial,zrangespecial,'RelTol',tol);                                        
+%             end
 
             %-----------------------------------------------------------
             % The analytical approximation
@@ -240,9 +239,9 @@ else
             useserialexp1 = absnyfivec < 0.01;
             useserialexp2 = abs(absnyfivec - 2*pi) < 0.01;
             useserialexp = (useserialexp1 | useserialexp2) & (~singularterm);
-             if localshowtext && useserialexp
+            if localshowtext && useserialexp
                    disp('   Using serial expansion for the cosnyfivec');
-               end
+            end
 
             if ~any(singularterm)
                 cosnyfifactor = ny./sqrt(2*(1-cosnyfivec)).*(useserialexp==0) + ...

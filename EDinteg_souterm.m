@@ -29,7 +29,7 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 %
 % Uses functions EDdistelements  EDcoordtrans1
 %
-% Peter Svensson 22 May 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 29 May 2018 (peter.svensson@ntnu.no)
 %
 % Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,inteq_ngauss,inteq_discretizationtype,...
 %     vispartedgesfroms,vispartedgesfroms_start,vispartedgesfroms_end,frequency,gaussvectors,rSvec,thetaSvec,zSvec,showtext);
@@ -58,6 +58,7 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 % 7 Mar 2018 Hid the singularity information printouts behind "if showtext
 % >= 2"
 % 22 May 2018 Fixed a mistake "in2str" instead of "int2str".
+% 29 May 2018 Implemented LCN for the highest sample (if it stands out).
 
 if nargin < 14
     showtext = 0;
@@ -270,23 +271,13 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             end
         end
                         
-%         Gsub = -(2-acrossface_out)*ny/4/pi*beta.*dz_expjkm;
         Gsub = -(2-acrossface_out)*ny/4/pi*beta.*dz_expjkmoverm;
         
-%         contrastfactor = max(abs(Gsub))/mean(abs(Gsub)); 
-%         
-%         
-%         if contrastfactor  > 22
-%         if contrastfactor  > 1000
-%            disp('   Singularity to take care of')
-           % We have a singularity to take care of 
-
           % For each value of z1 = the receiver edge point (which there
           % are n3 values of), select the z2-range (which there are n2
           % values of). We should integrate numerically over z2.
           n2countervec = [1:n2].';
           for jj = 1:n3
-%             ivselect1 = find(n3vertmat==jj);
             ivselect = (jj-1)*n2 + n2countervec;
                         
             dGrel = (diff(abs(Gsub(ivselect)))./abs(Gsub(ivselect(1:end-1))));
@@ -296,75 +287,21 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             dofixsingularity = 0;
             iv1 = find( abs(dGrel(1)+1) < 2e-3 );
             iv2 = find( abs(dGrel) > 0.8e3 );
-            if any(iv1) 
-%                 disp(['Need to take care of singularity, iv1: ',num2str(abs(dGrel(1)+1))])
+            if any(iv1) || any(iv2)
                 dofixsingularity = 1;
-            else
-%                 disp(['No need, iv1: ',num2str(abs(dGrel(1)+1))])
             end
-            if any(iv2)
-%                 disp(['Need to take care of singularity, iv2: ',num2str(max(abs(dGrel)))])
-                dofixsingularity = 1;
-            else
-%                 disp(['No need, iv2: ',num2str(max(abs(dGrel)))])
-            end
-%             if length(iv1) > 1 || length(iv2) > 1
-%                         dGrel
-%                disp('PROBLEM: More than one peak to integrate. Not implemented yet (location 1)')
-%             end
-%             if any(iv1)
-%                 if iv1(1) == 1
-%                     if any(iv2)
-%                         dGrel
-%                         error('PROBLEM: More than one peak to integrate. Not implemented yet (location 2)')
-%                     end
-%                     ivpeaks = 1;
-%                     npeaks = 1;
-%                 end
-%                 if iv1(1) == n2
-%                     if any(iv2)
-%                         error('PROBLEM: More than one peak to integrate. Not implemented yet (location 2)')
-%                     end
-%                     ivpeaks = n2;
-%                     npeaks = 1;                    
-%                 end
-%             end
-%             if any(iv2)
-%                 ivpeaks_candidate = iv2(1)+1; 
-%                 if abs(Gsub(ivselect(ivpeaks_candidate))) == max(abs( Gsub(ivselect )))
-%                     ivpeaks = ivpeaks_candidate;
-%                     npeaks = 1;
-%                 end
-%             end
-          
-
-            % Find the problem sample (we assume that we need to take
-            % care of only one), which we will do a local correction
-            % for.
-
-%             ivpeaks = find( (abs(Gsub(ivselect)))/mean(abs(Gsub(ivselect))) > 22);
-%             npeaks = length(ivpeaks);
-
-            
                         
             % Now we need to compute Iaccurate = integrate beta from S,
             % via edge2, to edge3. Integration should be over the
             % entire edge2, to one point on edge3.
 
-%                         disp(['   Integrate, over via-edge ',int2str(edge2),' from S, to edge ',int2str(edge3),', point number ',int2str(jj),' of ',int2str(n3)])
-%                         disp(['      Number of peaks: ',int2str(length(ivpeaks))])
-%             if npeaks > 1
-%                 disp(['      PROBLEM: More than one peak: ',int2str(npeaks)])
-%             else
-
-%             if npeaks == 1
-
             if dofixsingularity == 1
-           
-                [maxval,ivpeaks] = max(abs(Gsub(ivselect)));
+               [maxval,ivpeaks] = max(abs(Gsub(ivselect)));
                npeaks = 1;
-               disp(['   Integrating source term, from S, via edge ',int2str(edge2),' to edge ',int2str(edge3)])
-
+               if showtext >= 2
+                    disp(['   Integrating source term, from S, via edge ',int2str(edge2),' to edge ',int2str(edge3)])
+               end
+               
                % Source parameters: rS, thetaS, zS
                % Receiver parameters: re3_re2(jj),
                % thetaout, ze3_re2(jj)
@@ -380,7 +317,8 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                    [0,len2]);
                 Iaccurate = -(2-acrossface_out)*ny/4/pi*Iaccurate;
                       
-                % Here comes the LCN part:
+                % Here comes the LCN part, but with a single sample
+                % replacement.
                 % Iaccurate should be = len2*(w1*Gsub1 + w2*Gsub2 + ... +
                 % wN*GsubN)
                 % but due to the singularity, one term is imprecise: wL*GsubL             
@@ -390,50 +328,18 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                 % where Gsubvector_mod is [Gsub1,..., 0, ..., GsubN]
                 % that is, with GsubL replaced by zero.
 
-%                 if dofixsingularity == 0
-%                    savetemp
-%                    pause
-%                 end
-
                 Gsubvector_mod = Gsub(ivselect);
                 Gsubvector_mod(ivpeaks) = 0;
                 Lvalue = (Iaccurate/len2 - sum(Gsubvector_mod.*weight2vec))/weight2vec(ivpeaks);
 
                 Gsuborig = Gsub(ivselect);
-                disp(['      LCN: Old value was ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
-                reldiff = abs( Lvalue - Gsuborig(ivpeaks) )/abs( Gsuborig(ivpeaks) );
-%                 if reldiff < 1e-6
+%                 reldiff = abs( Lvalue - Gsuborig(ivpeaks) )/abs( Gsuborig(ivpeaks) );
                     Gsub(ivselect(ivpeaks)) = Lvalue;
-%                 end
-                disp(['      LCN: New value is ',num2str(Gsub(ivselect(ivpeaks))),' angle is ',num2str(atan(imag(Gsub(ivselect(ivpeaks)))/real(Gsub(ivselect(ivpeaks)))))])
-                Gsubmod = Gsub(ivselect);
-                
-%                 max(abs(Gsubmod-Gsuborig)./abs(Gsuborig))
-                disp(['         LCN: reldiff = ',num2str(reldiff)])
-                
-%                                figure(1)
-%         semilogy(abs(Gsub(ivselect)),'-o')
-%         grid
-%         title(['ivpeaks = ',num2str(ivpeaks),' (dofixsing = ',int2str(dofixsingularity),')'])
-% % %         figure(2)
-% % %         plot(abs(Gsub(ivselect)),'-o')
-% % %         grid
-%             pause
-% %                
+                Gsubmod = Gsub(ivselect);                
 
-% % % %                 semilogy(abs([Gsuborig Gsubmod]),'-o')
-% % % %                 grid      
-% % % %                 if ~isempty(ivpeaks)
-% % % %             title(['ivpeaks = ',num2str(ivpeaks)])
-% % % %         else
-% % % %             title('No peaks')
-% % % %         end 
-% % % % 
-% % % %                 pause
             end
             
           end
-%        end
          
         G(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) =     G(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) + Gsub;
                 

@@ -231,7 +231,8 @@ else
         disp('   Creating the planedata struct from the input geometry matrices')
     end
     t00 = clock;
-    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners);    
+    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners,geoinputdata.planerefltypes); 
+        
     ncorners = size(planedata.corners,1);
     nplanes = size(planedata.planecorners,1);
     t01 = etime(clock,t00);
@@ -268,6 +269,7 @@ if foundmatch == 1
     end
 else
     [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,geoinputdata.firstcornertoskip,[],0,filehandlingparameters.showtext);
+    
     if filehandlingparameters.saveeddatafile == 1
         eval(['save ',desiredname,' planedata edgedata EDinputdatahash'])
     end

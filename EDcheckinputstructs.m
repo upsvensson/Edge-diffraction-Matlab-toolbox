@@ -261,6 +261,9 @@ if ~isfield(Sinputdata,'doallSRcombinations')
     Sinputdata.doallSRcombinations = 1;
 else
     if Sinputdata.doallSRcombinations == 0 && nsources~=nreceivers
+        disp(['   nsources = ',int2str(nsources)])
+        disp(['   nreceivers = ',int2str(nreceivers)])
+        
        error('ERROR: doallSRcombinations was set to 0, but the number of sources was not the same as the number of receivers'); 
     end
 end

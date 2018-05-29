@@ -166,6 +166,14 @@ versiondate{icounter} = '27 Apr 2018';
 versiontext{icounter} = ['New function: EDconvertquadramodel. Also, implemented  '...
                          'general quadrilaterals for ESIEBEM.'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.211';
+versiondate{icounter} = '29 May 2018';
+versiontext{icounter} = ['New functions: EDintegratebetaoverm and EDbetaoverm_fd. Implemented a '...
+                         'first version of LCN (single sample) for the source term in EDinteg_souterm. '...
+                         'Also, introduced a parameter planedata.planerefltypes so that some planes '...
+                         'can be turned off for models specified in the input struct.'];
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

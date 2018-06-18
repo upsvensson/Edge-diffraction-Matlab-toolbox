@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 27 Apr 2018
+% Peter Svensson (peter.svensson@ntnu.no) 18 June 2018
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -173,6 +173,10 @@ versiontext{icounter} = ['New functions: EDintegratebetaoverm and EDbetaoverm_fd
                          'first version of LCN (single sample) for the source term in EDinteg_souterm. '...
                          'Also, introduced a parameter planedata.planerefltypes so that some planes '...
                          'can be turned off for models specified in the input struct.'];
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.211';
+versiondate{icounter} = '18 June 2018';
+versiontext{icounter} = ['Added geomacc as an input parameter to EDpoinpla and EDinfrontofplane'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

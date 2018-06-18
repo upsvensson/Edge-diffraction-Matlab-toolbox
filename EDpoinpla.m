@@ -1,4 +1,4 @@
-function [hitvec,edgehit,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs,showtext)
+function [hitvec,edgehit,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs,geomacc,showtext)
 % EDpoinpla - Detects if one or more points are inside a number of finite planes. 
 % If one point is given as input, it will be checked against all
 % planes in a list of planes. If N points are given as inputs, a list of
@@ -19,7 +19,9 @@ function [hitvec,edgehit,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxval
 %                   have been rearranged so that they have N rows, and each
 %                   row contain the data for one specific plane, the one
 %                   that the inside-check should be done for.
-%   showtext (optinal)  0 -> no text displayed on screen. Default: 0
+%   geomacc         (optional) The value in meters, by which it is
+%                   determined if a point belongs to a finite plane or not.
+%   showtext        (optinal)  0 -> no text displayed on screen. Default: 0
 %
 % Output parameters:
 %   hitvec			List, [N,1], with 1 or 0 indicating whether a point is
@@ -31,9 +33,9 @@ function [hitvec,edgehit,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxval
 %
 % Uses no special subroutines
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 18 June 2018
 % 
-% [hitvec,edgehit] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs);
+% [hitvec,edgehit] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs,geomacc,showtext);
 
 % 100204 Functioning version
 % 111201 Fixed a bug: when the ray (from the hitpoint in the positive x-direction) passed exactly
@@ -42,12 +44,15 @@ function [hitvec,edgehit,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxval
 % 15 Jan. 2018 Added the detection of edge hits and corner hits
 % 15 Mar 2018 Fixed a bug which happened when different planes had
 %             different numbers of corners.
+% 18 June 2018 Introduced geomacc as an optional input parameter with
+% default value 1e-9.
 
-if nargin < 9
+if nargin < 10
     showtext = 0;
 end
-
-geomacc = 1e-12;
+if nargin < 9
+    geomacc = 1e-12;
+end
 
 npoints = size(xpoints,1);
 nplanestotest = length(planelist);

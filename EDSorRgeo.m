@@ -59,7 +59,7 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 % EDcoordtrans1 EDgetedgepoints, EDcheckobstr_pointtoedge from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 18 June 2018
 %
 % [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,EDversionnumber,nedgesubs,showtext);
 
@@ -80,8 +80,10 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 % 17 Jan 2018 Turned off some text printouts
 % 8 Feb 2018 Introduced the EDinputdatahash
 % 15 Mar 2018 Fixed a little bug for cases where some plane was TOTABS.
+% 18 June 2018 Introduced the variable geomacc which is passed on to
+% EDinfrontofplane and to EDpoinpla.
 
-% geomacc = 1e-10;
+geomacc = 1e-9;
 
 if nargin < 7
     showtext = 0;
@@ -197,7 +199,38 @@ clear iv
 %    0 if point is behind plane
 
 visplanesfromr = EDinfrontofplane(pointcoords(colnumb,:),planedata.planeeqs(rownumb,1:3),...
-planedata.corners(planedata.planecorners(rownumb,1),:),planedata.corners(planedata.planecorners(rownumb,2),:)) + 1;
+planedata.corners(planedata.planecorners(rownumb,1),:),planedata.corners(planedata.planecorners(rownumb,2),:),'','',geomacc) + 1;
+
+% If any source/receiver belongs to a plane, we should check if the S/R is
+% inside the finite plane or not:
+%   Yes -> issue an error message, because source/receivers can not be too
+%          close to any plane
+%   No  -> no error message, but if difforder > 1, issue a warning message
+%          that ESIEBEM is recommended.
+
+iv_closetoplane = find(visplanesfromr==1);
+if any(iv_closetoplane)
+    [hitvec,edgehit] = EDpoinpla(pointcoords(colnumb(iv_closetoplane),:),rownumb(iv_closetoplane),...
+        planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,...
+        planedata.ncornersperplanevec,planedata.planeeqs(:,1:3),geomacc);
+    ivinside = find(hitvec);
+    ivedgehit = find(edgehit);
+    ivoutside = find(hitvec==0);
+
+    if any(ivinside)
+        error(['ERROR: at least ',upper(typeofcoords),' no. ',int2str( colnumb(iv_closetoplane(ivinside(1)))),...
+            ' is too close to plane no. ',int2str(  rownumb(iv_closetoplane(ivinside(1)))  )])
+    end    
+    if any(edgehit)
+        error(['ERROR: at least ',upper(typeofcoords),' no. ',int2str( colnumb(iv_closetoplane(ivedgehit(1)))),...
+            ' is too close to one edge'])
+    end    
+    if any(ivoutside)
+        error(['ERROR: at least ',upper(typeofcoords),' no. ',int2str( colnumb(iv_closetoplane(ivoutside(1)))),...
+            ' is too close to the extension of plane no. ',int2str(  rownumb(iv_closetoplane(ivoutside(1)))  )])
+    end
+end
+
 
 clear rownumb colnumb
 

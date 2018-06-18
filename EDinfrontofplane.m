@@ -1,4 +1,4 @@
-function pointinfront = EDinfrontofplane(pointcoords,planenvecs,planecoco,backupplanecoco,cornernumb,planenumb)
+function pointinfront = EDinfrontofplane(pointcoords,planenvecs,planecoco,backupplanecoco,cornernumb,planenumb,geomacc)
 % EDinfrontofplane - Checks if a point is in front of, in plane with, or behind a list of planes. 
 % Alternatively, a single plane is checked versus a list of points.
 % Alternatively, it checks n points versus n planes.
@@ -14,19 +14,40 @@ function pointinfront = EDinfrontofplane(pointcoords,planenvecs,planecoco,backup
 %                           If this list is used, the other input parameters pointcoords etc must be expanded.
 %   planenumb              (optional) A list of the values [1:nplanes] for huge problems.
 %                           If this list is used, the other input parameters pointcoords etc must be expanded.
+%   geomacc                (optional) The distance, in meters, for which a
+%                           point is considered to belong to a plane.
+%                           Default: 1e-9.
 %
 % Output parameters:
 %	pointinfront			A list of values, +1 (in front) 0 (in plane) or
 %                           -1 (behind). Type: int8.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 24 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 18 June 2018
 %
 % pointinfront = EDinfrontofplane(pointcoords,planenvecs,planecoco,backupplanecoco,cornernumb,planenumb);
 
 % 24 Nov. 2017 Copied, with minor changes, from ESIE2infrontofplane
+% 18 June 2018 Introduced geomacc as an input parameter w default value 1e-9 m
 
-% geomacc = 1e-6;
-geomacc = 1e-3;
+planenumbdefined = 0;
+cornernumbdefined = 0;
+if nargin < 7
+    geomacc = 1e-9;
+    if nargin >= 5        
+        cornernumbdefined = 1;
+        if nargin >= 6
+            planenumbdefined = 1;
+        end
+    end
+else
+    if ~isempty(planenumb)
+       planenumbdefined = 1;
+    end
+    if ~isempty(cornernumb)
+       cornernumbdefined = 1;
+    end
+    
+end
 batchsize = 2.5e6;
 
 nplanes = size(planenvecs,1);
@@ -75,7 +96,8 @@ elseif npoints > 1 && nplanes==1
 		pointinfront(iv) = -1*ones(size(iv),'int8');
 	end
 else
-    if nargin == 4
+%     if nargin == 4
+    if cornernumbdefined == 0
 		vectors = pointcoords - planecoco;
 		lvectors = sqrt(sum( (vectors.').^2 )).';
 		iv = find( lvectors < geomacc );
@@ -88,7 +110,8 @@ else
         if ~isempty(iv)
 			pointinfront(iv) = -1*ones(size(iv),'int8');
         end
-    elseif nargin == 6
+%     elseif nargin == 6
+    elseif planenumbdefined == 1        
         nplanes = length(planenumb);
         ncorners = length(cornernumb);
         corners = pointcoords; clear pointcoords

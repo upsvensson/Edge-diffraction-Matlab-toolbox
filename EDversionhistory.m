@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 18 June 2018
+% Peter Svensson (peter.svensson@ntnu.no) 6 Ferb 2018
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -177,6 +177,11 @@ icounter = icounter + 1;
 versionnumbers{icounter} = '0.211';
 versiondate{icounter} = '18 June 2018';
 versiontext{icounter} = ['Added geomacc as an input parameter to EDpoinpla and EDinfrontofplane'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.212';
+versiondate{icounter} = '6 Febr 2019';
+versiontext{icounter} = ['Modified EDfindconvexGApaths (bug: spec refl were not detected in all cases when nS>1 and nR >1'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

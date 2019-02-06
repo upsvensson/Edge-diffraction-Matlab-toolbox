@@ -46,7 +46,7 @@ function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,ed
 % Uses functions  EDfindis EDchkISvisible from EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 8 Feb 2018
+% Peter Svensson (peter.svensson@ntnu.no) 6 Feb 2019
 %
 % [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,...
@@ -75,6 +75,9 @@ function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,ed
 % direct sound obstructions were possible, or no specular reflection was possible,
 % then an error occurred.
 % 8 Feb 2018 Introduced the EDinputdatahash
+% 6 Feb 2019 Fixed a bug which occurred if nsources > 1 and nreceivers > 1.
+% The number of potential specular reflections was erroneously found to be the last
+% number of possible reflections in the for-loop around line 160.
 
 if nargin < 13
    showtext = 0; 
@@ -157,13 +160,14 @@ if nsources == min_number_elements
 else 
     possibleSPR = [];
     for ii = 1:nreceivers
+        disp(int2str(ii))
         visplanesfromoneR = visplanesfromR(:,ii);
         tempmatrix = visplanesfromS.*visplanesfromoneR(:,ones(1,nsources));
         ivpotential = find(tempmatrix);
         npotentialIS = length(ivpotential);
         if npotentialIS > 0
             [Pnumber_potentialIS, Snumber_potentialIS ] = ind2sub([nplanes,nsources], ivpotential);
-            possibleSPR = [possibleSPR;[ Snumber_potentialIS  Pnumber_potentialIS ii*ones(npotentialIS,1)]];
+            possibleSPR = [possibleSPR;[ Snumber_potentialIS  Pnumber_potentialIS ii*ones(npotentialIS,1)]];            
         end
     end
 end
@@ -176,11 +180,12 @@ if doallSRcombinations == 0
     else
         npotentialIS = 0;
     end
+else
+   npotentialIS = size(possibleSPR,1);    
 end
 
 if npotentialIS > 0
     coords_potentialIS = EDfindis(sources(possibleSPR(:,1),:),possibleSPR(:,2),planedata.planeeqs);
-
     [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = ...
         EDchkISvisible(coords_potentialIS,receivers(possibleSPR(:,3),:),...
         planedata.planeeqs(possibleSPR(:,2),4),planedata.planeeqs(possibleSPR(:,2),1:3),...

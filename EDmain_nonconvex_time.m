@@ -270,7 +270,6 @@ else
     [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_eddata',EDedgeoinputhash);
 end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_eddata.mat'];
-
 if foundmatch == 1
     eval(['load ',existingfilename])
     if ~strcmp(existingfilename,desiredname)
@@ -279,8 +278,6 @@ if foundmatch == 1
 else
     [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,geoinputdata.firstcornertoskip,[],0,filehandlingparameters.showtext);
     if filehandlingparameters.saveeddatafile == 1
-        desiredname
-        
         eval(['save ',desiredname,' planedata edgedata EDinputdatahash'])
     end
 end
@@ -472,17 +469,17 @@ if controlparameters.docalcir == 1 && controlparameters.skipfirstorder == 0
             'difforder',controlparameters.difforder,'envdata',envdata,'Sinputdata',Sinputdata,...
             'receivers',Rdata.receivers,'saveindividualfirstdiff',controlparameters.saveindividualfirstdiff,'EDversionnumber',EDversionnumber);
         EDfirstorderirsinputhash = DataHash(EDfirstorderirsinputstruct);
-        [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_ir',EDfirstorderirsinputhash);
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_ir',EDfirstorderirsinputhash);
     end
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_ir.mat'];    
     if foundmatch == 1
         currenttimingstruct = timingstruct;
-         eval(['load ',recycledresultsfile,' irdirect irgeom irdiff timingstruct'])
+         eval(['load ',existingfilename,' irdirect irgeom irdiff timingstruct'])
          EDinputdatahash = EDfirstorderirsinputhash;
         t01 = etime(clock,t00);
         currenttimingstruct.makeirs = [t01 timingstruct.makeirs(2:4)];
         timingstruct = currenttimingstruct;
-        eval(['save ',desiredname,' irdirect irgeom irdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
+        eval(['save ',desiredname,' irdirect irgeom irdiff timingstruct existingfilename EDsettings EDinputdatahash'])
     else
         [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderirs(firstorderpathdata,...
             controlparameters.fs,controlparameters.Rstart,controlparameters.difforder,envdata,Sinputdata,Rdata.receivers,...
@@ -490,18 +487,18 @@ if controlparameters.docalcir == 1 && controlparameters.skipfirstorder == 0
 %         [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordertfs(firstorderpathdata,...
 %             controlparameters.frequencies,controlparameters.Rstart,controlparameters.difforder,envdata,Sinputdata,Rdata.receivers,...
 %             edgedata,EDversionnumber,filehandlingparameters.showtext);
-        recycledresultsfile = '';
+        existingfilename = '';
         t01 = etime(clock,t00);
         timingstruct.makeirs = [t01 timingdata];
-        eval(['save ',desiredname,' irdirect irgeom irdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
+        eval(['save ',desiredname,' irdirect irgeom irdiff timingstruct existingfilename EDsettings EDinputdatahash'])
     end
     if filehandlingparameters.showtext >= 1 && foundmatch == 1
-        disp(['      Recycled ',recycledresultsfile])
+        disp(['      Recycled ',existingfilename])
     end
     if filehandlingparameters.savelogfile == 1
         fwrite(fid,['   EDmakefirstorderirs',lineending],'char');
         if foundmatch == 1
-            fwrite(fid,['      by recycling ',recycledresultsfile,lineending],'char');     
+            fwrite(fid,['      by recycling ',existingfilename,lineending],'char');     
             fwrite(fid,['                                Total time: ',num2str(t01),' s',lineending],'char');          
         else
             fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, as below',lineending],'char');

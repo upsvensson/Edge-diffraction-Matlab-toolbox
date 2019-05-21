@@ -70,19 +70,36 @@ for isou = 1:nsources
             edgeseesedgevalues = edgeseesedge_lastround(:,pathspattern_to_propagate(:,norder-1),ii); 
             ivec = find(edgeseesedgevalues);
             [paths1,paths2] = ind2sub([nedges,npaths],ivec);
-            hodpaths{norder,ii,isou} = [pathspattern_to_propagate(paths2,:) paths1];
-            hodpathsalongplane{norder,ii,isou} = ones(length(ivec),norder-1);
-            negivec = find(edgeseesedgevalues(ivec) == -1);
-            hodpathsalongplane{norder,ii,isou}(negivec,norder-1) = 0; 
-            if norder >= 3
-                hodpathsalongplane{norder,ii,isou}(:,1:norder-2) = ...
-                    hodpathsalongplane{norder-1,ii,isou}(paths2,:);
+            hodpaths{norder,ii,isou}           = [pathspattern_to_propagate(paths2,:) paths1];
+            indexlist = sub2ind([nedges nedges],pathspattern_to_propagate(paths2,end),paths1);
+            hodpathsalongplane_coltoadd = edgeseesedge(indexlist);
+            if norder > 2
+                hodpathsalongplane{norder,ii,isou} = [pathsalong_to_propagate(paths2,:) hodpathsalongplane_coltoadd];
+            else
+                hodpathsalongplane{norder,ii,isou} = hodpathsalongplane_coltoadd;
             end
+            
+%             negivec = find(edgeseesedgevalues(ivec) == -1)
+%             hodpathsalongplane{norder,ii,isou}(negivec,norder-1) = 0; 
+%             if norder >= 3
+%                 
+%                 hodpathsalongplane{norder,ii,isou}(:,1:norder-2) = ...
+%                     hodpathsalongplane{norder-1,ii,isou}(paths2,:);
+%             end
         end
 
         ivec = find(edgeseesedge(:,pathspattern_to_propagate(:,norder-1)));
         [paths1,paths2] = ind2sub([nedges,npaths],ivec);
         pathspattern_to_propagate = [pathspattern_to_propagate(paths2,:) paths1];
+        if norder == 2
+           indexlist = sub2ind([nedges nedges],pathspattern_to_propagate(:,1),pathspattern_to_propagate(:,2)) ;
+           pathsalong_to_propagate = edgeseesedge(indexlist);
+        else            
+            indexlist = sub2ind([nedges nedges],pathspattern_to_propagate(:,end-1),pathspattern_to_propagate(:,end));
+            pathsalong_to_propagate_coltoadd = edgeseesedge(indexlist);
+            pathsalong_to_propagate = [pathsalong_to_propagate(paths2,:) pathsalong_to_propagate_coltoadd];
+        end
     end
 
 end
+

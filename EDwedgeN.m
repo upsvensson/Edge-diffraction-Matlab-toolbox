@@ -58,7 +58,7 @@ pathalongplane,nedgeelcombs,R_irstart,bc,cair,fs,BIGEDGE1stvalue)
 %           transferred separately as BIGEDGE1stvalue (see above).
 %
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 16 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 21 May 2019
 %
 % [ir,ninit] = EDwedgeN(cylS,cylR,cylE,ncylrows,nyveclist,edgelengthlist,dzvec,method,...
 % pathalongplane,nedgeelcombs,R_irstart,bc,cair,fs,BIGEDGE1stvalue);
@@ -68,17 +68,19 @@ pathalongplane,nedgeelcombs,R_irstart,bc,cair,fs,BIGEDGE1stvalue)
 %              the end. Gives major speedup.
 % 7 April 2017 Small tweaking of the accumarray code.
 % 16 Mar 2018 Copied over to EDtoolbox
+% 21 May 2019 Implemented the handling of non-planar edge sequences (the
+%             recalculation of theta angles).
 
 global BIGEDGESTEPMATRIX
 
 Ndifforder = length(edgelengthlist);
 
-multfac = prod(1./(pathalongplane + 1));
+multfac = prod(1./(double(pathalongplane) + 1));
 
 %-----------------------------------------------------------------------
 % Create matrices with the z-, r- and theta-values
 %
-% BigB is a matrix that contains relative steps, ]0,1[, along each edge
+% BIGEDGESTEPMATRIX is a matrix that contains relative steps, ]0,1[, along each edge
 %
 % All the big matrices will have one column for each "edge n rel. to edge
 % m" combination:
@@ -113,7 +115,8 @@ zEn_REn1stvalue = BIGEDGE1stvalue.*edgelengthlist(1);
 % The z-values for each edge, relative to the two neighbour edges
 
 zreSTA = cylE(1:2:ncylrows,3).';
-zreDIF = cylE(2:2:ncylrows,3).' - zreSTA;
+zreEND = cylE(2:2:ncylrows,3).';
+zreDIF = zreEND - zreSTA;
 
 zEn_REm = zreSTA(onesvec,ivecwithhole) + BIGEDGESTEPMATRIX(:,colvec).*zreDIF(onesvec,ivecwithhole);
 zEn_REm2ndvalue = zreSTA(2) + BIGEDGE1stvalue.*zreDIF(2);
@@ -131,7 +134,8 @@ E2Rdist = sqrt( cylR(1)^2 + ( zEn_REn(:,Ndifforder-1) - cylR(3) ).^2);
 % The r-values for each edge, relative to the two neighbour edges
 
 rreSTA = cylE(1:2:ncylrows,1).';
-rreDIF = cylE(2:2:ncylrows,1).' - rreSTA;
+rreEND = cylE(2:2:ncylrows,1).';
+rreDIF =  rreEND - rreSTA;
 
 rEn_REm = rreSTA(onesvec,ivecwithhole) + BIGEDGESTEPMATRIX(:,colvec).*rreDIF(onesvec,ivecwithhole);
 rEn_REm2ndvalue = rreSTA(2) + BIGEDGE1stvalue.*rreDIF(2);
@@ -194,12 +198,36 @@ thetareDIF = cylE(2:2:ncylrows,2).' - thetareSTA;
 
 if all(thetareDIF==0)
     thetaEn_REm = thetareSTA(ivecwithhole);
-else
-    % CHECK: Here we need to implement something like
-    thetaEn_REm = acos(rEn_REm./E2Edist);
-    disp(['ERROR: Not implemented the proper calculation of theta-values for non-parallel edge pairs yet!'])    
-    % old version:
-    %     thetaEn_REm = thetareSTA(onesvec,ivecwithhole) + BIGEDGESTEPMATRIX(:,colvec).*thetareDIF(onesvec,ivecwithhole);
+else    
+    % For each edge-to-edge leg (that is, each column), we need to 
+    % reconvert the cylindrical coordinates of
+    % edge2-re1 into cartesian. Then we can use the EDB1coordtrans.
+    % We define our own cartesian coord syst such that the reference
+    % edge has its starting point in [0 0 0], and the x-axis is along
+    % the reference plane.       
+    % We should in principle check if really the full lengths of both
+    % edges should be used.
+    xSTA_REm = rreSTA(ivecwithhole).*cos(thetareSTA(ivecwithhole));
+    ySTA_REm = rreSTA(ivecwithhole).*sin(thetareSTA(ivecwithhole));
+    xEND_REm = rreEND(ivecwithhole).*cos(thetareSTA(ivecwithhole));
+    yEND_REm = rreEND(ivecwithhole).*sin(thetareSTA(ivecwithhole));
+
+    xvec_REm = xSTA_REm(onesvec,:) + (xEND_REm(onesvec,:) - xSTA_REm(onesvec,:)).*BIGEDGESTEPMATRIX(:,colvec);
+    yvec_REm = ySTA_REm(onesvec,:) + (yEND_REm(onesvec,:) - ySTA_REm(onesvec,:)).*BIGEDGESTEPMATRIX(:,colvec);
+    zvec_REm = zreSTA(onesvec,ivecwithhole)   + (zreEND(onesvec,ivecwithhole) - zreSTA(onesvec,ivecwithhole)).*BIGEDGESTEPMATRIX(:,colvec);        
+
+    thetaEn_REm = zeros( size(BIGEDGESTEPMATRIX(:,colvec)) );
+
+    edgerefnumbers = [2:Ndifforder;1:Ndifforder-1];
+    edgerefnumbers = reshape(edgerefnumbers,prod(size(edgerefnumbers)),1);
+    edgerefnumbers = edgerefnumbers(ivecwithhole);
+    
+    for colnumber = 1:size(thetaEn_REm,2)
+        wedgecoords = [0 0 0;0 0 edgelengthlist(edgerefnumbers(colnumber))];
+        [~,theta_onecol,~] = EDcoordtrans1([xvec_REm(:,colnumber) yvec_REm(:,colnumber) zvec_REm(:,colnumber)],wedgecoords,[0 1 0]);
+        thetaEn_REm(:,colnumber) = theta_onecol;
+    end
+    
 end
 
 thetaEn_REm2ndvalue = thetareSTA(2) + BIGEDGE1stvalue.*thetareDIF(2);
@@ -224,7 +252,7 @@ else
     end
 end
 
-% Second "leg" form edge 1, via the second edge, to the third edge
+% Second "leg" from edge 1, via the second edge, to the third edge
 % including the DF only for the second edge. We keep this out of the
 % for-loop because the matrix thetaEn_REm2ndvalue gives a special
 % formulation.

@@ -43,7 +43,7 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % EDinteg_submatrixstructure, EDintegralequation_convex_ir from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 14 May 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 21 May 2019 (peter.svensson@ntnu.no)
 %
 % EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -134,6 +134,9 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % 21 Mar 2018 Completed the section around EDmakeHODirs, with recycling
 % result files.
 % 14 May 2018 CLeaned up the lineending
+% 21 May 2019 Adjusted to changes of the function EDfindHODpaths, with a
+% new output parameter.
+% 21 May 2019 Cleaned up some file recycling mistakes.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -569,10 +572,10 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
     else
-        EDhodpathsinputstruct = struct();
-        EDhodpathsinputhash = DataHash(EDhodpathsinputstruct);
+%         EDhodpathsinputstruct = struct();
+%         EDhodpathsinputhash = DataHash(EDhodpathsinputstruct);
         EDhodpathsinputstruct = struct('difforder',controlparameters.difforder,...
-        'edgeseespartialedge',uint8(sign(edgetoedgedata.edgeseespartialedge)),...
+        'edgeseespartialedge',int8(sign(edgetoedgedata.edgeseespartialedge)),...
         'vispartedgesfroms',sign(Sdata.vispartedgesfroms),'vispartedgesfromr',sign(Rdata.vispartedgesfromr),'EDversionnumber',EDversionnumber);
         EDhodpathsinputhash = DataHash(EDhodpathsinputstruct);
         [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_hodpaths',EDhodpathsinputhash);
@@ -580,11 +583,13 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
     if foundmatch == 1
         eval(['load ',existingfilename])
     else
-        [hodpaths,EDinputdatahash] = EDfindHODpaths(uint8(sign(edgetoedgedata.edgeseespartialedge)),sign(Sdata.vispartedgesfroms),...
+        [hodpaths,hodpathsalongplane,EDinputdatahash] = EDfindHODpaths(int8(sign(edgetoedgedata.edgeseespartialedge)),sign(Sdata.vispartedgesfroms),...
             sign(Rdata.vispartedgesfromr),controlparameters.difforder,EDversionnumber);
+%         [hodpaths,EDinputdatahash] = EDfindHODpaths(uint8(sign(edgetoedgedata.edgeseespartialedge)),sign(Sdata.vispartedgesfroms),...
+%             sign(Rdata.vispartedgesfromr),controlparameters.difforder,EDversionnumber);
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_hodpaths.mat'];
         if filehandlingparameters.savehodpaths == 1
-            eval(['save ',desiredname,' hodpaths EDinputdatahash'])
+            eval(['save ',desiredname,' hodpaths hodpathsalongplane EDinputdatahash'])
         end
     end
     t01 = etime(clock,t00);
@@ -626,32 +631,32 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
     else
-        EDhodirsinputstruct = struct();
-        EDhodirinputhash = DataHash(EDhodirsinputstruct);
+%         EDhodirsinputstruct = struct();
+%         EDhodirinputhash = DataHash(EDhodirsinputstruct);
         EDhodirinputstruct = struct('difforder',controlparameters.difforder,...
-        'hodpaths',hodpaths,'elemsize',elemsize,'edgedata',edgedata,'Sdata',Sdata,...
+        'hodpaths',hodpaths,'hodpathsalongplane',hodpathsalongplane,'elemsize',elemsize,'edgedata',edgedata,'Sdata',Sdata,...
         'doaddsources',Sinputdata.doaddsources,'sourceamplitudes',Sinputdata.sourceamplitudes,...
         'Rdata',Rdata,'cair',envdata.cair,'fs',controlparameters.fs,...
         'Rstart',controlparameters.Rstart,'savealldifforders',...
         controlparameters.savealldifforders,'EDversionnumber',EDversionnumber);
         EDhodirinputhash = DataHash(EDhodirinputstruct);
-        [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_irhod',EDhodirinputhash);
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_irhod',EDhodirinputhash);
     end
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_irhod.mat'];
     if foundmatch == 1
         currenttimingstruct = timingstruct;
-         eval(['load ',recycledresultsfile,' irhod'])
+         eval(['load ',existingfilename,' irhod'])
          EDinputdatahash = EDhodirinputhash;
         t01 = etime(clock,t00);
         currenttimingstruct.hodir = t01;
         timingstruct = currenttimingstruct;
         eval(['save ',desiredname,'  irhod timingstruct EDsettings EDinputdatahash'])        
     else        
-        [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,controlparameters.difforder,elemsize,edgedata,...
+        [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,controlparameters.difforder,elemsize,edgedata,...
         edgetoedgedata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Rdata,envdata.cair,...
         controlparameters.fs,controlparameters.Rstart,controlparameters.savealldifforders,...
         filehandlingparameters.showtext,EDversionnumber);
-        recycledresultsfile =  '';
+        existingfilename =  '';
         t01 = etime(clock,t00);
         timingstruct.hodir = t01;
         eval(['save ',desiredname,' irhod timingstruct EDsettings EDinputdatahash'])

@@ -84,11 +84,11 @@ nyveclist,edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs)
 %           These values are multiplied with the lengths of the respective
 %           edges to give the actual position, in meters along each edge.
 %
-% Uses no special functions
+% Uses the subroutine EDcoordtrans1
 %
 % Peter Svensson (peter.svensson@ntnu.no) 21 May 2019
 %
-% [ir,ninit] = EDwedge2ndnew(cylS,cylR,cylE2_r1,cylE1_r2,...
+% [ir,ninit] = EDwedge2nd(cylS,cylR,cylE2_r1,cylE1_r2,...
 % nyveclist,edgelengthlist,dzvec,method,pathalongplane,BigB,R_irstart,bc,cair,fs);
 
 % 8 May 2008: Functioning version
@@ -103,7 +103,7 @@ nyveclist,edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs)
 
 global BIGEDGESTEPMATRIX
 
-multfac = 1/(pathalongplane + 1);
+multfac = 1/(double(pathalongplane) + 1);
 
 %-----------------------------------------------------------------------
 % Extract the individual parameters
@@ -187,7 +187,7 @@ if swapbigmatrix == 0
         % NB!!! Below we need to check if really the full lengths of both
         % edges should be used. If S or R see only part of the respective
         % edge then the edge-to-edge contribution should be "windowed" too.
-        [redge2_re1,thetaedge2_re1,znewedge2_re1] = EDB1coordtrans1([xvec_re1 yvec_re1 zvec_re1],[0 0 0;0 0 edgelengthlist(1,2)],[0 1 0]);
+        [redge2_re1,thetaedge2_re1,znewedge2_re1] = EDcoordtrans1([xvec_re1 yvec_re1 zvec_re1],[0 0 0;0 0 edgelengthlist(1,2)],[0 1 0]);
          
         xE1_re2 = rE1_r2*cos(thetaE1_r2);
         yE1_re2 = rE1_r2*sin(thetaE1_r2);
@@ -201,7 +201,7 @@ if swapbigmatrix == 0
         % NB!!! Below we need to check if really the full lengths of both
         % edges should be used. If S or R see only part of the respective
         % edge then the edge-to-edge contribution should be "windowed" too.
-        [redge1_re2,thetaedge1_re2,znewedge1_re2] = EDB1coordtrans1([xvec_re2 yvec_re2 zvec_re2],[0 0 0;0 0 edgelengthlist(2,2)],[0 1 0]);   
+        [redge1_re2,thetaedge1_re2,znewedge1_re2] = EDcoordtrans1([xvec_re2 yvec_re2 zvec_re2],[0 0 0;0 0 edgelengthlist(2,2)],[0 1 0]);   
          
     else
         redge2_re1 = rE1_r1 + BIGEDGESTEPMATRIX(:,2)*( rE2_r1 - rE1_r1 );

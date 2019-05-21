@@ -59,7 +59,8 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
 % from EDB1 functions to EDfunctions.
 % 21 Mar 2018 Introduced new input parameter: savealldifforders
 % 29 May 2018 Fixed small bug around line 300 for thin planes.
-% 21 May 2019 Added the new input parameter hodpathsalongplane
+% 21 May 2019 Added the new input parameter hodpathsalongplane and modified
+% the calls to EDwedge2nd and EDwedgeN accordingly.
 
 global BIGEDGESTEPMATRIX 
 
@@ -126,7 +127,9 @@ for isou = 1:nsources
 
                 for ii = 1:ncomponents
 
-                    if showtext >= 3
+                    if showtext >= 4
+                            disp(['      Combination no. ',int2str(ii),' of ',int2str(ncomponents),': ',int2str(edgepatternlist(ii,:))]) 
+                    elseif showtext == 3
                         if round(ii/ceil(ncomponents/10))*ceil(ncomponents/10) == ii
                             disp(['      Combination no. ',int2str(ii),' of ',int2str(ncomponents)]) 
                         end

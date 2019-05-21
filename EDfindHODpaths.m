@@ -1,7 +1,7 @@
-function [hodpaths,EDinputdatahash] = EDfindHODpaths(edgeseesedge,visedgesfroms,visedgesfromr,...
+function [hodpaths,hodpathsalongplane,EDinputdatahash] = EDfindHODpaths(edgeseesedge,visedgesfroms,visedgesfromr,...
 difforder,EDversionnumber)
 % EDfindHODpaths finds the higher order diffraction paths for a convex
-% object.
+% object, or a non-convex object where specular reflections are ignored.
 %
 % Input parameters:
 %   edgeseesedge        Matrix, [nedges,nedges], of 0 and 1
@@ -12,17 +12,25 @@ difforder,EDversionnumber)
 %
 % Output parameters:
 %   hodpaths            Cell variable, hodpaths{2} has size [npaths,2] etc
+%                       Each row in each matrix has a sequence of edge
+%                       numbers.
+%   hodpathsalongplane  Cell variable, hodpaths{2} has size [npaths,1] etc
+%                       Each row in each matrix has values 0 or 1, which tells
+%                       for each hod sequence "leg" whether it passes along
+%                       a plane or not.
 %   EDinputdatahash
 % 
 % Uses the function Datahash from Matlab Central
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 15 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 21 May 2019
 % 
-% hodpaths = EDfindHODpaths(edgeseesedge,visedgesfroms,visedgesfromr,...
-% difforder,EDversionnumber);
+% [hodpaths,hodpathsalongplane,EDinputdatahash] = EDfindHODpaths(edgeseesedge,...
+% visedgesfroms,visedgesfromr,difforder,EDversionnumber);
 
 % 15 Mar 2018 First version
 % 16 Mar 2018 Expanded to several sources and receivers
+% 21 May 2019 Made some changes so that negative values of edgeseesedge can
+% be handled. Introduced the output variable hodpathsalongplane.
 
 EDinputdatastruct = struct('difforder',difforder,...
         'edgeseespartialedge',edgeseesedge,...
@@ -34,7 +42,16 @@ nsources = size(visedgesfroms,2);
 nreceivers = size(visedgesfromr,2);
 
 hodpaths = cell(difforder,nreceivers,nsources);
+hodpathsalongplane = cell(difforder,nreceivers,nsources);
 
+classtocheck = class(edgeseesedge);
+if strcmp(classtocheck,'int8')
+    visedgesfromr = int8(visedgesfromr);
+else
+    if strcmp(classtocheck,'int16')
+        visedgesfromr = int16(visedgesfromr);
+    end
+end
 edgeseesedge_lastround = zeros(nedges,nedges,nreceivers);
 for ii = 1:nreceivers
     edgeseesedge_lastround(:,:,ii) = edgeseesedge.*visedgesfromr(:,ones(1,nedges)*ii);        
@@ -50,9 +67,17 @@ for isou = 1:nsources
         npaths = size(pathspattern_to_propagate,1);
 
         for ii = 1:nreceivers
-            ivec = find(edgeseesedge_lastround(:,pathspattern_to_propagate(:,norder-1),ii));
+            edgeseesedgevalues = edgeseesedge_lastround(:,pathspattern_to_propagate(:,norder-1),ii); 
+            ivec = find(edgeseesedgevalues);
             [paths1,paths2] = ind2sub([nedges,npaths],ivec);
             hodpaths{norder,ii,isou} = [pathspattern_to_propagate(paths2,:) paths1];
+            hodpathsalongplane{norder,ii,isou} = ones(length(ivec),norder-1);
+            negivec = find(edgeseesedgevalues(ivec) == -1);
+            hodpathsalongplane{norder,ii,isou}(negivec,norder-1) = 0; 
+            if norder >= 3
+                hodpathsalongplane{norder,ii,isou}(:,1:norder-2) = ...
+                    hodpathsalongplane{norder-1,ii,isou}(paths2,:);
+            end
         end
 
         ivec = find(edgeseesedge(:,pathspattern_to_propagate(:,norder-1)));

@@ -1,12 +1,14 @@
-function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edgedata,...
-    edgetoedgedata,Sdata,doaddsources,sourceamplitudes,Rdata,cair,fs,Rstart,...
+function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
+    difforder,elemsize,edgedata,edgetoedgedata,Sdata,doaddsources,...
+    sourceamplitudes,Rdata,cair,fs,Rstart,...
     savealldifforders,showtext,EDversionnumber)
 % EDmakeHODirs - Constructs higher-order (two and higher) diffraction impulse
 % responses from a list of paths in the input struct hodpaths.
 %
 % Input parameters:
-%   hodpaths        Cell variable with a list of all the valid edge-combos
-%                   for each diffraction order
+%   hodpaths        Cell variable with a list of all the valid
+%                   edge-sequences for each diffraction order
+%   hodpathsalongplane  Cell variable with a list of 0/1 for each edge-sequence.
 %   difforder       Value from controlparameters
 %   elemsize        Vector, [1,difforder], with values that specify how
 %                   fine edge discretization will be used for each order.
@@ -37,9 +39,9 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edge
 % Uses functions EDcreindexmatrix,EDwedge2nd,EDwedgeN from the EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 29 May 2018
+% Peter Svensson (peter.svensson@ntnu.no) 21 May 2019
 %
-% [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edgedata,...
+% [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,difforder,elemsize,edgedata,...
 %     edgetoedgedata,Sdata,doaddsources,sourceamplitudes,Rdata,cair,fs,Rstart,...
 %     savealldifforders,showtext,EDversionnumber);
     
@@ -57,10 +59,12 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,difforder,elemsize,edge
 % from EDB1 functions to EDfunctions.
 % 21 Mar 2018 Introduced new input parameter: savealldifforders
 % 29 May 2018 Fixed small bug around line 300 for thin planes.
+% 21 May 2019 Added the new input parameter hodpathsalongplane
 
 global BIGEDGESTEPMATRIX 
 
-EDinputdatastruct = struct('difforder',difforder,'hodpaths',hodpaths,'elemsize',elemsize,...
+EDinputdatastruct = struct('difforder',difforder,'hodpaths',hodpaths,...
+    'hodpathsalongplane',hodpathsalongplane,'elemsize',elemsize,...
 'edgedata',edgedata,'Sdata',Sdata,'doaddsources',doaddsources,'sourceamplitudes',sourceamplitudes,'Rdata',Rdata,'cair',cair,...
 'fs',fs,'Rstart',Rstart,'savealldifforders',savealldifforders,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
@@ -96,7 +100,10 @@ for isou = 1:nsources
                    cellcounter = Ndifforder; 
                 end
 
-                pathalongplane = ones(1,Ndifforder-1);
+                % 21 May 2019 Used the new input parameter
+                % hodpathsalongplane
+%                 pathalongplane = ones(1,Ndifforder-1);
+                pathalongplane = hodpathsalongplane{Ndifforder,irec,isou};
                 bc = ones(1,Ndifforder);
 
                 % Calculate some general parameters that are shared for all
@@ -113,7 +120,7 @@ for isou = 1:nsources
                 % the 2,3,4,... edge numbers for each path
 
                 edgepatternlist = hodpaths{Ndifforder,irec,isou}; 
-                ncomponents = size(edgepatternlist,1);
+                ncomponents = size(edgepatternlist,1);                
 
                 lastndivcomb = zeros(1,Ndifforder);
 
@@ -221,19 +228,20 @@ for isou = 1:nsources
 
                         [irnew,~] = EDwedge2nd(cylS,cylR,cylE2_r1frac,cylE1_r2frac,...
                             nyvec(edgepattern(:)),[0 edgedata.edgelengthvec(edgepattern(1));0 edgedata.edgelengthvec(edgepattern(2))],dzvec(edgepattern(:)),...
-                            'n',pathalongplane,Rstart,bc,cair,fs);
+                            'n',pathalongplane(ii),Rstart,bc,cair,fs);
 
         %                 IRDIFFVEC = [IRDIFFVEC;sum(irnew)];
 
                     elseif Ndifforder == 3    %   if Ndifforder == 2			
 
-                        for kk = 1:newndivvec(1)                    
+                        for kk = 1:newndivvec(1)  
+                            
                             BIGEDGE1stvalue = (kk-0.5)./newndivvec(1);
                             wedgeparams = [cylE2_r1;cylE1_r2;cylE3_r2;cylE2_r3];
 
                             [irnewpartition,~] = EDwedgeN(cylS,cylR,wedgeparams,ncylrows,...
                                 nyvec(edgepattern(:)),edgedata.edgelengthvec(edgepattern(:)).',...
-                                dzvec(edgepattern(:)),'n',pathalongplane,nedgeelcombs,Rstart,bc,cair,fs,BIGEDGE1stvalue);
+                                dzvec(edgepattern(:)),'n',pathalongplane(ii,:),nedgeelcombs,Rstart,bc,cair,fs,BIGEDGE1stvalue);
                             irnewpartition = real(irnewpartition);
 
                             if kk == 1
@@ -270,7 +278,7 @@ for isou = 1:nsources
 
                             [irnewpartition,~] = EDwedgeN(cylS,cylR,wedgeparams,ncylrows,...
                                 nyvec(edgepattern(:)),edgedata.edgelengthvec(edgepattern(:)).',...
-                                dzvec(edgepattern(:)),'n',pathalongplane,nedgeelcombs,Rstart,bc,cair,fs,BIGEDGE1stvalue);
+                                dzvec(edgepattern(:)),'n',pathalongplane(ii,:),nedgeelcombs,Rstart,bc,cair,fs,BIGEDGE1stvalue);
                             irnewpartition = real(irnewpartition);
 
                             if kk == 1
@@ -301,7 +309,7 @@ for isou = 1:nsources
 %                    29 May 2018: The line below caused an error for a thin
 %                    plane, so it was replaced by the line below.
 %                    if all( nyvec(edgepattern(:)) == 0.5 ) && pathalongplane==1                                
-                   if all( nyvec(edgepattern(:)) == 0.5 ) && all(pathalongplane==1)                                
+                   if all( nyvec(edgepattern(:)) == 0.5 ) && all(pathalongplane(ii,:)==1)                                
                         boostfactor = boostfactor*2^(Ndifforder-1);                        
                     end
 

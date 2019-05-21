@@ -5,11 +5,10 @@ function EDmain_nonconvex_time(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % and higher-order diffraction.
 %
 % Some types of non-convex geometries can be handled as well. These include
-% two separate objects, such as two or more thin plates, or two or more
-% boxes. Higher-order diffraction will be handled, **but not any dsd
-% combinations**. That is, no specular reflections inbetween edge
-% diffractions can be handled. Therefore flutter echo effects can not be
-% handled.
+% separate objects, such as two or more thin plates, or two or more
+% boxes. Higher-order diffraction will be handled, **but no specular 
+% reflections inbetween edge diffractions can be handled**. 
+% Therefore flutter echo effects can not be handled.
 %
 % Input parameters are six structs with fields as specified below:
 %   geoinputdata        .geoinputfile        (obligatory)
@@ -144,6 +143,7 @@ function EDmain_nonconvex_time(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % 19 May 2019 Turned off the check for non-convex geometries.
 % 21 May 2019 Adjusted to changes of the function EDfindHODpaths, with a
 % new output parameter.
+% 21 May 2019 Cleaned up some file recycling mistakes.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -153,7 +153,7 @@ function EDmain_nonconvex_time(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 if nargin < 6
     filehandlingparameters = struct('showtext',0);
     if nargin < 5
-        error('ERROR: The first five input parameters to EDmain_convex_time must be specified')  
+        error('ERROR: The first five input parameters to EDmain_nonconvex_time must be specified')  
     end
 end
 
@@ -192,7 +192,7 @@ end
 
 if filehandlingparameters.showtext >= 1
 	disp('    ');disp('####################################################################')
-              disp(['#  EDmain_convex_time, v. ',num2str(EDversionnumber),' (',lastsavedate,')'])
+              disp(['#  EDmain_nonconvex_time, v. ',num2str(EDversionnumber),' (',lastsavedate,')'])
               disp(['#  filestem for results: ',filehandlingparameters.filestem])
               disp(' ')
 end
@@ -581,10 +581,8 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
     else
-        EDhodpathsinputstruct = struct();
-        EDhodpathsinputhash = DataHash(EDhodpathsinputstruct);
         EDhodpathsinputstruct = struct('difforder',controlparameters.difforder,...
-        'edgeseespartialedge',uint8(sign(edgetoedgedata.edgeseespartialedge)),...
+        'edgeseespartialedge',int8(sign(edgetoedgedata.edgeseespartialedge)),...
         'vispartedgesfroms',sign(Sdata.vispartedgesfroms),'vispartedgesfromr',sign(Rdata.vispartedgesfromr),'EDversionnumber',EDversionnumber);
         EDhodpathsinputhash = DataHash(EDhodpathsinputstruct);
         [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_hodpaths',EDhodpathsinputhash);
@@ -592,13 +590,15 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
     if foundmatch == 1
         eval(['load ',existingfilename])
     else        
+        % 21 May 2019 Modified the call to EDfindHODpaths to include the
+        % new output parameter hodpathsalongplane.
         [hodpaths,hodpathsalongplane,EDinputdatahash] = EDfindHODpaths(int8(sign(edgetoedgedata.edgeseespartialedge)),sign(Sdata.vispartedgesfroms),...
             sign(Rdata.vispartedgesfromr),controlparameters.difforder,EDversionnumber);
 %         [hodpaths,EDinputdatahash] = EDfindHODpaths(uint8(sign(edgetoedgedata.edgeseespartialedge)),sign(Sdata.vispartedgesfroms),...
 %             sign(Rdata.vispartedgesfromr),controlparameters.difforder,EDversionnumber);
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_hodpaths.mat'];
         if filehandlingparameters.savehodpaths == 1
-            eval(['save ',desiredname,' hodpaths EDinputdatahash'])
+            eval(['save ',desiredname,' hodpaths hodpathsalongplane EDinputdatahash'])
         end
     end
     t01 = etime(clock,t00);
@@ -640,32 +640,32 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
     else
-        EDhodirsinputstruct = struct();
-        EDhodirinputhash = DataHash(EDhodirsinputstruct);
+%         EDhodirsinputstruct = struct();
+%         EDhodirinputhash = DataHash(EDhodirsinputstruct);
         EDhodirinputstruct = struct('difforder',controlparameters.difforder,...
-        'hodpaths',hodpaths,'elemsize',elemsize,'edgedata',edgedata,'Sdata',Sdata,...
+        'hodpaths',hodpaths,'hodpathsalongplane',hodpathsalongplane,'elemsize',elemsize,'edgedata',edgedata,'Sdata',Sdata,...
         'doaddsources',Sinputdata.doaddsources,'sourceamplitudes',Sinputdata.sourceamplitudes,...
         'Rdata',Rdata,'cair',envdata.cair,'fs',controlparameters.fs,...
         'Rstart',controlparameters.Rstart,'savealldifforders',...
         controlparameters.savealldifforders,'EDversionnumber',EDversionnumber);
         EDhodirinputhash = DataHash(EDhodirinputstruct);
-        [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_irhod',EDhodirinputhash);
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_irhod',EDhodirinputhash);
     end
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_irhod.mat'];
     if foundmatch == 1
         currenttimingstruct = timingstruct;
-         eval(['load ',recycledresultsfile,' irhod'])
+         eval(['load ',existingfilename,' irhod'])
          EDinputdatahash = EDhodirinputhash;
         t01 = etime(clock,t00);
         currenttimingstruct.hodir = t01;
         timingstruct = currenttimingstruct;
         eval(['save ',desiredname,'  irhod timingstruct EDsettings EDinputdatahash'])        
     else        
-        [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,controlparameters.difforder,elemsize,edgedata,...
+        [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,controlparameters.difforder,elemsize,edgedata,...
         edgetoedgedata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Rdata,envdata.cair,...
         controlparameters.fs,controlparameters.Rstart,controlparameters.savealldifforders,...
         filehandlingparameters.showtext,EDversionnumber);
-        recycledresultsfile =  '';
+        existingfilename =  '';
         t01 = etime(clock,t00);
         timingstruct.hodir = t01;
         eval(['save ',desiredname,' irhod timingstruct EDsettings EDinputdatahash'])

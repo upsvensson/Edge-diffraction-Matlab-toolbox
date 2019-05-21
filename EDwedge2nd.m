@@ -86,7 +86,7 @@ nyveclist,edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs)
 %
 % Uses no special functions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 16 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 21 May 2019
 %
 % [ir,ninit] = EDwedge2ndnew(cylS,cylR,cylE2_r1,cylE1_r2,...
 % nyveclist,edgelengthlist,dzvec,method,pathalongplane,BigB,R_irstart,bc,cair,fs);
@@ -94,9 +94,12 @@ nyveclist,edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs)
 % 8 May 2008: Functioning version
 % 1 Sep. 2014: Fixed probable bug for edgesareinplane
 % 24 March 2017 Major speedup by using accumarray for filling the
-% impulseresponse at the end.
-% 7 April 2017: tweaked the accumarray a bit; significant speeedup.
+% impulse response at the end.
+% 7 April 2017: tweaked the accumarray a bit; significant speedup.
 % 16 Mar 2018 Copied to EDtoolbox
+% 21 May 2019 Clarified a bit that theta is computed correctly for
+% non-plane edge combinations - but still not if swapbigmatrix = 1?
+% (which never seems to occur??)
 
 global BIGEDGESTEPMATRIX
 
@@ -166,8 +169,6 @@ E2Rdist = sqrt( rR^2 + ( B5 - zR ).^2);
 if swapbigmatrix == 0
     if edgesareinplane == 0      
         
-%         error('ERROR: r and theta calculation for non-in-plane edges not implemented yet!')
-
         % First we need to reconvert the cylindrical coordinates of
         % edge2-re1 into cartesian! Then we can use the EDB1coordtrans.
         % We define our own cartesian coord syst such that the reference
@@ -201,31 +202,24 @@ if swapbigmatrix == 0
         % edges should be used. If S or R see only part of the respective
         % edge then the edge-to-edge contribution should be "windowed" too.
         [redge1_re2,thetaedge1_re2,znewedge1_re2] = EDB1coordtrans1([xvec_re2 yvec_re2 zvec_re2],[0 0 0;0 0 edgelengthlist(2,2)],[0 1 0]);   
-        
+         
     else
         redge2_re1 = rE1_r1 + BIGEDGESTEPMATRIX(:,2)*( rE2_r1 - rE1_r1 );
         redge1_re2 = rE1_r2 + BIGEDGESTEPMATRIX(:,1)*( rE2_r2 - rE1_r2 );                
+        thetaedge1_re2 = thetaE1_r2;
+        thetaedge2_re1 = thetaE1_r1;
     end
 else
     
     if edgesareinplane == 0
-        error('ERROR: r and theta calculation for non-in-plane edges not implemented yet, for swapbigmatrix=1!')
+         error('ERROR: r and theta calculation for non-in-plane edges not implemented yet, for swapbigmatrix=1!')
 
     else
         redge2_re1 = rE1_r1 + BIGE(:,2)*( rE2_r1 - rE1_r1 );
         redge1_re2 = rE1_r2 + BIGE(:,1)*( rE2_r2 - rE1_r2 );    
+        thetaedge1_re2 = thetaE1_r2;
+        thetaedge2_re1 = thetaE1_r1;
     end
-end
-if edgesareinplane == 0
-%	PS 20120415: CHECK - is it correct or not for non-in-plane edges?
-% % %     error('ERROR: r and theta calculation for non-in-plane edges not implemented yet!')
-% % %     % We need to implement something like:
-% % % %     theta = acos(r./E2Edist);
-% % %     thetaedge1_re2 = thetaE1_r2 + BIGEDGESTEPMATRIX(:,1)*( thetaE2_r2 - thetaE1_r2 );
-% % %     thetaedge2_re1 = thetaE1_r1 + BIGEDGESTEPMATRIX(:,2)*( thetaE2_r1 - thetaE1_r1 );
-else
-    thetaedge1_re2 = thetaE1_r2;
-    thetaedge2_re1 = thetaE1_r1;
 end
 
 if method == 'n'

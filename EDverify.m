@@ -54,8 +54,9 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 5 Feb 2018  Added test 7, after that problem was discovered with v 0.108.
 % Made the logfile optional, via the specification of an outputdirectory. 
 % 15 Feb 2018 Added the description of test 8.
+% 22 May 2019 Fixed a bug: ntests was still set to 7.
 
-ntests = 7;
+ntests = 8;
 
 if nargin < 1 
     outputdirectory = [];
@@ -1066,8 +1067,6 @@ if runtest(8) == 1
     end
 
 end
-
-
 
 if savelogfile == 1
     fclose(fid);

@@ -68,7 +68,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   3, for EDmain_convexESIEBEM (frequency domain)
 %                   4, for EDmain_convex_time (time domain)
 % 
-% Peter Svensson 28 May 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 22 May 2019 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -127,6 +127,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 21 Apr 2018 Removed the extra "results" directory in the output
 % directory.
 % 28 May 2018 Added the input field geoinputdata.planerefltypes
+% 22 May 2019 Fixed an error with sourceamplitudes; they did not have the
+% right orientation.
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -238,22 +240,20 @@ if ~isfield(Sinputdata,'doaddsources')
     Sinputdata.doaddsources = 0;
 end
 if ~isfield(Sinputdata,'sourceamplitudes')
-    Sinputdata.sourceamplitudes = ones(1,nsources);    
+    Sinputdata.sourceamplitudes = ones(nsources,1);    
     sourceamplitudes_default = 1;
 else
     [n1,n2] = size(Sinputdata.sourceamplitudes);
-    if n2 == 1 && nsources > 1
-        Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes*ones(1,nsources);         
+    if n1 == 1 && nsources > 1
+        Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),:);         
     else
-        if n2 > 1 && n2 ~= nsources
+        if n1 > 1 && n1 ~= nsources
             nsources
             [n1,n2]
            error('ERROR 4: more then one source amplitude was specified but the number does not match the number of sources'); 
         end
     end    
 end
-
-
 if nsources == 1
     Sinputdata.doaddsources = 1;
 end    

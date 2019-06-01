@@ -4,7 +4,7 @@ difforder,EDversionnumber)
 % object, or a non-convex object where specular reflections are ignored.
 %
 % Input parameters:
-%   edgeseesedge        Matrix, [nedges,nedges], of 0 and 1
+%   edgeseesedge        Matrix, [nedges,nedges], of -1, 0 and 1
 %   visedgesfroms       Matrix, [nedges,nsources], of 0 and 1
 %   visedgesfromr       Matrix, [nedges,nreceivers], of 0 and 1
 %   difforder
@@ -22,7 +22,7 @@ difforder,EDversionnumber)
 % 
 % Uses the function Datahash from Matlab Central
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 21 May 2019
+% Peter Svensson (peter.svensson@ntnu.no) 1 June 2019
 % 
 % [hodpaths,hodpathsalongplane,EDinputdatahash] = EDfindHODpaths(edgeseesedge,...
 % visedgesfroms,visedgesfromr,difforder,EDversionnumber);
@@ -31,6 +31,8 @@ difforder,EDversionnumber)
 % 16 Mar 2018 Expanded to several sources and receivers
 % 21 May 2019 Made some changes so that negative values of edgeseesedge can
 % be handled. Introduced the output variable hodpathsalongplane.
+% 1 June 2019 Fixed bug; hadn't finished the handling of negative values of
+% edgeseesedge.
 
 EDinputdatastruct = struct('difforder',difforder,...
         'edgeseespartialedge',edgeseesedge,...
@@ -72,7 +74,7 @@ for isou = 1:nsources
             [paths1,paths2] = ind2sub([nedges,npaths],ivec);
             hodpaths{norder,ii,isou}           = [pathspattern_to_propagate(paths2,:) paths1];
             indexlist = sub2ind([nedges nedges],pathspattern_to_propagate(paths2,end),paths1);
-            hodpathsalongplane_coltoadd = edgeseesedge(indexlist);
+            hodpathsalongplane_coltoadd = (edgeseesedge(indexlist)+1)/2;            
             if norder > 2
                 hodpathsalongplane{norder,ii,isou} = [pathsalong_to_propagate(paths2,:) hodpathsalongplane_coltoadd];
             else

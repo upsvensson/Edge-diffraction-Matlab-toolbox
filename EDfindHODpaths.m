@@ -74,8 +74,7 @@ for isou = 1:nsources
             [paths1,paths2] = ind2sub([nedges,npaths],ivec);
             hodpaths{norder,ii,isou}           = [pathspattern_to_propagate(paths2,:) paths1];
             indexlist = sub2ind([nedges nedges],pathspattern_to_propagate(paths2,end),paths1);
-            hodpathsalongplane_coltoadd = (edgeseesedge(indexlist)+1)/2
-            pause
+            hodpathsalongplane_coltoadd = (edgeseesedge(indexlist)+1)/2;
             if norder > 2
                 hodpathsalongplane{norder,ii,isou} = [pathsalong_to_propagate(paths2,:) hodpathsalongplane_coltoadd];
             else

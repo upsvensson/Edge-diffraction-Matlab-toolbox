@@ -74,7 +74,8 @@ for isou = 1:nsources
             [paths1,paths2] = ind2sub([nedges,npaths],ivec);
             hodpaths{norder,ii,isou}           = [pathspattern_to_propagate(paths2,:) paths1];
             indexlist = sub2ind([nedges nedges],pathspattern_to_propagate(paths2,end),paths1);
-            hodpathsalongplane_coltoadd = (edgeseesedge(indexlist)+1)/2;            
+            hodpathsalongplane_coltoadd = (edgeseesedge(indexlist)+1)/2
+            pause
             if norder > 2
                 hodpathsalongplane{norder,ii,isou} = [pathsalong_to_propagate(paths2,:) hodpathsalongplane_coltoadd];
             else
@@ -95,13 +96,14 @@ for isou = 1:nsources
         pathspattern_to_propagate = [pathspattern_to_propagate(paths2,:) paths1];
         if norder == 2
            indexlist = sub2ind([nedges nedges],pathspattern_to_propagate(:,1),pathspattern_to_propagate(:,2)) ;
-           pathsalong_to_propagate = edgeseesedge(indexlist);
+           pathsalong_to_propagate = (edgeseesedge(indexlist)+1)/2;
         else            
             indexlist = sub2ind([nedges nedges],pathspattern_to_propagate(:,end-1),pathspattern_to_propagate(:,end));
-            pathsalong_to_propagate_coltoadd = edgeseesedge(indexlist);
+            pathsalong_to_propagate_coltoadd = (edgeseesedge(indexlist)+1)/2;
             pathsalong_to_propagate = [pathsalong_to_propagate(paths2,:) pathsalong_to_propagate_coltoadd];
         end
     end
 
 end
+
 

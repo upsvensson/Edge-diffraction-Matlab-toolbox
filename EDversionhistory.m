@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 22 Feb. 2019
+% Peter Svensson (peter.svensson@ntnu.no) 3 June 2020
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -187,6 +187,11 @@ icounter = icounter + 1;
 versionnumbers{icounter} = '0.213';
 versiondate{icounter} = '22 May 2019';
 versiontext{icounter} = ['Introduced EDmain_nonconvex_time, and made adjustments to handle all-diffraction paths in non-convex geometries']; 
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.214';
+versiondate{icounter} = '3 June 2020';
+versiontext{icounter} = ['Fixed a bug in many files so that folder names with spaces can be handled.']; 
 
 nversions = size(versiontext,2);
 txtwidth = 80;

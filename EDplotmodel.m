@@ -39,7 +39,7 @@ function EDplotmodel(eddatafile,varargin)
 %
 % Uses functions EDstrpend, EDstrpblnk
 %
-% Peter Svensson (peter.svensson@ntnu.no) 26 Jan 2018
+% Peter Svensson (peter.svensson@ntnu.no) 3 June 2020
 
 % 29 April 2016 Completed the use of structs planedata and edgedata
 % 1 Nov 2017 Added EDstrpblnk for the sdata etc file names. Also skipped the
@@ -51,6 +51,8 @@ function EDplotmodel(eddatafile,varargin)
 % 26 Jan 2018 Small fix: Sdata and Rdata filenames were wrong (but still
 % worked??). Also removed the little circles on edges if edgenumbers are
 % not plotted.
+% 3 June 2020 Fixed a bug: folder names with spaces can be handled now
+
 
 p = inputParser;
 
@@ -119,16 +121,16 @@ if plotcoCADnumbers, plotconumbers = 1; end
 % Load the needed input files
 
 if ~isempty(eddatafilepath)
-    eval(['load ',eddatafilepath,filesep,eddatafile])
+    eval(['load ''',eddatafilepath,filesep,eddatafile,''''])
 else
-    eval(['load ',eddatafile])    
+    eval(['load ''',eddatafile,''''])    
 end
     
 ncornersperplanevec = double(planedata.ncornersperplanevec);
 if plotsources
     sdatafile = EDstrpblnk([eddatafilepath,Filestem,'_Sdata.mat']);
     if exist(sdatafile) == 2
-        eval(['load ',sdatafile])
+        eval(['load ''',sdatafile,''''])
     else
         error(['ERROR: The sdata file named ',sdatafile,' could not be opened'])    
     end
@@ -136,7 +138,7 @@ end
 if plotreceivers
     rdatafile = EDstrpblnk([eddatafilepath,Filestem,'_Rdata.mat']);
     if exist(rdatafile) == 2
-        eval(['load ',rdatafile])
+        eval(['load ''',rdatafile,''''])
     else
         error(['ERROR: The rdata file named ',rdatafile,' could not be opened'])    
     end
@@ -145,7 +147,7 @@ end
 if plotplCADnumbers || plotcoCADnumbers
     cadgeofile = EDstrpblnk([eddatafilepath,Filestem,'_cadgeo.mat']);
     if exist(cadgeofile) == 2
-        eval(['load ',cadgeofile])
+        eval(['load ''',cadgeofile,''''])
     else
         error(['ERROR: The cadgeo file named ',cadgeofile,' could not be opened'])            
     end

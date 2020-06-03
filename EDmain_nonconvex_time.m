@@ -49,7 +49,7 @@ function EDmain_nonconvex_time(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDinteg_submatrixstructure, EDintegralequation_convex_ir from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 21 May 2019 (peter.svensson@ntnu.no)
+% Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
 %
 % EDmain_nonconvex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -144,6 +144,7 @@ function EDmain_nonconvex_time(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % 21 May 2019 Adjusted to changes of the function EDfindHODpaths, with a
 % new output parameter.
 % 21 May 2019 Cleaned up some file recycling mistakes.
+% 3 June 2020 Fixed a bug: folder names with spaces can be handled now
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -224,7 +225,7 @@ if isfield(geoinputdata,'geoinputfile')
     end
     if filehandlingparameters.savecadgeofile == 1
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
-        eval(['save ',desiredname,' planedata extraCATTdata'])
+        eval(['save ''',desiredname,''' planedata extraCATTdata'])
     end
     t01 = etime(clock,t00);
     ncorners = size(planedata.corners,1);
@@ -271,14 +272,14 @@ else
 end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_eddata.mat'];
 if foundmatch == 1
-    eval(['load ',existingfilename])
+    eval(['load ''',existingfilename,''''])
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
 else
     [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,geoinputdata.firstcornertoskip,[],0,filehandlingparameters.showtext);
     if filehandlingparameters.saveeddatafile == 1
-        eval(['save ',desiredname,' planedata edgedata EDinputdatahash'])
+        eval(['save ''',desiredname,''' planedata edgedata EDinputdatahash'])
     end
 end
 nedges = size(edgedata.edgecorners,1);
@@ -317,14 +318,14 @@ else
 end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Sdata.mat'];
 if foundmatch == 1
-    eval(['load ',existingfilename])
+    eval(['load ''',existingfilename,''''])
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
 else
     [Sdata,EDinputdatahash] = EDSorRgeo(planedata,edgedata,Sinputdata.coordinates,'S',EDversionnumber,2,filehandlingparameters.showtext);
     if filehandlingparameters.saveSRdatafiles == 1
-        eval(['save ',desiredname,' Sdata EDinputdatahash'])
+        eval(['save ''',desiredname,''' Sdata EDinputdatahash'])
     end    
 end
 nsources = size(Sdata.sources,1);
@@ -364,14 +365,14 @@ else
 end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Rdata.mat'];
 if foundmatch == 1
-    eval(['load ',existingfilename])
+    eval(['load ''',existingfilename,''''])
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
 else
     [Rdata,EDinputdatahash] = EDSorRgeo(planedata,edgedata,Rinputdata.coordinates,'R',EDversionnumber,2,filehandlingparameters.showtext);
     if filehandlingparameters.saveSRdatafiles == 1
-        eval(['save ',desiredname,' Rdata EDinputdatahash'])
+        eval(['save ''',desiredname,''' Rdata EDinputdatahash'])
     end
 end
 nreceivers = size(Rdata.receivers,1);
@@ -417,7 +418,7 @@ if controlparameters.skipfirstorder == 0
         [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_paths',EDfindconvGApathsinputhash);
     end
     if foundmatch == 1
-        eval(['load ',existingfilename])
+        eval(['load ''',existingfilename,''''])
     else
         [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,edgedata,...
             Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
@@ -426,7 +427,7 @@ if controlparameters.skipfirstorder == 0
             EDversionnumber,filehandlingparameters.showtext);
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
         if filehandlingparameters.savepathsfile == 1
-            eval(['save ',desiredname,' firstorderpathdata EDinputdatahash'])   
+            eval(['save ''',desiredname,''' firstorderpathdata EDinputdatahash'])   
         end
     end
     t01 = etime(clock,t00);
@@ -474,12 +475,12 @@ if controlparameters.docalcir == 1 && controlparameters.skipfirstorder == 0
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_ir.mat'];    
     if foundmatch == 1
         currenttimingstruct = timingstruct;
-         eval(['load ',existingfilename,' irdirect irgeom irdiff timingstruct'])
+         eval(['load ''',existingfilename,''' irdirect irgeom irdiff timingstruct'])
          EDinputdatahash = EDfirstorderirsinputhash;
         t01 = etime(clock,t00);
         currenttimingstruct.makeirs = [t01 timingstruct.makeirs(2:4)];
         timingstruct = currenttimingstruct;
-        eval(['save ',desiredname,' irdirect irgeom irdiff timingstruct existingfilename EDsettings EDinputdatahash'])
+        eval(['save ''',desiredname,''' irdirect irgeom irdiff timingstruct existingfilename EDsettings EDinputdatahash'])
     else
         [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderirs(firstorderpathdata,...
             controlparameters.fs,controlparameters.Rstart,controlparameters.difforder,envdata,Sinputdata,Rdata.receivers,...
@@ -490,7 +491,7 @@ if controlparameters.docalcir == 1 && controlparameters.skipfirstorder == 0
         existingfilename = '';
         t01 = etime(clock,t00);
         timingstruct.makeirs = [t01 timingdata];
-        eval(['save ',desiredname,' irdirect irgeom irdiff timingstruct existingfilename EDsettings EDinputdatahash'])
+        eval(['save ''',desiredname,''' irdirect irgeom irdiff timingstruct existingfilename EDsettings EDinputdatahash'])
     end
     if filehandlingparameters.showtext >= 1 && foundmatch == 1
         disp(['      Recycled ',existingfilename])
@@ -536,12 +537,12 @@ if controlparameters.difforder > 1
         [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_ed2data',EDed2geoinputhash);
     end    
     if foundmatch == 1
-        eval(['load ',existingfilename])
+        eval(['load ''',existingfilename,''''])
     else 
         [edgetoedgedata,EDinputdatahash] = EDed2geo(edgedata,planedata,Sdata,Rdata,1,2,EDversionnumber,2,1,filehandlingparameters.showtext);    
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_ed2data.mat'];
         if filehandlingparameters.saveed2datafile == 1
-            eval(['save ',desiredname,' planedata edgedata edgetoedgedata EDinputdatahash'])
+            eval(['save ''',desiredname,''' planedata edgedata edgetoedgedata EDinputdatahash'])
         end
     end
     t01 = etime(clock,t00);
@@ -585,7 +586,7 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
         [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_hodpaths',EDhodpathsinputhash);
     end
     if foundmatch == 1
-        eval(['load ',existingfilename])
+        eval(['load ''',existingfilename,''''])
     else        
         % 21 May 2019 Modified the call to EDfindHODpaths to include the
         % new output parameter hodpathsalongplane.
@@ -595,7 +596,7 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
 %             sign(Rdata.vispartedgesfromr),controlparameters.difforder,EDversionnumber);
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_hodpaths.mat'];
         if filehandlingparameters.savehodpaths == 1
-            eval(['save ',desiredname,' hodpaths hodpathsalongplane EDinputdatahash'])
+            eval(['save ''',desiredname,''' hodpaths hodpathsalongplane EDinputdatahash'])
         end
     end
     t01 = etime(clock,t00);
@@ -651,12 +652,12 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_irhod.mat'];
     if foundmatch == 1
         currenttimingstruct = timingstruct;
-         eval(['load ',existingfilename,' irhod'])
+         eval(['load ''',existingfilename,''' irhod'])
          EDinputdatahash = EDhodirinputhash;
         t01 = etime(clock,t00);
         currenttimingstruct.hodir = t01;
         timingstruct = currenttimingstruct;
-        eval(['save ',desiredname,'  irhod timingstruct EDsettings EDinputdatahash'])        
+        eval(['save ''',desiredname,'''  irhod timingstruct EDsettings EDinputdatahash'])        
     else        
         [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,controlparameters.difforder,elemsize,edgedata,...
         edgetoedgedata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Rdata,envdata.cair,...
@@ -665,7 +666,7 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
         existingfilename =  '';
         t01 = etime(clock,t00);
         timingstruct.hodir = t01;
-        eval(['save ',desiredname,' irhod timingstruct EDsettings EDinputdatahash'])
+        eval(['save ''',desiredname,''' irhod timingstruct EDsettings EDinputdatahash'])
     end
     if filehandlingparameters.showtext >= 1    
          if foundmatch == 1

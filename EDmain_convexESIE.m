@@ -45,7 +45,7 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 14 May 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
 %
 % EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -130,6 +130,7 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % parameter .suppressresultrecycling with default = 0, and implemented th
 % corresponding suppressing of the result recycling.
 % 14 May 2018 Cleaned up the lineending.
+% 3 June 2020 Fixed a bug: folder names with spaces can be handled now
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -215,7 +216,7 @@ if isfield(geoinputdata,'geoinputfile')
     end
     if filehandlingparameters.savecadgeofile == 1
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
-        eval(['save ',desiredname,' planedata extraCATTdata'])
+        eval(['save ''',desiredname,''' planedata extraCATTdata'])
     end
     t01 = etime(clock,t00);
     ncorners = size(planedata.corners,1);
@@ -263,7 +264,7 @@ else
 end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_eddata.mat'];
 if foundmatch == 1
-    eval(['load ',existingfilename])
+    eval(['load ''',existingfilename,''''])
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
@@ -271,7 +272,7 @@ else
     [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,geoinputdata.firstcornertoskip,[],0,filehandlingparameters.showtext);
     
     if filehandlingparameters.saveeddatafile == 1
-        eval(['save ',desiredname,' planedata edgedata EDinputdatahash'])
+        eval(['save ''',desiredname,''' planedata edgedata EDinputdatahash'])
     end
 end
 nedges = size(edgedata.edgecorners,1);
@@ -310,14 +311,14 @@ else
 end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Sdata.mat'];
 if foundmatch == 1
-    eval(['load ',existingfilename])
+    eval(['load ''',existingfilename,''''])
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
 else
     [Sdata,EDinputdatahash] = EDSorRgeo(planedata,edgedata,Sinputdata.coordinates,'S',EDversionnumber,2,filehandlingparameters.showtext);
     if filehandlingparameters.saveSRdatafiles == 1
-        eval(['save ',desiredname,' Sdata EDinputdatahash'])
+        eval(['save ''',desiredname,''' Sdata EDinputdatahash'])
     end    
 end
 nsources = size(Sdata.sources,1);
@@ -357,14 +358,14 @@ else
 end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Rdata.mat'];
 if foundmatch == 1
-    eval(['load ',existingfilename])
+    eval(['load ''',existingfilename,''''])
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
 else
     [Rdata,EDinputdatahash] = EDSorRgeo(planedata,edgedata,Rinputdata.coordinates,'R',EDversionnumber,2,filehandlingparameters.showtext);
     if filehandlingparameters.saveSRdatafiles == 1
-        eval(['save ',desiredname,' Rdata EDinputdatahash'])
+        eval(['save ''',desiredname,''' Rdata EDinputdatahash'])
     end
 end
 nreceivers = size(Rdata.receivers,1);
@@ -410,7 +411,7 @@ if controlparameters.skipfirstorder == 0
         [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_paths',EDfindconvGApathsinputhash);
     end
     if foundmatch == 1
-        eval(['load ',existingfilename])
+        eval(['load ''',existingfilename,''''])
     else
         [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,edgedata,...
             Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
@@ -419,7 +420,7 @@ if controlparameters.skipfirstorder == 0
             EDversionnumber,filehandlingparameters.showtext);
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
         if filehandlingparameters.savepathsfile == 1
-            eval(['save ',desiredname,' firstorderpathdata EDinputdatahash'])   
+            eval(['save ''',desiredname,''' firstorderpathdata EDinputdatahash'])   
         end
     end
     t01 = etime(clock,t00);
@@ -467,12 +468,12 @@ if controlparameters.docalctf == 1 && controlparameters.skipfirstorder == 0
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat'];    
     if foundmatch == 1
         currenttimingstruct = timingstruct;
-         eval(['load ',recycledresultsfile,' tfdirect tfgeom tfdiff timingstruct'])
+         eval(['load ''',recycledresultsfile,''' tfdirect tfgeom tfdiff timingstruct'])
          EDinputdatahash = EDfirstordertfsinputhash;
         t01 = etime(clock,t00);
         currenttimingstruct.maketfs = [t01 timingstruct.maketfs(2:4)];
         timingstruct = currenttimingstruct;
-        eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
+        eval(['save ''',desiredname,''' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     else
         [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordertfs(firstorderpathdata,...
             controlparameters.frequencies,controlparameters.Rstart,controlparameters.difforder,envdata,Sinputdata,Rdata.receivers,...
@@ -480,7 +481,7 @@ if controlparameters.docalctf == 1 && controlparameters.skipfirstorder == 0
         recycledresultsfile = '';
         t01 = etime(clock,t00);
         timingstruct.maketfs = [t01 timingdata];
-        eval(['save ',desiredname,' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
+        eval(['save ''',desiredname,''' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     end
     if filehandlingparameters.showtext >= 1 && foundmatch == 1
         disp(['      Recycled ',recycledresultsfile])
@@ -526,12 +527,12 @@ if controlparameters.difforder > 1
         [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_ed2data',EDed2geoinputhash);
     end    
     if foundmatch == 1
-        eval(['load ',existingfilename])
+        eval(['load ''',existingfilename,''''])
     else 
         [edgetoedgedata,EDinputdatahash] = EDed2geo(edgedata,planedata,Sdata,Rdata,1,2,EDversionnumber,2,1,filehandlingparameters.showtext);    
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_ed2data.mat'];
         if filehandlingparameters.saveed2datafile == 1
-            eval(['save ',desiredname,' planedata edgedata edgetoedgedata EDinputdatahash'])
+            eval(['save ''',desiredname,''' planedata edgedata edgetoedgedata EDinputdatahash'])
         end
     end
     t01 = etime(clock,t00);
@@ -576,14 +577,14 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
         [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_submatrixdata',EDsubmatrixinputhash);
     end
     if foundmatch == 1
-        eval(['load ',existingfilename])
+        eval(['load ''',existingfilename,''''])
     else
         [Hsubmatrixdata,EDinputdatahash] = EDinteg_submatrixstructure(edgedata.edgelengthvec,edgedata.closwedangvec,...
         controlparameters.ngauss,controlparameters.discretizationtype,edgetoedgedata,edgedata.planesatedge,EDversionnumber,filehandlingparameters.showtext);
     
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
         if filehandlingparameters.savesubmatrixdata == 1
-            eval(['save ',desiredname,' Hsubmatrixdata EDinputdatahash'])
+            eval(['save ''',desiredname,''' Hsubmatrixdata EDinputdatahash'])
         end
     end
     nsousigs = Hsubmatrixdata.bigmatrixendnums(end);
@@ -651,12 +652,12 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
     
     if foundmatch == 1
         currenttimingstruct = timingstruct;
-         eval(['load ',recycledresultsfile,' tfinteqdiff extraoutputdata timingstruct'])
+         eval(['load ''',recycledresultsfile,''' tfinteqdiff extraoutputdata timingstruct'])
          EDinputdatahash = EDinteqinputhash;
         t01 = etime(clock,t00);
         currenttimingstruct.integralequation = [t01 timingstruct.integralequation(2:5)];
         timingstruct = currenttimingstruct;
-        eval(['save ',desiredname,'  tfinteqdiff extraoutputdata recycledresultsfile timingstruct EDsettings EDinputdatahash'])        
+        eval(['save ''',desiredname,'''  tfinteqdiff extraoutputdata recycledresultsfile timingstruct EDsettings EDinputdatahash'])        
     else
         [tfinteqdiff,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequation_convex_tf(filehandlingparameters,...
             envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Sinputdata.doallSRcombinations,...
@@ -664,7 +665,7 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
         recycledresultsfile =  '';
         t01 = etime(clock,t00);
         timingstruct.integralequation = [t01 timingdata];
-        eval(['save ',desiredname,' tfinteqdiff  extraoutputdata timingstruct recycledresultsfile EDsettings EDinputdatahash'])
+        eval(['save ''',desiredname,''' tfinteqdiff  extraoutputdata timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     end
     if filehandlingparameters.showtext >= 1 && foundmatch == 1
         disp(['      Recycled ',recycledresultsfile])
@@ -695,7 +696,7 @@ else
     end
     extraoutputdata = [];
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
-    eval(['save ',desiredname,' tfinteqdiff extraoutputdata timingstruct'])    
+    eval(['save ''',desiredname,''' tfinteqdiff extraoutputdata timingstruct'])    
     if filehandlingparameters.savelogfile == 1
         fwrite(fid,['   The integral equation stage was not run',lineending],'char');
     end

@@ -1,8 +1,16 @@
-function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters)
-% EDmain_convex_time - Calculates the specular and edge diffraction IRs 
+function EDmain_nonconvexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters)
+% EDmain_nonconvexESIE - Calculates the specular and edge diffraction IRs and/or TFs
 % for convex, rigid scattering objects, using the image source method for
-% the specular reflection, and the explicit integral formulations for first-
-% and higher-order diffraction.
+% the specular reflection, the explicit integral formulation for first-order
+% diffraction, and the edge source integral equation for the second- and
+% higher-order diffraction.
+% 
+% Some types of non-convex geometries can be handled as well. These include
+% two separate objects, such as two or more thin plates, or two or more
+% boxes. Higher-order diffraction will be handled, **but not any dsd
+% combinations**. That is, no specular reflections inbetween edge
+% diffractions can be handled. Therefore flutter echo effects can not be
+% handled.
 %
 % Input parameters are six structs with fields as specified below:
 %   geoinputdata        .geoinputfile        (obligatory)
@@ -12,17 +20,18 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 %   Sinputdata          .coordinates         (obligatory)
 %                       .doaddsources        (default: 0 = no)
 %                       .sourceamplitudes    (default:
-%                        ones(nsources,1)
+%                        ones(nsources,nfrequencies)
 %   Rinputdata          .coordinates         (obligatory)
 %   envdata             .cair                (default: 344)
 %                       .rhoair              (default: 1.21)
 %   controlparameters   .fs                  (default: 44100)
 %                       .directsound         (default: 1 = yes)
-%                       .difforder           (default: 2)
-%                       .savealldifforders   (default: 0)
-%                       .docalcir            (default: 1)
+%                       .difforder           (default: 15)
+%                       .docalctf            (default: 1)
+%                       .docalcir            (default: 0)
 %                       .skipfirstorder      (default: 0)
 %                       .Rstart              (default: 0)
+%                       .frequencies         (obligatory, if docalcftf = 1)
 %                       .discretizationtype  (default: 2 = G-L)
 %                       .ngauss              (default: 16)
 %   filehandlingparameters (optional)    
@@ -39,13 +48,13 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 %                       .savediff2result      (default: 0)
 % 
 % Uses the functions EDgetversion,EDcheckinputstructs, EDreadcad, EDreadgeomatrices,
-% EDedgeo, EDSorRgeo, EDfindconvexGApaths, EDmakefirstorderirs, EDed2geo,
-% EDinteg_submatrixstructure, EDintegralequation_convex_ir from EDtoolbox
+% EDedgeo, EDSorRgeo, EDfindconvexGApaths, EDmakefirstordertfs, EDed2geo,
+% EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
 % Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
 %
-% EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
+% EDmain_nonconvexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
 % 24 Nov. 2017 A first version = a trimmed version of ESIE2main,
 % specialized for the scattering from a convex object.
@@ -127,16 +136,8 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % inputdatahash, if the corresponding savexxxxfile = 0. Introduced the
 % parameter .suppressresultrecycling with default = 0, and implemented th
 % corresponding suppressing of the result recycling.
-% 28 Feb 2018 First version of EDmain_convexESIEtime
-% 15 Mar 2018 First version of EDmain_convex_time
-% 21 Mar 2018 Introduced the new parameter .savealldifforders
-% 21 Mar 2018 Removed the parameter .hodtype
-% 21 Mar 2018 Completed the section around EDmakeHODirs, with recycling
-% result files.
-% 14 May 2018 CLeaned up the lineending
-% 21 May 2019 Adjusted to changes of the function EDfindHODpaths, with a
-% new output parameter.
-% 21 May 2019 Cleaned up some file recycling mistakes.
+% 14 May 2018 Cleaned up the lineending.
+% 19 May 2019 Allowed non-convex geometries.
 % 3 June 2020 Fixed a bug: folder names with spaces can be handled now
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
@@ -147,7 +148,7 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 if nargin < 6
     filehandlingparameters = struct('showtext',0);
     if nargin < 5
-        error('ERROR: The first five input parameters to EDmain_convex_time must be specified')  
+        error('ERROR: The first five input parameters to EDmain_convexESIE must be specified')  
     end
 end
 
@@ -169,7 +170,7 @@ if ispc == 1
    lineending = [13,10];
 end
 
-[geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,4);
+[geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,1);
 
 EDsettings = cell(7,1);
 EDsettings{1} = geoinputdata;
@@ -184,9 +185,14 @@ if filehandlingparameters.savelogfile == 1
     logfilename = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_log.txt'];
 end
 
+% if filehandlingparameters.savesetupfile == 1
+%     varlist = 'geoinputdata Sinputdata Rinputdata envdata controlparameters filehandlingparameters EDversionnumber';
+%     eval(['save ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_setup.mat ',varlist])
+% end
+
 if filehandlingparameters.showtext >= 1
 	disp('    ');disp('####################################################################')
-              disp(['#  EDmain_convex_time, v. ',num2str(EDversionnumber),' (',lastsavedate,')'])
+              disp(['#  EDmain_convexESIE, v. ',num2str(EDversionnumber),' (',lastsavedate,')'])
               disp(['#  filestem for results: ',filehandlingparameters.filestem])
               disp(' ')
 end
@@ -197,12 +203,12 @@ if filehandlingparameters.savelogfile == 1
     	return
     end
     fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['#  EDmain_convex_time, v. ',num2str(EDversionnumber),' (',lastsavedate,')',lineending],'char');
+    fwrite(fid,['#  EDmain_convexESIE, v. ',num2str(EDversionnumber),' (',lastsavedate,')',lineending],'char');
     fwrite(fid,['#  filestem for results: ',filehandlingparameters.filestem,lineending],'char');
     fwrite(fid,[' ',lineending],'char');
 end
 
-% nfrequencies = length(controlparameters.frequencies);
+nfrequencies = length(controlparameters.frequencies);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Read the input CAD-file, or input matrices, and create the planedata struct
@@ -214,11 +220,11 @@ if isfield(geoinputdata,'geoinputfile')
     t00 = clock;
     [planedata,extraCATTdata] = EDreadcad(geoinputdata.geoinputfile,0);
     if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
-        error('ERROR: EDmain_convex_time can only be used for convex scatterers, including a single thin plate')
+        error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
     end
     if filehandlingparameters.savecadgeofile == 1
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
-        eval(['save ',desiredname,' planedata extraCATTdata'])
+        eval(['save ''',desiredname,''' planedata extraCATTdata'])
     end
     t01 = etime(clock,t00);
     ncorners = size(planedata.corners,1);
@@ -234,7 +240,8 @@ else
         disp('   Creating the planedata struct from the input geometry matrices')
     end
     t00 = clock;
-    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners);    
+    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners,geoinputdata.planerefltypes); 
+        
     ncorners = size(planedata.corners,1);
     nplanes = size(planedata.planecorners,1);
     t01 = etime(clock,t00);
@@ -264,7 +271,6 @@ else
     [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_eddata',EDedgeoinputhash);
 end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_eddata.mat'];
-
 if foundmatch == 1
     eval(['load ''',existingfilename,''''])
     if ~strcmp(existingfilename,desiredname)
@@ -272,6 +278,7 @@ if foundmatch == 1
     end
 else
     [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,geoinputdata.firstcornertoskip,[],0,filehandlingparameters.showtext);
+    
     if filehandlingparameters.saveeddatafile == 1
         eval(['save ''',desiredname,''' planedata edgedata EDinputdatahash'])
     end
@@ -291,9 +298,9 @@ if filehandlingparameters.savelogfile == 1
         fwrite(fid,['      by recycling and duplicating ',existingfilename,lineending],'char');        
     end
 end
-if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
-    error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
-end
+% if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
+%     error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
+% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create the Sdata and Rdata structs
@@ -418,7 +425,7 @@ if controlparameters.skipfirstorder == 0
             Sdata.sources,Sdata.visplanesfroms,Sdata.vispartedgesfroms,...
             Rdata.receivers,Rdata.visplanesfromr,Rdata.vispartedgesfromr,...
             controlparameters.difforder,controlparameters.directsound,Sinputdata.doallSRcombinations,...
-            EDversionnumber,filehandlingparameters.showtext);
+            EDversionnumber,filehandlingparameters.showtext);        
         desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
         if filehandlingparameters.savepathsfile == 1
             eval(['save ''',desiredname,''' firstorderpathdata EDinputdatahash'])   
@@ -448,55 +455,52 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Generate the first-order specular, and first-order
-% diffraction irs.
+% diffraction tfs.
 
-if controlparameters.docalcir == 1 && controlparameters.skipfirstorder == 0
+if controlparameters.docalctf == 1 && controlparameters.skipfirstorder == 0
     if filehandlingparameters.showtext >= 1	
-        disp('   Generate the (first-order) GA and diff irs.')
+        disp('   Generate the (first-order) GA and diff tfs.')
     end
 
     t00 = clock;
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
     else
-        EDfirstorderirsinputstruct = struct('firstorderpathdata',firstorderpathdata,'edgedata',edgedata,...
-            'fs',controlparameters.fs,'Rstart',controlparameters.Rstart,...
+        EDfirstordertfsinputstruct = struct('firstorderpathdata',firstorderpathdata,'edgedata',edgedata,...
+            'frequencies',controlparameters.frequencies,'Rstart',controlparameters.Rstart,...
             'difforder',controlparameters.difforder,'envdata',envdata,'Sinputdata',Sinputdata,...
-            'receivers',Rdata.receivers,'saveindividualfirstdiff',controlparameters.saveindividualfirstdiff,'EDversionnumber',EDversionnumber);
-        EDfirstorderirsinputhash = DataHash(EDfirstorderirsinputstruct);
-        [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_ir',EDfirstorderirsinputhash);
+            'receivers',Rdata.receivers,'EDversionnumber',EDversionnumber);
+        EDfirstordertfsinputhash = DataHash(EDfirstordertfsinputstruct);
+        [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_tf',EDfirstordertfsinputhash);
     end
-    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_ir.mat'];    
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat'];    
     if foundmatch == 1
         currenttimingstruct = timingstruct;
-         eval(['load ''',recycledresultsfile,''' irdirect irgeom irdiff timingstruct'])
-         EDinputdatahash = EDfirstorderirsinputhash;
+         eval(['load ''',recycledresultsfile,''' tfdirect tfgeom tfdiff timingstruct'])
+         EDinputdatahash = EDfirstordertfsinputhash;
         t01 = etime(clock,t00);
-        currenttimingstruct.makeirs = [t01 timingstruct.makeirs(2:4)];
+        currenttimingstruct.maketfs = [t01 timingstruct.maketfs(2:4)];
         timingstruct = currenttimingstruct;
-        eval(['save ''',desiredname,''' irdirect irgeom irdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
+        eval(['save ''',desiredname,''' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     else
-        [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderirs(firstorderpathdata,...
-            controlparameters.fs,controlparameters.Rstart,controlparameters.difforder,envdata,Sinputdata,Rdata.receivers,...
-            edgedata,controlparameters.saveindividualfirstdiff,EDversionnumber,filehandlingparameters.showtext);        
-%         [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordertfs(firstorderpathdata,...
-%             controlparameters.frequencies,controlparameters.Rstart,controlparameters.difforder,envdata,Sinputdata,Rdata.receivers,...
-%             edgedata,EDversionnumber,filehandlingparameters.showtext);
+        [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordertfs(firstorderpathdata,...
+            controlparameters.frequencies,controlparameters.Rstart,controlparameters.difforder,envdata,Sinputdata,Rdata.receivers,...
+        edgedata,EDversionnumber,filehandlingparameters.showtext);
         recycledresultsfile = '';
         t01 = etime(clock,t00);
-        timingstruct.makeirs = [t01 timingdata];
-        eval(['save ''',desiredname,''' irdirect irgeom irdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
+        timingstruct.maketfs = [t01 timingdata];
+        eval(['save ''',desiredname,''' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     end
     if filehandlingparameters.showtext >= 1 && foundmatch == 1
         disp(['      Recycled ',recycledresultsfile])
     end
     if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDmakefirstorderirs',lineending],'char');
+        fwrite(fid,['   EDmakefirstordertfs (',int2str(nfrequencies),' frequencies)',lineending],'char');
         if foundmatch == 1
             fwrite(fid,['      by recycling ',recycledresultsfile,lineending],'char');     
             fwrite(fid,['                                Total time: ',num2str(t01),' s',lineending],'char');          
         else
-            fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, as below',lineending],'char');
+            fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for all frequencies, as below',lineending],'char');
             fwrite(fid,['                                Generate the direct sound: ',num2str(timingdata(1)),' s',lineending],'char');
             fwrite(fid,['                                Generate the specular reflections: ',num2str(timingdata(2)),' s',lineending],'char');
             fwrite(fid,['                                Generate the first-order diffraction: ',num2str(timingdata(3)),' s',lineending],'char');
@@ -504,12 +508,12 @@ if controlparameters.docalcir == 1 && controlparameters.skipfirstorder == 0
     end
 else
     if filehandlingparameters.showtext >= 1	
-        disp('   First-order GA and diff irs are not generated because docalcir was set to 0, or skipfirstorder was set to 1')
+        disp('   First-order GA and diff tfs are not generated because docalctf was set to 0, or skipfirstorder was set to 1')
     end
     if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDmakefirstorderirs was not run because docalcir was set to 0, or skipfirstorder was set to 1',lineending],'char');
+        fwrite(fid,['   EDmakefirstordertfs was not run because docalctf was set to 0, or skipfirstorder was set to 1',lineending],'char');
     end
-    timingstruct.makeirs = 0;
+    timingstruct.maketfs = 0;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -561,126 +565,148 @@ else
 end
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Find the higher-order diffraction paths
+% Prepare for the integral equation: set up the submatrix structure
 
-if controlparameters.difforder > 1 && controlparameters.docalcir == 1
-     
+if controlparameters.difforder > 1 && controlparameters.docalctf == 1
     if filehandlingparameters.showtext >= 1	
-        disp('   Finding the higher-order diffraction paths ')
+        disp('   Creating the integral equation Hsubmatrixdata struct ')
     end
     t00 = clock;
     
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
     else
-%         EDhodpathsinputstruct = struct();
-%         EDhodpathsinputhash = DataHash(EDhodpathsinputstruct);
-        EDhodpathsinputstruct = struct('difforder',controlparameters.difforder,...
-        'edgeseespartialedge',int8(sign(edgetoedgedata.edgeseespartialedge)),...
-        'vispartedgesfroms',sign(Sdata.vispartedgesfroms),'vispartedgesfromr',sign(Rdata.vispartedgesfromr),'EDversionnumber',EDversionnumber);
-        EDhodpathsinputhash = DataHash(EDhodpathsinputstruct);
-        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_hodpaths',EDhodpathsinputhash);
+        EDsubmatrixinputstruct = struct();
+        EDsubmatrixinputhash = DataHash(EDsubmatrixinputstruct);
+        EDsubmatrixinputstruct = struct('edgelengthvec',edgedata.edgelengthvec,'closwedangvec',edgedata.closwedangvec,...
+        'inteq_ngauss',controlparameters.ngauss,'inteq_discretizationtype',controlparameters.discretizationtype,...
+        'edgetoedgedata',edgetoedgedata,'planesatedge',edgedata.planesatedge,'EDversionnumber',EDversionnumber);
+        EDsubmatrixinputhash = DataHash(EDsubmatrixinputstruct);
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_submatrixdata',EDsubmatrixinputhash);
     end
     if foundmatch == 1
         eval(['load ''',existingfilename,''''])
     else
-        [hodpaths,hodpathsalongplane,EDinputdatahash] = EDfindHODpaths(int8(sign(edgetoedgedata.edgeseespartialedge)),sign(Sdata.vispartedgesfroms),...
-            sign(Rdata.vispartedgesfromr),controlparameters.difforder,EDversionnumber);
-%         [hodpaths,EDinputdatahash] = EDfindHODpaths(uint8(sign(edgetoedgedata.edgeseespartialedge)),sign(Sdata.vispartedgesfroms),...
-%             sign(Rdata.vispartedgesfromr),controlparameters.difforder,EDversionnumber);
-        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_hodpaths.mat'];
-        if filehandlingparameters.savehodpaths == 1
-            eval(['save ''',desiredname,''' hodpaths hodpathsalongplane EDinputdatahash'])
+        [Hsubmatrixdata,EDinputdatahash] = EDinteg_submatrixstructure(edgedata.edgelengthvec,edgedata.closwedangvec,...
+        controlparameters.ngauss,controlparameters.discretizationtype,edgetoedgedata,edgedata.planesatedge,EDversionnumber,filehandlingparameters.showtext);
+    
+        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
+        if filehandlingparameters.savesubmatrixdata == 1
+            eval(['save ''',desiredname,''' Hsubmatrixdata EDinputdatahash'])
         end
     end
+    nsousigs = Hsubmatrixdata.bigmatrixendnums(end);
+    nsubmatrices = size(Hsubmatrixdata.edgetripletlist,1);
+    edgeelemsizes = edgedata.edgelengthvec./Hsubmatrixdata.nedgeelems;
+    meanelemsize = mean(edgeelemsizes);
+    maxfreq = envdata.cair/(3*meanelemsize);
+    minedgeelemnumber = min(Hsubmatrixdata.nedgeelems);
+    maxedgeelemnumber = max(Hsubmatrixdata.nedgeelems);
+    nonzeroelements = sum(prod(Hsubmatrixdata.nedgeelems(Hsubmatrixdata.edgetripletlist),2));
     t01 = etime(clock,t00);
-    timingstruct.hodpaths = t01;
+    timingstruct.submatrixdata = t01;
     if filehandlingparameters.showtext >= 1    
          if foundmatch == 1
             disp(['      Recycled ',existingfilename])
          end
-         disp(['      Found higher-order diffraction paths up to order ',int2str(controlparameters.difforder)]) 
+         disp(['      ',int2str(nsubmatrices),' submatrices; ',int2str(Hsubmatrixdata.nuniquesubmatrices),' unique will be computed due to symmetry']) 
+         disp(['      Discretizing the edges with ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discret. points, giving an avg. "edge element" length of ',num2str(meanelemsize),' m'])
+         disp(['      This discretization has an upper frequency limit of ',num2str(round(maxfreq)),' Hz (3 edge points per wavelength)'])
+         disp(['      ',int2str(nsousigs),' edge source signals to compute'])
+         disp(['      The IE matrix has ',int2str(nonzeroelements),' non-zero elements, but many may be identical due to symmetries'])
     end
     if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDfindHODpaths, diffraction order ',int2str(controlparameters.difforder),', time: ',num2str(t01),' s',lineending],'char');
+        fwrite(fid,['   EDinteg_submatrixstructure, (',int2str(Hsubmatrixdata.nuniquesubmatrices),' submatrices, out of ',int2str(nsubmatrices),', to compute), time: ',num2str(t01),' s',lineending],'char');
         if foundmatch == 1
                 fwrite(fid,['      by recycling ',existingfilename,lineending],'char');        
         end
+        fwrite(fid,['                               (Edges discretized with: ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discretization points)',lineending],'char');
+        fwrite(fid,['                               (Avg. "edge element" size: ',num2str(meanelemsize),' m. OK up to ',num2str(round(maxfreq)),' Hz (3 edge points per wavelength))',lineending],'char');
+        fwrite(fid,['                               (',int2str(nsousigs),' edge source signals to compute)',lineending],'char');
+        fwrite(fid,['                               (',int2str(nonzeroelements),' non-zero elements in the IE matrix)',lineending],'char');
     end
 else
     if filehandlingparameters.showtext >= 1	
-        disp(['   Skipping EDfindHODpaths, since difforder = ',int2str(controlparameters.difforder),' (or docalcir was set to 0)'])
-        timingstruct.hodpaths = 0;
+        disp(['   Skipping the integral equation Hsubmatrixdata struct, since difforder = ',int2str(controlparameters.difforder),' (or docalctf was set to 0)'])
+        timingstruct.submatrixdata = 0;
     end    
     if filehandlingparameters.savelogfile >= 1	        
-        fwrite(fid,['   EDfindHODpaths was not run',lineending],'char');
+        fwrite(fid,['   The integral equation Hsubmatrixdata struct was not created',lineending],'char');
     end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Calculate the HOD contributions one order at a time
+% Calculate the HOD contribution with the integral equation
 
-if controlparameters.difforder > 1 && controlparameters.docalcir == 1
-     
+if controlparameters.difforder > 1 && controlparameters.docalctf == 1
     if filehandlingparameters.showtext >= 1	
-        disp('   Generating the higher-order diffraction irs ')
+        disp('   Calculating the HOD contribution with the FD integral equation')
+        disp(['      ',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',int2str(controlparameters.difforder)])
     end
-    t00 = clock;
-    elemsize = 2.^(-[0:controlparameters.difforder-1]);
-    elemsize = elemsize*2;
-    
+
+    t00 = clock;    
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
     else
-%         EDhodirsinputstruct = struct();
-%         EDhodirinputhash = DataHash(EDhodirsinputstruct);
-        EDhodirinputstruct = struct('difforder',controlparameters.difforder,...
-        'hodpaths',hodpaths,'hodpathsalongplane',hodpathsalongplane,'elemsize',elemsize,'edgedata',edgedata,'Sdata',Sdata,...
-        'doaddsources',Sinputdata.doaddsources,'sourceamplitudes',Sinputdata.sourceamplitudes,...
-        'Rdata',Rdata,'cair',envdata.cair,'fs',controlparameters.fs,...
-        'Rstart',controlparameters.Rstart,'savealldifforders',...
-        controlparameters.savealldifforders,'EDversionnumber',EDversionnumber);
-        EDhodirinputhash = DataHash(EDhodirinputstruct);
-        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_irhod',EDhodirinputhash);
-    end
-    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_irhod.mat'];
+        EDinteqinputstruct = struct('envdata',envdata,...
+            'planedata',planedata,'edgedata',edgedata,'edgetoedgedata',edgetoedgedata,...
+            'Hsubmatrixdata',Hsubmatrixdata,'Sdata',Sdata,'doaddsources',Sinputdata.doaddsources,...
+            'sourceamplitudes',Sinputdata.sourceamplitudes,'doallSRcombinations',Sinputdata.doallSRcombinations,...
+            'Rdata',Rdata,'controlparameters',controlparameters,'EDversionnumber',EDversionnumber);
+        EDinteqinputhash = DataHash(EDinteqinputstruct);
+        [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_tfinteq',EDinteqinputhash);
+    end    
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
+    
     if foundmatch == 1
         currenttimingstruct = timingstruct;
-         eval(['load ''',existingfilename,''' irhod'])
-         EDinputdatahash = EDhodirinputhash;
+         eval(['load ''',recycledresultsfile,''' tfinteqdiff extraoutputdata timingstruct'])
+         EDinputdatahash = EDinteqinputhash;
         t01 = etime(clock,t00);
-        currenttimingstruct.hodir = t01;
+        currenttimingstruct.integralequation = [t01 timingstruct.integralequation(2:5)];
         timingstruct = currenttimingstruct;
-        eval(['save ''',desiredname,'''  irhod timingstruct EDsettings EDinputdatahash'])        
-    else        
-        [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,controlparameters.difforder,elemsize,edgedata,...
-        edgetoedgedata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Rdata,envdata.cair,...
-        controlparameters.fs,controlparameters.Rstart,controlparameters.savealldifforders,...
-        filehandlingparameters.showtext,EDversionnumber);
-        existingfilename =  '';
+        eval(['save ''',desiredname,'''  tfinteqdiff extraoutputdata recycledresultsfile timingstruct EDsettings EDinputdatahash'])        
+    else
+        [tfinteqdiff,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequation_convex_tf(filehandlingparameters,...
+            envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Sinputdata.doallSRcombinations,...
+            Rdata,controlparameters,EDversionnumber);
+        recycledresultsfile =  '';
         t01 = etime(clock,t00);
-        timingstruct.hodir = t01;
-        eval(['save ''',desiredname,''' irhod timingstruct EDsettings EDinputdatahash'])
+        timingstruct.integralequation = [t01 timingdata];
+        eval(['save ''',desiredname,''' tfinteqdiff  extraoutputdata timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     end
-    if filehandlingparameters.showtext >= 1    
-         if foundmatch == 1
-            disp(['      Recycled ',existingfilename])
-         end
-         disp(['      Generated higher-order diffraction irs up to order ',int2str(controlparameters.difforder)]) 
+    if filehandlingparameters.showtext >= 1 && foundmatch == 1
+        disp(['      Recycled ',recycledresultsfile])
     end
+
     if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDmakeHODirs, diffraction order ',int2str(controlparameters.difforder),', time: ',num2str(t01),' s',lineending],'char');
+        fwrite(fid,['   EDintegralequation_convex_tf (',int2str(nfrequencies),' frequencies. Diffraction order: ',int2str(controlparameters.difforder),')',lineending],'char');
         if foundmatch == 1
-                fwrite(fid,['      by recycling ',existingfilename,lineending],'char');        
+            fwrite(fid,['      by recycling ',recycledresultsfile,lineending],'char');  
+            fwrite(fid,['                                Total time: ',num2str(t01),' s',lineending],'char');                      
+        else
+            fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for one freq, as below)',lineending],'char');
+            fwrite(fid,['                                Compute the H-matrix: ',num2str(timingdata(1)),' s',lineending],'char');
+            fwrite(fid,['                                Compute Q_firstterm: ',num2str(timingdata(2)),' s',lineending],'char');
+            fwrite(fid,['                                Compute Qfinal: ',num2str(timingdata(3)),' s',lineending],'char');
+            fwrite(fid,['                                Compute the result at the receiver(s): ',num2str(timingdata(4)),' s',lineending],'char');
         end
     end
 else
     if filehandlingparameters.showtext >= 1	
-        disp(['   Skipping EDmakeHODirs, since difforder = ',int2str(controlparameters.difforder),' (or docalcir was set to 0)'])
-        timingstruct.hodpaths = 0;
-    end    
-    if filehandlingparameters.savelogfile >= 1	        
-        fwrite(fid,['   EDmakeHODirs was not run',lineending],'char');
+        disp(['   Skipping the FD integral equation, since difforder = ',int2str(controlparameters.difforder),' (or docalctf was set to 0)'])
+    end
+    timingstruct.integralequation = [0 0 0 0 0];
+    if Sinputdata.doaddsources == 1 || nsources == 1
+        tfinteqdiff = zeros(nfrequencies,nreceivers);
+    else
+        tfinteqdiff = zeros(nfrequencies,nreceivers,nsources);        
+    end
+    extraoutputdata = [];
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
+    eval(['save ''',desiredname,''' tfinteqdiff extraoutputdata timingstruct'])    
+    if filehandlingparameters.savelogfile == 1
+        fwrite(fid,['   The integral equation stage was not run',lineending],'char');
     end
 end
 

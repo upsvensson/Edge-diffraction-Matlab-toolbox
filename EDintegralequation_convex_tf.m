@@ -30,7 +30,7 @@ function [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequ
 % EDcoordtrans1 from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  13 Apr 2018  
+% Peter Svensson (peter.svensson@ntnu.no)  3 June 2020  
 %                       
 % [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequation_convex_tf(filehandlingparameters,...
 %    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,sourceamplitudes,...
@@ -80,6 +80,7 @@ function [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequ
 % subdirectory.
 % 13 Apr 2018 Fixed a small bug on l143: thinplaneboostvec got the format
 % uint8 but needs to be double. Found by Antoine.
+% 3 June 2020 Fixed a bug: folder names with spaces can be handled now
 
 showtext = filehandlingparameters.showtext;
 
@@ -545,12 +546,12 @@ for ifreq = 1:nfrequencies
             
             if filehandlingparameters.saveinteqsousigs == 1
                filename_sousigs = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_f',int2str(ifreq),'_sousigs.mat'];  
-               eval(['save ',filename_sousigs,' Qfinal Q_firstterm doesQsegmenthavevalues'])             
+               eval(['save ''',filename_sousigs,''' Qfinal Q_firstterm doesQsegmenthavevalues'])             
             end
 
         else    % This 'else' part implies that controlparameters.loadinteqsousig = 1
             filename_sousigs = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_f',int2str(ifreq),'_sousigs.mat'];  
-            eval(['load ',filename_sousigs]) 
+            eval(['load ''',filename_sousigs,'''']) 
 			disp(['      Using existing edgesourcesignalsfile: ',filename_sousigs])
         end
 
@@ -604,8 +605,10 @@ for ifreq = 1:nfrequencies
                 % CASE 2: Compute the first term of the source signals (independent of H)            
                 
                 ISOU = int2str(isou); 
-                
-                disp(['Source no. ',ISOU,' of ',int2str(nsources)])
+    
+                if showtext >= 2
+                    disp(['Source no. ',ISOU,' of ',int2str(nsources)])
+                end
                 
                 Q_firstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
                     controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
@@ -669,12 +672,12 @@ for ifreq = 1:nfrequencies
 
                 if filehandlingparameters.saveinteqsousigs == 1
                    filename_sousigs = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_',ISOU,'_f',int2str(ifreq),'_sousigs.mat'];  
-                   eval(['save ',filename_sousigs,' Qfinal Q_firstterm doesQsegmenthavevalues'])             
+                   eval(['save ''',filename_sousigs,''' Qfinal Q_firstterm doesQsegmenthavevalues'])             
                 end
             
             else    % This 'else' part implies that filehandlingparameters.loadinteqsousig = 1                
                 filename_sousigs = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_',ISOU,'_f',int2str(ifreq),'_sousigs.mat'];  
-                eval(['load ',filename_sousigs])              	
+                eval(['load ''',filename_sousigs,''''])              	
                 disp(['   Using existing edgesourcesignalsfile: ',filename_sousigs])
             end  
 

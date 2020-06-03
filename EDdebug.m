@@ -3,9 +3,11 @@
 % as well as values of difforder = 0,1,2, doaddsources = 0,1
 % sourceamplitudes = 1 or ones(nfrequencies,nsources)
 % 
-% Peter Svensson 31 Jan. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
 
 % 31 Jan 2018 First version
+% 3 June 2020 Fixed it so that the path folders could have a space in the name.
+
 
 [EDversionnumber,changedate,changetime] = EDgetversion;
 
@@ -83,8 +85,8 @@ for ii = 1:length(souvar)
                         casecounter = casecounter + 1;
                         disp(['Case no. ',int2str(casecounter),': ',int2str(ii),' ',int2str(jj),' ',int2str(kk),' ',int2str(ll),' ',int2str(mm),' ',int2str(nn)])
                         EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
-                        eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat tfdirect tfdiff'])
-                        eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat tfinteqdiff'])
+                        eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat''',' tfdirect tfdiff'])
+                        eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat''',' tfinteqdiff'])
 
                         if any(any(any(tfdiff))) && controlparameters.difforder == 0
                             error('ERROR: difforder was set to zero but tfdiff got some result')

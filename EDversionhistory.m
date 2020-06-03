@@ -191,7 +191,8 @@ versiontext{icounter} = ['Introduced EDmain_nonconvex_time, and made adjustments
 icounter = icounter + 1;
 versionnumbers{icounter} = '0.214';
 versiondate{icounter} = '3 June 2020';
-versiontext{icounter} = ['Fixed a bug in many files so that folder names with spaces can be handled.']; 
+versiontext{icounter} = ['Fixed a bug in many files so that folder names with spaces can be handled. Also '...
+    'fixed an error in EDcheckinputstructs with sourceamplitudes.']; 
 
 nversions = size(versiontext,2);
 txtwidth = 80;

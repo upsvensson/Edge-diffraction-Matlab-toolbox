@@ -68,7 +68,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   3, for EDmain_convexESIEBEM (frequency domain)
 %                   4, for EDmain_convex_time (time domain)
 % 
-% Peter Svensson 22 May 2019 (peter.svensson@ntnu.no)
+% Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -129,6 +129,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 28 May 2018 Added the input field geoinputdata.planerefltypes
 % 22 May 2019 Fixed an error with sourceamplitudes; they did not have the
 % right orientation.
+% 3 June 2020 Fixed a but with sourceamplitudes that was found by EDdebug:
+% If the user had specified a constant sourceamplitudes, it wasn't expanded
+% to a matrix of size [nsources, nfrequencies].
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -204,27 +207,9 @@ if ~isfield(geoinputdata,'firstcornertoskip')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check the struct Rinputdata
-
-if ~isstruct(Rinputdata)
-    error('ERROR 1: receiver coordinates were not specified')
-end
-if ~isfield(Rinputdata,'coordinates')
-    error('ERROR 2: receiver coordinates were not specified')
-end
-nreceivers = size(Rinputdata.coordinates,1);
-if nreceivers == 0
-     error('ERROR 3: receiver coordinates were not specified')            
-end
-ncolumns = size(Rinputdata.coordinates,2);
-if ncolumns ~= 3
-   error(['ERROR: check your receiver coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check the struct Sinputdata
-
-sourceamplitudes_default = 0;
+% Check the struct Sinputdata, but the field .sourceamplitudes is handled
+% further down, since the values depend on whether it is a TD case or an FD
+% case.
 
 if ~isstruct(Sinputdata)
     error('ERROR 1: source coordinates were not specified')
@@ -239,21 +224,7 @@ end
 if ~isfield(Sinputdata,'doaddsources')
     Sinputdata.doaddsources = 0;
 end
-if ~isfield(Sinputdata,'sourceamplitudes')
-    Sinputdata.sourceamplitudes = ones(nsources,1);    
-    sourceamplitudes_default = 1;
-else
-    [n1,n2] = size(Sinputdata.sourceamplitudes);
-    if n1 == 1 && nsources > 1
-        Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),:);         
-    else
-        if n1 > 1 && n1 ~= nsources
-            nsources
-            [n1,n2]
-           error('ERROR 4: more then one source amplitude was specified but the number does not match the number of sources'); 
-        end
-    end    
-end
+
 if nsources == 1
     Sinputdata.doaddsources = 1;
 end    
@@ -270,6 +241,24 @@ end
 ncolumns = size(Sinputdata.coordinates,2);
 if ncolumns ~= 3
    error(['ERROR: check your source coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Check the struct Rinputdata
+
+if ~isstruct(Rinputdata)
+    error('ERROR 1: receiver coordinates were not specified')
+end
+if ~isfield(Rinputdata,'coordinates')
+    error('ERROR 2: receiver coordinates were not specified')
+end
+nreceivers = size(Rinputdata.coordinates,1);
+if nreceivers == 0
+     error('ERROR 3: receiver coordinates were not specified')            
+end
+ncolumns = size(Rinputdata.coordinates,2);
+if ncolumns ~= 3
+   error(['ERROR: check your receiver coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -328,9 +317,13 @@ if ~isfield(controlparameters,'frequencies')
     if (EDmaincase == 1 || EDmaincase == 3) && controlparameters.docalctf == 1
         error('ERROR: .frequencies were not specified')
     end
+    nfrequencies = 0;
 else
-    if EDmaincase == 2 || EDmaincase == 4
+    if (EDmaincase == 1 || EDmaincase == 3)
+        nfrequencies = length(controlparameters.frequencies);
+    elseif EDmaincase == 2 || EDmaincase == 4
         controlparameters = rmfield(controlparameters,'frequencies');
+        nfrequencies = 0;
     end     
 end
 if ~isfield(controlparameters,'discretizationtype')
@@ -379,19 +372,61 @@ else
     end    
 end
 
-if EDmaincase == 1 || EDmaincase == 3      
-    nfrequencies = length(controlparameters.frequencies);
-    nsources = size(Sinputdata.coordinates,1);
-    [n1,n2] = size(Sinputdata.sourceamplitudes);
-    if  n1 ~= nsources || n2 ~= nfrequencies
-        if (n1 == 1 && n2 == 1) || sourceamplitudes_default == 1
-            Sinputdata.sourceamplitudes = ones(nsources,nfrequencies);
-        else
-            error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have the size [1,1] or [nsources,nfrequencies], but it had the size ',int2str(n1),' by ',int2str(n2)])
-        end
-    end   
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Check the field .sourceamplitudes of the struct Sinputdata
+
+sourceamplitudes_default = 0;
+
+% We need to treat the frequency-domain cases differently from the
+% time-domain cases. But, if .sourceamplitudes was not specified, it gets
+% the default value 1 for all sources (and frequencies).
+
+if ~isfield(Sinputdata,'sourceamplitudes')
+%     Sinputdata.sourceamplitudes = ones(nsources,1);    
+    Sinputdata.sourceamplitudes = 1;    
+    sourceamplitudes_default = 1;
 end
 
+[n1,n2] = size(Sinputdata.sourceamplitudes);
+
+if n1 > 1
+    if n1 ~= nsources
+        error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one row, or one row per source, but it had the size ',int2str(n1),' by ',int2str(n2)])
+    else % So, we know that there is one amplitude per source. Check if there is one value per freq.
+        if EDmaincase == 1 || EDmaincase == 3      
+            if n2 == 1
+                Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(:,ones(1,nfrequencies));
+            else
+                if n2 ~= nfrequencies
+                    error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one column, or one column per frequency, but it had the size ',int2str(n1),' by ',int2str(n2)])
+                end
+            end
+        else
+            if n2 > 1
+               error(['ERROR: The Sinputdata.sourceamplitudes input parameter must, for TD calculations, have one column, but it had the size ',int2str(n1),' by ',int2str(n2)])
+            end
+        end
+    end
+else % Here we know that there is just one row. Check if there is one value per freq. (or a single value)
+    if n2 > 1
+        if EDmaincase == 1 || EDmaincase == 3      
+            if n2 ~= nfrequencies
+                error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one column, or one column per frequency, but it had the size ',int2str(n1),' by ',int2str(n2)])
+            else % Here we know that n2 == nfrequencies. Expand to number of sources
+                Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),:);
+            end
+        else
+            error(['ERROR: The Sinputdata.sourceamplitudes input parameter must, for TD calculations, have one column, but it had the size ',int2str(n1),' by ',int2str(n2)])            
+        end
+    else % Here we know that n1 = 1 and n2 = 1
+        if EDmaincase == 1 || EDmaincase == 3      
+            Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),ones(1,nfrequencies));
+        else
+            Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1));            
+        end
+    end
+end
+    
 if ~isfield(controlparameters,'savealldifforders')
     if EDmaincase == 4      
         controlparameters.savealldifforders = 0;

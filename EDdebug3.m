@@ -3,13 +3,16 @@
 % as well as values of difforder = 0,1,2, doaddsources = 0,1
 % sourceamplitudes = 1 or ones(nfrequencies,nsources)
 % 
-% Peter Svensson 13 Apr 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
 
 % 31 Jan 2018 First version
 % 7 Mar 2018 Version for the ESIEBEM
 % 11 Apr 2018 Version for the EDmain_convex_time
 % 13 Apr 2018 Introduced the saveindividualfirstdiff as varied input
 % parameter
+% 3 June 2020 Fixed a bug: Sinputdata.sourceamplitudes was previously given
+% the size [1,nsources] but it was changed to [nsources,1]. Also fixed it
+% so that the path folders could have a space in the name.
 
 [EDversionnumber,changedate,changetime] = EDgetversion;
 
@@ -90,13 +93,13 @@ for ii = 1:length(souvar)
                         if nn == 1
                             Sinputdata.sourceamplitudes = 1;
                         else
-                           Sinputdata.sourceamplitudes = ones(1,nsources); 
+                           Sinputdata.sourceamplitudes = ones(nsources,1); 
                         end
                         
                         casecounter = casecounter + 1;
                         disp(['Case no. ',int2str(casecounter),': ',int2str(ii),' ',int2str(jj),' ',int2str(ll),' ',int2str(mm),' ',int2str(nn)])
                         EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
-                        eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_ir.mat irdirect irdiff'])
+                        eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_ir.mat''',' irdirect irdiff'])
 
                         if controlparameters.saveindividualfirstdiff == 0
                             if any(any(any(irdiff))) && controlparameters.difforder == 0
@@ -119,7 +122,7 @@ for ii = 1:length(souvar)
                                                       
                         end
                         if controlparameters.difforder > 1
-                            eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_irhod.mat irhod'])
+                            eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_irhod.mat''',' irhod'])
                             if any(any(any(irhod{1,1}))) && controlparameters.difforder <2
                                 error('ERROR: difforder was set <2 but irhod got some result')
                             end

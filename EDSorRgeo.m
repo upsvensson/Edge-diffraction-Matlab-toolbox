@@ -83,6 +83,8 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 % 18 June 2018 Introduced the variable geomacc which is passed on to
 % EDinfrontofplane and to EDpoinpla.
 % 20 Jan 2021 Changed the format of .vispartedgesfroms_start to uint8 etc
+% 20 Jan 2021 The obstruction test is skipped altogether when a convex
+% model is used.
 
 geomacc = 1e-9;
 
@@ -696,7 +698,7 @@ else
     vispartedgesfromr = zeros(size(visedgesfromr),'uint32');
 end
 
-if planedata.modeltype == 'convex_ext'
+if strcmp(planedata.modeltype,'convex_ext') == 1
     iv = uint32(find(visedgesfromr==1));
     vispartedgesfromr(iv) = maxvisibilityval;
 else

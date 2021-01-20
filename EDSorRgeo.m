@@ -59,7 +59,7 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 % EDcoordtrans1 EDgetedgepoints, EDcheckobstr_pointtoedge from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 18 June 2018
+% Peter Svensson (peter.svensson@ntnu.no) 20 Jan 2021
 %
 % [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,EDversionnumber,nedgesubs,showtext);
 
@@ -82,6 +82,7 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 % 15 Mar 2018 Fixed a little bug for cases where some plane was TOTABS.
 % 18 June 2018 Introduced the variable geomacc which is passed on to
 % EDinfrontofplane and to EDpoinpla.
+% 20 Jan 2021 Changed the format of .vispartedgesfroms_start to uint8 etc
 
 geomacc = 1e-9;
 
@@ -660,6 +661,8 @@ clear onesvec1R
 %##################################################################
 %
 %		CHECK OBSTRUCTION OF R-TO-EDGE PATHS
+% 
+% This check is not needed if planedata.modeltype = 'convex_ext'
 %
 %   vispartedgesfromr   0-2^nedgesubs-1, [nedges,nrec]
 %                       telling which segments of an edge that
@@ -685,14 +688,6 @@ clear onesvec1R
 % weightvec = 2.^edgedividervec;
 maxvisibilityval = 2^nedgesubs-1;
 
-if showtext >= 3
-    if lower(typeofcoords(1)) == 'r'
-    	disp('         Checking for obstructing planes between R and edges')
-    else
-    	disp('         Checking for obstructing planes between S and edges')
-    end
-end
-
 if nedgesubs<8
     vispartedgesfromr = zeros(size(visedgesfromr),'uint8');
 elseif nedgesubs<16
@@ -701,259 +696,269 @@ else
     vispartedgesfromr = zeros(size(visedgesfromr),'uint32');
 end
 
-%##################################################################
-%
-% The receiver related quantities
-
-iv = uint32(find(visedgesfromr>=5));
-if ~isempty(iv)
-    if showtext > 1
-        disp('      We check aligned-edge obstructions')
-    end
+if planedata.modeltype == 'convex_ext'
+    iv = uint32(find(visedgesfromr==1));
+    vispartedgesfromr(iv) = maxvisibilityval;
+else
     
-    % All edges must be checked vs all other edges?
-    % Make subdivision of edges. If a line from R to edge segments
-    % pass through a plane that is constructed by an edge and perpendicular to
-    % the studied plane, then that edge is obstructing. 
-    
-    combnumbers = double(iv);
-	recnumbers = ceil(combnumbers/nedges);
-%     if nedges < 256
-% % 		edgenumbers = uint8(combnumbers - (recnumbers-1)*nedges);
-%     elseif nedges < 65536
-% % 		edgenumbers = uint16(combnumbers - (recnumbers-1)*nedges);
-%     else
-% %    		edgenumbers = uint32(combnumbers - (recnumbers-1)*nedges);
-%     end
-    nedgesperreceiver = histc(recnumbers,(1:nreceivers));
-    iv1 = find(nedgesperreceiver > 2, 1);
-    if isempty(iv1)
-        if showtext > 2
-            disp('   No aligned-edges can obscure each other')    
-        end
-        visedgesfromr(iv)    = ones(size(iv));
-    else
-        error('ERROR: Obstruction check of aligned-edges not implemented yet!')        
-    end
- end
-
-iv = uint32(find(visedgesfromr==3));
-if ~isempty(iv)
-    if showtext > 2
-        disp('      We check within-plane obstructions')
-    end
-%     visedgesfromr(iv)      = zeros(size(iv));
-    error('ERROR: Obstruction check of within-same-plane-edges not implemented yet!')        
-    %    vispartedgesfromr(iv) = 0 - full;
-end
-
-iv = uint32(find(visedgesfromr==2));
-if ~isempty(iv)
-    if showtext > 2
-        disp('      Edge fully visible')
-    end
-    visedgesfromr(iv)      = zeros(size(iv));
-    vispartedgesfromr(iv)  =  maxvisibilityval*ones(size(iv));
-    
-end
-
-iv = uint32(find(visedgesfromr==4));
-if ~isempty(iv)
-    if showtext > 2
-        disp('      Edge in totabs plane')
-    end
-    visedgesfromr(iv)      = zeros(size(iv));
-    vispartedgesfromr(iv)  =  zeros(size(iv));
-    
-end
-
-% Below is the main part of the obstruction test. In the matrix
-% visedgesfromr, values 1 indicate that edge-receiver combos should be
-% tested. visedgesfromr has the size [nedges,nreceivers].
-
-iv = uint32(find(visedgesfromr==1));
-if ~isempty(iv)
-            
-%     visedgesfromr(iv) = zeros(size(iv));
-    combnumbers = double(iv);
-    clear iv
-    
-    % combnumbers is a list of the "combined" values for edge and receiver. 
-    
-    if nreceivers < 256
-    	recnumbers = uint8(ceil(combnumbers/nedges));
-    elseif nreceivers < 65536
-    	recnumbers = uint16(ceil(combnumbers/nedges));
-    else
-    	recnumbers = uint32(ceil(combnumbers/nedges));
-    end
-    if nedges < 256
-		edgenumbers = uint8(combnumbers - (double(recnumbers)-1)*nedges);
-    elseif nedges < 65536
-		edgenumbers = uint16(combnumbers - (double(recnumbers)-1)*nedges);            
-    else
-		edgenumbers = uint32(combnumbers - (double(recnumbers)-1)*nedges);            
-    end
-    combnumbers = uint32(combnumbers);
-    ncombs = length(recnumbers);
-%     ntot = ncombs*nplanes;
-    
-    % Mark, in a big matrix, which planes can at all obstruct.
-    % Planes that can obstruct must be seen by the receiver or the edge but
-    % not both - because then they would be on the same side!
-    % NB! Also totabs planes can obstruct.
-    % The big matrix will have nedges*nplanes rows. The vector planenumb
-    % will have values such as [1 1 1 1... 2 2 2 2 .....]
-
-    iv = [1:ncombs*nplanes].';                
-    % Plane number is given by the col no.
-    if nplanes < 256
-        planenumb = uint8(ceil(iv/ncombs));
-    elseif nplanes < 65536
-        planenumb = uint16(ceil(iv/ncombs));
-    else
-        planenumb = uint32(ceil(iv/ncombs));        
-    end
-    indexvec = planenumb;
-    
-    % The rownumber will simply have values [1 2 3... N 1 2 3 ... N 1 2 3
-    % ... N] where N is the number of combinations.
-    if ncombs < 256
-        rownumber = uint8(iv - (double(planenumb)-1)*ncombs);
-    elseif ncombs < 65536
-        rownumber = uint16(iv - (double(planenumb)-1)*ncombs);
-    else
-        rownumber = uint32(iv - (double(planenumb)-1)*ncombs);
-    end
-    clear planenumb iv 
-    
-    % The peak in the memory need might be after the two indexvec lines
-    % below
-
-    % indexvec2 will point to the right location in an [nplanes,nedges] matrix
-    % indexvec will point to the right location in an [nplanes,nreceivers] matrix
-    indexvec2 = uint32(double(indexvec) + (double(edgenumbers(rownumber))-1)*nplanes);
-    indexvec = uint32(double(indexvec) + (double(recnumbers(rownumber))-1)*nplanes);
-    clear rownumber
-
-    % The big matrix checkplane, size [1,ncombs*nplanes], will contain the
-    % value 1 if a plane should be checked for obstruction.
-    % The index order of checkplane is:
-    % [Plane1&comb1 Plane1&comb2 Plane1&comb3 ...] where comb1 is the first
-    % combination of receiver and edge in the recnumbers & edgenumbers
-    % lists.
-    % Only planes that are seen by the S/R *or* the edge, but not both
-    % should be checked for obstruction!!
-    % We remove combinations where:
-    %   ... S/R is aligned with a plane (visplanesfromr == 1)
-    %   ... edge belongs to a plane or is aligned with a plane (edgeseesplane <0)
-    %   ... S/R is behind and edge is behind a plane (visplanesfromr == 0 & edgeseesplane == 0)
-    %   ... S/R is in front of and edge is in front of a plane ( (visplanesfromr == 2 | visplanesfromr == 3) & edgeseesplane == 1)
-    %
-    % Comment 050116 (PS):
-    %   We would actually need a matrix called planeseesedge. Here we use
-    %   edgeseesplane instead, and it is not completely clear if that works
-    %   fine. 
-    
-    checkplane = (visplanesfromr(indexvec)~=1) & (edgedata.edgeseesplane(indexvec2)>=0) & not(visplanesfromr(indexvec)==0 & edgedata.edgeseesplane(indexvec2)==0 ) & not( (visplanesfromr(indexvec)==2 | visplanesfromr(indexvec)==3) & edgedata.edgeseesplane(indexvec2)==1 );
-    if size(checkplane,1) > size(checkplane,2)
-        checkplane = checkplane.';    
-    end
-
-    if size(checkplane,1) == 1 || size(checkplane,2) == 1
-        checkplane = reshape(checkplane,ncombs,nplanes);
-    end
-
-    clear indexvec indexvec2 edgeseesplane
-
-    % If there are some R-edge combos that have no planes to check
-    % obstruction for, we can mark those combos ("combsnottocheck") as fully visible.
-    %
-    % The remaining ones ("combstocheck") still need to be checked.
-    
-    n1 = size(checkplane,1);
-    if n1 < 65536
-        combstocheck = uint16(find( sum(checkplane.') ));        
-    elseif n1 < 4e9
-        combstocheck = uint32(find( sum(checkplane.') ));                    
-    end
-    combsnottocheck = (1:ncombs);
-    combsnottocheck(combstocheck) = [];
-    if ~isempty(combsnottocheck)
-        vispartedgesfromr(combnumbers(combsnottocheck)) = maxvisibilityval*ones(size(combsnottocheck));
-    end
-
-    if ~isempty(combstocheck)
-        
-        checkplane = checkplane(combstocheck,:);
-        recnumbers = recnumbers(combstocheck);
-        maxrec = max(recnumbers);
-        if maxrec < 256
-            recnumbers = uint8(recnumbers);        
-        elseif maxrec < 65536
-            recnumbers = uint16(recnumbers);                
+    if showtext >= 3
+        if lower(typeofcoords(1)) == 'r'
+            disp('         Checking for obstructing planes between R and edges')
         else
-            recnumbers = uint32(recnumbers);                
+            disp('         Checking for obstructing planes between S and edges')
         end
-        edgenumbers = edgenumbers(combstocheck);
-%         combnumbers = combnumbers(combstocheck);
-        ncombs = length(combstocheck);
+    end
 
-        % Now, checkplane is a matrix of size [ncombs,nplanes] where each
-        % row corresponds to one path (from one receiver to one edge) that needs
-        % an obstruction check. For that row, checkplane has the value 1 for
-        % each plane that needs to be checked.
-        %    
-        % Expand all edges into their edge segment/subdivision
-        % We treat all the little edge subdivisions as separate edges
-	
-        nposs = ncombs*nedgesubs;        
-        
-        expandedrecnumbers = recnumbers(:,onesvec1ES);
-        clear recnumbers
-        expandedrecnumbers = reshape(expandedrecnumbers.',nposs,1);
-%         expandedcombnumbers = combnumbers(:,onesvec1ES);
-        clear combnumbers
-%         expandedcombnumbers = reshape(expandedcombnumbers.',nposs,1);
-        if nposs < 65536
-%             okcombs = zeros(size(expandedrecnumbers),'uint16');
-        elseif nposs < 4e9
-%             okcombs = zeros(size(expandedrecnumbers),'uint32');                
+    iv = uint32(find(visedgesfromr>=5));
+    if ~isempty(iv)
+        if showtext > 1
+            disp('      We check aligned-edge obstructions')
         end
-        
-         [tocoords,expandededgeweightlist,expandededgenumbers] = EDgetedgepoints(edgedata.edgestartcoords(edgenumbers,:),...
-             edgedata.edgeendcoords(edgenumbers,:),nedgesubs,1);
-         expandededgenumbers = edgenumbers(expandededgenumbers);
 
-        [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_pointtoedge(pointcoords,expandedrecnumbers,tocoords,reshape(repmat(checkplane.',[nedgesubs,1]),nplanes,nposs).',planedata);
+        % All edges must be checked vs all other edges?
+        % Make subdivision of edges. If a line from R to edge segments
+        % pass through a plane that is constructed by an edge and perpendicular to
+        % the studied plane, then that edge is obstructing. 
 
-%         expandedcombnumbers = expandedcombnumbers(nonobstructedpaths);
-        expandededgeweightlist = expandededgeweightlist(nonobstructedpaths);
-        expandedrecnumbers = expandedrecnumbers(nonobstructedpaths);
-        expandededgenumbers = expandededgenumbers(nonobstructedpaths);
+        combnumbers = double(iv);
+        recnumbers = ceil(combnumbers/nedges);
+    %     if nedges < 256
+    % % 		edgenumbers = uint8(combnumbers - (recnumbers-1)*nedges);
+    %     elseif nedges < 65536
+    % % 		edgenumbers = uint16(combnumbers - (recnumbers-1)*nedges);
+    %     else
+    % %    		edgenumbers = uint32(combnumbers - (recnumbers-1)*nedges);
+    %     end
+        nedgesperreceiver = histc(recnumbers,(1:nreceivers));
+        iv1 = find(nedgesperreceiver > 2, 1);
+        if isempty(iv1)
+            if showtext > 2
+                disp('   No aligned-edges can obscure each other')    
+            end
+            visedgesfromr(iv)    = ones(size(iv));
+        else
+            error('ERROR: Obstruction check of aligned-edges not implemented yet!')        
+        end
+     end
 
-        % Pack all non-obstructed edge segments together and add their weights together
-        
-        test = [double(expandedrecnumbers) double(expandededgenumbers)];
-		ncombs = length(expandedrecnumbers);
-		dtest = diff([0;prod(   double(test(1:ncombs-1,:)==test(2:ncombs,:)).'  ).']);
-		ivremove = find(dtest==1);
-		
-		while ~isempty(ivremove)
-            expandededgeweightlist(ivremove+1) = double(expandededgeweightlist(ivremove+1)) + double(expandededgeweightlist(ivremove));
-            expandededgeweightlist(ivremove) = [];
-            expandedrecnumbers(ivremove) = [];
-            expandededgenumbers(ivremove,:) = [];
-		
+    iv = uint32(find(visedgesfromr==3));
+    if ~isempty(iv)
+        if showtext > 2
+            disp('      We check within-plane obstructions')
+        end
+    %     visedgesfromr(iv)      = zeros(size(iv));
+        error('ERROR: Obstruction check of within-same-plane-edges not implemented yet!')        
+        %    vispartedgesfromr(iv) = 0 - full;
+    end
+
+    iv = uint32(find(visedgesfromr==2));
+    if ~isempty(iv)
+        if showtext > 2
+            disp('      Edge fully visible')
+        end
+        visedgesfromr(iv)      = zeros(size(iv));
+        vispartedgesfromr(iv)  =  maxvisibilityval*ones(size(iv));
+
+    end
+
+    iv = uint32(find(visedgesfromr==4));
+    if ~isempty(iv)
+        if showtext > 2
+            disp('      Edge in totabs plane')
+        end
+        visedgesfromr(iv)      = zeros(size(iv));
+        vispartedgesfromr(iv)  =  zeros(size(iv));
+
+    end
+
+    % Below is the main part of the obstruction test. In the matrix
+    % visedgesfromr, values 1 indicate that edge-receiver combos should be
+    % tested. visedgesfromr has the size [nedges,nreceivers].
+
+    iv = uint32(find(visedgesfromr==1));
+    if ~isempty(iv)
+
+    %     visedgesfromr(iv) = zeros(size(iv));
+        combnumbers = double(iv);
+        clear iv
+
+        % combnumbers is a list of the "combined" values for edge and receiver. 
+
+        if nreceivers < 256
+            recnumbers = uint8(ceil(combnumbers/nedges));
+        elseif nreceivers < 65536
+            recnumbers = uint16(ceil(combnumbers/nedges));
+        else
+            recnumbers = uint32(ceil(combnumbers/nedges));
+        end
+        if nedges < 256
+            edgenumbers = uint8(combnumbers - (double(recnumbers)-1)*nedges);
+        elseif nedges < 65536
+            edgenumbers = uint16(combnumbers - (double(recnumbers)-1)*nedges);            
+        else
+            edgenumbers = uint32(combnumbers - (double(recnumbers)-1)*nedges);            
+        end
+        combnumbers = uint32(combnumbers);
+        ncombs = length(recnumbers);
+    %     ntot = ncombs*nplanes;
+
+        % Mark, in a big matrix, which planes can at all obstruct.
+        % Planes that can obstruct must be seen by the receiver or the edge but
+        % not both - because then they would be on the same side!
+        % NB! Also totabs planes can obstruct.
+        % The big matrix will have nedges*nplanes rows. The vector planenumb
+        % will have values such as [1 1 1 1... 2 2 2 2 .....]
+
+        iv = [1:ncombs*nplanes].';                
+        % Plane number is given by the col no.
+        if nplanes < 256
+            planenumb = uint8(ceil(iv/ncombs));
+        elseif nplanes < 65536
+            planenumb = uint16(ceil(iv/ncombs));
+        else
+            planenumb = uint32(ceil(iv/ncombs));        
+        end
+        indexvec = planenumb;
+
+        % The rownumber will simply have values [1 2 3... N 1 2 3 ... N 1 2 3
+        % ... N] where N is the number of combinations.
+        if ncombs < 256
+            rownumber = uint8(iv - (double(planenumb)-1)*ncombs);
+        elseif ncombs < 65536
+            rownumber = uint16(iv - (double(planenumb)-1)*ncombs);
+        else
+            rownumber = uint32(iv - (double(planenumb)-1)*ncombs);
+        end
+        clear planenumb iv 
+
+        % The peak in the memory need might be after the two indexvec lines
+        % below
+
+        % indexvec2 will point to the right location in an [nplanes,nedges] matrix
+        % indexvec will point to the right location in an [nplanes,nreceivers] matrix
+        indexvec2 = uint32(double(indexvec) + (double(edgenumbers(rownumber))-1)*nplanes);
+        indexvec = uint32(double(indexvec) + (double(recnumbers(rownumber))-1)*nplanes);
+        clear rownumber
+
+        % The big matrix checkplane, size [1,ncombs*nplanes], will contain the
+        % value 1 if a plane should be checked for obstruction.
+        % The index order of checkplane is:
+        % [Plane1&comb1 Plane1&comb2 Plane1&comb3 ...] where comb1 is the first
+        % combination of receiver and edge in the recnumbers & edgenumbers
+        % lists.
+        % Only planes that are seen by the S/R *or* the edge, but not both
+        % should be checked for obstruction!!
+        % We remove combinations where:
+        %   ... S/R is aligned with a plane (visplanesfromr == 1)
+        %   ... edge belongs to a plane or is aligned with a plane (edgeseesplane <0)
+        %   ... S/R is behind and edge is behind a plane (visplanesfromr == 0 & edgeseesplane == 0)
+        %   ... S/R is in front of and edge is in front of a plane ( (visplanesfromr == 2 | visplanesfromr == 3) & edgeseesplane == 1)
+        %
+        % Comment 050116 (PS):
+        %   We would actually need a matrix called planeseesedge. Here we use
+        %   edgeseesplane instead, and it is not completely clear if that works
+        %   fine. 
+
+        checkplane = (visplanesfromr(indexvec)~=1) & (edgedata.edgeseesplane(indexvec2)>=0) & not(visplanesfromr(indexvec)==0 & edgedata.edgeseesplane(indexvec2)==0 ) & not( (visplanesfromr(indexvec)==2 | visplanesfromr(indexvec)==3) & edgedata.edgeseesplane(indexvec2)==1 );
+        if size(checkplane,1) > size(checkplane,2)
+            checkplane = checkplane.';    
+        end
+
+        if size(checkplane,1) == 1 || size(checkplane,2) == 1
+            checkplane = reshape(checkplane,ncombs,nplanes);
+        end
+
+        clear indexvec indexvec2 edgeseesplane
+
+        % If there are some R-edge combos that have no planes to check
+        % obstruction for, we can mark those combos ("combsnottocheck") as fully visible.
+        %
+        % The remaining ones ("combstocheck") still need to be checked.
+
+        n1 = size(checkplane,1);
+        if n1 < 65536
+            combstocheck = uint16(find( sum(checkplane.') ));        
+        elseif n1 < 4e9
+            combstocheck = uint32(find( sum(checkplane.') ));                    
+        end
+        combsnottocheck = (1:ncombs);
+        combsnottocheck(combstocheck) = [];
+        if ~isempty(combsnottocheck)
+            vispartedgesfromr(combnumbers(combsnottocheck)) = maxvisibilityval*ones(size(combsnottocheck));
+        end
+
+        if ~isempty(combstocheck)
+
+            checkplane = checkplane(combstocheck,:);
+            recnumbers = recnumbers(combstocheck);
+            maxrec = max(recnumbers);
+            if maxrec < 256
+                recnumbers = uint8(recnumbers);        
+            elseif maxrec < 65536
+                recnumbers = uint16(recnumbers);                
+            else
+                recnumbers = uint32(recnumbers);                
+            end
+            edgenumbers = edgenumbers(combstocheck);
+    %         combnumbers = combnumbers(combstocheck);
+            ncombs = length(combstocheck);
+
+            % Now, checkplane is a matrix of size [ncombs,nplanes] where each
+            % row corresponds to one path (from one receiver to one edge) that needs
+            % an obstruction check. For that row, checkplane has the value 1 for
+            % each plane that needs to be checked.
+            %    
+            % Expand all edges into their edge segment/subdivision
+            % We treat all the little edge subdivisions as separate edges
+
+            nposs = ncombs*nedgesubs;        
+
+            expandedrecnumbers = recnumbers(:,onesvec1ES);
+            clear recnumbers
+            expandedrecnumbers = reshape(expandedrecnumbers.',nposs,1);
+    %         expandedcombnumbers = combnumbers(:,onesvec1ES);
+            clear combnumbers
+    %         expandedcombnumbers = reshape(expandedcombnumbers.',nposs,1);
+            if nposs < 65536
+    %             okcombs = zeros(size(expandedrecnumbers),'uint16');
+            elseif nposs < 4e9
+    %             okcombs = zeros(size(expandedrecnumbers),'uint32');                
+            end
+
+             [tocoords,expandededgeweightlist,expandededgenumbers] = EDgetedgepoints(edgedata.edgestartcoords(edgenumbers,:),...
+                 edgedata.edgeendcoords(edgenumbers,:),nedgesubs,1);
+             expandededgenumbers = edgenumbers(expandededgenumbers);
+
+            [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_pointtoedge(pointcoords,expandedrecnumbers,tocoords,reshape(repmat(checkplane.',[nedgesubs,1]),nplanes,nposs).',planedata);
+
+    %         expandedcombnumbers = expandedcombnumbers(nonobstructedpaths);
+            expandededgeweightlist = expandededgeweightlist(nonobstructedpaths);
+            expandedrecnumbers = expandedrecnumbers(nonobstructedpaths);
+            expandededgenumbers = expandededgenumbers(nonobstructedpaths);
+
+            % Pack all non-obstructed edge segments together and add their weights together
+
             test = [double(expandedrecnumbers) double(expandededgenumbers)];
             ncombs = length(expandedrecnumbers);
             dtest = diff([0;prod(   double(test(1:ncombs-1,:)==test(2:ncombs,:)).'  ).']);
             ivremove = find(dtest==1);
-		end
-         
-        indexvec = uint32(nedges*(double(expandedrecnumbers)-1)+double(expandededgenumbers));
-        vispartedgesfromr(indexvec)  =  expandededgeweightlist;
-        clear indexvec                
+
+            while ~isempty(ivremove)
+                expandededgeweightlist(ivremove+1) = double(expandededgeweightlist(ivremove+1)) + double(expandededgeweightlist(ivremove));
+                expandededgeweightlist(ivremove) = [];
+                expandedrecnumbers(ivremove) = [];
+                expandededgenumbers(ivremove,:) = [];
+
+                test = [double(expandedrecnumbers) double(expandededgenumbers)];
+                ncombs = length(expandedrecnumbers);
+                dtest = diff([0;prod(   double(test(1:ncombs-1,:)==test(2:ncombs,:)).'  ).']);
+                ivremove = find(dtest==1);
+            end
+
+            indexvec = uint32(nedges*(double(expandedrecnumbers)-1)+double(expandededgenumbers));
+            vispartedgesfromr(indexvec)  =  expandededgeweightlist;
+            clear indexvec                
+        end
     end
 end
 
@@ -989,8 +994,16 @@ EDcompress3(rRcomplete,thetaRcomplete,zRcomplete);
 %
 %--------------------------------------------------------------------------
 
-vispartedgesfromr_start = zeros(size(vispartedgesfromr));
-vispartedgesfromr_end   = ones(size(vispartedgesfromr));
+if nedgesubs<8
+    vispartedgesfromr_start = zeros(size(vispartedgesfromr),'uint8');
+    vispartedgesfromr_end   = ones(size(vispartedgesfromr),'uint8');
+elseif nedgesubs<16
+    vispartedgesfromr_start = zeros(size(vispartedgesfromr),'uint16');
+    vispartedgesfromr_end   = ones(size(vispartedgesfromr),'uint16');
+else
+    vispartedgesfromr_start = zeros(size(vispartedgesfromr),'uint32');
+    vispartedgesfromr_end   = ones(size(vispartedgesfromr),'uint32');
+end
 
 if typeofcoords=='r'
     receivers = pointcoords;

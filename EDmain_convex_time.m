@@ -43,7 +43,7 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % EDinteg_submatrixstructure, EDintegralequation_convex_ir from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
+% Peter Svensson 20 Jan 2021 (peter.svensson@ntnu.no)
 %
 % EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -138,6 +138,8 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % new output parameter.
 % 21 May 2019 Cleaned up some file recycling mistakes.
 % 3 June 2020 Fixed a bug: folder names with spaces can be handled now
+% 20 Jan 2021 Fixed: the field .planerefltypes wasn't forwarded to
+%             EDreadgeomatrices
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -234,7 +236,9 @@ else
         disp('   Creating the planedata struct from the input geometry matrices')
     end
     t00 = clock;
-    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners);    
+    % Fix on 20 Jan 2021: the field .planerefltypes wasn't forwarded to
+    % EDreadgeomatrices
+    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners,geoinputdata.planerefltypes);    
     ncorners = size(planedata.corners,1);
     nplanes = size(planedata.planecorners,1);
     t01 = etime(clock,t00);

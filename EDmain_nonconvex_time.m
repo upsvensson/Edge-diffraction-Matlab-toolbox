@@ -145,6 +145,8 @@ function EDmain_nonconvex_time(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % new output parameter.
 % 21 May 2019 Cleaned up some file recycling mistakes.
 % 3 June 2020 Fixed a bug: folder names with spaces can be handled now
+% 20 Jan 2021 Fixed: the field .planerefltypes wasn't forwarded to
+%             EDreadgeomatrices
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -241,7 +243,10 @@ else
         disp('   Creating the planedata struct from the input geometry matrices')
     end
     t00 = clock;
-    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners);    
+    % Fix on 20 Jan 2021: the field .planerefltypes wasn't forwarded to
+    % EDreadgeomatrices
+    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners,geoinputdata.planerefltypes);    
+%     planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners);    
     ncorners = size(planedata.corners,1);
     nplanes = size(planedata.planecorners,1);
     t01 = etime(clock,t00);

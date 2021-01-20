@@ -161,7 +161,6 @@ lineending = 10;
 if ispc == 1
    lineending = [13,10];
 end
-
 [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,1);
 
 EDsettings = cell(7,1);

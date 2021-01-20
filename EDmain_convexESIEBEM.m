@@ -48,7 +48,7 @@ function EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,control
 % EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
+% Peter Svensson 20 Jan 2021 (peter.svensson@ntnu.no)
 %
 % EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -142,6 +142,8 @@ function EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,control
 % 4 Apr 2018 Removed the showtext parameter from the EDgensurfreceivers
 % 14 May 2018 CLeaned up the lineending business.
 % 3 June 2020 Fixed a bug: folder names with spaces can be handled now
+% 20 Jan 2021 Fixed: the field .planerefltypes wasn't forwarded to
+%             EDreadgeomatrices
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -229,7 +231,10 @@ else
         disp('   Creating the planedata struct from the input geometry matrices')
     end
     t00 = clock;
-    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners);    
+    % Fix on 20 Jan 2021: the field .planerefltypes wasn't forwarded to
+    % EDreadgeomatrices
+    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners,geoinputdata.planerefltypes);    
+%     planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners);    
     ncorners = size(planedata.corners,1);
     nplanes = size(planedata.planecorners,1);
     t01 = etime(clock,t00);

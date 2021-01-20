@@ -43,7 +43,7 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % EDinteg_submatrixstructure, EDintegralequation_convex_ir from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 28 Feb. 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 20 Jan 2021 (peter.svensson@ntnu.no)
 %
 % EDmain_convexESIEtime(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -128,6 +128,8 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % parameter .suppressresultrecycling with default = 0, and implemented th
 % corresponding suppressing of the result recycling.
 % 28 Feb 2018 First version
+% 20 Jan 2021 Fixed: the field .planerefltypes wasn't forwarded to
+%             EDreadgeomatrices
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -220,7 +222,10 @@ else
         disp('   Creating the planedata struct from the input geometry matrices')
     end
     t00 = clock;
-    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners);    
+    % Fix on 20 Jan 2021: the field .planerefltypes wasn't forwarded to
+    % EDreadgeomatrices
+    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners,geoinputdata.planerefltypes);    
+%     planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners);    
     ncorners = size(planedata.corners,1);
     nplanes = size(planedata.planecorners,1);
     t01 = etime(clock,t00);

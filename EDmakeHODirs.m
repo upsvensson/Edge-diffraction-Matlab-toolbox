@@ -97,6 +97,7 @@ for isou = 1:nsources
 
             if ~isempty(hodpaths{Ndifforder})
                 
+%                 disp(['   Paths found for order ',int2str(Ndifforder)])
                 if savealldifforders == 1
                    cellcounter = Ndifforder; 
                 end
@@ -159,6 +160,7 @@ for isou = 1:nsources
                             else
                                 BIGEDGESTEPMATRIX = (double(ivmatrix)-0.5)./newndivvec(uint8(ones(nedgeelcombs,1)),2:end);
                             end
+                            
                             clear ivmatrix
                             lastndivcomb = newndivvec;
 
@@ -236,7 +238,9 @@ for isou = 1:nsources
         %                 IRDIFFVEC = [IRDIFFVEC;sum(irnew)];
 
                     elseif Ndifforder == 3    %   if Ndifforder == 2			
-
+% disp(['   Difforder: ',int2str(Ndifforder)])
+% pathalongplane(ii,:)
+% pause
                         for kk = 1:newndivvec(1)  
                             
                             BIGEDGE1stvalue = (kk-0.5)./newndivvec(1);
@@ -272,12 +276,16 @@ for isou = 1:nsources
                     end
 
                     if Ndifforder >= 4    
+% disp(['   Difforder: ',int2str(Ndifforder)])
+% pathalongplane(ii,:)
+% pause
 
                         for kk = 1:newndivvec(1)
                             if showtext >= 5
                                 disp(['   ',int2str(kk),' of ',int2str(newndivvec(1))]) 
                             end
                             BIGEDGE1stvalue = (kk-0.5)./newndivvec(1);
+
 
                             [irnewpartition,~] = EDwedgeN(cylS,cylR,wedgeparams,ncylrows,...
                                 nyvec(edgepattern(:)),edgedata.edgelengthvec(edgepattern(:)).',...
@@ -352,7 +360,8 @@ for isou = 1:nsources
                     end
 
                 end 
-
+            else
+                disp(['   No paths for order ',int2str(Ndifforder)])
             end  
 
         end  

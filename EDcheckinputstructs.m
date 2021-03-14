@@ -68,7 +68,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   3, for EDmain_convexESIEBEM (frequency domain)
 %                   4, for EDmain_convex_time (time domain)
 % 
-% Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
+% Peter Svensson 14 March 2021 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
@@ -132,6 +132,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 3 June 2020 Fixed a but with sourceamplitudes that was found by EDdebug:
 % If the user had specified a constant sourceamplitudes, it wasn't expanded
 % to a matrix of size [nsources, nfrequencies].
+% 14 March 2021 The section "% Check the struct Rinputdata" was moved to
+% before "% Check the struct Sinputdata"
 
 if nargin < 7
     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -207,6 +209,24 @@ if ~isfield(geoinputdata,'firstcornertoskip')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Check the struct Rinputdata
+
+if ~isstruct(Rinputdata)
+    error('ERROR 1: receiver coordinates were not specified')
+end
+if ~isfield(Rinputdata,'coordinates')
+    error('ERROR 2: receiver coordinates were not specified')
+end
+nreceivers = size(Rinputdata.coordinates,1);
+if nreceivers == 0
+     error('ERROR 3: receiver coordinates were not specified')            
+end
+ncolumns = size(Rinputdata.coordinates,2);
+if ncolumns ~= 3
+   error(['ERROR: check your receiver coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct Sinputdata, but the field .sourceamplitudes is handled
 % further down, since the values depend on whether it is a TD case or an FD
 % case.
@@ -224,7 +244,6 @@ end
 if ~isfield(Sinputdata,'doaddsources')
     Sinputdata.doaddsources = 0;
 end
-
 if nsources == 1
     Sinputdata.doaddsources = 1;
 end    
@@ -243,23 +262,6 @@ if ncolumns ~= 3
    error(['ERROR: check your source coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check the struct Rinputdata
-
-if ~isstruct(Rinputdata)
-    error('ERROR 1: receiver coordinates were not specified')
-end
-if ~isfield(Rinputdata,'coordinates')
-    error('ERROR 2: receiver coordinates were not specified')
-end
-nreceivers = size(Rinputdata.coordinates,1);
-if nreceivers == 0
-     error('ERROR 3: receiver coordinates were not specified')            
-end
-ncolumns = size(Rinputdata.coordinates,2);
-if ncolumns ~= 3
-   error(['ERROR: check your receiver coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct envdata

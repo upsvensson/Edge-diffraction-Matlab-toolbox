@@ -28,7 +28,7 @@ function [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_e
 %
 % Uses EDpoinpla
 %
-% Peter Svensson (peter.svensson@ntnu.no) 27 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 14 March 2021
 %
 % [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_edgetoedge(canplaneobstruct,planeseesplane,...
 %    planeeqs,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec,rearsideplane)
@@ -37,6 +37,7 @@ function [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_e
 % 27 Nov. 2017 Copied from ESIE2toolbox
 % 28 Nov. 2017 Removed input parameter planeseesplane after Matlab
 %               recommendation
+% 14 Mar 2021 Adapted to change of EDpoinpla
 
 global  REFTOFROMCOSHO  REFTOTOCOSHO STARTPLANES ENDPLANES
 global BIGTOCOORDS BIGFROMCOORDS BIGSTARTPLANES BIGENDPLANES
@@ -215,7 +216,9 @@ if ~isempty(iv1)
             clear udir
             BIGFROMCOORDS = [];
             
-            [hitvec,edgehitvec,cornerhitvec] = EDpoinpla(tempmatrix,iv1,minvals(bigplanelist,:),maxvals(bigplanelist,:),planecorners(bigplanelist,:),corners,ncornersperplanevec(bigplanelist),planenvecsexpanded.');
+%             [hitvec,edgehitvec,cornerhitvec] = EDpoinpla(tempmatrix,iv1,minvals(bigplanelist,:),maxvals(bigplanelist,:),planecorners(bigplanelist,:),corners,ncornersperplanevec(bigplanelist),planenvecsexpanded.');
+            [hitvec,edgehitvec,edgehitnumbers,cornerhitvec,cornerhitnumbers] = ...
+                EDpoinpla(tempmatrix,iv1,minvals(bigplanelist,:),maxvals(bigplanelist,:),planecorners(bigplanelist,:),corners,ncornersperplanevec(bigplanelist),planenvecsexpanded.');
         
     	   	hitplanes = [];
 %             reflpoints = [];

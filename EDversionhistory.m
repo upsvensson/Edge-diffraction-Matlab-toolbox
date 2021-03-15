@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 20 Jan 2021
+% Peter Svensson (peter.svensson@ntnu.no) 14 Mar 2021
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -200,6 +200,15 @@ versiondate{icounter} = '20 Jan 2021';
 versiontext{icounter} = ['Fixed a small bug: if you set some planes to non-reflecting, those planes '...
     'were still handled as reflective. Also, obstruction check for S/R-to-edge paths was turned off '...
     'for convex models.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.216';
+versiondate{icounter} = '15 Mar 2021';
+versiontext{icounter} = ['Fixed serious bug: EDpoinpla gave wrong hit results for '...
+    'some plane geometries (corners and hit points on x-axis). Also, corner and '...
+    'edge hit detection was fixed. Also fixed another bug which gave the wrong ...'...
+    'for first-order diffraction when a corner was hit exactly at the corner.'];
+
 
 nversions = size(versiontext,2);
 txtwidth = 80;

@@ -39,7 +39,7 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 %
 % Uses the built-in function QUADGK and the function EDbetaoverml_fd for numerical integration.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 12 Feb 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 March 2021
 %
 % [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc);
 
@@ -62,6 +62,7 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 % 12 Feb 2018 Introduced new output parameter: zfirst. This is a value
 % between 0 and L, which tells which point along the edge gives the first
 % arrival. 
+% 15 March 2021 Fixed bug: 
 
 localshowtext = 0;
 
@@ -284,12 +285,7 @@ else
                    if localshowtext
                        disp('   Part2 not included');
                    end
-                end
-%                 if doublecheck == 1
-%                     tf2orig = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),-zrangespecial,zrangespecial,'RelTol',tol);
-%                     tf2orig = tf2orig*(-ny/4/pi);                    
-%                 end
-                
+                end                
                 
                 %-----------------------------------------------------------
                 % The analytical approximation
@@ -330,7 +326,11 @@ else
                         if analyticalsymmetry == 1  
                             tf2(jj) = -sinovercosnyfifactor/pi/R0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
                             if exacthalf == 1
-                                tf2 = tf2/2;
+                                % Fixed a bug 15.3.2021; the old wrong
+                                % version was the line below, which changed
+                                % all 4 beta-values
+                                % tf2 = tf2/2;
+                                tf2(jj) = tf2(jj)/2;
                             end
                         else
                             tf2(jj) = -sinovercosnyfifactor/pi/R0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;                            
@@ -341,13 +341,6 @@ else
 
                 tf2 = sum(tf2);
                 
-%                 if doublecheck 
-%                    relerr = abs(tf2-tf2orig)/abs(tf2orig);
-%                    if relerr > 1e-4
-%                        disp(['   Rel err = ',num2str(relerr)]) 
-%                        end
-%                 end
-
                 tf(ii) = (tf1+tf2+tf3)*exp(-1i*k*Rextra);
 
             end

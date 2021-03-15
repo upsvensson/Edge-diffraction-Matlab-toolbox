@@ -59,7 +59,7 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 % EDcoordtrans1 EDgetedgepoints, EDcheckobstr_pointtoedge from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 20 Jan 2021
+% Peter Svensson (peter.svensson@ntnu.no) 14 March 2021
 %
 % [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,EDversionnumber,nedgesubs,showtext);
 
@@ -85,6 +85,7 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 % 20 Jan 2021 Changed the format of .vispartedgesfroms_start to uint8 etc
 % 20 Jan 2021 The obstruction test is skipped altogether when a convex
 % model is used.
+% 14 Mar 2021 Update to change of EDpoinpla
 
 geomacc = 1e-9;
 
@@ -213,11 +214,15 @@ planedata.corners(planedata.planecorners(rownumb,1),:),planedata.corners(planeda
 
 iv_closetoplane = find(visplanesfromr==1);
 if any(iv_closetoplane)
-    [hitvec,edgehit] = EDpoinpla(pointcoords(colnumb(iv_closetoplane),:),rownumb(iv_closetoplane),...
+%     [hitvec,edgehit] = EDpoinpla(pointcoords(colnumb(iv_closetoplane),:),rownumb(iv_closetoplane),...
+%         planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,...
+%         planedata.ncornersperplanevec,planedata.planeeqs(:,1:3),geomacc);
+    [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(pointcoords(colnumb(iv_closetoplane),:),rownumb(iv_closetoplane),...
         planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,...
         planedata.ncornersperplanevec,planedata.planeeqs(:,1:3),geomacc);
     ivinside = find(hitvec);
     ivedgehit = find(edgehit);
+    ivcornerhit = find(cornerhit);
     ivoutside = find(hitvec==0);
 
     if any(ivinside)
@@ -228,12 +233,15 @@ if any(iv_closetoplane)
         error(['ERROR: at least ',upper(typeofcoords),' no. ',int2str( colnumb(iv_closetoplane(ivedgehit(1)))),...
             ' is too close to one edge'])
     end    
+    if any(cornerhit)
+        error(['ERROR: at least ',upper(typeofcoords),' no. ',int2str( colnumb(iv_closetoplane(ivedgehit(1)))),...
+            ' is too close to one corner'])
+    end    
     if any(ivoutside)
         error(['ERROR: at least ',upper(typeofcoords),' no. ',int2str( colnumb(iv_closetoplane(ivoutside(1)))),...
             ' is too close to the extension of plane no. ',int2str(  rownumb(iv_closetoplane(ivoutside(1)))  )])
     end
 end
-
 
 clear rownumb colnumb
 
@@ -274,7 +282,8 @@ if ~isempty(ivec_visR1)
     else
         rownumb = uint32(ivec_visR1 - (double(colnumb)-1)*nplanes);     % This is the plane number
     end
-    hitvec = find(EDpoinpla(pointcoords(colnumb,:),rownumb,planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,planedata.ncornersperplanevec,planedata.planeeqs(rownumb,1:3)));
+%     hitvec = find(EDpoinpla(pointcoords(colnumb,:),rownumb,planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,planedata.ncornersperplanevec,planedata.planeeqs(rownumb,1:3)));
+    [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = find(EDpoinpla(pointcoords(colnumb,:),rownumb,planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,planedata.ncornersperplanevec,planedata.planeeqs(rownumb,1:3)));
     if ~isempty(hitvec)
         visplanesfromr(ivec_visR1(hitvec)) = uint8(ones(size(hitvec))*4);
         if ntotabsplanes > 0

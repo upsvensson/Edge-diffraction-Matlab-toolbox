@@ -33,12 +33,13 @@ function [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints]
 %
 % Uses the subroutine EDpoinpla.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 27 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 14 March 2021
 % 
 % [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = EDchkISvisible(ISlist,R,planeeqs_lastvalue,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec);
 
 % 16 January 2005 Functioning version
 % 27 Nov. 2017 Copied to EDtoolbox
+% 14 Mar 2021 Update to change of EDpoinpla
 
 % nsou = size(ISlist,1);
 nplanes = size(planeeqs_lastvalue,1);
@@ -120,13 +121,16 @@ if ~isempty(iv1)
             tempmatrix = ISlist(iv1,:) + udir(:,ones(1,3)).*tempmatrix(iv1,:);        
         
             clear ISlist udir
-
-            [hitvec,edgehitvec,cornerhitvec] = EDpoinpla(tempmatrix,iv1,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs.');
+% savetemp
+% pause
+%             [hitvec,edgehitvec,cornerhitvec] = EDpoinpla(tempmatrix,iv1,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs.');
+            [hitvec,edgehitvec,edgehitnumbers,cornerhitvec,cornerhitnumbers] = ...
+                EDpoinpla(tempmatrix,iv1,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs.');
         
     	   	hitplanes = [];
             hitpoints = [];
             edgehits = [];
-         edgehitpoints = [];
+            edgehitpoints = [];
             cornerhits = [];
             cornerhitpoints = [];
             if any(any(hitvec)) ~=0

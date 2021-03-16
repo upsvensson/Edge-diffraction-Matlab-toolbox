@@ -62,7 +62,8 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 % 12 Feb 2018 Introduced new output parameter: zfirst. This is a value
 % between 0 and L, which tells which point along the edge gives the first
 % arrival. 
-% 15 March 2021 Fixed bug: 
+% 15 March 2021 Fixed bug: the code was tf2 = tf2/2; but should be 
+% tf2(jj) = tf2(jj)/2;
 
 localshowtext = 0;
 

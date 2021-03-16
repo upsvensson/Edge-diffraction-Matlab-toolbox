@@ -46,7 +46,7 @@ function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,ed
 % Uses functions  EDfindis EDchkISvisible from EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 6 Feb 2019
+% Peter Svensson (peter.svensson@ntnu.no) 16 March 2021
 %
 % [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,...
@@ -78,6 +78,8 @@ function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,ed
 % 6 Feb 2019 Fixed a bug which occurred if nsources > 1 and nreceivers > 1.
 % The number of potential specular reflections was erroneously found to be the last
 % number of possible reflections in the for-loop around line 160.
+% 16 Mar 2021 Empirically established corner-hit scaling of the direct
+% sound and specular reflections were introduced.
 
 if nargin < 13
    showtext = 0; 
@@ -207,7 +209,10 @@ if npotentialIS > 0
         validIScoords  = [validIScoords;coords_potentialIS(cornerhits,:)];
         validsounumber = [validsounumber;possibleSPR(cornerhits,1)];
         validrecnumber = [validrecnumber;possibleSPR(cornerhits,3)];
-        specreflamp = [specreflamp;0.25*ones(size(cornerhits))];        
+        % 16 March 2021: for a 90 degree corner (thin sheet or cube),
+        % a smooth transition results across a corner if the specular
+        % reflection is scaled to 1/3 (rather than 1/2) 
+        specreflamp = [specreflamp;1/3*ones(size(cornerhits))];        
     end
     
     numberofcomponents(2) = length(specreflamp);
@@ -296,12 +301,10 @@ if directsound ~= 0
         if ~isempty(cornerhits)
             cornerhitlist = possibleSPR_obstruct(cornerhits,:);
             iv = sub2ind([nreceivers,nsources],cornerhitlist(:,3),cornerhitlist(:,1));  
-            % Before 23 Jan 2018, the first line was  used. This lead to that a
-            % completely obscured receiver (which got marked by hitplanes)
-            % might get a non-zero direct sound if there was an additional
-            % cornerhit, unrelated to the obscuring plane.
-    %         directsoundOK(iv)=0.75;
-            directsoundOK(iv)=0.75*directsoundOK(iv);
+            % 16 March 2021: for a 90 degree corner (thin sheet or cube),
+            % a smooth transition results across a corner if the direct
+            % sound is scaled to 2/3 (rather than 1/2)
+            directsoundOK(iv)=2/3*directsoundOK(iv);
         end
     end
 

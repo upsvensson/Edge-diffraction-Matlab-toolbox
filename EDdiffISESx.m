@@ -56,7 +56,7 @@ function [edgedifflist,startandendpoints,prespeclist,postspeclist,validIScoords,
 %
 % Uses functions  EDfindis EDgetedgepoints EDchkISvisible EDcheckobstrpaths
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 16 March 2021
 %
 % [edgedifflist,startandendpoints,prespeclist,postspeclist,validIScoords,validIRcoords,listguide,listoforders,...
 %   bigedgeweightlist] = EDdiffISESx(planedata,edgedata,S,R,...
@@ -67,6 +67,7 @@ function [edgedifflist,startandendpoints,prespeclist,postspeclist,validIScoords,
 % 18 Nov. 2006 Functioning version
 % 28 Nov. 2017 Copied to EDtoolbox. Introduced the showtext non-global
 % input parameter
+% 16 Mar 2021 Adapted to changes in EDchkISvisible.
 
 global POTENTIALISES ISCOORDS ORIGINSFROM REFLORDER ISESVISIBILITY
 
@@ -477,7 +478,7 @@ if specorder > 1 && nspecular_select_not_empty == 1
                 
                 colno = ii-jj+1;
 	
-                [hitplanes,reflpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = EDchkISvisible(fromcoords,tocoords,planedata.planeeqs(expandedposscombs(:,colno),4),planenvecs(expandedposscombs(:,colno),:),planedata.minvals(expandedposscombs(:,colno),:),...
+                [hitplanes,reflpoints,edgehits,edgehitpoints,edgehitnumbers,cornerhits,cornerhitpoints,cornerhitnumbers] = EDchkISvisible(fromcoords,tocoords,planedata.planeeqs(expandedposscombs(:,colno),4),planenvecs(expandedposscombs(:,colno),:),planedata.minvals(expandedposscombs(:,colno),:),...
 				    planedata.maxvals(expandedposscombs(:,colno),:),planedata.planecorners(expandedposscombs(:,colno),:),planedata.corners,planedata.ncornersperplanevec(expandedposscombs(:,colno)));
                 if ~isempty(edgehits) || ~isempty(cornerhits)
                     disp('WARNING! An edgehit or cornerhit occurred during the visibility test but this is not')

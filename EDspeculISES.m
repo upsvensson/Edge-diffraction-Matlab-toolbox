@@ -32,7 +32,7 @@ function 	[validISlist,validIScoords,allreflpoints,listguide,listofreflorder] = 
 %
 % Uses functions EDchkISvisible EDcheckobstrpaths
 %
-% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 16 March 2021
 %
 % [validISlist,validIScoords,allreflpoints,listguide,listofreflorder] = EDspeculISES(corners,planecorners,planeeqs,planenvecs,...
 %     S,R,lengthNspecmatrix,specorder,visplanesfromoner,planeisthin,canplaneobstruct,minvals,maxvals,ncornersperplanevec,planeseesplane,rearsideplane,modeltype,showtext);
@@ -44,6 +44,7 @@ function 	[validISlist,validIScoords,allreflpoints,listguide,listofreflorder] = 
 % parameter showtext.
 % 29 Nov. 2017 Changed so that a thin-plate model doesn't need obstruction
 %              check for the specular reflections.
+% 16 Mar 2021 Adapted to a change in EDchkISvisible.
 
 global POTENTIALISES ISCOORDS ORIGINSFROM IVNSPECMATRIX
 
@@ -134,7 +135,8 @@ for norder = 1:specorder_maxpossible
 % 				maxvals(possiblecombs(:,jj),:),planecorners(possiblecombs(:,jj),:),corners,ncornersperplanevec(possiblecombs(:,jj)));
 %             [hitplanes,reflpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = ESIE2chkISvisible(fromcoords,tocoords,planeeqs(possiblecombs(:,jj),4),planenvecs(possiblecombs(:,jj),:),minvals(possiblecombs(:,jj),:),...
 % 				maxvals(possiblecombs(:,jj),:),planecorners(possiblecombs(:,jj),:),corners,ncornersperplanevec(possiblecombs(:,jj)));
-            [hitplanes,reflpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = EDchkISvisible(fromcoords,tocoords,planeeqs(possiblecombs(:,jj),4),planenvecs(possiblecombs(:,jj),:),minvals(possiblecombs(:,jj),:),...
+            [hitplanes,reflpoints,edgehits,edgehitpoints,edgehitnumbers,cornerhits,cornerhitpoints,cornerhitnumbers] = ...
+                EDchkISvisible(fromcoords,tocoords,planeeqs(possiblecombs(:,jj),4),planenvecs(possiblecombs(:,jj),:),minvals(possiblecombs(:,jj),:),...
 				maxvals(possiblecombs(:,jj),:),planecorners(possiblecombs(:,jj),:),corners,ncornersperplanevec(possiblecombs(:,jj)));
             if ~isempty(edgehits) || ~isempty(cornerhits)
                 disp('WARNING! An edgehit or cornerhit occurred during the visibility test but this is not')

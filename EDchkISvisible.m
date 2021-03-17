@@ -1,4 +1,5 @@
-function [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = EDchkISvisible(ISlist,R,planeeqs_lastvalue,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec)
+function [hitplanes,hitpoints,edgehits,edgehitpoints,edgehitnumbers,cornerhits,...
+    cornerhitpoints,cornerhitnumbers] = EDchkISvisible(ISlist,R,planeeqs_lastvalue,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec)
 % EDchkISvisible - Checks if paths from a set of IS to a set of R pass through their refl. planes. 
 % EDchkISvisible checks if the paths between a number of IS and a single R, or a number of R, 
 % pass through their respective reflecting planes.
@@ -25,12 +26,16 @@ function [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints]
 %                   but the extra information in edgehits can possibly be used.
 %    edgehitpoints  List, [nedgehits,3] of the hitpoint coordinates for the
 %                   planes that were hit at an edge.
+%    edgehitnumbers List, [nIS,1], with zeros, or the edge number that was
+%                   hit
 %    cornerhits     List, [ncornerhits,1] of the planes that were hit right at a corner.
 %                   These combinations were marked as hit in the list hitplanes, 
 %                   but the extra information in edgehits can possibly be used.
 %    cornerhitpoints  List, [ncornerhits,3] of the hitpoint coordinates for the
 %                   planes that were hit at a corner.
-%
+%    cornerhitnumbers List, [nIS,1], with zeros, or the corner number that was
+%                   hit
+% 
 % Uses the subroutine EDpoinpla.
 %
 % Peter Svensson (peter.svensson@ntnu.no) 14 March 2021
@@ -121,54 +126,59 @@ if ~isempty(iv1)
             tempmatrix = ISlist(iv1,:) + udir(:,ones(1,3)).*tempmatrix(iv1,:);        
         
             clear ISlist udir
-% savetemp
-% pause
 %             [hitvec,edgehitvec,cornerhitvec] = EDpoinpla(tempmatrix,iv1,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs.');
             [hitvec,edgehitvec,edgehitnumbers,cornerhitvec,cornerhitnumbers] = ...
                 EDpoinpla(tempmatrix,iv1,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs.');
-        
+           
     	   	hitplanes = [];
             hitpoints = [];
             edgehits = [];
             edgehitpoints = [];
             cornerhits = [];
             cornerhitpoints = [];
+
             if any(any(hitvec)) ~=0
                 ivhit = find(hitvec==1);
 			    hitplanes = iv1( ivhit );  
-             hitpoints = tempmatrix(ivhit,:);
+                hitpoints = tempmatrix(ivhit,:);
             end
             if ~isempty(edgehitvec)
                 ivhit = find(edgehitvec==1);
                 edgehits      = iv1( ivhit );
-                edgehitpoints = tempmatrix(ivhit,:); 
+                edgehitpoints = tempmatrix(ivhit,:);                 
             end
             if ~isempty(cornerhitvec)
                 ivhit = find(cornerhitvec==1);
                 cornerhits  = iv1( ivhit );
-                cornerhitpoints = tempmatrix(ivhit,:);    
+                cornerhitpoints = tempmatrix(ivhit,:);                 
             end
         else
     		hitplanes = [];
             hitpoints = [];
             edgehits = [];
             edgehitpoints = [];
+            edgehitnumbers = [];
             cornerhits = [];
-            cornerhitpoints = [];        
+            cornerhitpoints = []; 
+            cornerhitnumbers = [];
         end
 	else
 		hitplanes = [];
         hitpoints = [];
         edgehits = [];
         edgehitpoints = [];
+        edgehitnumbers = [];
         cornerhits = [];
         cornerhitpoints = [];
+        cornerhitnumbers = [];
 	end
 else
-	hitplanes = [];   
+    hitplanes = [];
     hitpoints = [];
     edgehits = [];
     edgehitpoints = [];
+    edgehitnumbers = [];
     cornerhits = [];
     cornerhitpoints = [];
+    cornerhitnumbers = [];
 end

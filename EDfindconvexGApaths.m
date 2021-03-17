@@ -79,7 +79,9 @@ function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,ed
 % The number of potential specular reflections was erroneously found to be the last
 % number of possible reflections in the for-loop around line 160.
 % 16 Mar 2021 Empirically established corner-hit scaling of the direct
-% sound and specular reflections were introduced.
+% sound and specular reflections were introduced. Also, an extra test was
+% introduced for edge hits and corner hits, so that the direct sound was not
+% slipping through in special cases. 
 
 if nargin < 13
    showtext = 0; 
@@ -188,7 +190,7 @@ end
 
 if npotentialIS > 0
     coords_potentialIS = EDfindis(sources(possibleSPR(:,1),:),possibleSPR(:,2),planedata.planeeqs);
-    [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = ...
+    [hitplanes,hitpoints,edgehits,edgehitpoints,edgehitnumbers,cornerhits,cornerhitpoints,cornerhitnumbers] = ...
         EDchkISvisible(coords_potentialIS,receivers(possibleSPR(:,3),:),...
         planedata.planeeqs(possibleSPR(:,2),4),planedata.planeeqs(possibleSPR(:,2),1:3),...
         planedata.minvals(possibleSPR(:,2),:),planedata.maxvals(possibleSPR(:,2),:),...
@@ -278,7 +280,7 @@ if directsound ~= 0
 
     if npotentialobstruct > 0
 
-        [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = ...
+        [hitplanes,hitpoints,edgehits,edgehitpoints,edgehitnumbers,cornerhits,cornerhitpoints,cornerhitnumbers] = ...
             EDchkISvisible(sources(possibleSPR_obstruct(:,1),:),receivers(possibleSPR_obstruct(:,3),:),...
             planedata.planeeqs(possibleSPR_obstruct(:,2),4),planedata.planeeqs(possibleSPR_obstruct(:,2),1:3),...
             planedata.minvals(possibleSPR_obstruct(:,2),:),planedata.maxvals(possibleSPR_obstruct(:,2),:),...
@@ -288,7 +290,7 @@ if directsound ~= 0
         iv = sub2ind([nreceivers,nsources],obstructlist(:,3),obstructlist(:,1));    
         directsoundOK(iv)=0;
 
-        if ~isempty(edgehits)
+        if ~isempty(edgehits)            
             edgehitlist = possibleSPR_obstruct(edgehits,:);
             iv = sub2ind([nreceivers,nsources],edgehitlist(:,3),edgehitlist(:,1));  
             % Before 23 Jan 2018, the first line was  used. This lead to that a
@@ -296,7 +298,26 @@ if directsound ~= 0
             % might get a non-zero direct sound if there was an additional
             % edgehit, unrelated to the obscuring plane.
             %         directsoundOK(iv)=0.5;        
-            directsoundOK(iv)=0.5*directsoundOK(iv);        
+            directsoundOK(iv)=0.5*directsoundOK(iv); 
+            % 16 Mar 2021: for the direct sound to be (half) visible, the
+            % edge must be seen by the source and the receiver. It is a bit
+            % inefficient to run this after the direct sound amplitude has
+            % already been modified, but it works.
+            ivedgehit = find(edgehitnumbers);
+            for kk = 1:length(ivedgehit)
+               corners_of_one_plane = planedata.planecorners...
+                   (possibleSPR_obstruct(ivedgehit(kk),2),:);
+               corners_of_one_plane = [corners_of_one_plane corners_of_one_plane(1)];
+               corners_of_one_edge = corners_of_one_plane(edgehitnumbers(ivedgehit(kk)):edgehitnumbers(ivedgehit(kk))+1);              
+               [lia,locb] = ismember(corners_of_one_edge,edgedata.edgecorners,'rows');
+               if lia == 0
+                [lia,locb] = ismember(fliplr(corners_of_one_edge),edgedata.edgecorners,'rows');
+               end
+               edgenumber_that_was_hit = locb(1);
+               if vispartedgesfromS(edgenumber_that_was_hit)*vispartedgesfromR(edgenumber_that_was_hit) == 0
+                    directsoundOK(iv(kk))=0; 
+               end
+            end
         end
         if ~isempty(cornerhits)
             cornerhitlist = possibleSPR_obstruct(cornerhits,:);
@@ -305,6 +326,20 @@ if directsound ~= 0
             % a smooth transition results across a corner if the direct
             % sound is scaled to 2/3 (rather than 1/2)
             directsoundOK(iv)=2/3*directsoundOK(iv);
+            % 16 Mar 2021: for the direct sound to be (partly) visible, the
+            % corner must be seen by the source and the receiver. It is a bit
+            % inefficient to run this after the direct sound amplitude has
+            % already been modified, but it works.
+            ivcornerhit = find(cornerhitnumbers);
+            for kk = 1:length(ivcornerhit)
+                corners_of_one_plane = planedata.planecorners...
+                   (possibleSPR_obstruct(ivcornerhit(kk),2),:);
+                the_hit_corner = corners_of_one_plane(cornerhitnumbers(ivcornerhit(kk)));
+                connectededges_to_hit_corner = find( sum( (edgedata.edgecorners == the_hit_corner).' ).');
+                if sum(vispartedgesfromS(connectededges_to_hit_corner).*vispartedgesfromR(connectededges_to_hit_corner)) == 0
+                    directsoundOK(iv(kk))=0;
+                end
+            end
         end
     end
 

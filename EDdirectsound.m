@@ -14,7 +14,7 @@ function dirsoundok = EDdirectsound(corners,planecorners,planeeqs,planenvecs,...
 % Output parameter:
 %   dirsoundok      1 or 0, telling if the sound path is unobstructed or not.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 16 March 2021
 %
 % Uses the function EDchkISvisible
 %
@@ -24,6 +24,7 @@ function dirsoundok = EDdirectsound(corners,planecorners,planeeqs,planenvecs,...
 % 29 Sept. 2003 Functioning version
 % 28 Nov. 2017 Copied to EDtoolbox. Introduced the non-global showtext
 % input parameter
+% 16 Mar 2021 Adapted to change in EDchkISvisible.
 
 % global showtext
 % showtext = 1;
@@ -47,7 +48,7 @@ onesvec = ones(nplanestocheck,1);
 
 % [hitplanes,reflpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = EDchkISvisible(S(onesvec,:),R(onesvec,:),planeeqs(planestocheck,4),planenvecs(planestocheck,:),minvals(planestocheck,:),...
 %    maxvals(planestocheck,:),planecorners(planestocheck,:),corners,ncornersperplanevec(planestocheck));
-[hitplanes,~,~,~,~,~] = EDchkISvisible(S(onesvec,:),R(onesvec,:),planeeqs(planestocheck,4),planenvecs(planestocheck,:),minvals(planestocheck,:),...
+[hitplanes,~,~,~,~,~,~,~] = EDchkISvisible(S(onesvec,:),R(onesvec,:),planeeqs(planestocheck,4),planenvecs(planestocheck,:),minvals(planestocheck,:),...
    maxvals(planestocheck,:),planecorners(planestocheck,:),corners,ncornersperplanevec(planestocheck));
 
 if isempty(hitplanes)

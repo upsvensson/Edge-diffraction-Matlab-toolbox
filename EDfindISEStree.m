@@ -90,7 +90,7 @@ function [lengthNspecmatrix,lengthNdiffmatrix,singlediffcol,startindicessingledi
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 27 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 16 March 2021
 %
 % [POTENTIALISES,ORIGINSFROM.ISCOORDS ,ISESVISIBILITY,IVNSPECMATRIX,lengthNspecmatrix,IVNDIFFMATRIX,lengthNdiffmatrix, ...
 %    singlediffcol,REFLORDER,startindicessinglediff,endindicessinglediff,ndecimaldivider,PointertoIRcombs,IRoriginsfrom] = ...
@@ -107,6 +107,7 @@ function [lengthNspecmatrix,lengthNdiffmatrix,singlediffcol,startindicessingledi
 %              Removed the input parameter isou.
 % 28 Nov. 2017 Cleaned up code a bit. Removed global parameters from the
 % output list.
+% 16 Mar 2021 Adapted to change in EDchkISvisible.
 
 global POTENTIALISES ISCOORDS IVNDIFFMATRIX
 global IVNSPECMATRIX ORIGINSFROM ISESVISIBILITY REFLORDER
@@ -429,7 +430,8 @@ if specorder > 1
                         [tocoords,edgeweightlist,~] = EDgetedgepoints(edgedata.edgestartcoords(possibleedges,:),edgedata.edgeendcoords(possibleedges,:),edgedata.edgelengthvec(possibleedges,:),nedgesubs);
                         clear possibleedges
                         
-                         [hitplanes,reflpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = EDchkISvisible(fromcoords,tocoords,planedata.planeeqs(expandedposscombs(:,1),4),planenvecs(expandedposscombs(:,1),:),planedata.minvals(expandedposscombs(:,1),:),...
+                         [hitplanes,reflpoints,edgehits,edgehitpoints,edgehitnumbers,cornerhits,cornerhitpoints,cornerhitnumbers] = ...
+                             EDchkISvisible(fromcoords,tocoords,planedata.planeeqs(expandedposscombs(:,1),4),planenvecs(expandedposscombs(:,1),:),planedata.minvals(expandedposscombs(:,1),:),...
  						    planedata.maxvals(expandedposscombs(:,1),:),planedata.planecorners(expandedposscombs(:,1),:),planedata.corners,planedata.ncornersperplanevec(expandedposscombs(:,1)));
                         if ~isempty(edgehits) || ~isempty(cornerhits)
                             disp('WARNING! An edgehit or cornerhit occurred during the visibility test but this is not')
@@ -877,7 +879,8 @@ for ordernum = 3:specorder
                                            
                     end
 
-                    [hitplanes,reflpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = EDchkISvisible(fromcoords,tocoords,planedata.planeeqs(expandedposscombs(:,jj),4),planenvecs(expandedposscombs(:,jj),:),planedata.minvals(expandedposscombs(:,jj),:),...
+                    [hitplanes,reflpoints,edgehits,edgehitpoints,edgehitnumbers,...
+                        cornerhits,cornerhitpoints,cornerhitnumbers] = EDchkISvisible(fromcoords,tocoords,planedata.planeeqs(expandedposscombs(:,jj),4),planenvecs(expandedposscombs(:,jj),:),planedata.minvals(expandedposscombs(:,jj),:),...
 					    planedata.maxvals(expandedposscombs(:,jj),:),planedata.planecorners(expandedposscombs(:,jj),:),planedata.corners,planedata.ncornersperplanevec(expandedposscombs(:,jj)));
                     if ~isempty(edgehits) || ~isempty(cornerhits)
                         disp('WARNING! An edgehit or cornerhit occurred during the visibility test but this is not')

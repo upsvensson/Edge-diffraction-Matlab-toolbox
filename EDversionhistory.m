@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 16 Mar 2021
+% Peter Svensson (peter.svensson@ntnu.no) 22 June 2021
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -209,6 +209,13 @@ versiontext{icounter} = ['Fixed serious bug: EDpoinpla gave wrong hit results fo
     'edge hit detection was fixed. Also fixed another bug which gave the wrong amplitude ...'...
     'for first-order diffraction when a corner was hit exactly at the corner.'...
     'Fixed a small bug in EDwedge1st_fd. Fixed EDverify cases 7 and 8.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.217';
+versiondate{icounter} = '22 June 2021';
+versiontext{icounter} = ['Fixed a small bug which strangely has not caused '...
+    'an error earlier: EDpoinpla misbehaved when the number of points to check,'...
+    'and the size of planecorners were mismatched.'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

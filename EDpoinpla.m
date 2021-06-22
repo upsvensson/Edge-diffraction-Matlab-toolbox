@@ -42,7 +42,7 @@ function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(
 %
 % Uses no special subroutines
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 March 2021
+% Peter Svensson (peter.svensson@ntnu.no) 21 June 2021
 % 
 % [hitvec,edgehit,edgehitnumbers,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs,geomacc,showtext);
 
@@ -57,6 +57,8 @@ function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(
 % default value 1e-9.
 % 14 March 2021 Fixed serious errors that happened with edges parallel to
 % xy-axes. Also, edge hits and corner hits were not registered correctly.
+% 22 June 2021 Fixed a bug around line 83, which strangely has not lead to
+% an error before.
 
 if nargin < 10
     showtext = 0;
@@ -75,8 +77,12 @@ end
 % columns of zeros at the end, but the repetition of the first corner
 % number happened after those zeros. So, now we remove those zero columns
 % first.
+%
+% Fixed bug 22 June 2021. nplanestotest does not tell how many rows
+% planecorners has, so the line below was changed.
 
-if nplanestotest == 1
+% if nplanestotest == 1
+if size(planecorners,1) == 1
    dataincolumns = sign(planecorners); 
 else
     dataincolumns = any(planecorners);
@@ -85,9 +91,7 @@ ncolumnswithdata = sum(double(dataincolumns));
 if ncolumnswithdata < size(planecorners,2)
    planecorners = planecorners(:,1:ncolumnswithdata);
 end
-% planecorners = [planecorners planecorners(:,1)];
 planecorners = [planecorners planecorners(:,1)];
-
 
 %------------------------------------------------------------
 % First test: are the points inside the cubic boxes?
@@ -436,7 +440,6 @@ if nposs>0
         % Find t by setting z_ray = z_edge        
       
        for ii = 1:double(max(edgenumbers))
-
             z1 = corners(planecorners(planelist(yzsubset),ii),3);
             z2 = corners(planecorners(planelist(yzsubset),ii+1),3);
             

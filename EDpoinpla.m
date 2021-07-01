@@ -42,7 +42,7 @@ function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(
 %
 % Uses no special subroutines
 %
-% Peter Svensson (peter.svensson@ntnu.no) 21 June 2021
+% Peter Svensson (peter.svensson@ntnu.no) 22 June 2021
 % 
 % [hitvec,edgehit,edgehitnumbers,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs,geomacc,showtext);
 

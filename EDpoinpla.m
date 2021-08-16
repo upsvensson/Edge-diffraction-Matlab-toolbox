@@ -42,7 +42,7 @@ function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(
 %
 % Uses no special subroutines
 %
-% Peter Svensson (peter.svensson@ntnu.no) 22 June 2021
+% Peter Svensson (peter.svensson@ntnu.no) 16 Aug 2021
 % 
 % [hitvec,edgehit,edgehitnumbers,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs,geomacc,showtext);
 
@@ -59,6 +59,8 @@ function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(
 % xy-axes. Also, edge hits and corner hits were not registered correctly.
 % 22 June 2021 Fixed a bug around line 83, which strangely has not lead to
 % an error before.
+% 16 Aug 2021 Converted two logical arrays (addto_closetorcorner and 
+% addto_closetoedge) to double since Matlab 2018 protested, but Matlab 2020 did not.
 
 if nargin < 10
     showtext = 0;
@@ -235,13 +237,18 @@ if nposs>0
             edgecrossings = edgecrossings + ...
                 (tinside & xedge > xstart).*(ii <= numberofedgestocheck).*(nonhorizontaledges) + ...
                 (tendpoint_countablehit & xedge > xstart).*(ii <= numberofedgestocheck).*(nonhorizontaledges) ;
-
-            addto_closetocorner = (xedgeveryclosetostart==1 & (talmostzero+talmostone) > 0).*(ii <= numberofedgestocheck);
+            % 16 Aug 2021 Converted the logical addto_closetocorner to
+            % double since some Matlab versions protested against the
+            % addition/multiplication on the lines below.
+            addto_closetocorner = double( (xedgeveryclosetostart==1 & (talmostzero+talmostone) > 0).*(ii <= numberofedgestocheck) );
             edgeswithcorners_that_were_hit(:,2) = edgeswithcorners_that_were_hit(:,2) + sign(addto_closetocorner).*(sign(edgeswithcorners_that_were_hit(:,1)))*ii;
             edgeswithcorners_that_were_hit(:,1) = edgeswithcorners_that_were_hit(:,1) + sign(addto_closetocorner).*(1-sign(edgeswithcorners_that_were_hit(:,1)))*ii;
             closetocorner = closetocorner + addto_closetocorner.*(1-sign(closetocorner));
 
-            addto_closetoedge = (xedgeveryclosetostart==1 & tinside & (talmostzero+talmostone) == 0).*(ii <= numberofedgestocheck);
+            % 16 Aug 2021 Converted the logical addto_closetoedge to
+            % double since some Matlab versions protested against the
+            % addition/multiplication on the lines below.
+            addto_closetoedge = double( (xedgeveryclosetostart==1 & tinside & (talmostzero+talmostone) == 0).*(ii <= numberofedgestocheck) );
             closetoedge = closetoedge + addto_closetoedge.*(1-sign(closetoedge));
             if any(addto_closetoedge)
                edgenumbers_that_were_hit = edgenumbers_that_were_hit + sign(addto_closetoedge)*ii; 
@@ -254,7 +261,10 @@ if nposs>0
                     ( ( xstart(ivhor)-x1(ivhor)>geomacc & x2(ivhor)-xstart(ivhor)>geomacc ) | ...
                       ( xstart(ivhor)-x2(ivhor)>geomacc & x1(ivhor)-xstart(ivhor)>geomacc ) ).* ...
                       smallvertdistance(ivhor);
-                addto_closetoedge = (horizontaledges == 1 & insidehorizontaledge == 1 );
+                % 16 Aug 2021 Converted the logical addto_closetoedge to
+                % double since some Matlab versions protested against the
+                % addition/multiplication on the lines below.
+                addto_closetoedge = double( (horizontaledges == 1 & insidehorizontaledge == 1 ) );
                 closetoedge = closetoedge + addto_closetoedge.*(1-sign(closetoedge));
                 if any(addto_closetoedge)
                     edgenumbers_that_were_hit = edgenumbers_that_were_hit + sign(addto_closetoedge)*ii;                     
@@ -264,7 +274,10 @@ if nposs>0
                     (abs( xstart(ivhor)-x1(ivhor) ) < geomacc | ...
                      abs( xstart(ivhor)-x2(ivhor) ) < geomacc ).* ...
                       smallvertdistance(ivhor);
-                addto_closetocorner = (horizontaledges == 1 & closetocornerofhorizontaledge == 1 );
+                % 16 Aug 2021 Converted the logical addto_closetocorner to
+                % double since some Matlab versions protested against the
+                % addition/multiplication on the lines below.
+                addto_closetocorner = double( (horizontaledges == 1 & closetocornerofhorizontaledge == 1 ) );
                 edgeswithcorners_that_were_hit(:,2) = edgeswithcorners_that_were_hit(:,2) + sign(addto_closetocorner).*(sign(edgeswithcorners_that_were_hit(:,1)))*ii;
                 edgeswithcorners_that_were_hit(:,1) = edgeswithcorners_that_were_hit(:,1) + sign(addto_closetocorner).*(1-sign(edgeswithcorners_that_were_hit(:,1)))*ii;
                 closetocorner = closetocorner + addto_closetocorner.*(1-sign(closetocorner));
@@ -351,12 +364,18 @@ if nposs>0
                 (tinside & xedge > xstart).*(ii <= numberofedgestocheck).*(nonhorizontaledges) + ...
                 (tendpoint_countablehit & xedge > xstart).*(ii <= numberofedgestocheck).*(nonhorizontaledges) ;
 
-            addto_closetocorner = (xedgeveryclosetostart==1 & (talmostzero+talmostone) > 0).*(ii <= numberofedgestocheck);
+            % 16 Aug 2021 Converted the logical addto_closetocorner to
+            % double since some Matlab versions protested against the
+            % addition/multiplication on the lines below.
+            addto_closetocorner = double( (xedgeveryclosetostart==1 & (talmostzero+talmostone) > 0).*(ii <= numberofedgestocheck) );
             edgeswithcorners_that_were_hit(:,2) = edgeswithcorners_that_were_hit(:,2) + sign(addto_closetocorner).*(sign(edgeswithcorners_that_were_hit(:,1)))*ii;
             edgeswithcorners_that_were_hit(:,1) = edgeswithcorners_that_were_hit(:,1) + sign(addto_closetocorner).*(1-sign(edgeswithcorners_that_were_hit(:,1)))*ii;
             closetocorner = closetocorner + addto_closetocorner.*(1-sign(closetocorner));
 
-            addto_closetoedge = (xedgeveryclosetostart==1 & tinside & (talmostzero+talmostone) == 0).*(ii <= numberofedgestocheck);
+            % 16 Aug 2021 Converted the logical addto_closetoedge to
+            % double since some Matlab versions protested against the
+            % addition/multiplication on the lines below.
+            addto_closetoedge = double( (xedgeveryclosetostart==1 & tinside & (talmostzero+talmostone) == 0).*(ii <= numberofedgestocheck) );
             closetoedge = closetoedge + addto_closetoedge.*(1-sign(closetoedge));
             if any(addto_closetoedge)
                edgenumbers_that_were_hit = edgenumbers_that_were_hit + sign(addto_closetoedge)*ii; 
@@ -369,7 +388,11 @@ if nposs>0
                     ( ( xstart(ivhor)-x1(ivhor)>geomacc & x2(ivhor)-xstart(ivhor)>geomacc ) | ...
                       ( xstart(ivhor)-x2(ivhor)>geomacc & x1(ivhor)-xstart(ivhor)>geomacc ) ).* ...
                       smallvertdistance(ivhor);
-                addto_closetoedge = (horizontaledges == 1 & insidehorizontaledge == 1 );
+
+                % 16 Aug 2021 Converted the logical addto_closetoedge to
+                % double since some Matlab versions protested against the
+                % addition/multiplication on the lines below.
+                addto_closetoedge = double( (horizontaledges == 1 & insidehorizontaledge == 1 ) );
                 closetoedge = closetoedge + addto_closetoedge.*(1-sign(closetoedge));
                 if any(addto_closetoedge)
                     edgenumbers_that_were_hit = edgenumbers_that_were_hit + sign(addto_closetoedge)*ii;                     
@@ -379,7 +402,11 @@ if nposs>0
                     (abs( xstart(ivhor)-x1(ivhor) ) < geomacc | ...
                      abs( xstart(ivhor)-x2(ivhor) ) < geomacc ).* ...
                       smallvertdistance(ivhor);
-                addto_closetocorner = (horizontaledges == 1 & closetocornerofhorizontaledge == 1 );
+                  
+                % 16 Aug 2021 Converted the logical addto_closetocorner to
+                % double since some Matlab versions protested against the
+                % addition/multiplication on the lines below.
+                addto_closetocorner = double( (horizontaledges == 1 & closetocornerofhorizontaledge == 1 ) );
                 edgeswithcorners_that_were_hit(:,2) = edgeswithcorners_that_were_hit(:,2) + sign(addto_closetocorner).*(sign(edgeswithcorners_that_were_hit(:,1)))*ii;
                 edgeswithcorners_that_were_hit(:,1) = edgeswithcorners_that_were_hit(:,1) + sign(addto_closetocorner).*(1-sign(edgeswithcorners_that_were_hit(:,1)))*ii;
                 closetocorner = closetocorner + addto_closetocorner.*(1-sign(closetocorner));
@@ -463,12 +490,18 @@ if nposs>0
                 (tinside & yedge > ystart).*(ii <= numberofedgestocheck).*(nonhorizontaledges) + ...
                 (tendpoint_countablehit & yedge > ystart).*(ii <= numberofedgestocheck).*(nonhorizontaledges) ;
 
-            addto_closetocorner = (yedgeveryclosetostart==1 & (talmostzero+talmostone) > 0).*(ii <= numberofedgestocheck);
+            % 16 Aug 2021 Converted the logical addto_closetocorner to
+            % double since some Matlab versions protested against the
+            % addition/multiplication on the lines below.
+            addto_closetocorner = double( (yedgeveryclosetostart==1 & (talmostzero+talmostone) > 0).*(ii <= numberofedgestocheck) );
             edgeswithcorners_that_were_hit(:,2) = edgeswithcorners_that_were_hit(:,2) + sign(addto_closetocorner).*(sign(edgeswithcorners_that_were_hit(:,1)))*ii;
             edgeswithcorners_that_were_hit(:,1) = edgeswithcorners_that_were_hit(:,1) + sign(addto_closetocorner).*(1-sign(edgeswithcorners_that_were_hit(:,1)))*ii;
             closetocorner = closetocorner + addto_closetocorner.*(1-sign(closetocorner));
 
-            addto_closetoedge = (yedgeveryclosetostart==1 & tinside & (talmostzero+talmostone) == 0).*(ii <= numberofedgestocheck);
+            % 16 Aug 2021 Converted the logical addto_closetoedge to
+            % double since some Matlab versions protested against the
+            % addition/multiplication on the lines below.
+            addto_closetoedge = double( (yedgeveryclosetostart==1 & tinside & (talmostzero+talmostone) == 0).*(ii <= numberofedgestocheck) );
             closetoedge = closetoedge + addto_closetoedge.*(1-sign(closetoedge));
             if any(addto_closetoedge)
                edgenumbers_that_were_hit = edgenumbers_that_were_hit + sign(addto_closetoedge)*ii; 
@@ -481,7 +514,11 @@ if nposs>0
                     ( ( ystart(ivhor)-y1(ivhor)>geomacc & y2(ivhor)-ystart(ivhor)>geomacc ) | ...
                       ( ystart(ivhor)-y2(ivhor)>geomacc & y1(ivhor)-ystart(ivhor)>geomacc ) ).* ...
                       smallvertdistance(ivhor);
-                addto_closetoedge = (horizontaledges == 1 & insidehorizontaledge == 1 );
+                  
+                % 16 Aug 2021 Converted the logical addto_closetoedge to
+                % double since some Matlab versions protested against the
+                % addition/multiplication on the lines below.
+                addto_closetoedge = double( (horizontaledges == 1 & insidehorizontaledge == 1 ) );
                 closetoedge = closetoedge + addto_closetoedge.*(1-sign(closetoedge));
                 if any(addto_closetoedge)
                     edgenumbers_that_were_hit = edgenumbers_that_were_hit + sign(addto_closetoedge)*ii;                     
@@ -491,7 +528,10 @@ if nposs>0
                     (abs( ystart(ivhor)-y1(ivhor) ) < geomacc | ...
                      abs( ystart(ivhor)-y2(ivhor) ) < geomacc ).* ...
                       smallvertdistance(ivhor);
-                addto_closetocorner = (horizontaledges == 1 & closetocornerofhorizontaledge == 1 );
+                % 16 Aug 2021 Converted the logical addto_closetocorner to
+                % double since some Matlab versions protested against the
+                % addition/multiplication on the lines below.
+                addto_closetocorner = double( (horizontaledges == 1 & closetocornerofhorizontaledge == 1 ) );
                 edgeswithcorners_that_were_hit(:,2) = edgeswithcorners_that_were_hit(:,2) + sign(addto_closetocorner).*(sign(edgeswithcorners_that_were_hit(:,1)))*ii;
                 edgeswithcorners_that_were_hit(:,1) = edgeswithcorners_that_were_hit(:,1) + sign(addto_closetocorner).*(1-sign(edgeswithcorners_that_were_hit(:,1)))*ii;
                 closetocorner = closetocorner + addto_closetocorner.*(1-sign(closetocorner));

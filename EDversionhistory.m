@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 22 June 2021
+% Peter Svensson (peter.svensson@ntnu.no) 16 Aug 2021
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -214,6 +214,16 @@ icounter = icounter + 1;
 versionnumbers{icounter} = '0.217';
 versiondate{icounter} = '22 June 2021';
 versiontext{icounter} = ['Fixed a small bug which strangely has not caused '...
+    'an error earlier: EDpoinpla misbehaved when the number of points to check,'...
+    'and the size of planecorners were mismatched.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.218';
+versiondate{icounter} = '16 Aug 2021';
+versiontext{icounter} = ['Made a small change in EDpoinpla which caused an error '...
+    'for earlier Matlab versions (2018). Also fixed a bug in an error message in '...
+    'EDreadcadgeomatrices.'];
+    Fixed a small bug which strangely has not caused '...
     'an error earlier: EDpoinpla misbehaved when the number of points to check,'...
     'and the size of planecorners were mismatched.'];
 

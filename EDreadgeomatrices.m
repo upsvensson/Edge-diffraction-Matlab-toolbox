@@ -35,7 +35,7 @@ function planedata = EDreadgeomatrices(corners,planecorners,planerefltypes)
 %
 % Uses the functions EDinfrontofplane
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 28 May 2018
+% Peter Svensson (peter.svensson@ntnu.no) 13 Aug 2021
 %
 % planedata = EDreadgeomatrices(corners,planecorners,planerefltypes);
 
@@ -48,6 +48,8 @@ function planedata = EDreadgeomatrices(corners,planecorners,planerefltypes)
 % planes, the last zero of the 3-corner planes need to be replaced by a
 % repetition.
 % 28 May 2018 Introduced the input parameter planerefltypes
+% 13 Aug 2021 Fixed a bug: error messages used "planenumbers" but it was
+% corrected to "planecorners" in three locations.
 
 if nargin < 2
     error('ERROR: the corners and planecorners matrices must be specified')
@@ -183,7 +185,7 @@ for ii = 1:nplanes
     
     if sum(nvecsigns) == 0
         disp(' ')        
-       error(['ERROR: Plane ',int2str(planenumbers(ii)),' (plane numbering as in the CAD file) seems to be twisted.'])        
+       error(['ERROR: Plane ',int2str(planecorners(ii)),' (plane numbering as in the CAD file) seems to be twisted.'])        
     end
     
     if abs(sum(nvecsigns)) ~= n1
@@ -217,14 +219,14 @@ for ii = 1:nplanes
     
     if any(nvecdiff>1e-4)
         nvecdiff
-        error(['ERROR: Normal vectors for plane ',int2str(planenumbers(ii)),' (in the CAD file, = ',int2str(ii),' in the ESIE2 file), get different normal vectors for consecutive corner triplets. Check the geometry in the CAD-file'])
+        error(['ERROR: Normal vectors for plane ',int2str(planecorners(ii)),' (in the CAD file, = ',int2str(ii),' in the ESIE2 file), get different normal vectors for consecutive corner triplets. Check the geometry in the CAD-file'])
     elseif any(nvecdiff>1e-8)
         nvecdiff
-        disp(['WARNING: Normal vectors for plane ',int2str(planenumbers(ii)),' (in the CAD file, = ',int2str(ii),' in the ESIE2 file), get somewhat different normal vectors for consecutive corner triplets. Check the geometry in the CAD-file'])
+        disp(['WARNING: Normal vectors for plane ',int2str(planecorners(ii)),' (in the CAD file, = ',int2str(ii),' in the ESIE2 file), get somewhat different normal vectors for consecutive corner triplets. Check the geometry in the CAD-file'])
     end
     
 	if ncorners > 5 && abs(sum(nvecsigns)) <= 1
-		disp(['WARNING for plane number ',int2str(planenumbers(ii)),' in the CAD-file'])
+		disp(['WARNING for plane number ',int2str(planecorners(ii)),' in the CAD-file'])
 		disp(['   with the name ',strtrim(char(full(planenames(ii,:))))])
 		disp('   The normal vector can not be determined for this plane because there are')
 		disp('   the same number of inwards and outwards corners')

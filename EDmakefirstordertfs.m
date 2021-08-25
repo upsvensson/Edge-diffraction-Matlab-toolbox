@@ -30,7 +30,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordert
 % Uses functions EDcoordtrans2, EDwedge1st_fd from EDtoolbox
 % Uses function DataHash form Matlab Central
 % 
-% Peter Svensson 12 Feb 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 25 Aug. 2021 (peter.svensson@ntnu.no)
 %
 % [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordertfs(firstorderpathdata,...
 %     frequencies,Rstart,difforder,envdata,Sinputdata,receivers,edgedata,EDversionnumber,showtext)
@@ -54,13 +54,17 @@ function [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordert
 % controlparameters to three of its fields.
 % 12 Feb 2018 Adapted to a change in the EDwedge1st_fd (new output
 % parameter).
+% 25 Aug 2021 Introduced the new hash parameter calcfirstorderdiff.
 
 if nargin < 10
    showtext = 0; 
 end
 
+% New parameter for the hash 25 Aug. 2021: calcfirstorderdiff
+calcfirstorderdiff = double(difforder > 0);
+    
 EDinputdatastruct = struct('firstorderpathdata',firstorderpathdata,'edgedata',edgedata,...
-    'frequencies',frequencies,'Rstart',Rstart,'difforder',difforder,'envdata',envdata,'Sinputdata',Sinputdata,...
+    'frequencies',frequencies,'Rstart',Rstart,'calcfirstorderdiff',calcfirstorderdiff,'envdata',envdata,'Sinputdata',Sinputdata,...
     'receivers',receivers,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
 

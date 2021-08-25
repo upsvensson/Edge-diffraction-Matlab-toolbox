@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 16 Aug 2021
+% Peter Svensson (peter.svensson@ntnu.no) 26 Aug 2021
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -226,6 +226,13 @@ versiontext{icounter} = ['Made a small change in EDpoinpla which caused an error
     Fixed a small bug which strangely has not caused '...
     'an error earlier: EDpoinpla misbehaved when the number of points to check,'...
     'and the size of planecorners were mismatched.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.218';
+versiondate{icounter} = '26 Aug 2021';
+versiontext{icounter} = ['Made a small improvement in EDmakefirstordertfs and '...
+    'EDmakefirstorderirs, and corresponding changes in EDmain_xxx. '...
+    'The improvement reuses results more often. '];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

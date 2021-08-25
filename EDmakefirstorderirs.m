@@ -41,7 +41,7 @@ function [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderi
 % Uses functions EDcoordtrans2, EDwedge1st_fd from EDtoolbox
 % Uses function DataHash from Matlab Central
 % 
-% Peter Svensson 6 May 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 25 Aug 2021 (peter.svensson@ntnu.no)
 %
 % [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderirs(firstorderpathdata,...
 %     fs,Rstart,difforder,envdata,Sinputdata,receivers,edgedata,saveindividualfirstdiff,EDversionnumber,showtext)
@@ -65,13 +65,17 @@ function [irdirect,irgeom,irdiff,timingdata,EDinputdatahash] = EDmakefirstorderi
 % 9 Apr 2018 Little bug fixed, on line 358, thanks to Ville Pulkki
 % 12 Apr 2018 Little bug fixed, around line 334, thanks to Ville Pulkki
 % 6 May 2018 Little bug fixed, around line 331, thanks to Ville Pulkki
+% 25 Aug 2021 Introduced the new hash parameter calcfirstorderdiff.
 
 if nargin < 11
    showtext = 0; 
 end
 
+% New parameter for the hash 25 Aug. 2021: calcfirstorderdiff
+calcfirstorderdiff = double(difforder > 0);
+
 EDinputdatastruct = struct('firstorderpathdata',firstorderpathdata,'edgedata',edgedata,...
-    'fs',fs,'Rstart',Rstart,'difforder',difforder,...
+    'fs',fs,'Rstart',Rstart,'calcfirstorderdiff',calcfirstorderdiff,...
     'envdata',envdata,'Sinputdata',Sinputdata,...
     'receivers',receivers,'saveindividualfirstdiff',saveindividualfirstdiff,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);

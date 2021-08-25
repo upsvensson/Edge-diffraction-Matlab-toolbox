@@ -45,7 +45,7 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
+% Peter Svensson 25 August 2021 (peter.svensson@ntnu.no)
 %
 % EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -131,6 +131,9 @@ function EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,envdata,controlpar
 % corresponding suppressing of the result recycling.
 % 14 May 2018 Cleaned up the lineending.
 % 3 June 2020 Fixed a bug: folder names with spaces can be handled now
+% 25 Aug. 2021 Small improvement: introduced the parameter
+% calcfirstorderdiff in the hash for EDmakefirstordertfs. Makes recycling
+% possible a bit more often.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -454,12 +457,14 @@ if controlparameters.docalctf == 1 && controlparameters.skipfirstorder == 0
     end
 
     t00 = clock;
+    % New parameter for the hash 25 Aug. 2021: calcfirstorderdiff
+    calcfirstorderdiff = double(controlparameters.difforder > 0);
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
     else
         EDfirstordertfsinputstruct = struct('firstorderpathdata',firstorderpathdata,'edgedata',edgedata,...
             'frequencies',controlparameters.frequencies,'Rstart',controlparameters.Rstart,...
-            'difforder',controlparameters.difforder,'envdata',envdata,'Sinputdata',Sinputdata,...
+            'calcfirstorderdiff',calcfirstorderdiff,'envdata',envdata,'Sinputdata',Sinputdata,...
             'receivers',Rdata.receivers,'EDversionnumber',EDversionnumber);
         EDfirstordertfsinputhash = DataHash(EDfirstordertfsinputstruct);
         [foundmatch,recycledresultsfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_tf',EDfirstordertfsinputhash);

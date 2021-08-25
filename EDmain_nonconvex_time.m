@@ -49,7 +49,7 @@ function EDmain_nonconvex_time(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDinteg_submatrixstructure, EDintegralequation_convex_ir from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
+% Peter Svensson 25 Aug 2021 (peter.svensson@ntnu.no)
 %
 % EDmain_nonconvex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -147,6 +147,9 @@ function EDmain_nonconvex_time(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % 3 June 2020 Fixed a bug: folder names with spaces can be handled now
 % 20 Jan 2021 Fixed: the field .planerefltypes wasn't forwarded to
 %             EDreadgeomatrices
+% 25 Aug. 2021 Small improvement: introduced the parameter
+% calcfirstorderdiff in the hash for EDmakefirstordertfs. Makes recycling
+% possible a bit more often.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -467,12 +470,16 @@ if controlparameters.docalcir == 1 && controlparameters.skipfirstorder == 0
     end
 
     t00 = clock;
+
+    % New parameter for the hash 25 Aug. 2021: calcfirstorderdiff
+    calcfirstorderdiff = double(controlparameters.difforder > 0);
+
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
     else
         EDfirstorderirsinputstruct = struct('firstorderpathdata',firstorderpathdata,'edgedata',edgedata,...
             'fs',controlparameters.fs,'Rstart',controlparameters.Rstart,...
-            'difforder',controlparameters.difforder,'envdata',envdata,'Sinputdata',Sinputdata,...
+            'calcfirstorderdiff',calcfirstorderdiff,'envdata',envdata,'Sinputdata',Sinputdata,...
             'receivers',Rdata.receivers,'saveindividualfirstdiff',controlparameters.saveindividualfirstdiff,'EDversionnumber',EDversionnumber);
         EDfirstorderirsinputhash = DataHash(EDfirstorderirsinputstruct);
         [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_ir',EDfirstorderirsinputhash);

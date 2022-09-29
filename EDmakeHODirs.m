@@ -39,7 +39,7 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
 % Uses functions EDcreindexmatrix,EDwedge2nd,EDwedgeN from the EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 21 May 2019
+% Peter Svensson (peter.svensson@ntnu.no) 24 Sep. 2022
 %
 % [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,difforder,elemsize,edgedata,...
 %     edgetoedgedata,Sdata,doaddsources,sourceamplitudes,Rdata,cair,fs,Rstart,...
@@ -61,13 +61,26 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
 % 29 May 2018 Fixed small bug around line 300 for thin planes.
 % 21 May 2019 Added the new input parameter hodpathsalongplane and modified
 % the calls to EDwedge2nd and EDwedgeN accordingly.
+% 24 Sep. 2022 Changed how the definition of the input data struct was
+% defined. The previous version created a huge struct and failed to
+% identify existing files that could be reused.
 
 global BIGEDGESTEPMATRIX 
 
-EDinputdatastruct = struct('difforder',difforder,'hodpaths',hodpaths,...
-    'hodpathsalongplane',hodpathsalongplane,'elemsize',elemsize,...
-'edgedata',edgedata,'Sdata',Sdata,'doaddsources',doaddsources,'sourceamplitudes',sourceamplitudes,'Rdata',Rdata,'cair',cair,...
-'fs',fs,'Rstart',Rstart,'savealldifforders',savealldifforders,'EDversionnumber',EDversionnumber);
+EDinputdatastruct = struct('difforder',difforder);
+EDinputdatastruct.hodpaths = hodpaths;
+EDinputdatastruct.hodpathsalongplane = hodpathsalongplane;
+EDinputdatastruct.elemsize = elemsize;
+EDinputdatastruct.edgedata = edgedata;
+EDinputdatastruct.Sdata = Sdata;
+EDinputdatastruct.doaddsources = doaddsources;
+EDinputdatastruct.sourceamplitudes = sourceamplitudes;
+EDinputdatastruct.Rdata = Rdata;
+EDinputdatastruct.cair = cair;
+EDinputdatastruct.fs = fs;
+EDinputdatastruct.Rstart = Rstart;
+EDinputdatastruct.savealldifforders = savealldifforders;
+EDinputdatastruct.EDversionnumber = EDversionnumber;
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %--------------------------------------------------------------------------

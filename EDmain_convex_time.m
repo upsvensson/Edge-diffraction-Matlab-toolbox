@@ -43,7 +43,7 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % EDinteg_submatrixstructure, EDintegralequation_convex_ir from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 25 Aug 2021 (peter.svensson@ntnu.no)
+% Peter Svensson 24 Sep 2022 (peter.svensson@ntnu.no)
 %
 % EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -143,6 +143,9 @@ function EDmain_convex_time(geoinputdata,Sinputdata,Rinputdata,envdata,controlpa
 % 25 Aug. 2021 Small improvement: introduced the parameter
 % calcfirstorderdiff in the hash for EDmakefirstordertfs. Makes recycling
 % possible a bit more often.
+% 24 Sep. 2022 Changed the definition of the input data hash for the HODir.
+% The previous version created a huge struct, and failed to identify
+% existing results that could be reused.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -645,12 +648,20 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
     else
 %         EDhodirsinputstruct = struct();
 %         EDhodirinputhash = DataHash(EDhodirsinputstruct);
-        EDhodirinputstruct = struct('difforder',controlparameters.difforder,...
-        'hodpaths',hodpaths,'hodpathsalongplane',hodpathsalongplane,'elemsize',elemsize,'edgedata',edgedata,'Sdata',Sdata,...
-        'doaddsources',Sinputdata.doaddsources,'sourceamplitudes',Sinputdata.sourceamplitudes,...
-        'Rdata',Rdata,'cair',envdata.cair,'fs',controlparameters.fs,...
-        'Rstart',controlparameters.Rstart,'savealldifforders',...
-        controlparameters.savealldifforders,'EDversionnumber',EDversionnumber);
+        EDhodirinputstruct = struct('difforder',controlparameters.difforder);       
+        EDhodirinputstruct.hodpaths = hodpaths;
+        EDhodirinputstruct.hodpathsalongplane = hodpathsalongplane;
+        EDhodirinputstruct.elemsize = elemsize;
+        EDhodirinputstruct.edgedata = edgedata;
+        EDhodirinputstruct.Sdata = Sdata;
+        EDhodirinputstruct.doaddsources = Sinputdata.doaddsources;
+        EDhodirinputstruct.sourceamplitudes = Sinputdata.sourceamplitudes;
+        EDhodirinputstruct.Rdata = Rdata;
+        EDhodirinputstruct.cair = envdata.cair;
+        EDhodirinputstruct.fs = controlparameters.fs;
+        EDhodirinputstruct.Rstart = controlparameters.Rstart;
+        EDhodirinputstruct.savealldifforders = controlparameters.savealldifforders;
+        EDhodirinputstruct.EDversionnumber = EDversionnumber;
         EDhodirinputhash = DataHash(EDhodirinputstruct);
         [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_irhod',EDhodirinputhash);
     end
@@ -668,6 +679,7 @@ if controlparameters.difforder > 1 && controlparameters.docalcir == 1
         edgetoedgedata,Sdata,Sinputdata.doaddsources,Sinputdata.sourceamplitudes,Rdata,envdata.cair,...
         controlparameters.fs,controlparameters.Rstart,controlparameters.savealldifforders,...
         filehandlingparameters.showtext,EDversionnumber);
+
         existingfilename =  '';
         t01 = etime(clock,t00);
         timingstruct.hodir = t01;

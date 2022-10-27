@@ -46,7 +46,7 @@ function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,ed
 % Uses functions  EDfindis EDchkISvisible from EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 16 March 2021
+% Peter Svensson (peter.svensson@ntnu.no) 28 October 2022
 %
 % [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,...
@@ -82,6 +82,8 @@ function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,ed
 % sound and specular reflections were introduced. Also, an extra test was
 % introduced for edge hits and corner hits, so that the direct sound was not
 % slipping through in special cases. 
+% 28 Oct. 2022 Fixed a bug: the directsound visibility was not done
+% correctly when "doaddsources = 0".
 
 if nargin < 13
    showtext = 0; 
@@ -164,7 +166,6 @@ if nsources == min_number_elements
 else 
     possibleSPR = [];
     for ii = 1:nreceivers
-        disp(int2str(ii))
         visplanesfromoneR = visplanesfromR(:,ii);
         tempmatrix = visplanesfromS.*visplanesfromoneR(:,ones(1,nsources));
         ivpotential = find(tempmatrix);
@@ -275,7 +276,8 @@ if directsound ~= 0
             npotentialobstruct = 0;
         end
     else
-        directsoundOK = ones(nreceivers,nsources);        
+        directsoundOK = ones(nreceivers,nsources); 
+        npotentialobstruct = size(possibleSPR_obstruct,1);
     end
 
     if npotentialobstruct > 0

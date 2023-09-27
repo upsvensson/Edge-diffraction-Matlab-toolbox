@@ -44,11 +44,11 @@ function EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,control
 %                       .savediff2result      (default: 0)
 % 
 % Uses the functions EDgetversion,EDcheckinputstructs, EDreadcad, EDreadgeomatrices,
-% EDedgeo, EDSorRgeo, EDfindconvexGApaths, EDmakefirstordertfs, EDed2geo,
+% EDmessage, EDpostfunctext,EDedgeo, EDSorRgeo, EDfindconvexGApaths, EDmakefirstordertfs, EDed2geo,
 % EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 25 Aug 2021 (peter.svensson@ntnu.no)
+% Peter Svensson 27 Sep. 2023 (peter.svensson@ntnu.no)
 %
 % EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -147,6 +147,8 @@ function EDmain_convexESIEBEM(geoinputdata,Sinputdata,Rinputdata,envdata,control
 % 25 Aug. 2021 Small improvement: introduced the parameter
 % calcfirstorderdiff in the hash for EDmakefirstordertfs. Makes recycling
 % possible a bit more often.
+% 27 Sep. 2023 Introduced the functions EDmessage and EDpostfunctext to
+% make this main function more readable. 
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -160,104 +162,53 @@ if nargin < 6
     end
 end
 
-% compstr = computer;
-% compstr = lower(compstr(1:3));
-% if compstr == 'mac'  
-% 	lineending = 13;
-% elseif compstr == 'sun' 
-% 	lineending = 10;    
-% elseif compstr == 'sol'            
-% 	lineending = 10;
-% elseif compstr == 'pcw'
-% 	lineending = [13,10];
-% else
-%     error('ERROR: Not implemented for this computer type yet')	
-% end
-lineending = 10;
 if ispc == 1
    lineending = [13,10];
+else
+    lineending = 10;
 end
 
 [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,3);
 
-if filehandlingparameters.savelogfile == 1
-    logfilename = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_log.txt'];
-end
-
-if filehandlingparameters.showtext >= 1
-	disp('    ');disp('####################################################################')
-              disp(['#  EDmain_convexESIEBEM, v. ',num2str(EDversionnumber),' (',lastsavedate,')'])
-              disp(['#  filestem for results: ',filehandlingparameters.filestem])
-              disp(' ')
-end
-if filehandlingparameters.savelogfile == 1
-    fid = fopen(logfilename,'w');
-    if fid == -1
-        disp('This file is not possible to open - check that it isn''t opened by any program!')
-    	return
-    end
-    fwrite(fid,['####################################################################',lineending],'char');
-    fwrite(fid,['#  EDmain_convexESIEBEM, v. ',num2str(EDversionnumber),' (',lastsavedate,')',lineending],'char');
-    fwrite(fid,['#  filestem for results: ',filehandlingparameters.filestem,lineending],'char');
-    fwrite(fid,[' ',lineending],'char');
-end
+textline1 = ['EDmain_convexESIEBEM, v.',num2str(EDversionnumber),' (',lastsavedate,')'];
+textline2 = ['filestem for results: ',filehandlingparameters.filestem];
+textline3 = ['directory for results: ',filehandlingparameters.outputdirectory];
+fid = EDmessage(filehandlingparameters,'sf',0,1,'',textline1,textline2,textline3);
 
 nfrequencies = length(controlparameters.frequencies);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Read the input CAD-file, or input matrices, and create the planedata struct
 
-if isfield(geoinputdata,'geoinputfile')
-    if filehandlingparameters.showtext >= 1
-        disp('   Creating the planedata struct from the CAD file')
-    end
-    t00 = clock;
+t00 = clock;
+if isfield(geoinputdata,'geoinputfile')    
+    EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the planedata struct from the CAD file']);
     [planedata,extraCATTdata] = EDreadcad(geoinputdata.geoinputfile,0);
-    if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
-        error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
-    end
-    if filehandlingparameters.savecadgeofile == 1
-        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
-        eval(['save ''',desiredname,''' planedata extraCATTdata'])
-    end
+    textline1start = ['   EDreadcad: '];
     t01 = etime(clock,t00);
-    ncorners = size(planedata.corners,1);
-    nplanes = (size(planedata.planecorners,1));
-    if filehandlingparameters.showtext >= 1
-        disp(['      ',int2str(ncorners),' corners and ',int2str(nplanes),' planes'])
-    end
-    if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDreadcad (',int2str(ncorners),' corners and ',int2str(nplanes),' planes), time: ',num2str(t01),' s',lineending],'char');
-    end
 else
-    if filehandlingparameters.showtext >= 1
-        disp('   Creating the planedata struct from the input geometry matrices')
-    end
-    t00 = clock;
-    % Fix on 20 Jan 2021: the field .planerefltypes wasn't forwarded to
-    % EDreadgeomatrices
-    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners,geoinputdata.planerefltypes);    
-%     planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners);    
-    ncorners = size(planedata.corners,1);
-    nplanes = size(planedata.planecorners,1);
+    EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the planedata struct from the input geometry matrices']);
+    planedata = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners,geoinputdata.planerefltypes); 
+    textline1start = ['   EDreadgeomatrices: '];
     t01 = etime(clock,t00);
-    if filehandlingparameters.showtext >= 1
-        disp(['      ',int2str(ncorners),' corners and ',int2str(nplanes),' planes'])
-    end
-    if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDreadgeomatrices (',int2str(ncorners),' corners and ',int2str(nplanes),' planes), time: ',num2str(t01),' s',lineending],'char');
-    end    
 end
+if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
+     error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
+end
+ncorners = size(planedata.corners,1);
+nplanes = (size(planedata.planecorners,1));
+Timestring = [' Time: ',num2str(t01(1)),' s'];
+if length(t01) > 1, Timestring = [Timestring,' (Orig.: ',num2str(t01(2)), 's)'];  end
+textline1 = [textline1start,int2str(ncorners),' corners and ',int2str(nplanes),' planes.',Timestring];
+    
+EDmessage(filehandlingparameters,'sf',fid,1,'',textline1);
 timingstruct = struct('geoinput',t01);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Store the original receiver points as "fieldpoints", and generate new
 % receiver points at the surfaces of the polyhedron.
 
-if filehandlingparameters.showtext >= 1	
-	disp('   Creating the new surface receiver positions ')
-end
-
+EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the new surface receiver positions']);
 t00 = clock;
 fieldpoints = Rinputdata.coordinates;
 doallSRcombinations_fieldpoints = Sinputdata.doallSRcombinations;
@@ -284,22 +235,14 @@ EDsettings{5} = controlparameters;
 EDsettings{6} = filehandlingparameters;
 EDsettings{7} = EDversionnumber;
 
-if filehandlingparameters.showtext >= 1
-     disp(['       Created ',int2str(size(Rinputdata.coordinates,1)),' surface receiver positions'])
-end
-
-if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   Created ',int2str(size(Rinputdata.coordinates,1)),' surface ',...
-        'receiver positions. Time: ',num2str(t01),' s',lineending],'char');
-end
+textline1 = ['       Created ',int2str(size(Rinputdata.coordinates,1)),' surface receiver positions'];
+EDpostfunctext('EDgensurfreceivers',t01,existingfilename,...
+    filehandlingparameters,fid,'',textline1)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Use the planedata struct and create an edgedata struct
 
-if filehandlingparameters.showtext >= 1	
-	disp('   Creating the edgedata struct ')
-end
-
+EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the edgedata struct']);
 t00 = clock;
 if filehandlingparameters.suppressresultrecycling == 1
     foundmatch = 0;
@@ -316,7 +259,7 @@ if foundmatch == 1
         copyfile(existingfilename,desiredname);
     end
 else
-    [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,geoinputdata.firstcornertoskip,[],0,filehandlingparameters.showtext);
+    [edgedata,planedata,EDinputdatahash] = EDedgeo(planedata,EDversionnumber,geoinputdata.firstcornertoskip,[],0,filehandlingparameters.showtext);    
     if filehandlingparameters.saveeddatafile == 1
         eval(['save ''',desiredname,''' planedata edgedata EDinputdatahash'])
     end
@@ -324,18 +267,9 @@ end
 nedges = size(edgedata.edgecorners,1);
 t01 = etime(clock,t00);
 timingstruct.edgedata = t01;
-if filehandlingparameters.showtext >= 1
-    if foundmatch == 1
-        disp(['      Recycled and duplicated ',existingfilename])
-    end
-     disp(['      ',int2str(nedges),' edges'])
-end
-if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDedgeo, (',int2str(nedges),' edges), time: ',num2str(t01),' s',lineending],'char');
-    if foundmatch == 1
-        fwrite(fid,['      by recycling and duplicating ',existingfilename,lineending],'char');        
-    end
-end
+EDpostfunctext('EDedgeo',t01,existingfilename,...
+    filehandlingparameters,fid,'',[int2str(nedges),' edges.'])
+
 if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
     error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
 end
@@ -343,9 +277,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create the Sdata and Rdata structs
 
-if filehandlingparameters.showtext >= 1	
-	disp('   Creating the Sdata struct ')
-end
+EDmessage(filehandlingparameters,'s',fid,1,'',[TTT,'Creating the Sdata struct']);
 t00 = clock;
 if filehandlingparameters.suppressresultrecycling == 1
     foundmatch = 0;
@@ -373,25 +305,13 @@ timingstruct.Sdata = t01;
 if any(any(Sdata.visplanesfroms)) == 0
    error('ERROR: No source can see any of the planes of the scattering object. Please check your geometry.') 
 end
-
-if filehandlingparameters.showtext >= 1
-    if foundmatch == 1
-        disp(['      Recycled and duplicated ',existingfilename])
-    end
-     disp(['      ',int2str(nsources),' source(s)'])
-end
-if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDSorRgeo(S), (',int2str(nsources),' source(s)), time: ',num2str(t01),' s',lineending],'char');
-    if foundmatch == 1
-        fwrite(fid,['      by recycling and duplicating ',existingfilename,lineending],'char');        
-    end
-end
+EDpostfunctext('EDSorRgeo',t01,existingfilename,...
+    filehandlingparameters,fid,'',[int2str(nsources),' sources.'])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Create the Rdata struct
 
-if filehandlingparameters.showtext >= 1
-	disp('   Creating the Rdata struct ')
-end
+EDmessage(filehandlingparameters,'s',fid,1,'',[TTT,'Creating the Rdata struct']);
 t00 = clock;
 if filehandlingparameters.suppressresultrecycling == 1
     foundmatch = 0;
@@ -420,19 +340,8 @@ timingstruct.Rdata = t01;
 if any(any(Rdata.visplanesfromr)) == 0
    error('ERROR: No receiver can see any of the planes of the scattering object. Please check your geometry.') 
 end
-
-if filehandlingparameters.showtext >= 1
-    if foundmatch == 1
-        disp(['      Recycled and duplicated ',existingfilename])
-    end
-     disp(['      ',int2str(nreceivers),' receiver(s)'])
-end
-if filehandlingparameters.savelogfile == 1
-    fwrite(fid,['   EDSorRgeo(R), (',int2str(nreceivers),' receiver(s)), time: ',num2str(t01),' s',lineending],'char');
-    if foundmatch == 1
-        fwrite(fid,['      by recycling and duplicating ',existingfilename,lineending],'char');        
-    end
-end
+ EDpostfunctext('EDSorRgeo',t01,existingfilename,...
+    filehandlingparameters,fid,'',[int2str(nreceivers),' receivers.'])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -440,10 +349,7 @@ end
 % diffraction paths.
 
 if controlparameters.skipfirstorder == 0
-    if filehandlingparameters.showtext >= 1	
-        disp('   Find the (first-order) GA paths')
-    end
-
+    EDmessage(filehandlingparameters,'s',fid,1,'',['Find the (first-order) GA paths']);
     t00 = clock;
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
@@ -469,25 +375,17 @@ if controlparameters.skipfirstorder == 0
             eval(['save ''',desiredname,''' firstorderpathdata EDinputdatahash'])   
         end
     end
+    nspecs = size(firstorderpathdata.specrefllist,1);
+    ndiffs = prod(size(firstorderpathdata.diffpaths));
     t01 = etime(clock,t00);
     timingstruct.findpaths = t01;
-    if filehandlingparameters.showtext >= 1	&& foundmatch == 1
-        disp(['      Recycled ',existingfilename])
-    end    
-    if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDfindconvexGApaths',lineending],'char');
-        fwrite(fid,['                                Total time: ',num2str(t01),' s',lineending],'char');
-        if foundmatch == 1
-            fwrite(fid,['      by recycling ',existingfilename,lineending],'char');        
-        end
-    end
+    EDpostfunctext('EDfindconvexGApaths',t01,existingfilename,...
+        filehandlingparameters,fid,'',[int2str(nspecs),' spec. paths and ',...
+        int2str(ndiffs),' diff. paths.'])
+
 else
-    if filehandlingparameters.showtext >= 1	
-        disp('   The first-order GA and diff paths are not identified because skipfirstorder was set to 1')
-    end
-    if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDfindconvexGApaths was not run because skipfirstorder was set to 1',lineending],'char');
-    end
+    textline1 = ['   EDfindconvexGApaths was not run because skipfirstorder was set to 1'];
+    EDmessage(filehandlingparameters,'fs',fid,1,'',textline1);
     timingstruct.findpaths = 0;
 end
 
@@ -496,11 +394,9 @@ end
 % diffraction tfs.
 
 if controlparameters.docalctf == 1 && controlparameters.skipfirstorder == 0
-    if filehandlingparameters.showtext >= 1	
-        disp('   Generate the (first-order) GA and diff tfs.')
-    end
-
+    EDmessage(filehandlingparameters,'s',fid,1,'',['Generate the (first-order) GA and diff tfs']);
     t00 = clock;
+
     % New parameter for the hash 25 Aug. 2021: calcfirstorderdiff
     calcfirstorderdiff = double(controlparameters.difforder > 0);
     if filehandlingparameters.suppressresultrecycling == 1
@@ -520,7 +416,7 @@ if controlparameters.docalctf == 1 && controlparameters.skipfirstorder == 0
          EDinputdatahash = EDfirstordertfsinputhash;
         t01 = etime(clock,t00);
         currenttimingstruct.maketfs = [t01 timingstruct.maketfs(2:4)];
-        timingstruct = currenttimingstruct;
+        timingdata = timingstruct.maketfs(2:4);
         eval(['save ''',desiredname,''' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     else
         [tfdirect,tfgeom,tfdiff,timingdata,EDinputdatahash] = EDmakefirstordertfs(firstorderpathdata,...
@@ -531,40 +427,23 @@ if controlparameters.docalctf == 1 && controlparameters.skipfirstorder == 0
         timingstruct.maketfs = [t01 timingdata];
         eval(['save ''',desiredname,''' tfdirect tfgeom tfdiff timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     end
-    if filehandlingparameters.showtext >= 1 && foundmatch == 1
-        disp(['      Recycled ',recycledresultsfile])
-    end
-    if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDmakefirstordertfs (',int2str(nfrequencies),' frequencies)',lineending],'char');
-        if foundmatch == 1
-            fwrite(fid,['      by recycling ',recycledresultsfile,lineending],'char');     
-            fwrite(fid,['                                Total time: ',num2str(t01),' s',lineending],'char');          
-        else
-            fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for all frequencies, as below',lineending],'char');
-            fwrite(fid,['                                Generate the direct sound: ',num2str(timingdata(1)),' s',lineending],'char');
-            fwrite(fid,['                                Generate the specular reflections: ',num2str(timingdata(2)),' s',lineending],'char');
-            fwrite(fid,['                                Generate the first-order diffraction: ',num2str(timingdata(3)),' s',lineending],'char');
-        end
-    end
+    textline1 = [int2str(nfrequencies),' frequencies.'];
+    textline2 = ['      Direct sound: ',num2str(timingdata(1)),'s, spec.refl.: ',...
+        num2str(timingdata(2)),'s, first-order diff.: ',num2str(timingdata(3)),'s'];
+    EDpostfunctext('EDmakefirstordertfs',t01,existingfilename,filehandlingparameters,fid,'',textline1,textline2);    
 else
-    if filehandlingparameters.showtext >= 1	
-        disp('   First-order GA and diff tfs are not generated because docalctf was set to 0, or skipfirstorder was set to 1')
-    end
-    if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDmakefirstordertfs was not run because docalctf was set to 0, or skipfirstorder was set to 1',lineending],'char');
-    end
+    textline1 = ['   EDmakefirstordertfs was not run because docalctf was set to 0, or skipfirstorder was set to 1'];
+    EDmessage(filehandlingparameters,'fs',fid,1,'',textline1);
     timingstruct.maketfs = 0;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Add edge-to-edge visibility data
 
+DIF = int2str(controlparameters.difforder);
 if controlparameters.difforder > 1
-    if filehandlingparameters.showtext >= 1	
-        disp('   Creating the edgetoedgedata struct ')
-    end
+   EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the edgetoedgedata struct']);
     t00 = clock;
-
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
     else
@@ -585,34 +464,20 @@ if controlparameters.difforder > 1
     end
     t01 = etime(clock,t00);
     timingstruct.edgetoedgedata = t01;
-    if filehandlingparameters.showtext >= 1	&& foundmatch == 1
-        disp(['      Recycled ',existingfilename])
-    end    
-    if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDed2geo, time: ',num2str(t01),' s',lineending],'char');
-        if foundmatch == 1
-                fwrite(fid,['      by recycling ',existingfilename,lineending],'char');        
-        end
-    end
+    EDpostfunctext('EDed2geo',t01,existingfilename,...
+        filehandlingparameters,fid,'');
 else
-    if filehandlingparameters.showtext >= 1	
-        disp(['   Skipping the edgetoedgedata struct, since difforder = ',int2str(controlparameters.difforder)])
-    end
+    textline1 = ['   EDed2geo was not run since difforder = ',DIF];
+    EDmessage(filehandlingparameters,'sf',fid,1,'',textline1);
     timingstruct.edgetoedgedata = 0;
-    if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDed2geo was not run',lineending],'char');
-    end    
 end
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Prepare for the integral equation: set up the submatrix structure
 
 if controlparameters.difforder > 1 && controlparameters.docalctf == 1
-    if filehandlingparameters.showtext >= 1	
-        disp('   Creating the integral equation Hsubmatrixdata struct ')
-    end
-    t00 = clock;
-    
+    EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the integral equation Hsubmatrixdata struct']);
+    t00 = clock;    
     if filehandlingparameters.suppressresultrecycling == 1
         foundmatch = 0;
     else
@@ -635,54 +500,35 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
             eval(['save ''',desiredname,''' Hsubmatrixdata EDinputdatahash'])
         end
     end
-    nsousigs = Hsubmatrixdata.bigmatrixendnums(end);
-    nsubmatrices = size(Hsubmatrixdata.edgetripletlist,1);
+%    nsousigs = Hsubmatrixdata.bigmatrixendnums(end);
+%    nsubmatrices = size(Hsubmatrixdata.edgetripletlist,1);
     edgeelemsizes = edgedata.edgelengthvec./Hsubmatrixdata.nedgeelems;
     meanelemsize = mean(edgeelemsizes);
-    maxfreq = envdata.cair/(3*meanelemsize);
-    minedgeelemnumber = min(Hsubmatrixdata.nedgeelems);
-    maxedgeelemnumber = max(Hsubmatrixdata.nedgeelems);
+%    maxfreq = envdata.cair/(3*meanelemsize);
+%    minedgeelemnumber = min(Hsubmatrixdata.nedgeelems);
+%    maxedgeelemnumber = max(Hsubmatrixdata.nedgeelems);
     nonzeroelements = sum(prod(Hsubmatrixdata.nedgeelems(Hsubmatrixdata.edgetripletlist),2));
     t01 = etime(clock,t00);
     timingstruct.submatrixdata = t01;
-    if filehandlingparameters.showtext >= 1    
-         if foundmatch == 1
-            disp(['      Recycled ',existingfilename])
-         end
-         disp(['      ',int2str(nsubmatrices),' submatrices; ',int2str(Hsubmatrixdata.nuniquesubmatrices),' unique will be computed due to symmetry']) 
-         disp(['      Discretizing the edges with ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discret. points, giving an avg. "edge element" length of ',num2str(meanelemsize),' m'])
-         disp(['      This discretization has an upper frequency limit of ',num2str(round(maxfreq)),' Hz (3 edge points per wavelength)'])
-         disp(['      ',int2str(nsousigs),' edge source signals to compute'])
-         disp(['      The IE matrix has ',int2str(nonzeroelements),' non-zero elements, but many may be identical due to symmetries'])
-    end
-    if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDinteg_submatrixstructure, (',int2str(Hsubmatrixdata.nuniquesubmatrices),' submatrices, out of ',int2str(nsubmatrices),', to compute), time: ',num2str(t01),' s',lineending],'char');
-        if foundmatch == 1
-                fwrite(fid,['      by recycling ',existingfilename,lineending],'char');        
-        end
-        fwrite(fid,['                               (Edges discretized with: ',int2str(minedgeelemnumber),' to ',int2str(maxedgeelemnumber),' discretization points)',lineending],'char');
-        fwrite(fid,['                               (Avg. "edge element" size: ',num2str(meanelemsize),' m. OK up to ',num2str(round(maxfreq)),' Hz (3 edge points per wavelength))',lineending],'char');
-        fwrite(fid,['                               (',int2str(nsousigs),' edge source signals to compute)',lineending],'char');
-        fwrite(fid,['                               (',int2str(nonzeroelements),' non-zero elements in the IE matrix)',lineending],'char');
-    end
-else
-    if filehandlingparameters.showtext >= 1	
-        disp(['   Skipping the integral equation Hsubmatrixdata struct, since difforder = ',int2str(controlparameters.difforder),' (or docalctf was set to 0)'])
-        timingstruct.submatrixdata = 0;
-    end    
-    if filehandlingparameters.savelogfile >= 1	        
-        fwrite(fid,['   The integral equation Hsubmatrixdata struct was not created',lineending],'char');
-    end
+    EDpostfunctext('EDinteg_submatrixstructure',t01,existingfilename,...
+        filehandlingparameters,fid,'',...
+        [int2str(Hsubmatrixdata.nuniquesubmatrices),' submatrices, out of ',int2str(size(Hsubmatrixdata.edgetripletlist,1)),', to compute.'],...
+        ['      Edges discretized with: ',int2str(min(Hsubmatrixdata.nedgeelems)),'-',...
+        int2str(max(Hsubmatrixdata.nedgeelems)),' gauss points. ',int2str(Hsubmatrixdata.bigmatrixendnums(end)),' edge source signals to compute.'],...
+        ['      The IE matrix has ',int2str(nonzeroelements),' non-zero elements. Some may be identical due to symmetries'])    
+    
+ else
+   textline1 = ['   EDinteg_submatrixstructure was not run because difforder = ',DIF,' or docalctf was set to 0'];
+    EDmessage(filehandlingparameters,'sf',fid,1,'',textline1);
+    timingstruct.submatrixdata = 0;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate the HOD contribution with the integral equation
 
 if controlparameters.difforder > 1 && controlparameters.docalctf == 1
-    if filehandlingparameters.showtext >= 1	
-        disp('   Calculating the HOD contribution with the FD integral equation')
-        disp(['      ',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',int2str(controlparameters.difforder)])
-    end
+    textline2 = ['      ',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',DIF];
+    EDmessage(filehandlingparameters,'s',fid,1,'',['Calculating the HOD contribution with the FD integral equation'],textline2);
 
     t00 = clock;    
     if filehandlingparameters.suppressresultrecycling == 1
@@ -703,7 +549,8 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
          eval(['load ''',recycledresultsfile,''' tfinteqdiff extraoutputdata timingstruct'])
          EDinputdatahash = EDinteqinputhash;
         t01 = etime(clock,t00);
-        currenttimingstruct.integralequation = [t01 timingstruct.integralequation(2:5)];
+        timingdata = timingstruct.integralequation(2:5);
+        currenttimingstruct.integralequation = [t01 timingdata];
         timingstruct = currenttimingstruct;
         eval(['save ''',desiredname,'''  tfinteqdiff extraoutputdata recycledresultsfile timingstruct EDsettings EDinputdatahash'])        
     else
@@ -715,27 +562,17 @@ if controlparameters.difforder > 1 && controlparameters.docalctf == 1
         timingstruct.integralequation = [t01 timingdata];
         eval(['save ''',desiredname,''' tfinteqdiff  extraoutputdata timingstruct recycledresultsfile EDsettings EDinputdatahash'])
     end
-    if filehandlingparameters.showtext >= 1 && foundmatch == 1
-        disp(['      Recycled ',recycledresultsfile])
-    end
 
-    if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   EDintegralequation_convex_tf (',int2str(nfrequencies),' frequencies. Diffraction order: ',int2str(controlparameters.difforder),')',lineending],'char');
-        if foundmatch == 1
-            fwrite(fid,['      by recycling ',recycledresultsfile,lineending],'char');  
-            fwrite(fid,['                                Total time: ',num2str(t01),' s',lineending],'char');                      
-        else
-            fwrite(fid,['                                Total time: ',num2str(t01),' s. Parts, for one freq, as below)',lineending],'char');
-            fwrite(fid,['                                Compute the H-matrix: ',num2str(timingdata(1)),' s',lineending],'char');
-            fwrite(fid,['                                Compute Q_firstterm: ',num2str(timingdata(2)),' s',lineending],'char');
-            fwrite(fid,['                                Compute Qfinal: ',num2str(timingdata(3)),' s',lineending],'char');
-            fwrite(fid,['                                Compute the result at the receiver(s): ',num2str(timingdata(4)),' s',lineending],'char');
-        end
-    end
+    EDpostfunctext('EDintegralequation_convex_tf',t01,existingfilename,...
+        filehandlingparameters,fid,'',...
+        ['      ',int2str(nfrequencies),' frequencies. Diffraction order: ',DIF,'.'],...
+        ['      H-matrix: ',num2str(timingdata(1)),' s. Q_firstterm: ',num2str(timingdata(2)),' s (per freq.)'],...
+        ['      Qfinal: ',num2str(timingdata(3)),' s. P at receiver: ',num2str(timingdata(4)),' s.'])    
+    timingstruct.integralequation = timingdata;
+
 else
-    if filehandlingparameters.showtext >= 1	
-        disp(['   Skipping the FD integral equation, since difforder = ',int2str(controlparameters.difforder),' (or docalctf was set to 0)'])
-    end
+    textline1 = ['   EDintegralequation_convex_tf was not run since difforder = ',DIF,' or docalctf was set to 0.'];
+    EDmessage(filehandlingparameters,'sf',fid,1,'',textline1);    
     timingstruct.integralequation = [0 0 0 0 0];
     if Sinputdata.doaddsources == 1 || nsources == 1
         tfinteqdiff = zeros(nfrequencies,nreceivers);
@@ -745,9 +582,6 @@ else
     extraoutputdata = [];
     desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
     eval(['save ''',desiredname,''' tfinteqdiff extraoutputdata timingstruct'])    
-    if filehandlingparameters.savelogfile == 1
-        fwrite(fid,['   The integral equation stage was not run',lineending],'char');
-    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -758,10 +592,7 @@ end
 % **free-field** component (not direct sound!), from the original source
 % to the fieldpoints. 
 
-if filehandlingparameters.showtext >= 1	
-    disp('   Propagating the surface pressure to the fieldpoints = original receivers')
-end
-
+EDmessage(filehandlingparameters,'s',fid,1,'',['Propagating the surface pressure to the fieldpoints = original receivers']);
 t00 = clock;    
 
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat'];

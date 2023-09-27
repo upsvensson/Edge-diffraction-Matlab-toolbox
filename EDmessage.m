@@ -43,12 +43,9 @@ function fid = EDmessage(filehandlingparameters,showprint,fid,showtextlevelneede
 % text can be specified (and transfered as a cell variable).
 
 ntextstrings = nargin - 5;
+
 if ntextstrings > 0
     textstr1 = setstr(varargin{1});
-%     for ii = 1:nargin-2
-%         disp(setstr(varargin{ii}))
-%     end
-%inputtextcell{2}
 end
 
 if ispc == 1
@@ -106,7 +103,7 @@ if writetofile == 1
     if ~isempty(pretext)
         fwrite(fid,[pretext,lineending],'char');
     end
-    fwrite(fid,[textline1,lineending],'char');
+    fwrite(fid,[textstr1,lineending],'char');
     if ~isempty(existingfilename)
         fwrite(fid,['         (Recycled and duplicated ',existingfilename,')',lineending],'char');
     else

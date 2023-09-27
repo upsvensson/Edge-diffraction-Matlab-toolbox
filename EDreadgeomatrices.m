@@ -1,4 +1,4 @@
-function planedata = EDreadgeomatrices(corners,planecorners,planerefltypes)
+function [planedata,elapsedtimegeomatrices] = EDreadgeomatrices(corners,planecorners,planerefltypes)
 % EDreadgeomatrices - Reads the geometrydata (corners and planecorners) from
 % two input matrices, and builds the planedata from these. Rigid surfaces
 % are assumed.
@@ -32,12 +32,13 @@ function planedata = EDreadgeomatrices(corners,planecorners,planerefltypes)
 %                   order given in planecorners for that plane.
 %       cornerinfrontofplane Matrix 
 %       modeltype
+%  elapsedtimegeomatrices
 %
 % Uses the functions EDinfrontofplane
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 13 Aug 2021
+% Peter Svensson (peter.svensson@ntnu.no) 10 Oct 2022
 %
-% planedata = EDreadgeomatrices(corners,planecorners,planerefltypes);
+% [planedata,elapsedtimegeomatrices] = EDreadgeomatrices(corners,planecorners,planerefltypes);
 
 % 29 Nov. 2017 First version
 % 12 Jan. 2018 Increased the bounding boxes a bit - doesn't hurt to make
@@ -50,6 +51,10 @@ function planedata = EDreadgeomatrices(corners,planecorners,planerefltypes)
 % 28 May 2018 Introduced the input parameter planerefltypes
 % 13 Aug 2021 Fixed a bug: error messages used "planenumbers" but it was
 % corrected to "planecorners" in three locations.
+% 10 Oct 2022 Added the timing inside this function and returned as a
+% second output parameter.
+
+t00 = clock;
 
 if nargin < 2
     error('ERROR: the corners and planecorners matrices must be specified')
@@ -384,3 +389,4 @@ planedata = struct('corners',corners,'planecorners',planecorners,...
     'planehasindents',planehasindents,'indentingcorners',indentingcorners,...
     'cornerinfrontofplane',cornerinfrontofplane,'modeltype',modeltype);
 
+elapsedtimegeomatrices = etime(clock,t00);

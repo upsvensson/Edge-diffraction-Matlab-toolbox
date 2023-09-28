@@ -240,7 +240,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create the Sdata struct
 
-EDmessage(filehandlingparameters,'s',fid,1,'',[TTT,'Creating the Sdata struct']);
+EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the Sdata struct']);
 t00 = clock;
 if filehandlingparameters.suppressresultrecycling == 1
     foundmatch = 0;
@@ -274,7 +274,7 @@ EDpostfunctext('EDSorRgeo',t01,existingfilename,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create the Rdata struct
 
-EDmessage(filehandlingparameters,'s',fid,1,'',[TTT,'Creating the Rdata struct']);
+EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the Rdata struct']);
 t00 = clock;
 if filehandlingparameters.suppressresultrecycling == 1
     foundmatch = 0;

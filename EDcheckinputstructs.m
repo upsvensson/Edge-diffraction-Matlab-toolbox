@@ -1,7 +1,7 @@
 function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
-    EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase)
-% EDcheckinputstructs checks the input data structs to the various EDmain
-% versions and sets default values.
+    EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters)
+% EDcheckinputstructs checks the input data structs to EDmain_convex
+% and sets default values.
 % 
 % Input parameters:
 %   geoinputdata     .geoinputfile        (specified, or a file open
@@ -63,15 +63,11 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   .savehodpaths         (default: 0) Used only by
 %                   EDmain_convex_time
 %                   .showtext             (default: 1)
-%   EDmaincase      1, for EDmain_convexESIE (frequency domain)
-%                   2, for EDmain_convexESIEtime (time domain)
-%                   3, for EDmain_convexESIEBEM (frequency domain)
-%                   4, for EDmain_convex_time (time domain)
 % 
-% Peter Svensson 14 March 2021 (peter.svensson@ntnu.no)
+% Peter Svensson 28 Sep. 2023 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
-% EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,EDmaincase);
+% EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
 % 24 Nov. 2017 First version
 % 28 Nov. 2017 Cleaned code a bit
@@ -134,11 +130,12 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % to a matrix of size [nsources, nfrequencies].
 % 14 March 2021 The section "% Check the struct Rinputdata" was moved to
 % before "% Check the struct Sinputdata"
+% 28 Sep. 2023 Adapted to EDmain_convex which does both tf and ir
 
-if nargin < 7
-    disp('ERROR: the input parameter EDmaincase was not specified')
-    return
-end
+% if nargin < 7
+%     disp('ERROR: the input parameter EDmaincase was not specified')
+%     return
+% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check if the needed non-EDtoolbox functions are available.
@@ -262,7 +259,6 @@ if ncolumns ~= 3
    error(['ERROR: check your source coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
 end
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct envdata
 
@@ -283,7 +279,7 @@ if ~isstruct(controlparameters)
      error('ERROR: the struct controlparameters was not specified')           
 end
 
-% First some parameters that are needed for all EDmain_ functions
+% First some general parameters 
 
 if ~isfield(controlparameters,'directsound')
     controlparameters.directsound = 1;
@@ -295,83 +291,60 @@ if ~isfield(controlparameters,'Rstart')
     controlparameters.Rstart = 0;
 end
 if ~isfield(controlparameters,'difforder')
-    if EDmaincase == 4
-        error('ERROR: You must specify .difforder for EDmain_convex_time')
-    elseif EDmaincase == 2
-        controlparameters.difforder = 1000;
-    else
-        controlparameters.difforder = 15;
-    end
+    disp('WARNING: controlparameters.difforder was not specified. It is given the value 15.')
+    controlparameters.difforder = 15;
 end
 
 % Then other parameters 
 
 if ~isfield(controlparameters,'docalctf')
-    if EDmaincase == 1 || EDmaincase == 3
-        controlparameters.docalctf = 1;
-    end
-else
-    if EDmaincase == 2 || EDmaincase == 4
-        controlparameters = rmfield(controlparameters,'docalctf');
-    end    
+    controlparameters.docalctf = 0;
+    disp('WARNING: controlparameters.docalctf was not specified. It is given the value 0.')
 end
-if ~isfield(controlparameters,'frequencies')
-    if (EDmaincase == 1 || EDmaincase == 3) && controlparameters.docalctf == 1
-        error('ERROR: .frequencies were not specified')
-    end
-    nfrequencies = 0;
-else
-    if (EDmaincase == 1 || EDmaincase == 3)
-        nfrequencies = length(controlparameters.frequencies);
-    elseif EDmaincase == 2 || EDmaincase == 4
-        controlparameters = rmfield(controlparameters,'frequencies');
-        nfrequencies = 0;
-    end     
+if ~isfield(controlparameters,'docalcir')
+    controlparameters.docalcir = 0;
+    disp('WARNING: controlparameters.docalcir was not specified. It is given the value 0.')
 end
-if ~isfield(controlparameters,'discretizationtype')
-    if EDmaincase <= 3
+if ~isfield(controlparameters,'docalctf_BEM')
+    controlparameters.docalctf_BEM = 0;
+    disp('WARNING: controlparameters.docalctf_BEM was not specified. It is given the value 0.')
+end
+
+if controlparameters.docalctf == 1 || controlparameters.docalctf_BEM == 1
+    if ~isfield(controlparameters,'frequencies')
+        error('ERROR: controlparameters.frequencies were not specified')
+    end
+    if ~isfield(controlparameters,'ngauss')
+        disp('WARNING! controlparameters.ngauss wasnt set; it is given the default value 16.')
+        controlparameters.ngauss = 16;
+    end
+    if ~isfield(controlparameters,'discretizationtype')
+        disp('WARNING! controlparameters.discretizationtype wasnt set; it is given the default value 2.')
         controlparameters.discretizationtype = 2;
     end
 else
-    if EDmaincase == 4
-        controlparameters = rmfield(controlparameters,'discretizationtype');
-    end    
+    controlparameters.frequencies = [];
+    controlparameters.ngauss = 0;
+    controlparameters.discretizationtype = 0;
 end
-if ~isfield(controlparameters,'ngauss')
-    if EDmaincase <= 3
-        controlparameters.ngauss = 16;
-    end
-else
-    if EDmaincase == 4
-        controlparameters = rmfield(controlparameters,'ngauss');
-    end    
-end
-if ~isfield(controlparameters,'surfacegaussorder')
-    if EDmaincase == 3
+nfrequencies = length(controlparameters.frequencies);
+
+if controlparameters.docalctf_BEM == 1
+    if ~isfield(controlparameters,'surfacegaussorder')
+        disp('WARNING! controlparameters.surfacegaussorder wasnt set; it is given the default value 5.')
         controlparameters.surfacegaussorder = 5;
     end
 else
-    if EDmaincase ~= 3
-        controlparameters = rmfield(controlparameters,'surfacegaussorder');
-    end    
+    controlparameters.surfacegaussorder = 0;
 end
-if ~isfield(controlparameters,'docalcir')
-    if EDmaincase == 2 || EDmaincase == 4
-        controlparameters.docalcir = 1;
-    end
-else
-    if EDmaincase == 1 || EDmaincase == 3
-        controlparameters = rmfield(controlparameters,'docalcir');
-    end    
-end
-if ~isfield(controlparameters,'fs')
-    if EDmaincase == 2 || EDmaincase == 4
+
+if controlparameters.docalcir == 1
+    if ~isfield(controlparameters,'fs')
+        disp('WARNING! controlparameters.fs wasnt set; it is given the default value 44100.')
         controlparameters.fs = 44100;
-    end
+    end   
 else
-    if EDmaincase == 1 || EDmaincase == 3
-        controlparameters = rmfield(controlparameters,'fs');
-    end    
+   controlparameters.fs = 44100;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -395,7 +368,7 @@ if n1 > 1
     if n1 ~= nsources
         error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one row, or one row per source, but it had the size ',int2str(n1),' by ',int2str(n2)])
     else % So, we know that there is one amplitude per source. Check if there is one value per freq.
-        if EDmaincase == 1 || EDmaincase == 3      
+        if controlparameters.docalctf == 1 || controlparameters.docalctf_BEM == 1      
             if n2 == 1
                 Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(:,ones(1,nfrequencies));
             else
@@ -411,7 +384,7 @@ if n1 > 1
     end
 else % Here we know that there is just one row. Check if there is one value per freq. (or a single value)
     if n2 > 1
-        if EDmaincase == 1 || EDmaincase == 3      
+        if controlparameters.docalctf == 1 || controlparameters.docalctf_BEM == 1      
             if n2 ~= nfrequencies
                 error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one column, or one column per frequency, but it had the size ',int2str(n1),' by ',int2str(n2)])
             else % Here we know that n2 == nfrequencies. Expand to number of sources
@@ -421,33 +394,25 @@ else % Here we know that there is just one row. Check if there is one value per 
             error(['ERROR: The Sinputdata.sourceamplitudes input parameter must, for TD calculations, have one column, but it had the size ',int2str(n1),' by ',int2str(n2)])            
         end
     else % Here we know that n1 = 1 and n2 = 1
-        if EDmaincase == 1 || EDmaincase == 3      
+        if controlparameters.docalctf == 1 || controlparameters.docalctf_BEM == 1      
             Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),ones(1,nfrequencies));
         else
             Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1));            
         end
     end
 end
-    
-if ~isfield(controlparameters,'savealldifforders')
-    if EDmaincase == 4      
+
+if controlparameters.docalcir == 1
+    if ~isfield(controlparameters,'savealldifforders')
         controlparameters.savealldifforders = 0;
     end
-else
-    if EDmaincase ~= 4      
-        controlparameters = rmfield(controlparameters,'savealldifforders');
-    end    
-end
-
-if ~isfield(controlparameters,'saveindividualfirstdiff')
-    if EDmaincase == 4      
+    if ~isfield(controlparameters,'saveindividualfirstdiff')
         controlparameters.saveindividualfirstdiff = 0;
     end
 else
-    if EDmaincase ~= 4      
-        controlparameters = rmfield(controlparameters,'saveindividualfirstdiff');
-    end    
-end
+    controlparameters.savealldifforders = 0;
+    controlparameters.saveindividualfirstdiff = 0;
+ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct filehandlingparameters
@@ -510,15 +475,17 @@ end
 if ~isfield(filehandlingparameters,'savepathsfile')
     filehandlingparameters.savepathsfile = 1;
 end
-if EDmaincase > 2
+
+if controlparameters.docalcir == 1
     if ~isfield(filehandlingparameters,'saveISEStree')
         filehandlingparameters.saveISEStree = 0;
     end
-end
-if EDmaincase == 4
     if ~isfield(filehandlingparameters,'savehodpaths')
         filehandlingparameters.savehodpaths = 0;
     end
+else
+    filehandlingparameters.savehodpaths = 0;
+    filehandlingparameters.saveISEStree = 0;
 end
 if ~isfield(filehandlingparameters,'savediff2result')
     filehandlingparameters.savediff2result = 0;

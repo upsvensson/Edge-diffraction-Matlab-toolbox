@@ -2,7 +2,8 @@ function [edgedata,planedata,outpar,existingfilename] = EDedgeo(planedata,EDvers
     firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,inpar)
 % EDedgeo - Calculates some plane- and edge-related geometrical
 % parameters, based on corners and planes in the planedata struct.
-% A version 1 of the function was used up to v 0.221 of EDtoolbox
+% 
+% A version 1 of this function was used up to v 0.221 of EDtoolbox
 % and version 2 after that.
 %
 % Input parameters:
@@ -20,8 +21,8 @@ function [edgedata,planedata,outpar,existingfilename] = EDedgeo(planedata,EDvers
 %   inpar                   This parameter is different for version 1 and
 %                           version 2 of this function. 
 %       v1 inpar should be showtext (optional)
-%                           0 -> no text displayed. > 0 -> text displayed.
-%       v2 of inpar should filehandlingparameters (obligatory)
+%                           0 -> no text displayed. Value > 0 -> text displayed.
+%       v2 of inpar should be filehandlingparameters (obligatory)
 %                           filehandlingparameters is a struct which
 %                           contains the field showtext.
 % 
@@ -104,13 +105,11 @@ function [edgedata,planedata,outpar,existingfilename] = EDedgeo(planedata,EDvers
 %                           version 2 of this function. 
 %       v1 outpar = EDinputdatahash       
 %                           This is a string of characters which is
-%                           uniquely representing the input data planedata, firstcornertoskip, 
-%                           listofcornerstoskip, planeseesplanestrategy.
-%                           Before calling EDedgeo, you can load this hash
-%                           variable from all existing files, and if you
-%                           find a match with the hash generated form your
-%                           calculation settings, you can load the file
-%                           instead of running EDedgeo.
+%                           uniquely representing the input data planedata, 
+%                           firstcornertoskip, listofcornerstoskip, 
+%                           planeseesplanestrategy. An existing result file
+%                           with the same value of this EDinputdatahash
+%                           will be reused.
 %       v2 outpar = elapsedtimeedgeo
 %                           This tells how long time was used inside this
 %                           function. If an existing file was reused, then
@@ -173,24 +172,6 @@ function [edgedata,planedata,outpar,existingfilename] = EDedgeo(planedata,EDvers
 t00 = clock;
 geomacc = 1e-10;
 
-% if nargin < 6
-%     showtext = 0;
-%     if nargin < 5
-%         planeseesplanestrategy = 0;
-%         if nargin < 4
-%             listofcornerstoskip = [];
-%             if nargin < 3
-%                 firstcornertoskip = 1e6;
-%             end
-%         end
-%     end
-% end
-% if isempty(planeseesplanestrategy)
-%     planeseesplanestrategy = 0;
-% end
-% if isempty(firstcornertoskip)
-%     firstcornertoskip = 1e6;
-% end
 if nargin < 6  % Must be the old version
 	functionversion = 1;
 	showtext = 0;
@@ -207,6 +188,7 @@ else % nargin = 6 -> could be the old or new version
 	if isstruct(inpar)
 		functionversion = 2;
 		filehandlingparameters = inpar;
+        showtext = filehandlingparameters.showtext;
 	else
 		functionversion = 1;
 		showtext = inpar;
@@ -255,7 +237,9 @@ elseif functionversion == 2
 		return
 	end
 end
-%---------------------------------------------------------------
+
+%----------------------------------------------------------------
+% No existing file can be used
 
 ncorners = size(planedata.corners,1);
 
@@ -1553,9 +1537,9 @@ planedata.reflfactors = reflfactors;
 
 if functionversion == 2
 	elapsedtimeedgeo = etime(clock,t00);
+    outpar = elapsedtimeedgeo;
 
 	if filehandlingparameters.saveeddatafile == 1
     	eval(['save(''',desiredname,''',''planedata'',''edgedata'',''EDinputdatahash'',''elapsedtimeedgeo'');'])
 	end
 end
-

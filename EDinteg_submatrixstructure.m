@@ -1,6 +1,9 @@
-function [Hsubmatrixdata,EDinputdatahash] = EDinteg_submatrixstructure(edgelengthvec,closwedangvec,...
-    inteq_ngauss,inteq_discretizationtype,edgetoedgedata,planesatedge,EDversionnumber,showtext)
+function [Hsubmatrixdata,outpar,existingfilename] = EDinteg_submatrixstructure(edgelengthvec,closwedangvec,...
+    inteq_ngauss,inteq_discretizationtype,edgetoedgedata,planesatedge,EDversionnumber,inpar)
 % EDinteg_submatrixstructure - Develop the edge-to-edge matrix structure for the ED int.eq.
+% 
+% A version 1 of this function was used up to v 0.221 of EDtoolbox
+% and version 2 after that.
 %
 % Input parameters:
 % 	edgelengthvec       A list [nedge,1] of the lenghts of each edge.
@@ -11,7 +14,13 @@ function [Hsubmatrixdata,EDinputdatahash] = EDinteg_submatrixstructure(edgelengt
 %   edgetoedgedata      struct
 %   planesatedge        A matrix, size [nedges,nplanes] 
 %   EDversionnumber
-%   showtext (optional) 0 -> No text displayed on screen. Default: 0
+%   inpar               This parameter is different for version 1 and
+%                       version 2 of this function. 
+%       v1 inpar should be showtext (optional)
+%                       0 -> no text displayed. Value > 0 -> text displayed.
+%       v2 inpar should be filehandlingparameters (obligatory)
+%                       filehandlingparameters is a struct which
+%                       contains the field showtext.
 %
 % Output parameters:
 %   Hsubmatrixdata      Struct with the fields
@@ -27,17 +36,33 @@ function [Hsubmatrixdata,EDinputdatahash] = EDinteg_submatrixstructure(edgelengt
 %       shortlist
 %       reftoshortlist
 %       isthinplanetriplet
-%   EDinputdatahash
+%   outpar              This parameter is different for version 1 and
+%                       version 2 of this function. 
+%       v1 outpar = EDinputdatahash       
+%                       This is a string of characters which is
+%                       uniquely representing the input data.
+%                       An existing result file with the same value of this
+%                       EDinputdatahash will be reused.
+%       v2 outpar = elapsedtimesubmatrix
+%                       This tells how long time was used inside this
+%                       function. If an existing file was reused, then
+%                       elapsedtimesubmatrix has a second value which tells
+%                       how much time was used for the existing file.
+%   existingfilename    For v2 of this function, if an existing file was
+%                       found that was reused, then the reused file
+%                       name is given here. If no existing file could be 
+%                       reused then this variable is empty. For v1 of
+%                       this function, this variable is also empty.%
 %
-% Uses the function  EDdistelements from EDtoolbox
+% Uses the functions  EDdistelements, EDrecycleresultfiles from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 8 Feb 2018 
+% Peter Svensson (peter.svensson@ntnu.no) 28 Sep. 2023 
 %
-% [Hsubmatrixdata,EDinputdatahash] = ...
-%    EDinteg_submatrixstructureedgelengthvec,closwedangvec,...
-%     inteq_ngauss,inteq_discretizationtype,edgetoedgedata,planesatedge,EDversionnumber,showtext
- 
+% [Hsubmatrixdata,outpar,existingfilename] = EDinteg_submatrixstructure...
+%    (edgelengthvec,closwedangvec,inteq_ngauss,inteq_discretizationtype,...
+%    edgetoedgedata,planesatedge,EDversionnumber,inpar)
+
 % 29-1-2013 Cleaned up quite much and avoided looping through all the
 %           empty combinations. Exported much more data. Introduced
 %           edgepairlist and edgetripletlist
@@ -56,15 +81,61 @@ function [Hsubmatrixdata,EDinputdatahash] = EDinteg_submatrixstructure(edgelengt
 % 15 Dec. 2017 Turned off the code which suppresses symmetrycompressions
 % 25 Jan 2018 Made sure there are at least 2 edge elements per edge.
 % 8 Feb 2018 Introduced the EDinputdatahash
+% 28 Sep. 2023 Implemented version 2 of this function while maintaining
+% compatibility with the old "version 1". v2 moves the check if an existing
+% file can be reused inside this function. Also updated load and save to
+% the function call form, which avoids problems with spaces in file names.
 
-if nargin < 7
-    showtext = 0;
+t00 = clock;
+
+if nargin < 8  % Must be the old version
+	functionversion = 1;
+	showtext = 0;
+else % nargin = 8 -> could be the old or new version
+	if isstruct(inpar)
+		functionversion = 2;
+		filehandlingparameters = inpar;
+        showtext = filehandlingparameters.showtext;
+	else
+		functionversion = 1;
+		showtext = inpar;
+	end
 end
 
 EDinputdatastruct = struct('edgelengthvec',edgelengthvec,'closwedangvec',closwedangvec,...
     'inteq_ngauss',inteq_ngauss,'inteq_discretizationtype',inteq_discretizationtype,...
     'edgetoedgedata',edgetoedgedata,'planesatedge',planesatedge,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
+
+if functionversion == 1
+	outpar = EDinputdatahash;
+	existingfilename = '';
+elseif functionversion == 2
+
+    %---------------------------------------------------------------
+    % Sort out the file business: can an existing file be used?
+    % Then copy the existing file to a new copy. Should the data be saved in a file? 
+    
+    if filehandlingparameters.suppressresultrecycling == 1
+        foundmatch = 0;
+        existingfilename = '';
+    else
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_submatrixdata',EDinputdatahash);
+    end
+    
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
+    
+    if foundmatch == 1
+        eval(['load(''',existingfilename,''')'])
+        if ~strcmp(existingfilename,desiredname)
+            copyfile(existingfilename,desiredname);
+        end
+        elapsedtimesubmatrix_new = etime(clock,t00);
+        elapsedtimesubmatrix = [elapsedtimesubmatrix_new elapsedtimesubmatrix];
+        outpar = elapsedtimesubmatrix;
+        return
+    end
+end
 
 % ----------------------------------------------------------------------------------------------
 % Create the two-index list for the edge-source column matrix.
@@ -325,6 +396,16 @@ Hsubmatrixdata.isthinplanetriplet = isthinplanetriplet;
 Hsubmatrixdata.isthinplaneedgepair = isthinplaneedgepair;
 Hsubmatrixdata.quadraturematrix_pos = quadraturematrix_pos;
 Hsubmatrixdata.quadraturematrix_weights = quadraturematrix_weights;
+
+if functionversion == 2
+    elapsedtimesubmatrix = etime(clock,t00);
+    outpar = elapsedtimesubmatrix;
+    
+    if filehandlingparameters.savesubmatrixdata == 1
+    	eval(['save(''',desiredname,''',''Hsubmatrixdata'',''EDinputdatahash'',''elapsedtimesubmatrix'');'])
+    end
+end
+
 
 
 

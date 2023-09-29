@@ -1,15 +1,18 @@
-function [planedata,extraCATTdata] = EDreadcad(CADfile,checkgeom)
+function [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(CADfile,checkgeom,filehandlingparameters)
 % EDreadcad - Reads a file of type .CAD (made by e.g. CATT-Acoustic) and returns all the geometry data 
 %  + extra geometrical data based on planes, in two structs.
 % CAD-files v6,v7,v8 are read.
+% 
+% A version 1 of this function was used up to v 0.221 of EDtoolbox
+% and version 2 after that.
 %
 % Input parameters:
-%  CADfile     	(optional) The input file, with or without the .CAD extension.
-%					If this file is not specified, a file opening window will appear.
-%  checkgeom		(optional) If this parameter is given the value 'check', then a few checks
+%  CADfile     	    The input file, with or without the .CAD extension.
+%					If the specification is empty, a file opening window will appear.
+%  checkgeom		If this parameter is given the value 'check', then a few checks
 %                   of the geometry consistency will be done: a check for duplicate corners
 %                   for redundant corners and for corners that are connected to only one plane.
-%					Only warnings are given. As default, no check is done.
+%  filehandlingparameters 
 %
 % Output parameters:
 %	planedata       Structwith fields:
@@ -60,12 +63,14 @@ function [planedata,extraCATTdata] = EDreadcad(CADfile,checkgeom)
 %                   in the outputfile, the corners will effectively be renumbered from 1 to ncorners
 %                   in the order they appeared in the CAD-file. 
 %           planenames      Matrix [nplanes,nmaxcharacters1] (sparse), with the planenames in the CAD file.
+%   elapsedtimecadgeo       This tells how long time was used inside this
+%                           function. 
 %
 % Uses the functions EDextrnums EDinfrontofplane
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 22 Jan. 2018
+% Peter Svensson (peter.svensson@ntnu.no) 28 Sep. 2023
 %
-% [planedata,extraCATTdata] = EDreadcad(CADfile,checkgeom);
+% [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(CADfile,checkgeom,filehandlingparameters)
 
 % 18 July 2009 Last previous fix
 % 29 Oct. 2014 Fixed a bug for planes with indents, which gave the message
@@ -83,18 +88,34 @@ function [planedata,extraCATTdata] = EDreadcad(CADfile,checkgeom)
 % them a bit bigger.
 % 22 Jan 2018 Retired the input parameter planecornerstype since it is
 % actually not used anywhere.
+% 28 Sep. 2023 Implemented version 2 of this function while maintaining
+% compatibility with the old "version 1". v2 moves the check if an existing
+% file can be reused inside this function. Also updated load and save to
+% the function call form, which avoids problems with spaces in file names.
 
-if nargin == 0
-	CADfile = '';
-	checkgeom = '';
-elseif nargin == 1
-	checkgeom = '';
+
+t00 = clock;
+
+if nargin < 3 % Must be the old version
+    functionversion = 1;
+    if nargin == 0
+	    CADfile = '';
+	    checkgeom = '';
+    elseif nargin == 1
+	    checkgeom = '';
+    end
+else % nargin = 3 -> Must be the new version
+    functionversion = 2;
 end
 
 % geomacc is only used to make the bounding boxes a bit bigger than the
 % corner coordinates. Was 1e-10 earlier.
 
 geomacc = 1e-4;
+
+if functionversion == 2
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
+end
 
 %---------------------------------------------------------------
 % If no CAD-file was specified, present a file opening window
@@ -112,7 +133,6 @@ else
     [filepath,filestem,fileext] = fileparts(CADfile);
     CADfile = [[filepath,filesep],filestem,fileext];
 end
-
 
 if exist(CADfile) ~= 2
 	error(['ERROR: CAD-file: ',CADfile,' can not be found'])
@@ -795,3 +815,10 @@ planedata = struct('corners',corners,'planecorners',planecorners,...
     'planehasindents',planehasindents,'indentingcorners',indentingcorners,...
     'cornerinfrontofplane',cornerinfrontofplane,'modeltype',modeltype);
 
+if functionversion == 2
+    elapsedtimecadgeo = etime(clock,t00);
+
+    if filehandlingparameters.savecadgeofile == 1
+    	eval(['save(''',desiredname,''',''planedata'',''extraCATTdata'',''elapsedtimecadgeo'');'])
+    end
+end

@@ -1,10 +1,12 @@
-function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoords,...
-    typeofcoords,EDversionnumber,nedgesubs,showtext)
+function [outputstruct,outpar,existingfilename] = EDSorRgeo(planedata,edgedata,pointcoords,...
+    typeofcoords,EDversionnumber,nedgesubs,inpar)
 % EDSorRgeo - Calculates some source- or receiver-related geometrical parameters.
 % Calculates some source- or receiver-related geometrical parameters,
-% based on corners,edges and planes in an eddata-file,
-% and on a list of source/receiver coordinates.
-% The output is saved in a .mat-file.
+% based on corners,edges and planes in an eddata-file, and on a list of
+% source/receiver coordinates. The output is saved in a .mat-file.
+% 
+% A version 1 of this function was used up to v 0.221 of EDtoolbox
+% and version 2 after that.
 %
 % Input parameters:
 %   planedata               struct
@@ -17,7 +19,14 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 %	nedgesubs (optional)	The number of subdivisions that each edge will be
 %							subdivided into for visibility/obstruction tests. Default: 2
 %							NB! When nedgesubs = 2, the two end points will be checked.
-%   showtext (optional)     0 -> no text displayed
+%   inpar                   This parameter is different for version 1 and
+%                           version 2 of this function. 
+%       v1 inpar should be showtext (optional)
+%                           0 -> no text displayed. Value > 0 -> text displayed.
+%       v2 of inpar should be filehandlingparameters (obligatory)
+%                           filehandlingparameters is a struct which
+%                           contains the field showtext.
+%
 % Output parameters:
 %   outputstruct            struct with fields
 %       sources/receivers                       (renamed) copy of the input parameter 'pointcoords'
@@ -44,24 +53,36 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 %                                           values of radius for sources/receivers relative to the the edges.
 %       thetaSsho/thetaRsho
 %       zSsho/zRsho
-%   EDinputdatahash      This is a string of characters which is
-%                           uniquely representing the input data planedata, edgedata, 
-%                           pointcoords, nedgesubs.
-%                           Before calling EDSorRgeo, you can load this hash
-%                           variable from all existing files, and if you
-%                           find a match with the hash generated from your
-%                           calculation settings, you can load the file
-%                           instead of running EDSorRgeo.
+%   outpar              This parameter is different for version 1 and
+%                           version 2 of this function. 
+%       v1 outpar = EDinputdatahash       
+%                           This is a string of characters which is
+%                           uniquely representing the input data planedata, 
+%                           edgedata, pointcoords, nedgesubs.
+%                           An existing result file with the same value of
+%                           this EDinputdatahash will be reused.
+%       v2 outpar = elapsedtimeSgeo
+%                           This tells how long time was used inside this
+%                           function. If an existing file was reused, then
+%                           elapsedtimeSgeo has a second value which tells
+%                           how much time was used for the existing file.
+%   existingfilename        For v2 of this function, if an existing file was
+%                           found that was reused, then the reused file
+%                           name is given here. If no existing file could be 
+%                           reused then this variable is empty. For v1 of
+%                           this function, this variable is also empty.
 %
 % NB! The text on the screeen, and in the code refers to 'R' or 'receivers' but it should be S or R.
 %
 % Uses the functions 	EDinfrontofplane, EDpoinpla, EDcompress3
-% EDcoordtrans1 EDgetedgepoints, EDcheckobstr_pointtoedge from EDtoolbox
+% EDcoordtrans1 EDgetedgepoints, EDcheckobstr_pointtoedge, EDrecycleresultfiles
+% from EDtoolbox.
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 March 2021
+% Peter Svensson (peter.svensson@ntnu.no) 28 Sep. 2023
 %
-% [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,EDversionnumber,nedgesubs,showtext);
+% [outputstruct,outpar,existingfilename] = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,...
+% EDversionnumber,nedgesubs,inpar);
 
 %  1 June 2006 Functioning version
 %  2 Dec 2014  Introduced new output parameters in the file: reftoshortlistR,rRsho,thetaRsho,zRsho
@@ -86,19 +107,42 @@ function [outputstruct,EDinputdatahash] = EDSorRgeo(planedata,edgedata,pointcoor
 % 20 Jan 2021 The obstruction test is skipped altogether when a convex
 % model is used.
 % 14 Mar 2021 Update to change of EDpoinpla
+% 28 Sep 2023 Implemented version 2 of this function while maintaining
+% compatibility with the old "version 1". v2 moves the check if an existing
+% file can be reused inside this function. Also updated load and save to
+% the function call form, which avoids problems with spaces in file names.
 
+t00 = clock;
 geomacc = 1e-9;
 
-if nargin < 7
-    showtext = 0;
-    if nargin < 6
-        nedgesubs = 2;
+% if nargin < 7
+%     showtext = 0;
+%     if nargin < 6
+%         nedgesubs = 2;
+%     end
+% end
+% if isempty(nedgesubs)
+%     nedgesubs = 2; 
+% end
+if nargin < 7  % Must be the old version
+	functionversion = 1;
+	showtext = 0;
+	if nargin < 6
+		nedgesubs = 2;
     end
+else % nargin = 7 -> could be the old or new version
+	if isstruct(inpar)
+		functionversion = 2;
+		filehandlingparameters = inpar;
+        showtext = filehandlingparameters.showtext;
+	else
+		functionversion = 1;
+		showtext = inpar;
+	end
 end
 if isempty(nedgesubs)
-    nedgesubs = 2; 
+     nedgesubs = 2; 
 end
-
 typeofcoords = lower(typeofcoords(1));
 if typeofcoords~='r' && typeofcoords~='s'
     error('ERROR: The input parameter typeofcoords must have the value S or R')    
@@ -107,6 +151,53 @@ end
 EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata, 'pointcoords',pointcoords,...
     'nedgesubs',nedgesubs,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
+
+%---------------------------------------------------------------
+
+if functionversion == 1
+	outpar = EDinputdatahash;
+	existingfilename = '';
+elseif functionversion == 2
+    %---------------------------------------------------------------
+    % Sort out the file business: can an existing file be used?
+    % Should the data be saved in a file? 
+    
+    if filehandlingparameters.suppressresultrecycling == 1
+        foundmatch = 0;
+        existingfilename = '';
+    else
+        if typeofcoords == 's'
+            [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_Sdata',EDinputdatahash);
+        else
+            [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_Rdata',EDinputdatahash);
+        end    
+    end
+    
+    if typeofcoords == 's'
+        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Sdata.mat'];
+    else
+        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Rdata.mat'];
+    end
+    
+    if foundmatch == 1
+        eval(['load(''',existingfilename,''')'])
+        if ~strcmp(existingfilename,desiredname)
+            copyfile(existingfilename,desiredname);
+        end
+        if typeofcoords == 's'
+            outputstruct = Sdata;
+            elapsedtimeSgeo_new = etime(clock,t00);
+            elapsedtimeSRgeo = [elapsedtimeSgeo_new elapsedtimeSgeo];
+        else
+            outputstruct = Rdata;
+            elapsedtimeRgeo_new = etime(clock,t00);
+            elapsedtimeSRgeo = [elapsedtimeRgeo_new elapsedtimeRgeo];
+        end
+        outpar = elapsedtimeSRgeo;
+        return
+    end
+    
+end
 
 %---------------------------------------------------------------
 
@@ -1026,6 +1117,16 @@ if typeofcoords=='r'
         'zRsho',zRsho);
 
     outputstruct = Rdata;
+
+    if functionversion == 2
+        elapsedtimeRgeo = etime(clock,t00);
+        elapsedtimeSRgeo = elapsedtimeRgeo;
+        outpar = elapsedtimeSRgeo;
+    
+        if filehandlingparameters.saveSRdatafiles == 1
+        	eval(['save(''',desiredname,''',''Rdata'',''EDinputdatahash'',''elapsedtimeRgeo'');'])
+        end   
+    end
     
 else
     sources = pointcoords;
@@ -1045,5 +1146,15 @@ else
         'reftoshortlistS',reftoshortlistS,'rSsho',rSsho,'thetaSsho',thetaSsho,...
         'zSsho',zSsho);
     outputstruct = Sdata;
+
+    if functionversion == 2
+        elapsedtimeSgeo = etime(clock,t00);
+        elapsedtimeSRgeo = elapsedtimeSgeo;
+        outpar = elapsedtimeSRgeo;
+    
+        if filehandlingparameters.saveSRdatafiles == 1
+        	eval(['save(''',desiredname,''',''Sdata'',''EDinputdatahash'',''elapsedtimeSgeo'');'])
+        end   
+    end
     
 end

@@ -1,8 +1,12 @@
-function [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequation_convex_tf(filehandlingparameters,...
-    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,doaddsources,sourceamplitudes,...
-        doallSRcombinations,Rdata,controlparameters,EDversionnumber)
+function [P_receiver,timingdata,extraoutputdata,outpar,existingfilename] = ...
+    EDintegralequation_convex_tf(filehandlingparameters,envdata,planedata,...
+    edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,doaddsources,sourceamplitudes,...
+    doallSRcombinations,Rdata,controlparameters,EDversionnumber)
 % EDintegralequation_convex_tf calculates the sound pressure representing second-
 % and higher-order diffraction, for a convex scattering object
+% 
+% A version 1 of this function was used up to v 0.221 of EDtoolbox
+% and version 2 after that.
 %
 % Input parameters:
 %   filehandlingparameters, envdata, planedata,edgedata,edgetoedgedata,...
@@ -24,17 +28,34 @@ function [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequ
 %                       [nfrequencies,nreceivers,nsources]
 %   timingdata
 %   extraoutputdata
-%   EDinputdatahash
+%   outpar              This parameter is different for version 1 and
+%                       version 2 of this function. 
+%       v1 outpar = EDinputdatahash       
+%                       This is a string of characters which is
+%                       uniquely representing the input data.
+%                       An existing result file with the same value of this
+%                       EDinputdatahash will be reused.
+%       v2 outpar = elapsedtimehodtf
+%                       This tells how long time was used inside this
+%                       function. If an existing file was reused, then
+%                       elapsedtimehodtf has a second value which tells
+%                       how much time was used for the existing file.
+%   existingfilename    For v2 of this function, if an existing file was
+%                       found that was reused, then the reused file
+%                       name is given here. If no existing file could be 
+%                       reused then this variable is empty. For v1 of
+%                       this function, this variable is also empty.
 %
-% Uses functions EDdistelements, EDcalcedgeinteqmatrixsub2_mex, EDinteg_souterm, EDcalcpropagatematrix
-% EDcoordtrans1 from EDtoolbox
+% Uses functions EDdistelements, EDcalcedgeinteqmatrixsub2_mex, EDinteg_souterm, 
+% EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1 from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  3 June 2020  
+% Peter Svensson (peter.svensson@ntnu.no)  28 Sep. 2023  
 %                       
-% [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequation_convex_tf(filehandlingparameters,...
-%    envdata,planedata,edgedata,edgetoedgedata,Hsubmatrix,Sdata,doaddsources,sourceamplitudes,...
-%    Rdata,controlparameters,EDversionnumber)
+% [P_receiver,timingdata,extraoutputdata,outpar,existingfilename] = ...
+%     EDintegralequation_convex_tf(filehandlingparameters,envdata,planedata,...
+%     edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,doaddsources,sourceamplitudes,...
+%     doallSRcombinations,Rdata,controlparameters,EDversionnumber)
 
 % 31 March 2015 Introduced detailed timing, also as output parameter.
 % 8 April 2015 Substantial speeding up by saving Hsubdata instead of Hsub
@@ -81,8 +102,19 @@ function [P_receiver,timingdata,extraoutputdata,EDinputdatahash] = EDintegralequ
 % 13 Apr 2018 Fixed a small bug on l143: thinplaneboostvec got the format
 % uint8 but needs to be double. Found by Antoine.
 % 3 June 2020 Fixed a bug: folder names with spaces can be handled now
+% 28 Sep. 2023 Implemented version 2 of this function while maintaining
+% compatibility with the old "version 1". v2 moves the check if an existing
+% file can be reused inside this function. Also updated load and save to
+% the function call form, which avoids problems with spaces in file names.
 
+t00 = clock;
 showtext = filehandlingparameters.showtext;
+
+if nargout == 4
+    functionversion = 1;
+else
+    functionversion = 2;
+end
 
 EDinputdatastruct = struct('envdata',envdata,...
     'planedata',planedata,'edgedata',edgedata,'edgetoedgedata',edgetoedgedata,...
@@ -90,6 +122,39 @@ EDinputdatastruct = struct('envdata',envdata,...
     'sourceamplitudes',sourceamplitudes,'doallSRcombinations',doallSRcombinations,...
     'Rdata',Rdata,'controlparameters',controlparameters,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
+
+if functionversion == 1
+	outpar = EDinputdatahash;
+	existingfilename = '';
+elseif functionversion == 2
+    %---------------------------------------------------------------
+    % Sort out the file business: can an existing file be used?
+    % Then copy the existing file to a new copy. 
+    
+    if filehandlingparameters.suppressresultrecycling == 1
+        foundmatch = 0;
+        existingfilename = '';
+    else
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_tfinteq',EDinputdatahash);
+    end
+    
+    EDinputdatahash_tfinteq = EDinputdatahash;
+    
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
+    
+    if foundmatch == 1
+        eval(['load(''',existingfilename,''')'])
+        if ~strcmp(existingfilename,desiredname)
+            copyfile(existingfilename,desiredname);
+        end
+        elapsedtimehodtf_new = etime(clock,t00);
+        elapsedtimehodtf = [elapsedtimehodtf_new elapsedtimehodtf];
+        P_receiver = tfinteqdiff;
+        timingdata = zeros(1,4);
+        outpar = elapsedtimehodtf;
+        return
+    end
+end
 
 extraoutputdata = struct('tfinteqdiff_nodiff2',[]);
 
@@ -745,6 +810,15 @@ for ifreq = 1:nfrequencies
     end
 end
 
+if functionversion == 2
+    elapsedtimehodtf = etime(clock,t00);
+    outpar = elapsedtimehodtf;
+    tfinteqdiff = P_receiver;
+
+    EDinputdatahash = EDinputdatahash_tfinteq;
+
+    eval(['save(''',desiredname,''',''tfinteqdiff'',''extraoutputdata'',''EDinputdatahash'',''elapsedtimehodtf'');'])
+end
 
 
     

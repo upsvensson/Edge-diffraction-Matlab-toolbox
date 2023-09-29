@@ -1,9 +1,12 @@
-function [edgetoedgedata,EDinputdatahash] = EDed2geo(edgedata,planedata,Sdata,...
-    Rdata,specorder,difforder,EDversionnumber,nedgesubs,ndiff2batches,showtext)
+function [edgetoedgedata,outpar,existingfilename] = EDed2geo(edgedata,planedata,Sdata,...
+    Rdata,specorder,difforder,EDversionnumber,nedgesubs,ndiff2batches,inpar)
 % EDed2geo - Calculates 2nd- and higher-order edge-related geom. parameters.
 % EDed2geo calculates some plane- and edge-related geometrical parameters,
-% based on corners and planes from a EDreadcad,
-% but only data that is independent of the source and receiver.
+% based on corners and planes from a EDreadcad, but only data that is 
+% independent of the source and receiver.
+% 
+% A version 1 of this function was used up to v 0.221 of EDtoolbox
+% and version 2 after that.
 %
 % Input parameters:
 %	edgedata
@@ -17,7 +20,13 @@ function [edgetoedgedata,EDinputdatahash] = EDed2geo(edgedata,planedata,Sdata,..
 %   EDversionnumber
 %   nedgesubs (optional)            Default: 2
 %   ndiff2batches (optional)        Default: 1
-%   showtext (optional)     0 -> no text displayed. Default: 0
+%   inpar                   This parameter is different for version 1 and
+%                           version 2 of this function. 
+%       v1 of inpar should be showtext (optional)
+%                           0 -> no text displayed. Value > 0 -> text displayed.
+%       v2 of inpar should be filehandlingparameters (obligatory)
+%                           filehandlingparameters is a struct which
+%                           contains the field showtext.
 % 
 % Output parameters:
 %   edgetoedgedata          struct with fields:
@@ -57,16 +66,32 @@ function [edgetoedgedata,EDinputdatahash] = EDed2geo(edgedata,planedata,Sdata,..
 %       thetae1sho, thetae2sho
 %       ze1sho, ze2sho
 %       examplecombE	
-%   EDinputdatahash
+%   outpar                  This parameter is different for version 1 and
+%                           version 2 of this function. 
+%       v1 outpar = EDinputdatahash       
+%                           This is a string of characters which is
+%                           uniquely representing the input data.
+%                           An existing result file with the same value of
+%                           this EDinputdatahash will be reused.
+%       v2 outpar = elapsedtimeed2geo
+%                           This tells how long time was used inside this
+%                           function. If an existing file was reused, then
+%                           elapsedtimeedgeo has a second value which tells
+%                           how much time was used for the existing file.
+%   existingfilename        For v2 of this function, if an existing file was
+%                           found that was reused, then the reused file
+%                           name is given here. If no existing file could be 
+%                           reused then this variable is empty. For v1 of
+%                           this function, this variable is also empty.
 %
-% Uses the functions EDcoordtrans2, EDinfrontofplane, EDcompress7,
+% Uses the functions EDcoordtrans2, EDinfrontofplane, EDcompress7,EDrecycleresultfiles
 %                    EDcheckobstr_edgetoedge EDgetedgepoints in EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 8 Feb 2018
+% Peter Svensson (peter.svensson@ntnu.no) 28 Sep. 2023
 %
-% [edgetoedgedata,EDinputdatahash] = EDed2geo(edgedata,planedata,Sdata,Rdata,...
-% specorder,difforder,EDversionnumber,nedgesubs,ndiff2batches,showtext);
+% [edgetoedgedata,outpar,existingfilename] = EDed2geo(edgedata,planedata,Sdata,...
+%    Rdata,specorder,difforder,EDversionnumber,nedgesubs,ndiff2batches,inpar)
 
 % 27.5.2011  Stable version
 % 13.3.2013  Fixed a problem with thin folded planes. Two edges with the
@@ -91,14 +116,36 @@ function [edgetoedgedata,EDinputdatahash] = EDed2geo(edgedata,planedata,Sdata,..
 % 15 Jan. 2018 Little modification; edge-to-edge obstruction test was
 % active before, for a single plate.
 % 8 Feb 2018 Introduced the EDinputdatahash
+% 28 Sep. 2023 Implemented version 2 of this function while maintaining
+% compatibility with the old "version 1". v2 moves the check if an existing
+% file can be reused inside this function. Also updated load and save to
+% the function call form, which avoids problems with spaces in file names.
 
-if nargin < 10
-    showtext = 0;
+t00 = clock;
+
+if nargin < 10  % Must be the old version
+	functionversion = 1;
+	showtext = 0;
     if nargin < 9
         ndiff2batches = 1;
         if nargin < 8
             nedgesubs = 2;
         end
+    end
+else % nargin = 10 -> could be the old or new version
+	if isstruct(inpar)
+		functionversion = 2;
+		filehandlingparameters = inpar;
+        showtext = filehandlingparameters.showtext;
+	else
+		functionversion = 1;
+		showtext = inpar;
+	end
+    if isempty(ndiff2batches)
+        ndiff2batches = 1;
+    end
+    if isempty(nedgesubs)
+        nedgesubs = 2;
     end
 end
 
@@ -108,6 +155,35 @@ EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata,...
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 % geomacc = 1e-10;
+
+if functionversion == 1
+	outpar = EDinputdatahash;
+	existingfilename = '';
+elseif functionversion == 2
+    %---------------------------------------------------------------
+    % Sort out the file business: can an existing file be used?
+    % Then copy the existing file to a new copy. Should the data be saved in a file? 
+    
+    if filehandlingparameters.suppressresultrecycling == 1
+        foundmatch = 0;
+        existingfilename = '';
+    else
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_ed2data',EDinputdatahash);
+    end
+    
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_ed2data.mat'];
+    
+    if foundmatch == 1
+        eval(['load(''',existingfilename,''')'])
+        if ~strcmp(existingfilename,desiredname)
+            copyfile(existingfilename,desiredname);
+        end
+        elapsedtimeed2geo_new = etime(clock,t00);
+        elapsedtimeed2geo = [elapsedtimeed2geo_new elapsedtimeed2geo];
+        outpar = elapsedtimeed2geo;
+        return
+    end
+end
 
 edgestartcoordsnudge =   edgedata.edgestartcoordsnudge;
 edgeendcoordsnudge =    edgedata.edgeendcoordsnudge;
@@ -1436,4 +1512,15 @@ edgetoedgedata = struct('reftoshortlistE',reftoshortlistE,'re1sho',re1sho,...
     'edgeseespartialedge',edgeseespartialedge,'edgealignedwithedge',edgealignedwithedge,...
     'edgeperptoplane',edgeperptoplane,'edgeplaneperptoplane1',edgeplaneperptoplane1,...
     'edgeplaneperptoplane2',edgeplaneperptoplane2);
+
+if functionversion == 2
+	elapsedtimeed2geo = etime(clock,t00);
+    outpar = elapsedtimeed2geo;
+
+	if filehandlingparameters.saveeddatafile == 1
+    	eval(['save(''',desiredname,''',''planedata'',''edgedata'',''edgetoedgedata'',''EDinputdatahash'',''elapsedtimeed2geo'');'])
+	end
+end
+
+
 

@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 27 Sep. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 29 Sep. 2023
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -255,6 +255,14 @@ versionnumbers{icounter} = '0.221';
 versiondate{icounter} = '27 Sep. 2023';
 versiontext{icounter} = ['Introduced the functions EDmessage.m '...
     'and EDpostfunctext.m to mae the main functions more readable.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.300';
+versiondate{icounter} = '29 Sep. 2023';
+versiontext{icounter} = ['Made a single EDmain_convex '...
+    'and modified many functions to "version 2" which makes the '...
+    'main function much more readable. The IR calc has not yet been '...
+    'implemented in the EDmain_convex.'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

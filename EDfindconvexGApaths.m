@@ -1,8 +1,11 @@
-function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,edgedata,...
+function [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(planedata,edgedata,...
     sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,...
-    vispartedgesfromR,difforder,directsound,doallSRcombinations,EDversionnumber,showtext)
+    vispartedgesfromR,difforder,directsound,doallSRcombinations,EDversionnumber,inpar)
 % EDfindconvexGApaths - Finds all the first-order specular and (possibly)
 % first-order diffraction paths for a convex object.
+% 
+% A version 1 of this function was used up to v 0.221 of EDtoolbox
+% and version 2 after that.
 %
 % Input parameters:
 %   planedata, edgedata,edgetoedgedata   structs
@@ -14,7 +17,13 @@ function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,ed
 %   directsound
 %   doallSRcombinations
 %   EDversionnumber
-%   showtext                (optional) Default: 0
+%   inpar                   This parameter is different for version 1 and
+%                           version 2 of this function. 
+%       v1 inpar should be showtext (optional)
+%                           0 -> no text displayed. > 0 -> text displayed.
+%       v2 of inpar should be filehandlingparameters (obligatory)
+%                           filehandlingparameters is a struct which
+%                           contains the field showtext.
 %
 % Output parameters:
 %   firstorderpathdata      struct with the fields:
@@ -32,25 +41,35 @@ function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,ed
 %                           the receiver number.
 %   .ncomponents            vector, [1,3], with the number of components
 %                           for the direct sound, specular reflections, diffraction.
-%   EDinputdatahash         This is a string of characters which is
+%   outpar                  This parameter is different for version 1 and
+%                           version 2 of this function. 
+%       v1 outpar = EDinputdatahash       
+%                           This is a string of characters which is
 %                           uniquely representing the input data planedata, edgedata, 
 %                           sources,visplanesfroms,vispartedgesfroms,
 %                           receivers,visplanesfromr,vispartedgesfromr,
 %                           difforder,directsound,doallSRcombinations.
-%                           Before calling EDfindconvexGApaths, you can load this hash
-%                           variable from all existing files, and if you
-%                           find a match with the hash generated from your
-%                           calculation settings, you can load the file
-%                           instead of running EDfindconvexGApaths.
+%                           An existing result file with the same value of 
+%                           this EDinputdatahash will be reused.
+%       v2 outpar = elapsedtimefindpaths
+%                           This tells how long time was used inside this
+%                           function. If an existing file was reused, then
+%                           elapsedtimefindpaths has a second value which tells
+%                           how much time was used for the existing file.
+%   existingfilename        For v2 of this function, if an existing file was
+%                           found that was reused, then the reused file
+%                           name is given here. If no existing file could be 
+%                           reused then this variable is empty. For v1 of
+%                           this function, this variable is also empty.
 %
-% Uses functions  EDfindis EDchkISvisible from EDtoolbox
+% Uses functions  EDfindis EDchkISvisible EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 October 2022
+% Peter Svensson (peter.svensson@ntnu.no) 28 September 2023
 %
-% [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
+% [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,...
-% difforder,directsound,doallSRcombinations,EDversionnumber,showtext)
+% difforder,directsound,doallSRcombinations,EDversionnumber,inpar)
 
 % 27 Dec. 2017 First start
 % 28 Dec. 2017 Functioning version for diff
@@ -84,9 +103,29 @@ function [firstorderpathdata,EDinputdatahash] = EDfindconvexGApaths(planedata,ed
 % slipping through in special cases. 
 % 28 Oct. 2022 Fixed a bug: the directsound visibility was not done
 % correctly when "doaddsources = 0".
+% 28 Sep. 2023 Implemented version 2 of this function while maintaining
+% compatibility with the old "version 1". v2 moves the check if an existing
+% file can be reused inside this function. Also updated load and save to
+% the function call form, which avoids problems with spaces in file names.
 
-if nargin < 13
-   showtext = 0; 
+t00 = clock;
+
+% if nargin < 13
+%    showtext = 0; 
+% end
+
+if nargin < 13  % Must be the old version
+	functionversion = 1;
+	showtext = 0;
+else % nargin = 13 -> could be the old or new version
+	if isstruct(inpar)
+		functionversion = 2;
+		filehandlingparameters = inpar;
+        showtext = filehandlingparameters.showtext;
+	else
+		functionversion = 1;
+		showtext = inpar;
+	end
 end
 
 EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata,...
@@ -96,6 +135,37 @@ EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata,...
     'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
+if functionversion == 1
+	outpar = EDinputdatahash;
+	existingfilename = '';
+elseif functionversion == 2
+    %---------------------------------------------------------------
+    % Sort out the file business: can an existing file be used?
+    % Then copy the existing file to a new copy. Should the data be saved in a file? 
+    
+    if filehandlingparameters.suppressresultrecycling == 1
+        foundmatch = 0;
+        existingfilename = '';
+    else
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_paths',EDinputdatahash);
+    end
+    
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
+    
+    if foundmatch == 1
+%        eval(['load ''',existingfilename,''''])
+        eval(['load(''',existingfilename,''')'])
+        if ~strcmp(existingfilename,desiredname)
+            copyfile(existingfilename,desiredname);
+        end
+        elapsedtimefindpaths_new = etime(clock,t00);
+        elapsedtimefindpaths = [elapsedtimefindpaths_new elapsedtimefindpaths];
+        outpar = elapsedtimefindpaths;
+        return
+    end
+end
+
+%-----------------------------------------------------------------
 % planedata.corners = size(planedata.corners,1);
 nplanes = length(planedata.planeisthin);
 nedges = length(edgedata.closwedangvec);
@@ -367,3 +437,13 @@ firstorderpathdata.diffpaths        = diffpaths;
 firstorderpathdata.edgeisactive     = edgeisactive;
 firstorderpathdata.directsoundlist  = [Snumber_directsoundOK(:) Rnumber_directsoundOK(:) dirsoundamp(:)];
 firstorderpathdata.ncomponents      = numberofcomponents;
+
+if functionversion == 2
+	elapsedtimefindpaths = etime(clock,t00);
+    outpar = elapsedtimefindpaths;
+
+	if filehandlingparameters.savepathsfile == 1
+    	eval(['save(''',desiredname,''',''firstorderpathdata'',''EDinputdatahash'',''elapsedtimefindpaths'');'])
+	end
+end
+

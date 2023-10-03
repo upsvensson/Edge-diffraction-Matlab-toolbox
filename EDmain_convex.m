@@ -303,16 +303,7 @@ if controlparameters.docalctf_ESIEBEM == 1
     controlparameters.directsound = 1;
     t01 = etime(clock,t00);
     timingstruct.surfrecs = t01;
-    
-%     EDsettings = cell(7,1);
-%     EDsettings{1} = geoinputdata;
-%     EDsettings{2} = Sinputdata;
-%     EDsettings{3} = Rinputdata;
-%     EDsettings{4} = envdata;
-%     EDsettings{5} = controlparameters;
-%     EDsettings{6} = filehandlingparameters;
-%     EDsettings{7} = EDversionnumber;
-    
+        
     textline1 = ['       Created ',int2str(size(Rinputdata.coordinates,1)),' surface receiver positions'];
     EDpostfunctext('EDgensurfreceivers',t01,'',...
         filehandlingparameters,fid,'',textline1)

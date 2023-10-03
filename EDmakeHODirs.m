@@ -1,9 +1,12 @@
-function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
+function [irhod,outpar,existingfilename] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
     difforder,elemsize,edgedata,edgetoedgedata,Sdata,doaddsources,...
     sourceamplitudes,Rdata,cair,fs,Rstart,...
-    savealldifforders,showtext,EDversionnumber)
+    savealldifforders,showtext,EDversionnumber,filehandlingparameters,EDsettingshash)
 % EDmakeHODirs - Constructs higher-order (two and higher) diffraction impulse
 % responses from a list of paths in the input struct hodpaths.
+% 
+% A version 1 of this function was used up to v 0.221 of EDtoolbox
+% and version 2 after that.
 %
 % Input parameters:
 %   hodpaths        Cell variable with a list of all the valid
@@ -23,6 +26,10 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
 %   savealldifforders   0 or 1
 %   showtext        Value from filehandlingparameters
 %   EDversionnumber
+%   filehandlingparameters  Ignored in version 1 of this function and 
+%                       obligatory for version 2.
+%   EDsettingshash  Ignored in version 1 of this function and 
+%                       obligatory for version 2.
 %
 % Output parameters:
 %   irhod           The ir with all the higher-order diffraction orders summed up
@@ -34,16 +41,34 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
 %                   where each irhod{ndifforder} has this size:
 %                       [nsampels,nreceivers,nsources] (if doaddsources = 0)
 %                       [nsampels,nreceivers,1] (if doaddsources = 1)
-%   EDinputdatahash
+%   outpar                  This parameter is different for version 1 and
+%                           version 2 of this function. 
+%       v1 outpar = EDinputdatahash       
+%                           This is a string of characters which is
+%                           uniquely representing the input data. An 
+%                           existing result file with the same value of 
+%                           this EDinputdatahash will be reused.
+%       v2 outpar = elapsedtimemakeirhod
+%                           This tells how long time was used inside this
+%                           function. If an existing file was reused, then
+%                           elapsedtimemakehodirs has a second value which tells
+%                           how much time was used for the existing file.
+%   existingfilename        For v2 of this function, if an existing file was
+%                           found that was reused, then the reused file
+%                           name is given here. If no existing file could be 
+%                           reused then this variable is empty. For v1 of
+%                           this function, this variable is also empty.
 %
-% Uses functions EDcreindexmatrix,EDwedge2nd,EDwedgeN from the EDtoolbox
+% Uses functions EDcreindexmatrix,EDwedge2nd,EDwedgeN,EDrecycleresultfiles
+% from the EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 24 Sep. 2022
+% Peter Svensson (peter.svensson@ntnu.no) 29 Sep. 2023
 %
-% [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,difforder,elemsize,edgedata,...
-%     edgetoedgedata,Sdata,doaddsources,sourceamplitudes,Rdata,cair,fs,Rstart,...
-%     savealldifforders,showtext,EDversionnumber);
+% [irhod,outpar,existingfilename] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
+%     difforder,elemsize,edgedata,edgetoedgedata,Sdata,doaddsources,...
+%     sourceamplitudes,Rdata,cair,fs,Rstart,...
+%     savealldifforders,showtext,EDversionnumber,filehandlingparameters)
     
 % 8 Dec. 2006 First version
 % 1 May 2017 Fixed a bug which gave an erroneous boosting of some
@@ -64,8 +89,18 @@ function [irhod,EDinputdatahash] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
 % 24 Sep. 2022 Changed how the definition of the input data struct was
 % defined. The previous version created a huge struct and failed to
 % identify existing files that could be reused.
+% 29 Sep. 2023 Implemented version 2 of this function while maintaining
+% compatibility with the old "version 1". v2 moves the check if an existing
+% file can be reused inside this function. Also updated load and save to
+% the function call form, which avoids problems with spaces in file names.
 
-global BIGEDGESTEPMATRIX 
+t00 = clock;
+
+if nargin < 17  % Must be the old version
+	functionversion = 1;
+else   % nargin = 6 -> must be the new version
+    functionversion = 2;
+end
 
 EDinputdatastruct = struct('difforder',difforder);
 EDinputdatastruct.hodpaths = hodpaths;
@@ -83,7 +118,42 @@ EDinputdatastruct.savealldifforders = savealldifforders;
 EDinputdatastruct.EDversionnumber = EDversionnumber;
 EDinputdatahash = DataHash(EDinputdatastruct);
 
-%--------------------------------------------------------------------------
+if functionversion == 1
+	outpar = EDinputdatahash;
+	existingfilename = '';
+elseif functionversion == 2
+	%---------------------------------------------------------------
+	% Sort out the file business: can an existing file be used?
+	% Then copy the existing file to a new copy. Should the data be saved in a file? 
+
+	if filehandlingparameters.suppressresultrecycling == 1
+		foundmatch = 0;
+		existingfilename = '';
+	else
+		[foundmatch,existingfilename] = ... 
+			EDrecycleresultfiles(filehandlingparameters.outputdirectory,...
+			'_irhod',EDinputdatahash);
+	end
+
+	desiredname = [filehandlingparameters.outputdirectory,filesep,...
+		filehandlingparameters.filestem,'_irhod.mat'];
+
+	if foundmatch == 1
+		eval(['load(''',existingfilename,''')'])
+		if ~strcmp(existingfilename,desiredname)
+			copyfile(existingfilename,desiredname);
+		end
+		elapsedtimemakeirhod_new = etime(clock,t00);
+		elapsedtimemakeirhod = [elapsedtimemakeirhod_new elapsedtimemakeirhod];
+        outpar = elapsedtimemakeirhod;
+		return
+	end
+end
+
+%----------------------------------------------------------------
+% No existing file can be used
+
+global BIGEDGESTEPMATRIX 
 
 nyvec = pi./(2*pi - edgedata.closwedangvec);    
 
@@ -402,6 +472,12 @@ if savealldifforders == 1
            end
        end
    end
-   
-   
+      
+end
+
+if functionversion == 2
+	elapsedtimemakeirhod = etime(clock,t00);
+    outpar = elapsedtimemakeirhod;
+
+    eval(['save(''',desiredname,''',''irhod'',''EDinputdatahash'',''elapsedtimemakeirhod'',''EDsettingshash'');'])
 end

@@ -1,7 +1,10 @@
-function [hodpaths,hodpathsalongplane,EDinputdatahash] = EDfindHODpaths(edgeseesedge,visedgesfroms,visedgesfromr,...
-difforder,EDversionnumber)
+function [hodpaths,hodpathsalongplane,outpar,existingfilename] = EDfindHODpaths(edgeseesedge,visedgesfroms,visedgesfromr,...
+difforder,EDversionnumber,filehandlingparameters)
 % EDfindHODpaths finds the higher order diffraction paths for a convex
 % object, or a non-convex object where specular reflections are ignored.
+% 
+% A version 1 of this function was used up to v 0.221 of EDtoolbox
+% and version 2 after that.
 %
 % Input parameters:
 %   edgeseesedge        Matrix, [nedges,nedges], of -1, 0 and 1
@@ -9,6 +12,8 @@ difforder,EDversionnumber)
 %   visedgesfromr       Matrix, [nedges,nreceivers], of 0 and 1
 %   difforder
 %   EDversionnumber
+%   filehandlingparameters  Ignored in version 1 of this function and 
+%                       obligatory for version 2.
 %
 % Output parameters:
 %   hodpaths            Cell variable, hodpaths{2} has size [npaths,2] etc
@@ -18,14 +23,32 @@ difforder,EDversionnumber)
 %                       Each row in each matrix has values 0 or 1, which tells
 %                       for each hod sequence "leg" whether it passes along
 %                       a plane or not.
-%   EDinputdatahash
+%   outpar                  This parameter is different for version 1 and
+%                           version 2 of this function. 
+%       v1 outpar = EDinputdatahash       
+%                           This is a string of characters which is
+%                           uniquely representing the input data. 
+%                           An existing result file with the same value of
+%                           this EDinputdatahash will be reused.
+%       v2 outpar = elapsedtimehodpaths
+%                           This tells how long time was used inside this
+%                           function. If an existing file was reused, then
+%                           elapsedtimefindHODpaths has a second value which tells
+%                           how much time was used for the existing file.
+%   existingfilename        For v2 of this function, if an existing file was
+%                           found that was reused, then the reused file
+%                           name is given here. If no existing file could be 
+%                           reused then this variable is empty. For v1 of
+%                           this function, this variable is also empty.
 % 
+% Uses the function EDrecycleresultfiles from EDtoolbox
 % Uses the function Datahash from Matlab Central
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 1 June 2019
+% Peter Svensson (peter.svensson@ntnu.no) 29 Sep. 2023
 % 
-% [hodpaths,hodpathsalongplane,EDinputdatahash] = EDfindHODpaths(edgeseesedge,...
-% visedgesfroms,visedgesfromr,difforder,EDversionnumber);
+% [hodpaths,hodpathsalongplane,outpar,existingfilename] = EDfindHODpaths...
+% (edgeseesedge,visedgesfroms,visedgesfromr,...
+% difforder,EDversionnumber,filehandlingparameters)
 
 % 15 Mar 2018 First version
 % 16 Mar 2018 Expanded to several sources and receivers
@@ -33,11 +56,59 @@ difforder,EDversionnumber)
 % be handled. Introduced the output variable hodpathsalongplane.
 % 1 June 2019 Fixed bug; hadn't finished the handling of negative values of
 % edgeseesedge.
+% 29 Sep. 2023 Implemented version 2 of this function while maintaining
+% compatibility with the old "version 1". v2 moves the check if an existing
+% file can be reused inside this function. Also updated load and save to
+% the function call form, which avoids problems with spaces in file names.
+
+t00 = clock;
+
+if nargin < 6  % Must be the old version
+	functionversion = 1;
+else   % nargin = 6 -> must be the new version
+    functionversion = 2;
+end
 
 EDinputdatastruct = struct('difforder',difforder,...
         'edgeseespartialedge',edgeseesedge,...
-        'vispartedgesfroms',visedgesfroms,'vispartedgesfromr',visedgesfromr,'EDversionnumber',EDversionnumber);
+        'vispartedgesfroms',visedgesfroms,'vispartedgesfromr',visedgesfromr,...
+        'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
+
+if functionversion == 1
+	outpar = EDinputdatahash;
+	existingfilename = '';
+elseif functionversion == 2
+	%---------------------------------------------------------------
+	% Sort out the file business: can an existing file be used?
+	% Then copy the existing file to a new copy. Should the data be saved in a file? 
+
+	if filehandlingparameters.suppressresultrecycling == 1
+		foundmatch = 0;
+		existingfilename = '';
+	else
+		[foundmatch,existingfilename] = ... 
+			EDrecycleresultfiles(filehandlingparameters.outputdirectory,...
+			'_hodpaths',EDinputdatahash);
+	end
+
+	desiredname = [filehandlingparameters.outputdirectory,filesep,...
+		filehandlingparameters.filestem,'_hodpaths.mat'];
+
+	if foundmatch == 1
+		eval(['load(''',existingfilename,''')'])
+		if ~strcmp(existingfilename,desiredname)
+			copyfile(existingfilename,desiredname);
+		end
+		elapsedtimehodpaths_new = etime(clock,t00);
+		elapsedtimehodpaths = [elapsedtimehodpaths_new elapsedtimehodpaths];
+        outpar = elapsedtimehodpaths;
+		return
+	end
+end
+
+%----------------------------------------------------------------
+% No existing file can be used
 
 nedges = size(edgeseesedge,2);
 nsources = size(visedgesfroms,2);
@@ -105,4 +176,11 @@ for isou = 1:nsources
 
 end
 
+if functionversion == 2
+	elapsedtimehodpaths = etime(clock,t00);
+    outpar = elapsedtimehodpaths;
 
+	if filehandlingparameters.savehodpaths == 1
+    	eval(['save(''',desiredname,''',''hodpaths'',''hodpathsalongplane'',''EDinputdatahash'',''elapsedtimehodpaths'');'])
+	end
+end

@@ -1517,7 +1517,7 @@ if functionversion == 2
 	elapsedtimeed2geo = etime(clock,t00);
     outpar = elapsedtimeed2geo;
 
-	if filehandlingparameters.saveeddatafile == 1
+	if filehandlingparameters.saveed2datafile == 1
     	eval(['save(''',desiredname,''',''planedata'',''edgedata'',''edgetoedgedata'',''EDinputdatahash'',''elapsedtimeed2geo'');'])
 	end
 end

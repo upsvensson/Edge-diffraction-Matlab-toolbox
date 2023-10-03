@@ -131,6 +131,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 14 March 2021 The section "% Check the struct Rinputdata" was moved to
 % before "% Check the struct Sinputdata"
 % 28 Sep. 2023 Adapted to EDmain_convex which does both tf and ir
+% 2 Oct. 2023 Changed so that only one of docalftf, docalcir, docalctf_ESIEBEM
+% can be set to zero.
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -305,12 +307,27 @@ if ~isfield(controlparameters,'docalcir')
     controlparameters.docalcir = 0;
     disp('WARNING: controlparameters.docalcir was not specified. It is given the value 0.')
 end
-if ~isfield(controlparameters,'docalctf_BEM')
-    controlparameters.docalctf_BEM = 0;
-    disp('WARNING: controlparameters.docalctf_BEM was not specified. It is given the value 0.')
+if (controlparameters.docalctf == 1) && (controlparameters.docalcir == 1)
+    error('EROR: docalcir and docalctf can not both be set to 1')
+end        
+if ~isfield(controlparameters,'docalctf_ESIEBEM')
+    controlparameters.docalctf_ESIEBEM = 0;
+    disp('WARNING: controlparameters.docalctf_ESIEBEM was not specified. It is given the value 0.')
+else
+    if controlparameters.docalctf_ESIEBEM == 1 
+        if controlparameters.docalctf == 1
+            error('ERROR: controlparameters.docalctf and controlparameters.docalctf_ESIEBEM can not both be set to 1')
+        end
+        if controlparameters.docalcir == 1
+            error('ERROR: controlparameters.docalcir and controlparameters.docalctf_ESIEBEM can not both be set to 1')
+        end
+    end
+end
+if (controlparameters.docalctf == 0) && (controlparameters.docalcir == 0) && (controlparameters.docalctf_ESIEBEM == 0)
+    error('ERROR: You must choose a calulcation method: one of (docalcir, docalctf, docalctf_ESIEBEM) must be 1')
 end
 
-if controlparameters.docalctf == 1 || controlparameters.docalctf_BEM == 1
+if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1
     if ~isfield(controlparameters,'frequencies')
         error('ERROR: controlparameters.frequencies were not specified')
     end
@@ -329,7 +346,7 @@ else
 end
 nfrequencies = length(controlparameters.frequencies);
 
-if controlparameters.docalctf_BEM == 1
+if controlparameters.docalctf_ESIEBEM == 1
     if ~isfield(controlparameters,'surfacegaussorder')
         disp('WARNING! controlparameters.surfacegaussorder wasnt set; it is given the default value 5.')
         controlparameters.surfacegaussorder = 5;
@@ -368,7 +385,7 @@ if n1 > 1
     if n1 ~= nsources
         error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one row, or one row per source, but it had the size ',int2str(n1),' by ',int2str(n2)])
     else % So, we know that there is one amplitude per source. Check if there is one value per freq.
-        if controlparameters.docalctf == 1 || controlparameters.docalctf_BEM == 1      
+        if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
             if n2 == 1
                 Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(:,ones(1,nfrequencies));
             else
@@ -384,7 +401,7 @@ if n1 > 1
     end
 else % Here we know that there is just one row. Check if there is one value per freq. (or a single value)
     if n2 > 1
-        if controlparameters.docalctf == 1 || controlparameters.docalctf_BEM == 1      
+        if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
             if n2 ~= nfrequencies
                 error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one column, or one column per frequency, but it had the size ',int2str(n1),' by ',int2str(n2)])
             else % Here we know that n2 == nfrequencies. Expand to number of sources
@@ -394,7 +411,7 @@ else % Here we know that there is just one row. Check if there is one value per 
             error(['ERROR: The Sinputdata.sourceamplitudes input parameter must, for TD calculations, have one column, but it had the size ',int2str(n1),' by ',int2str(n2)])            
         end
     else % Here we know that n1 = 1 and n2 = 1
-        if controlparameters.docalctf == 1 || controlparameters.docalctf_BEM == 1      
+        if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
             Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),ones(1,nfrequencies));
         else
             Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1));            

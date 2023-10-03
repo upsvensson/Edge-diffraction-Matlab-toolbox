@@ -1,5 +1,5 @@
 function [tfdirect,tfgeom,tfdiff,timingdata,outpar,existingfilename] = EDmakefirstordertfs(firstorderpathdata,...
-    frequencies,Rstart,difforder,envdata,Sinputdata,receivers,edgedata,EDversionnumber,inpar1,inpar2)
+    frequencies,Rstart,difforder,envdata,Sinputdata,receivers,edgedata,EDversionnumber,inpar1,inpar2,inpar3)
 % EDmakefirstordertfs calculates the direct sound, specular reflection, and
 % first-order diffraction.
 % 
@@ -28,6 +28,8 @@ function [tfdirect,tfgeom,tfdiff,timingdata,outpar,existingfilename] = EDmakefir
 %                           contains the field showtext.
 %   inpar2                  This parameter is used only for version 2 and
 %                           should be the struct geoinputdata (obligatory).
+%   inpar3                  This parameter is used only for version 2 and
+%                           should be the EDsettingshash (obligatory).
 % 
 % Output parameters:
 %   tfdirect,tfgeom,tfdiff  Matrices, size [nfrequencies,nreceivers,nsources]
@@ -57,10 +59,10 @@ function [tfdirect,tfgeom,tfdiff,timingdata,outpar,existingfilename] = EDmakefir
 % Uses functions EDcoordtrans2, EDwedge1st_fd, EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash form Matlab Central
 % 
-% Peter Svensson 28 Sep. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 3 Oct. 2023 (peter.svensson@ntnu.no)
 %
 % [tfdirect,tfgeom,tfdiff,timingdata,outpar,existingfilename] = EDmakefirstordertfs(firstorderpathdata,...
-%     frequencies,Rstart,difforder,envdata,Sinputdata,receivers,edgedata,EDversionnumber,inpar1,inpar2)
+%     frequencies,Rstart,difforder,envdata,Sinputdata,receivers,edgedata,EDversionnumber,inpar1,inpar2,inpar3)
 
 % 12 Jan. 2018 First complete version. Much simplified version of the
 %                           previous ESIE2maketfs. Edgehits not handled
@@ -88,6 +90,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata,outpar,existingfilename] = EDmakefir
 % the function call form, which avoids problems with spaces in file names.
 % Added the input parameter geoinputdata, for future handling of piston
 % sources.
+% 3 Oct. 2023 Added the EDsettingshash as input parameter
 
 t00 = clock;
 
@@ -100,6 +103,7 @@ else % nargin = 10 or 11 -> could be the old or new version
 		filehandlingparameters = inpar1;
         showtext = filehandlingparameters.showtext;
         geoinputdata = inpar2;
+        EDsettingshash = inpar3;
 	else
 		functionversion = 1;
 		showtext = inpar1;
@@ -358,7 +362,7 @@ if functionversion == 2
 	elapsedtimemaketfs = etime(clock,t00);
     outpar = elapsedtimemaketfs;
 
-    eval(['save(''',desiredname,''',''tfdirect'',''tfgeom'',''tfdiff'',''timingdata'',''EDinputdatahash'',''elapsedtimemaketfs'');'])
+    eval(['save(''',desiredname,''',''tfdirect'',''tfgeom'',''tfdiff'',''timingdata'',''EDinputdatahash'',''elapsedtimemaketfs'',''EDsettingshash'');'])
 end
 
     

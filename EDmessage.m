@@ -20,13 +20,16 @@ function fid = EDmessage(filehandlingparameters,showprint,fid,showtextlevelneede
 %                               then the text "Recycled and duplicated"
 %                               will be printed, followed by the file name.
 %   varargin                    One or more text strings, separated with commas,
-%                               that will be printed on one line each.
+%                               that will be printed on one line each. If
+%                               the last one is an empty string, a blank
+%                               line will be printed. If the two last ones
+%                               are empty, only one blank will be printed.
 %
 % Output parameters
 %   fid                         The file id: either 0 or the value for the
 %                               actually opened file
 %
-% Peter Svensson 27 Sep. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 2 Oct. 2023 (peter.svensson@ntnu.no)
 %
 % fid = EDmessage(filehandlingparameters,showprint,fid,showtextlevelneeded,...
 %    existingfilename,varargin);
@@ -41,11 +44,18 @@ function fid = EDmessage(filehandlingparameters,showprint,fid,showtextlevelneede
 % Communications toolbox
 % 26 Sep. 2023 Introduced the varargin input parameter so that 1-N lines of
 % text can be specified (and transfered as a cell variable).
+% 2 Oct. 2023 If the two last input strings are empty, only one will be
+% shown.
 
 ntextstrings = nargin - 5;
 
 if ntextstrings > 0
     textstr1 = setstr(varargin{1});
+    if ntextstrings >= 3
+        if isempty(varargin{ntextstrings}) && isempty(varargin{ntextstrings-1})
+            ntextstrings = ntextstrings - 1;
+        end
+    end
 end
 
 if ispc == 1

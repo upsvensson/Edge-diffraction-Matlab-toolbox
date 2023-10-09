@@ -28,7 +28,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                        EDmain_convexESIE, but used by
 %                                        EDmain_convexESIE_ir
 %                   .directsound         (default: 1 = yes)
-%                   .difforder           (default: 15)
+%                   .difforder           (default: 10)
 %                   .savealldifforders   (default: 0) Used only by
 %                                        EDmain_convex_time
 %                   .saveindividualfirstdiff (default: 0) Used only by
@@ -64,7 +64,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   EDmain_convex_time
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 28 Sep. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 4 Oct. 2023 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -133,6 +133,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 28 Sep. 2023 Adapted to EDmain_convex which does both tf and ir
 % 2 Oct. 2023 Changed so that only one of docalftf, docalcir, docalctf_ESIEBEM
 % can be set to zero.
+% 4 Oct. 2023 Changed default difforder to 10
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -293,8 +294,8 @@ if ~isfield(controlparameters,'Rstart')
     controlparameters.Rstart = 0;
 end
 if ~isfield(controlparameters,'difforder')
-    disp('WARNING: controlparameters.difforder was not specified. It is given the value 15.')
-    controlparameters.difforder = 15;
+    disp('WARNING: controlparameters.difforder was not specified. It is given the value 10.')
+    controlparameters.difforder = 10;
 end
 
 % Then other parameters 

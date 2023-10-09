@@ -8,7 +8,7 @@ function [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(plan
 % and version 2 after that.
 %
 % Input parameters:
-%   planedata, edgedata,edgetoedgedata   structs
+%   planedata, edgedata                    structs
 % 	sources
 % 	visplanesfromS, vispartedgesfromS       From the Sdata struct
 %   receivers
@@ -65,7 +65,7 @@ function [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(plan
 % Uses functions  EDfindis EDchkISvisible EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 September 2023
+% Peter Svensson (peter.svensson@ntnu.no) 9 Oct. 2023
 %
 % [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,...
@@ -107,6 +107,7 @@ function [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(plan
 % compatibility with the old "version 1". v2 moves the check if an existing
 % file can be reused inside this function. Also updated load and save to
 % the function call form, which avoids problems with spaces in file names.
+% 9 Oct. 2023 Corrected the description of input and output parameters
 
 t00 = clock;
 

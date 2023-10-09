@@ -40,9 +40,9 @@ if length(timingvalue) > 1
 end
 
 if isempty(textstr1)
-    textline1 = [TTT,'   ',functype,': ',Timestring];
+    textline1 = [TTT,functype,': ',Timestring];
 else
-    textline1 = [TTT,'   ',functype,': ',textstr1,Timestring];
+    textline1 = [TTT,functype,': ',textstr1,Timestring];
 end
 
 if ~isempty(existingfilename)
@@ -57,4 +57,3 @@ end
 
 commandstring = [commandstring,');'];
 eval(commandstring)
-%EDmessage(filehandlingparameters,'sf',fid,1,existingfilename,varargin);

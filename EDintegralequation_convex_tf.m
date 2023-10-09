@@ -51,7 +51,7 @@ function [P_receiver,timingdata,extraoutputdata,outpar,existingfilename] = ...
 % EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1 from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  3 Oct. 2023  
+% Peter Svensson (peter.svensson@ntnu.no)  6 Oct. 2023  
 %                       
 % [P_receiver,timingdata,extraoutputdata,outpar,existingfilename] = ...
 %     EDintegralequation_convex_tf(filehandlingparameters,envdata,planedata,...
@@ -108,6 +108,8 @@ function [P_receiver,timingdata,extraoutputdata,outpar,existingfilename] = ...
 % file can be reused inside this function. Also updated load and save to
 % the function call form, which avoids problems with spaces in file names.
 % 3 Oct. 2023 Introduced the EDsettingshash as input parameter.
+% 6 Oct. 2023 Fixed a small error: the timing data wasn't returned when an
+% existing file was reused.
 
 t00 = clock;
 showtext = filehandlingparameters.showtext;
@@ -152,7 +154,6 @@ elseif functionversion == 2
         elapsedtimehodtf_new = etime(clock,t00);
         elapsedtimehodtf = [elapsedtimehodtf_new elapsedtimehodtf];
         P_receiver = tfinteqdiff;
-        timingdata = zeros(1,4);
         outpar = elapsedtimehodtf;
         return
     end
@@ -819,7 +820,7 @@ if functionversion == 2
 
     EDinputdatahash = EDinputdatahash_tfinteq;
 
-    eval(['save(''',desiredname,''',''tfinteqdiff'',''extraoutputdata'',''EDinputdatahash'',''elapsedtimehodtf'',''EDsettingshash'');'])
+    eval(['save(''',desiredname,''',''tfinteqdiff'',''extraoutputdata'',''EDinputdatahash'',''timingdata'',''elapsedtimehodtf'',''EDsettingshash'');'])
 end
 
 

@@ -35,7 +35,7 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 7. Direct sound obscuring for a corner-on hit of an octahedron.
 % 8. Direct sound obscuring for an edge-on hit of a cube.
 % 
-% Peter Svensson 3 June 2020 (peter.svensson@ntnu.no)
+% Peter Svensson 7 Oct. 2023 (peter.svensson@ntnu.no)
 % 
 % passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams);
 
@@ -56,6 +56,7 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 15 Feb 2018 Added the description of test 8.
 % 22 May 2019 Fixed a bug: ntests was still set to 7.
 % 3 June 2020 Fixed a bug: folder names with spaces can be handled now
+% 7 Oct. 2023 Adapted to the EDmain_convex of v0.300
 
 ntests = 8;
 
@@ -134,7 +135,7 @@ if runtest(1) == 1
         disp(['EDverify, EDtoolbox v. ',NN,' (last change on ',changedate,'), run on ',datetimevec])
         disp(' ')
         disp('*********************************************************************')
-        disp(['Test ',II,': EDmain_convexESIE, DC response at surface, plane wave incidence']);
+        disp(['Test ',II,': EDmain_convex, DC response at surface, plane wave incidence']);
         disp('Expected rel. errors for receiver positions 1 (in front, at surface) and 2 (behind, at surface), with')
         disp('Gauss-Legendre quadrature, and 96 points for the longest edge, and diffraction order 20, are')
         disp('1.3e-5 and 1.5e-5, respectively.')
@@ -143,7 +144,7 @@ if runtest(1) == 1
         disp(['EDverify, EDtoolbox v. ',NN,' (last change on ',changedate,'), run on ',datetimevec])
         disp(' ')
         disp('*********************************************************************')
-        disp(['Test ',II,': EDmain_convexESIE, DC response at surface, plane wave incidence']);    
+        disp(['Test ',II,': EDmain_convex, DC response at surface, plane wave incidence']);    
     end
 
     mfile = mfilename('fullpath');
@@ -170,16 +171,19 @@ if runtest(1) == 1
     Rinputdata = struct('coordinates',[0 0 0.00001;0 0 -0.32001]);
     controlparameters = struct('frequencies',0);
     controlparameters.difforder = 20;
+    controlparameters.docalctf = 1;
+    controlparameters.docalcir = 0;
+    controlparameters.docalctf_ESIEBEM = 0;
     filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
-    filehandlingparameters.savelogfile = 0;
+    filehandlingparameters.savelogfile = 1;
     filehandlingparameters.showtext = 0;
     controlparameters.ngauss = 96;    
     controlparameters.discretizationtype = 2;
     controlparameters.Rstart = norm(Sinputdata.coordinates);
     envdata.cair = 344;
 
-    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
+    EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'''])
     eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat''',' tfdirect tfgeom tfdiff EDversionnumber'])
@@ -211,7 +215,7 @@ if runtest(1) == 1
     if savelogfile == 1
         fwrite(fid,[' ',lineending],'char');
         fwrite(fid,['####################################################################',lineending],'char');
-        fwrite(fid,['Test ',II,': EDmain_convexESIE, DC response at surface, plane wave incidence',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convex, DC response at surface, plane wave incidence',lineending],'char');
         fwrite(fid,['Expected rel. errors for receiver positions 1 (in front, at surface) and 2 (behind, at surface), with',lineending],'char');
         fwrite(fid,['Gauss-Legendre quadrature, and 96 points for the longest edge, and diffraction order 20, are',lineending],'char');
         fwrite(fid,['1.3e-5 and 1.5e-5, respectively.',lineending],'char');
@@ -229,7 +233,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Test 2: EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz
+%  Test 2: EDmain_convex, diff1 continuity across zone boundary, at 100 Hz
 %          Perpendicular edge hit
 %
 
@@ -240,13 +244,13 @@ if runtest(2) == 1
     if showtext > 0
         disp(' ')
         disp('*********************************************************************')
-        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz']);
+        disp(['Test ',II,': EDmain_convex, diff1 continuity across zone boundary, at 100 Hz']);
         disp('Single edge; receivers distributed at, and very near, zone boundaries')
         disp('Perpendicular edge hit.')
         disp('Computed value at ZB should be very close to the mean value of the two')
         disp('surrounding responses (< 1e-5)')
     else
-        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz']);        
+        disp(['Test ',II,': EDmain_convex, diff1 continuity across zone boundary, at 100 Hz']);        
     end
     mfile = mfilename('fullpath');
     [infilepath,filestem] = fileparts(mfile);
@@ -266,6 +270,11 @@ if runtest(2) == 1
     Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 1;
+    controlparameters.docalctf = 1;
+    controlparameters.docalcir = 0;
+    controlparameters.docalctf_ESIEBEM = 0;
+    controlparameters.ngauss = 16;
+    controlparameters.discretizationtype = 2;
     filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
     filehandlingparameters.savelogfile = 1;
@@ -275,7 +284,7 @@ if runtest(2) == 1
 
     envdata.cair = 344;
 
-    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
+    EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat''',' tfdirect tfgeom tfdiff EDversionnumber'])
 
@@ -360,13 +369,13 @@ if runtest(3) == 1
     if showtext > 0
         disp(' ')
         disp('*********************************************************************')
-        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz']);
+        disp(['Test ',II,': EDmain_convex, diff1 continuity across zone boundary, at 100 Hz']);
         disp('Single edge; receivers distributed at, and very near, zone boundaries')
         disp('Skewed edge hit.')
         disp('Computed value at ZB should be very close to the mean value of the two')
         disp('surrounding responses (< 1e-5)')
     else
-        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz']);        
+        disp(['Test ',II,': EDmain_convex, diff1 continuity across zone boundary, at 100 Hz']);        
     end
     mfile = mfilename('fullpath');
     [infilepath,filestem] = fileparts(mfile);
@@ -386,15 +395,20 @@ if runtest(3) == 1
     Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 1;
+    controlparameters.docalctf = 1;
+    controlparameters.docalcir = 0;
+    controlparameters.docalctf_ESIEBEM = 0;
+    controlparameters.ngauss = 16;
+    controlparameters.discretizationtype = 2;
     filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
-    filehandlingparameters.savelogfile = 0;
+    filehandlingparameters.savelogfile = 1;
     filehandlingparameters.showtext = 0;
     controlparameters.Rstart = 0;
 
     envdata.cair = 344;
 
-    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
+    EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat''',' tfdirect tfgeom tfdiff EDversionnumber'])
 
@@ -449,7 +463,7 @@ if runtest(3) == 1
     if savelogfile == 1
         fwrite(fid,[' ',lineending],'char');
         fwrite(fid,['####################################################################',lineending],'char');
-        fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convex, diff1 continuity across zone boundary, at 100 Hz',lineending],'char');
         fwrite(fid,['Single edge; receivers distributed at, and very near, zone boundaries',lineending],'char');
         fwrite(fid,['Skewed edge hit.',lineending],'char');
         fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
@@ -480,12 +494,12 @@ if runtest(4) == 1
     if showtext > 0
         disp(' ')
         disp('*********************************************************************')
-        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across corner zone boundary, at 100 Hz']);
+        disp(['Test ',II,': EDmain_convex, diff1 continuity across corner zone boundary, at 100 Hz']);
         disp('Two edges meat at 90 deg.; several receivers exactly at, and very near zone boundaries')
         disp('Computed value at ZB should be very close to the mean value of the two')
         disp('surrounding responses (< 1e-3)')
     else
-        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across corner zone boundary, at 100 Hz']);    
+        disp(['Test ',II,': EDmain_convex, diff1 continuity across corner zone boundary, at 100 Hz']);    
     end
 
     mfile = mfilename('fullpath');
@@ -514,16 +528,20 @@ if runtest(4) == 1
     Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 4;
+    controlparameters.docalctf = 1;
+    controlparameters.docalcir = 0;
+    controlparameters.docalctf_ESIEBEM = 0;
+    controlparameters.discretizationtype = 2;
     controlparameters.ngauss = 32;
     filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
-    filehandlingparameters.savelogfile = 0;
+    filehandlingparameters.savelogfile = 1;
     filehandlingparameters.showtext = 0;
     controlparameters.Rstart = 0;
 
     envdata.cair = 344;
 
-    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
+    EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat''',' tfdirect tfgeom tfdiff EDversionnumber'])
     eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'''])
@@ -565,7 +583,7 @@ if runtest(4) == 1
     if savelogfile == 1
         fwrite(fid,[' ',lineending],'char');
         fwrite(fid,['####################################################################',lineending],'char');
-        fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across corner zone boundary, at 100 Hz',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convex, diff1 continuity across corner zone boundary, at 100 Hz',lineending],'char');
         fwrite(fid,['Two edges meat at 90 deg.; several receivers exactly at, and very near zone boundaries',lineending],'char');
         fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
         fwrite(fid,['surrounding responses (< 1e-3)',lineending],'char');
@@ -584,7 +602,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Test 5: EDmain_convexESIE, diff1 continuity across edge, at 100 Hz
+%  Test 5: EDmain_convex, diff1 continuity across edge, at 100 Hz
 %
 
 if runtest(5) == 1
@@ -594,12 +612,12 @@ if runtest(5) == 1
     if showtext > 0
         disp(' ')
         disp('*********************************************************************')
-        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across edge, for very low frequencies']);
+        disp(['Test ',II,': EDmain_convex, diff1 continuity across edge, for very low frequencies']);
         disp('Single edge; receivers very near the edge, in front and in back')
         disp('Far source, perp. incidence and skewed incidence.')
         disp('Computed values in front and in back should be within 1.5e-3 for the three frequencies')
     else
-        disp(['Test ',II,': EDmain_convexESIE, diff1 continuity across edge, for very low frequencies']);    
+        disp(['Test ',II,': EDmain_convex, diff1 continuity across edge, for very low frequencies']);    
     end
 
     mfile = mfilename('fullpath');
@@ -621,15 +639,20 @@ if runtest(5) == 1
     Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',[0.1 ]);
     controlparameters.difforder = 1;
+    controlparameters.docalctf = 1;
+    controlparameters.docalcir = 0;
+    controlparameters.docalctf_ESIEBEM = 0;
+    controlparameters.discretizationtype = 2;
+    controlparameters.ngauss = 26;
     filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
-    filehandlingparameters.savelogfile = 0;
+    filehandlingparameters.savelogfile = 1;
     filehandlingparameters.showtext = 0;
     controlparameters.Rstart = soudist;
 
     envdata.cair = 344;
 
-    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
+    EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat''',' tfdirect tfgeom tfdiff EDversionnumber'])
 
@@ -671,7 +694,7 @@ if runtest(5) == 1
     if savelogfile == 1
         fwrite(fid,[' ',lineending],'char');
         fwrite(fid,['####################################################################',lineending],'char');
-        fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across edge, for very low frequencies',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convex, diff1 continuity across edge, for very low frequencies',lineending],'char');
         fwrite(fid,['Single edge; receivers very near the edge, in front and in back',lineending],'char');
         fwrite(fid,['Far source, perp. incidence and skewed incidence.',lineending],'char');
         fwrite(fid,['Computed values in front and in back should be within 1.5e-3 for the three frequencies',lineending],'char');
@@ -688,7 +711,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Test 6: EDmain_convexESIE, replicate internal monopole, at 0.1 Hz
+%  Test 6: EDmain_convex, replicate internal monopole, at 0.1 Hz
 
 if runtest(6) == 1
     itest = 6;
@@ -697,7 +720,7 @@ if runtest(6) == 1
     if showtext > 0
         disp(' ')
         disp('*********************************************************************')
-        disp(['Test ',II,': EDmain_convexESIE, replicate internal monopole, at 0.1 Hz']);
+        disp(['Test ',II,': EDmain_convex, replicate internal monopole, at 0.1 Hz']);
         disp('Cube w internal, non-centered monopole')
         disp('Entire cube surface gets sources')
         disp('Radiated field should be within [0.996,1.008] around a circle of receivers')
@@ -733,6 +756,10 @@ if runtest(6) == 1
     nfrequencies = length(controlparameters.frequencies);
     controlparameters.ngauss = 32;
     controlparameters.difforder = 15;
+    controlparameters.docalctf = 1;
+    controlparameters.docalcir = 0;
+    controlparameters.docalctf_ESIEBEM = 0;
+    controlparameters.discretizationtype = 2;
 
     envdata = struct('cair',344);
     envdata.rhoair = 1.21;
@@ -817,9 +844,9 @@ if runtest(6) == 1
     filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
     filehandlingparameters.showtext = 0;
-    filehandlingparameters.savelogfile = 0;
+    filehandlingparameters.savelogfile = 1;
 
-    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
+    EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Load and present the results
@@ -861,7 +888,7 @@ if runtest(6) == 1
     if savelogfile == 1
         fwrite(fid,[' ',lineending],'char');
         fwrite(fid,['####################################################################',lineending],'char');
-        fwrite(fid,['Test ',II,': EDmain_convexESIE, replicate internal monopole, at 0.1 Hz.',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convex, replicate internal monopole, at 0.1 Hz.',lineending],'char');
         fwrite(fid,['Cube w internal, non-centered monopole.',lineending],'char');
         fwrite(fid,['Entire cube surface gets sources.',lineending],'char');
         fwrite(fid,['Radiated field should be within [0.996,1.008] around a circle of receivers',lineending],'char');
@@ -878,7 +905,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Test 7 EDmain_convexESIE, make sure the direct sound is obscured for a
+%  Test 7 EDmain_convex, make sure the direct sound is obscured for a
 %  corner-on hit, for an octahedron
 %
 
@@ -889,10 +916,10 @@ if runtest(7) == 1
     if showtext > 0
         disp(' ')
         disp('*********************************************************************')
-        disp(['Test ',II,': EDmain_convexESIE, make sure the direct sound is obscured for a']);
+        disp(['Test ',II,': EDmain_convex, make sure the direct sound is obscured for a']);
         disp('corner-on hit, for an octahedron')
     else
-        disp(['Test ',II,': EDmain_convexESIE, direct sound obscuring for corner-on hit, octahedron']);    
+        disp(['Test ',II,': EDmain_convex, direct sound obscuring for corner-on hit, octahedron']);    
     end
 
     mfile = mfilename('fullpath');
@@ -923,15 +950,21 @@ if runtest(7) == 1
     Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 0;
+    controlparameters.docalctf = 1;
+    controlparameters.docalcir = 0;
+    controlparameters.docalctf_ESIEBEM = 0;
+    controlparameters.discretizationtype = 2;
+    controlparameters.ngauss = 16;
+    
     filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
-    filehandlingparameters.savelogfile = 0;
+    filehandlingparameters.savelogfile = 1;
     filehandlingparameters.showtext = 0;
     controlparameters.Rstart = 0;
 
     envdata.cair = 344;
 
-    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
+    EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     eval(['load ''',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat''',' tfdirect'])
 %     eval(['load ',filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'])
@@ -958,7 +991,7 @@ if runtest(7) == 1
     if savelogfile == 1
         fwrite(fid,[' ',lineending],'char');
         fwrite(fid,['####################################################################',lineending],'char');
-        fwrite(fid,['Test ',II,': EDmain_convexESIE, make sure the direct sound is obscured for a',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convex, make sure the direct sound is obscured for a',lineending],'char');
         fwrite(fid,['corner-on hit, for an octahedron',lineending],'char');
         fwrite(fid,[' ',lineending],'char');
         fwrite(fid,['The direct sound should be zero. The computed direct sound had the value ',num2str(abs(tfdirect)),lineending],'char');
@@ -974,7 +1007,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Test 8 EDmain_convexESIE, make sure the direct sound is obscured for an
+%  Test 8 EDmain_convex, make sure the direct sound is obscured for an
 %  edge-on hit, for a cube
 %
 
@@ -985,10 +1018,10 @@ if runtest(8) == 1
     if showtext > 0
         disp(' ')
         disp('*********************************************************************')
-        disp(['Test ',II,': EDmain_convexESIE, make sure the direct sound is obscured for an']);
+        disp(['Test ',II,': EDmain_convex, make sure the direct sound is obscured for an']);
         disp('edge-on hit, for a cube')
     else
-        disp(['Test ',II,': EDmain_convexESIE, direct sound obscuring for edge-on hit, cube']);    
+        disp(['Test ',II,': EDmain_convex, direct sound obscuring for edge-on hit, cube']);    
     end
 
 
@@ -1018,13 +1051,19 @@ if runtest(8) == 1
     Rinputdata = struct('coordinates',receivers);
     controlparameters = struct('frequencies',100);
     controlparameters.difforder = 0;
+    controlparameters.docalctf = 1;
+    controlparameters.docalcir = 0;
+    controlparameters.docalctf_ESIEBEM = 0;
+    controlparameters.discretizationtype = 2;
+    controlparameters.ngauss = 16;
+    
     filehandlingparameters = struct('outputdirectory',outputdirectory);
     filehandlingparameters.filestem = filestem;
-    filehandlingparameters.savelogfile = 0;
+    filehandlingparameters.savelogfile = 1;
     filehandlingparameters.showtext = 0;
     controlparameters.Rstart = 0;
 
-    EDmain_convexESIE(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
+    EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Load and present the results
@@ -1055,7 +1094,7 @@ if runtest(8) == 1
     if savelogfile == 1
         fwrite(fid,[' ',lineending],'char');
         fwrite(fid,['####################################################################',lineending],'char');
-        fwrite(fid,['Test ',II,': EDmain_convexESIE, make sure the direct sound is obscured for an',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convex, make sure the direct sound is obscured for an',lineending],'char');
         fwrite(fid,['edge-on hit, for a cube',lineending],'char');
         fwrite(fid,[' ',lineending],'char');
         fwrite(fid,['The direct sound should be zero. The computed direct sound had the value ',num2str(abs(tfdirect)),lineending],'char');

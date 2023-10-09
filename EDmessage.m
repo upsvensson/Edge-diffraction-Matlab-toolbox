@@ -29,7 +29,7 @@ function fid = EDmessage(filehandlingparameters,showprint,fid,showtextlevelneede
 %   fid                         The file id: either 0 or the value for the
 %                               actually opened file
 %
-% Peter Svensson 2 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 6 Oct. 2023 (peter.svensson@ntnu.no)
 %
 % fid = EDmessage(filehandlingparameters,showprint,fid,showtextlevelneeded,...
 %    existingfilename,varargin);
@@ -46,6 +46,8 @@ function fid = EDmessage(filehandlingparameters,showprint,fid,showtextlevelneede
 % text can be specified (and transfered as a cell variable).
 % 2 Oct. 2023 If the two last input strings are empty, only one will be
 % shown.
+% 6 Oct. 2023 Fixed error: when a file is recycled, the detailed timing
+% data wasnt written to the log file.
 
 ntextstrings = nargin - 5;
 
@@ -75,11 +77,11 @@ else
     writetofile = 0;
 end
 
-if textstr1(1:2) == 'ED'
-    pretext = '####################################################################';
-else
+% if textstr1(1:2) == 'ED'
+%     pretext = '####################################################################';
+% else
     pretext = '';
-end
+%end
 
 if showtext == 1 & filehandlingparameters.showtext >= showtextlevelneeded
     if ~isempty(pretext)
@@ -88,10 +90,13 @@ if showtext == 1 & filehandlingparameters.showtext >= showtextlevelneeded
     end
     disp(textstr1)
     if ~isempty(existingfilename)
-        disp(['            Recycled and duplicated ',existingfilename])
+        disp(['   Recycled and duplicated ',existingfilename])
+       for ii = 2:ntextstrings
+            disp(['   (',setstr(varargin{ii}),')'])
+        end
     else
         for ii = 2:ntextstrings
-            disp(setstr(varargin{ii}))
+            disp(['   ',setstr(varargin{ii})])
         end
     end
     if ~isempty(pretext)
@@ -115,10 +120,13 @@ if writetofile == 1
     end
     fwrite(fid,[textstr1,lineending],'char');
     if ~isempty(existingfilename)
-        fwrite(fid,['         (Recycled and duplicated ',existingfilename,')',lineending],'char');
+        fwrite(fid,['   (Recycled and duplicated ',existingfilename,')',lineending],'char');
+        for ii = 2:ntextstrings
+            fwrite(fid,['   (',setstr(varargin{ii}),')',lineending],'char');
+        end
     else
         for ii = 2:ntextstrings
-            fwrite(fid,[setstr(varargin{ii}),lineending],'char');
+            fwrite(fid,['   ',setstr(varargin{ii}),lineending],'char');
         end
     end
     if ~isempty(pretext)

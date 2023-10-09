@@ -69,7 +69,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 3 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 9 Oct. 2023 (peter.svensson@ntnu.no)
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -168,6 +168,11 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % before). Included the ESIEBEM steps as well.
 % 3 Oct. 2023 Added the optional output parameter EDres. Also added the
 % saving of a settings hash, "EDsettingshash" in all results files.
+% 5 Oct. 2023 Fixed a small mistake: the wrong time data was saved for the
+% EDintegralequation_convex_tf call.
+% 9 Oct. 2023 Fixed a small mistake: when the irhod cells were summed, the
+% first irhod cell is empty because first-order diffraction is stored 
+% separately.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -255,12 +260,12 @@ fid = EDmessage(filehandlingparameters,'sf',fid,1,'',textline1,[]);
 if isfield(geoinputdata,'geoinputfile')
     EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the planedata struct from the CAD file']);
     [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(filehandlingparameters,geoinputdata.geoinputfile,0);
-    textline1start = ['   EDreadcad: '];
+    textline1start = ['EDreadcad: '];
     t01 = elapsedtimecadgeo;
 else
     EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the planedata struct from the input geometry matrices']);
     [planedata,elapsedtimegeomatrices] = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners,geoinputdata.planerefltypes);         
-    textline1start = ['   EDreadgeomatrices: '];
+    textline1start = ['EDreadgeomatrices: '];
     t01 = elapsedtimegeomatrices;
 end
 %%%% disp('WARNING! Test for geometry convexity has been turned off!!')
@@ -396,7 +401,7 @@ if ( controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1)
     EDpostfunctext('EDmakefirstordertfs',elapsedtimemaketfs,existingfilename,...
         filehandlingparameters,fid,'',...
         [int2str(nfrequencies),' frequencies.'],...
-        ['      Direct sound: ',num2str(timingdata(1)),'s, spec.refl.: ',...
+        ['Direct sound: ',num2str(timingdata(1)),'s, spec.refl.: ',...
         num2str(timingdata(2)),'s, first-order diff.: ',num2str(timingdata(3)),'s'])
     timingstruct.maketfs = elapsedtimemaketfs;
 else
@@ -418,7 +423,7 @@ if controlparameters.docalcir == 1 && controlparameters.skipfirstorder == 0
     EDpostfunctext('EDmakefirstorderirs',elapsedtimemakeirs,existingfilename,...
         filehandlingparameters,fid,'',...
         ['fs = ',num2str(controlparameters.fs)],...
-        ['         Direct sound: ',num2str(timingdata(1)),'s, spec.refl.: ',...
+        ['Direct sound: ',num2str(timingdata(1)),'s, spec.refl.: ',...
         num2str(timingdata(2)),'s, first-order diff.: ',num2str(timingdata(3)),'s'])
     timingstruct.makeirs = elapsedtimemakeirs;
 else
@@ -456,9 +461,9 @@ if controlparameters.difforder > 1 && ( controlparameters.docalctf == 1 || contr
     EDpostfunctext('EDinteg_submatrixstructure',elapsedtimesubmatrix,existingfilename,...
         filehandlingparameters,fid,'',...
         [int2str(Hsubmatrixdata.nuniquesubmatrices),' submatrices, out of ',int2str(size(Hsubmatrixdata.edgetripletlist,1)),', to compute.'],...
-        ['      Edges discretized with: ',int2str(min(Hsubmatrixdata.nedgeelems)),'-',...
+        ['Edges discretized with: ',int2str(min(Hsubmatrixdata.nedgeelems)),'-',...
         int2str(max(Hsubmatrixdata.nedgeelems)),' gauss points. ',int2str(Hsubmatrixdata.bigmatrixendnums(end)),' edge source signals to compute.'],...
-        ['      The IE matrix has ',int2str(nonzeroelements),' non-zero elements. Some may be identical due to symmetries'])    
+        ['The IE matrix has ',int2str(nonzeroelements),' non-zero elements. Some may be identical due to symmetries'])    
     timingstruct.submatrixdata = elapsedtimesubmatrix;
 else
     timingstruct.submatrixdata = 0;
@@ -477,9 +482,9 @@ if controlparameters.difforder > 1 && ( controlparameters.docalctf == 1 || contr
     EDpostfunctext('EDintegralequation_convex_tf',elapsedtimehodtf,existingfilename,...
         filehandlingparameters,fid,'',...
         [int2str(nfrequencies),' frequencies. Diffraction order: ',DIF,'.'],...
-        ['      H-matrix: ',num2str(timingdata(1)),' s. Q_firstterm: ',num2str(timingdata(2)),' s (per freq.)'],...
-        ['      Qfinal: ',num2str(timingdata(3)),' s. P at receiver: ',num2str(timingdata(4)),' s.'])    
-    timingstruct.integralequation = timingdata;
+        ['H-matrix: ',num2str(timingdata(1)),' s. Q_firstterm: ',num2str(timingdata(2)),' s (per freq.)'],...
+        ['Qfinal: ',num2str(timingdata(3)),' s. P at receiver: ',num2str(timingdata(4)),' s.'])    
+    timingstruct.integralequation = elapsedtimehodtf;
 else
     tfinteqdiff = [];
     timingstruct.integralequation = [0 0 0 0 0];
@@ -553,10 +558,11 @@ if nargout > 0
     if controlparameters.docalcir == 1
         irtot = irdirect + irgeom + irdiff;
         [nold,nrec,nsou] = size(irtot);
+
         if iscell(irhod)
             ncells = length(irhod);
-            irhodsum = irhod{1};
-            for ii = 2:ncells
+            irhodsum = irhod{2};
+            for ii = 3:ncells
                 irhodsum = irhodsum + irhod{ii};
             end
         else
@@ -575,7 +581,11 @@ if nargout > 0
         EDres.irdirect = irdirect;
         EDres.irgeom   = irgeom;
         EDres.irdiff   = irdiff;
-        EDres.irhod    = irhodsum;
+        if controlparameters.savealldifforders == 1
+            EDres.irhod = irhod;
+        else
+            EDres.irhod    = irhodsum;
+        end
         EDres.irtot    = irtot;
     else
         EDres.irdirect = [];

@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 3 Oct. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 9 Oct. 2023
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -272,6 +272,10 @@ versiontext{icounter} = ['Implemented the IR calc in the single EDmain_convex. '
     'Also added a settings hash "EDsettingshash" which is saved in all '...
     'results files.'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.302';
+versiondate{icounter} = '9 Oct. 2023';
+versiontext{icounter} = ['A number of smaller bug fixes'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

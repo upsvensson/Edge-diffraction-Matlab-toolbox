@@ -69,7 +69,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 9 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 12 Oct. 2023 (peter.svensson@ntnu.no)
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -173,6 +173,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % 9 Oct. 2023 Fixed a small mistake: when the irhod cells were summed, the
 % first irhod cell is empty because first-order diffraction is stored 
 % separately.
+% 12 Oct. 2023 Introduced the possibility for a free-field case
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -257,30 +258,34 @@ fid = EDmessage(filehandlingparameters,'sf',fid,1,'',textline1,[]);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Read the input CAD-file, or input matrices, and create the planedata struct
 
-if isfield(geoinputdata,'geoinputfile')
-    EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the planedata struct from the CAD file']);
-    [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(filehandlingparameters,geoinputdata.geoinputfile,0);
-    textline1start = ['EDreadcad: '];
-    t01 = elapsedtimecadgeo;
-else
-    EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the planedata struct from the input geometry matrices']);
-    [planedata,elapsedtimegeomatrices] = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners,geoinputdata.planerefltypes);         
-    textline1start = ['EDreadgeomatrices: '];
-    t01 = elapsedtimegeomatrices;
-end
-%%%% disp('WARNING! Test for geometry convexity has been turned off!!')
-if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
-    error('ERROR: EDmain_convex can only be used for convex scatterers, including a single thin plate')
-end
-
-ncorners = size(planedata.corners,1);
-nplanes = (size(planedata.planecorners,1));
-Timestring = [' Time: ',num2str(t01(1)),' s'];
-if length(t01) > 1, Timestring = [Timestring,' (Orig.: ',num2str(t01(2)), 's)'];  end
-textline1 = [textline1start,int2str(ncorners),' corners and ',int2str(nplanes),' planes.',Timestring];
+if geoinputdata.freefieldcase == 0
+   if isfield(geoinputdata,'geoinputfile')
+        EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the planedata struct from the CAD file']);
+     [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(filehandlingparameters,geoinputdata.geoinputfile,0);
+        textline1start = ['EDreadcad: '];
+        t01 = elapsedtimecadgeo;
+    else
+        EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the planedata struct from the input geometry matrices']);
+        [planedata,elapsedtimegeomatrices] = EDreadgeomatrices(geoinputdata.corners,geoinputdata.planecorners,geoinputdata.planerefltypes);         
+        textline1start = ['EDreadgeomatrices: '];
+        t01 = elapsedtimegeomatrices;
+   end
+    %%%% disp('WARNING! Test for geometry convexity has been turned off!!')
+    if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
+        error('ERROR: EDmain_convex can only be used for convex scatterers, including a single thin plate')
+    end
+    ncorners = size(planedata.corners,1);
+    nplanes = (size(planedata.planecorners,1));
+    Timestring = [' Time: ',num2str(t01(1)),' s'];
+    if length(t01) > 1, Timestring = [Timestring,' (Orig.: ',num2str(t01(2)), 's)'];  end
+    textline1 = [textline1start,int2str(ncorners),' corners and ',int2str(nplanes),' planes.',Timestring];
     
-EDmessage(filehandlingparameters,'sf',fid,1,'',textline1);
-timingstruct = struct('geoinput',t01);
+    EDmessage(filehandlingparameters,'sf',fid,1,'',textline1);
+    timingstruct = struct('geoinput',t01);
+else
+    planedata = struct('corners','','planecorners','');
+    timingstruct = struct('geoinput',0);
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % If the ESIEBEM method should be used, store the original receiver
@@ -317,43 +322,66 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Use the planedata struct and create an edgedata struct
 
-EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the edgedata struct']);
-[edgedata,planedata,elapsedtimeedgeo,existingfilename]...
-    = EDedgeo(planedata,EDversionnumber,geoinputdata.firstcornertoskip,...
-    [],0,filehandlingparameters);
-nedges = size(edgedata.edgecorners,1);
-EDpostfunctext('EDedgeo',elapsedtimeedgeo,existingfilename,...
-    filehandlingparameters,fid,'',[int2str(nedges),' edges.'])
-timingstruct.edgedata = elapsedtimeedgeo(1);
+if geoinputdata.freefieldcase == 0
+    EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the edgedata struct']);
+    [edgedata,planedata,elapsedtimeedgeo,existingfilename]...
+        = EDedgeo(planedata,EDversionnumber,geoinputdata.firstcornertoskip,...
+        [],0,filehandlingparameters);
+    nedges = size(edgedata.edgecorners,1);
+    EDpostfunctext('EDedgeo',elapsedtimeedgeo,existingfilename,...
+        filehandlingparameters,fid,'',[int2str(nedges),' edges.'])
+    timingstruct.edgedata = elapsedtimeedgeo(1);
+else
+    edgedata = struct('edgecorners','');
+    timingstruct.edgedata = 0;
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create the Sdata struct
 
-EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the Sdata struct']);
-[Sdata,elapsedtimeSgeo,existingfilename] = EDSorRgeo(planedata,edgedata,Sinputdata.coordinates,...
-     'S',EDversionnumber,2,filehandlingparameters);
-if any(any(Sdata.visplanesfroms)) == 0
-   error('ERROR: No source can see any of the planes of the scattering object. ',...
-         'Please check your geometry.') 
+if geoinputdata.freefieldcase == 0
+    EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the Sdata struct']);
+    [Sdata,elapsedtimeSgeo,existingfilename] = EDSorRgeo(planedata,edgedata,Sinputdata.coordinates,...
+         'S',EDversionnumber,2,filehandlingparameters);
+    if any(any(Sdata.visplanesfroms)) == 0
+        error('ERROR: No source can see any of the planes of the scattering object. ',...
+            'Please check your geometry.') 
+    end
+    EDpostfunctext('EDSorRgeo',elapsedtimeSgeo,existingfilename,...
+        filehandlingparameters,fid,'',[int2str(nsources),' sources.'])
+    timingstruct.Sdata = elapsedtimeSgeo;
+else
+    Sdata = Sinputdata;
+    Sdata.sources = Sdata.coordinates;
+    Sdata.visplanesfroms = [];
+    Sdata.vispartedgesfroms = [];
+    timingstruct.Sdata = 0;    
 end
-EDpostfunctext('EDSorRgeo',elapsedtimeSgeo,existingfilename,...
-    filehandlingparameters,fid,'',[int2str(nsources),' sources.'])
-timingstruct.Sdata = elapsedtimeSgeo;
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create the Rdata struct
 
-EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the Rdata struct']);
-[Rdata,elapsedtimeRgeo,existingfilename] = EDSorRgeo(planedata,edgedata,Rinputdata.coordinates,...
-     'R',EDversionnumber,2,filehandlingparameters);
-if any(any(Rdata.visplanesfromr)) == 0
-   error('ERROR: No receiver can see any of the planes of the scattering object. ',...
-         'Please check your geometry.') 
+if geoinputdata.freefieldcase == 0
+    EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the Rdata struct']);
+    [Rdata,elapsedtimeRgeo,existingfilename] = EDSorRgeo(planedata,edgedata,Rinputdata.coordinates,...
+         'R',EDversionnumber,2,filehandlingparameters);
+    if any(any(Rdata.visplanesfromr)) == 0
+       error('ERROR: No receiver can see any of the planes of the scattering object. ',...
+             'Please check your geometry.') 
+    end
+    nreceivers = size(Rdata.receivers,1);
+    EDpostfunctext('EDSorRgeo',elapsedtimeRgeo,existingfilename,...
+        filehandlingparameters,fid,'',[int2str(nreceivers),' receivers.'])
+    timingstruct.Rdata = elapsedtimeRgeo;
+else
+    Rdata = Rinputdata;
+    Rdata.receivers = Rdata.coordinates;
+    Rdata.visplanesfromr = [];
+    Rdata.vispartedgesfromr = [];
+    timingstruct.Rdata = 0;
 end
-nreceivers = size(Rdata.receivers,1);
-EDpostfunctext('EDSorRgeo',elapsedtimeRgeo,existingfilename,...
-    filehandlingparameters,fid,'',[int2str(nreceivers),' receivers.'])
-timingstruct.Rdata = elapsedtimeRgeo;
 
 DIF = int2str(controlparameters.difforder);
 
@@ -595,6 +623,9 @@ if nargout > 0
         EDres.irtot = [];
     end
     if controlparameters.docalctf == 1
+        if isempty(tfinteqdiff)
+            tfinteqdiff = zeros(size(tfdirect));
+        end
         tftot = tfdirect + tfgeom + tfdiff + tfinteqdiff;
         EDres.tfdirect = tfdirect;
         EDres.tfgeom = tfgeom;

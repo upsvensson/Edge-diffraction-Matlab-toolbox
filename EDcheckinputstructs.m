@@ -15,6 +15,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                         factors of the planes: 1,0,-1.
 %                                         default: ones(nplanes,1) )
 %                   .firstcornertoskip   (default: 1e6)
+%                   .freefieldcase       (default: 0)
 %   Sinputdata         .coordinates         (obligatory)
 %                   .doaddsources        (default: 0 = no)
 %                   .sourceamplitudes    Only used if doaddsources = 1
@@ -64,7 +65,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   EDmain_convex_time
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 4 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 12 Oct. 2023 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -134,6 +135,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 2 Oct. 2023 Changed so that only one of docalftf, docalcir, docalctf_ESIEBEM
 % can be set to zero.
 % 4 Oct. 2023 Changed default difforder to 10
+% 12 Oct. 2023 Introduced the field geoinputdata.freefieldcase
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -175,37 +177,46 @@ if ~isstruct(geoinputdata)
         filehandlingparameters.filestem = CADfilestem;
     end
 end
-if isfield(geoinputdata,'geoinputfile')
-    [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
-    if ~isfield(filehandlingparameters,'outputdirectory')
-        filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
-    end    
-    if ~isfield(filehandlingparameters,'filestem')
-        filehandlingparameters.filestem = CADfilestem;
-    end
+if ~isfield(geoinputdata,'freefieldcase')
+    geoinputdata.freefieldcase = 0;
+end
+if geoinputdata.freefieldcase == 1
+    geoinputdata.corners = [];
+    geoinputdata.planecorners = [];
 else
-    if ~isfield(geoinputdata,'corners') || ~isfield(geoinputdata,'planecorners')
-    	[CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
-        [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
-
-        CADfile = [CADfilepath,CADfile];
-        geoinputdata.geoinputfile = CADfile;
-        [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);        
+    if isfield(geoinputdata,'geoinputfile')
+        [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
         if ~isfield(filehandlingparameters,'outputdirectory')
             filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
         end    
-    else
-        if isfield(filehandlingparameters,'outputdirectory') == 0 || isfield(filehandlingparameters,'filestem') == 0
-            error('ERROR: When you give the geometry input in the form of data matrices, you must specify filehandlingparameters.outputdirectory and .filestem')            
+        if ~isfield(filehandlingparameters,'filestem')
+            filehandlingparameters.filestem = CADfilestem;
         end
-        if ~isfield(geoinputdata,'planerefltypes')
-           nplanes = size(geoinputdata.planecorners,1);
-           geoinputdata.planerefltypes = ones(nplanes,1);
+    else
+    
+        if ~isfield(geoinputdata,'corners') || ~isfield(geoinputdata,'planecorners')
+    	    [CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
+            [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
+    
+            CADfile = [CADfilepath,CADfile];
+            geoinputdata.geoinputfile = CADfile;
+            [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);        
+            if ~isfield(filehandlingparameters,'outputdirectory')
+                filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
+            end    
+        else
+            if isfield(filehandlingparameters,'outputdirectory') == 0 || isfield(filehandlingparameters,'filestem') == 0
+                error('ERROR: When you give the geometry input in the form of data matrices, you must specify filehandlingparameters.outputdirectory and .filestem')            
+            end
+            if ~isfield(geoinputdata,'planerefltypes')
+               nplanes = size(geoinputdata.planecorners,1);
+               geoinputdata.planerefltypes = ones(nplanes,1);
+            end
         end
     end
-end
-if ~isfield(geoinputdata,'firstcornertoskip')
-    geoinputdata.firstcornertoskip = 1e6;
+    if ~isfield(geoinputdata,'firstcornertoskip')
+        geoinputdata.firstcornertoskip = 1e6;
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -293,9 +304,13 @@ end
 if ~isfield(controlparameters,'Rstart')
     controlparameters.Rstart = 0;
 end
-if ~isfield(controlparameters,'difforder')
-    disp('WARNING: controlparameters.difforder was not specified. It is given the value 10.')
-    controlparameters.difforder = 10;
+if ~isfield(controlparameters,'difforder') 
+    if geoinputdata.freefieldcase == 1
+        controlparameters.difforder = 0;
+    else
+        disp('WARNING: controlparameters.difforder was not specified. It is given the value 10.')
+        controlparameters.difforder = 10;
+    end
 end
 
 % Then other parameters 
@@ -316,6 +331,9 @@ if ~isfield(controlparameters,'docalctf_ESIEBEM')
     disp('WARNING: controlparameters.docalctf_ESIEBEM was not specified. It is given the value 0.')
 else
     if controlparameters.docalctf_ESIEBEM == 1 
+        if geoinputdata.freefieldcase == 1
+            error('ERROR: controlparameters.docalctf_ESIEBEM and geoinputdata.freefieldcase can not both be set to 1')
+        end
         if controlparameters.docalctf == 1
             error('ERROR: controlparameters.docalctf and controlparameters.docalctf_ESIEBEM can not both be set to 1')
         end

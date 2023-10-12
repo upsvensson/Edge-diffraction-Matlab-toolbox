@@ -65,7 +65,7 @@ function [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(plan
 % Uses functions  EDfindis EDchkISvisible EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 9 Oct. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 12 Oct. 2023
 %
 % [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
 % sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,...
@@ -108,6 +108,8 @@ function [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(plan
 % file can be reused inside this function. Also updated load and save to
 % the function call form, which avoids problems with spaces in file names.
 % 9 Oct. 2023 Corrected the description of input and output parameters
+% 12 Oct. 2023 Made small modifications so a free-field case could be
+% handled.
 
 t00 = clock;
 
@@ -168,10 +170,10 @@ end
 
 %-----------------------------------------------------------------
 % planedata.corners = size(planedata.corners,1);
-nplanes = length(planedata.planeisthin);
-nedges = length(edgedata.closwedangvec);
-nsources = size(visplanesfromS,2);
-nreceivers = size(visplanesfromR,2);
+nplanes = size(planedata.planecorners,1);
+nedges = size(edgedata.edgecorners,1);
+nsources = size(sources,1);
+nreceivers = size(receivers,1);
 
 numberofcomponents = zeros(1,3);
 
@@ -222,30 +224,34 @@ end
 
 min_number_elements = min([nsources nreceivers nplanes]);
 
-if nsources == min_number_elements
-    possibleSPR = [];
-    for ii = 1:nsources
-        visplanesfromoneS = visplanesfromS(:,ii);
-        tempmatrix = visplanesfromR.*visplanesfromoneS(:,ones(1,nreceivers));
-        ivpotential = find(tempmatrix);
-        npotentialIS = length(ivpotential);
-        if npotentialIS > 0
-            [Pnumber_potentialIS,Rnumber_potentialIS] = ind2sub([nplanes,nreceivers], ivpotential);
-            possibleSPR = [possibleSPR;[ii*ones(npotentialIS,1) Pnumber_potentialIS Rnumber_potentialIS]];
+if nplanes > 0
+    if nsources == min_number_elements
+        possibleSPR = [];
+        for ii = 1:nsources
+            visplanesfromoneS = visplanesfromS(:,ii);
+            tempmatrix = visplanesfromR.*visplanesfromoneS(:,ones(1,nreceivers));
+            ivpotential = find(tempmatrix);
+            npotentialIS = length(ivpotential);
+            if npotentialIS > 0
+                [Pnumber_potentialIS,Rnumber_potentialIS] = ind2sub([nplanes,nreceivers], ivpotential);
+                possibleSPR = [possibleSPR;[ii*ones(npotentialIS,1) Pnumber_potentialIS Rnumber_potentialIS]];
+            end
+        end
+    else 
+        possibleSPR = [];
+        for ii = 1:nreceivers
+            visplanesfromoneR = visplanesfromR(:,ii);
+            tempmatrix = visplanesfromS.*visplanesfromoneR(:,ones(1,nsources));
+            ivpotential = find(tempmatrix);
+            npotentialIS = length(ivpotential);
+            if npotentialIS > 0
+                [Pnumber_potentialIS, Snumber_potentialIS ] = ind2sub([nplanes,nsources], ivpotential);
+                possibleSPR = [possibleSPR;[ Snumber_potentialIS  Pnumber_potentialIS ii*ones(npotentialIS,1)]];            
+            end
         end
     end
-else 
+else
     possibleSPR = [];
-    for ii = 1:nreceivers
-        visplanesfromoneR = visplanesfromR(:,ii);
-        tempmatrix = visplanesfromS.*visplanesfromoneR(:,ones(1,nsources));
-        ivpotential = find(tempmatrix);
-        npotentialIS = length(ivpotential);
-        if npotentialIS > 0
-            [Pnumber_potentialIS, Snumber_potentialIS ] = ind2sub([nplanes,nsources], ivpotential);
-            possibleSPR = [possibleSPR;[ Snumber_potentialIS  Pnumber_potentialIS ii*ones(npotentialIS,1)]];            
-        end
-    end
 end
 
 if doallSRcombinations == 0
@@ -297,8 +303,7 @@ else
     validrecnumber = [];  
     specreflamp = [];
 end
-    
-    
+        
 %--------------------------------------------------------------------------
 % Then the direct sound 
 %
@@ -312,26 +317,30 @@ if directsound ~= 0
        disp(['      Finding direct sound paths']) 
     end
 
-    if nsources == min_number_elements
+    if nplanes == 0
         possibleSPR_obstruct = [];
-        for ii = 1:nsources
-            visplanesfromoneS = visplanesfromS(:,ii);
-            ivpotential = find(visplanesfromR ~= visplanesfromoneS(:,ones(1,nreceivers)));
-            npotentialobstruct = length(ivpotential);
-            if npotentialobstruct > 0
-                [Pnumber_potentialobstruct, Rnumber_potentialobstruct] = ind2sub([nplanes,nreceivers], ivpotential);
-                possibleSPR_obstruct = [possibleSPR_obstruct;[ii*ones(npotentialobstruct,1) Pnumber_potentialobstruct Rnumber_potentialobstruct]];
+    else
+        if nsources == min_number_elements
+            possibleSPR_obstruct = [];
+            for ii = 1:nsources
+                visplanesfromoneS = visplanesfromS(:,ii);
+                ivpotential = find(visplanesfromR ~= visplanesfromoneS(:,ones(1,nreceivers)));
+                npotentialobstruct = length(ivpotential);
+                if npotentialobstruct > 0
+                    [Pnumber_potentialobstruct, Rnumber_potentialobstruct] = ind2sub([nplanes,nreceivers], ivpotential);
+                    possibleSPR_obstruct = [possibleSPR_obstruct;[ii*ones(npotentialobstruct,1) Pnumber_potentialobstruct Rnumber_potentialobstruct]];
+                end
             end
-        end
-    else 
-        possibleSPR_obstruct = [];
-        for ii = 1:nreceivers
-            visplanesfromoneR = visplanesfromR(:,ii);
-            ivpotential = find(visplanesfromS ~= visplanesfromoneR(:,ones(1,nsources)) );
-            npotentialobstruct = length(ivpotential);
-            if npotentialobstruct > 0
-                [Pnumber_potentialobstruct, Snumber_potentialobstruct] = ind2sub([nplanes,nsources], ivpotential);
-                possibleSPR_obstruct = [possibleSPR_obstruct;[ Snumber_potentialobstruct  Pnumber_potentialobstruct ii*ones(npotentialobstruct,1)]];
+        else 
+            possibleSPR_obstruct = [];
+            for ii = 1:nreceivers
+                visplanesfromoneR = visplanesfromR(:,ii);
+                ivpotential = find(visplanesfromS ~= visplanesfromoneR(:,ones(1,nsources)) );
+                npotentialobstruct = length(ivpotential);
+                if npotentialobstruct > 0
+                    [Pnumber_potentialobstruct, Snumber_potentialobstruct] = ind2sub([nplanes,nsources], ivpotential);
+                    possibleSPR_obstruct = [possibleSPR_obstruct;[ Snumber_potentialobstruct  Pnumber_potentialobstruct ii*ones(npotentialobstruct,1)]];
+                end
             end
         end
     end
@@ -347,7 +356,7 @@ if directsound ~= 0
             npotentialobstruct = 0;
         end
     else
-        directsoundOK = ones(nreceivers,nsources); 
+        directsoundOK = ones(nreceivers,nsources);
         npotentialobstruct = size(possibleSPR_obstruct,1);
     end
 

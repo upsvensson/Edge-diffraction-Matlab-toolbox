@@ -69,7 +69,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 12 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 13 Oct. 2023 (peter.svensson@ntnu.no)
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -174,6 +174,8 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % first irhod cell is empty because first-order diffraction is stored 
 % separately.
 % 12 Oct. 2023 Introduced the possibility for a free-field case
+% 13 Oct. 2023 Small modification: only direct sound saved for the
+% free-field case
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -357,8 +359,6 @@ else
     Sdata.vispartedgesfroms = [];
     timingstruct.Sdata = 0;    
 end
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create the Rdata struct
@@ -584,37 +584,45 @@ if nargout > 0
     EDres = struct;
     EDres.timingstruct = timingstruct;
     if controlparameters.docalcir == 1
-        irtot = irdirect + irgeom + irdiff;
-        [nold,nrec,nsou] = size(irtot);
-
-        if iscell(irhod)
-            ncells = length(irhod);
-            irhodsum = irhod{2};
-            for ii = 3:ncells
-                irhodsum = irhodsum + irhod{ii};
+        if geoinputdata.freefieldcase == 0
+            irtot = irdirect + irgeom + irdiff;
+            [nold,nrec,nsou] = size(irtot);
+    
+            if iscell(irhod)
+                ncells = length(irhod);
+                irhodsum = irhod{2};
+                for ii = 3:ncells
+                    irhodsum = irhodsum + irhod{ii};
+                end
+            else
+                irhodsum = irhod;
             end
+            nnew = size(irhodsum,1);
+            if nnew > nold
+               irdirect = [irdirect;zeros(nnew-nold,nrec,nsou)];
+               irgeom   = [irgeom;zeros(nnew-nold,nrec,nsou)];
+               irdiff   = [irdiff;zeros(nnew-nold,nrec,nsou)];
+               irtot    = [irtot;zeros(nnew-nold,nrec,nsou)];
+            elseif nnew < nold
+               irhodsum = [irhodsum;zeros(nold-nnew,nrec,nsou)];
+            end
+            irtot = irtot + irhodsum;
+            EDres.irdirect = irdirect;
+            EDres.irgeom   = irgeom;
+            EDres.irdiff   = irdiff;
+            if controlparameters.savealldifforders == 1
+                EDres.irhod = irhod;
+            else
+                EDres.irhod    = irhodsum;
+            end
+            EDres.irtot    = irtot;
         else
-            irhodsum = irhod;
+            EDres.irdirect = irdirect;
+            EDres.irgeom = [];
+            EDres.irdiff = [];
+            EDres.irhod = [];
+            EDres.irtot = irdirect;
         end
-        nnew = size(irhodsum,1);
-        if nnew > nold
-           irdirect = [irdirect;zeros(nnew-nold,nrec,nsou)];
-           irgeom   = [irgeom;zeros(nnew-nold,nrec,nsou)];
-           irdiff   = [irdiff;zeros(nnew-nold,nrec,nsou)];
-           irtot    = [irtot;zeros(nnew-nold,nrec,nsou)];
-        elseif nnew < nold
-           irhodsum = [irhodsum;zeros(nold-nnew,nrec,nsou)];
-        end
-        irtot = irtot + irhodsum;
-        EDres.irdirect = irdirect;
-        EDres.irgeom   = irgeom;
-        EDres.irdiff   = irdiff;
-        if controlparameters.savealldifforders == 1
-            EDres.irhod = irhod;
-        else
-            EDres.irhod    = irhodsum;
-        end
-        EDres.irtot    = irtot;
     else
         EDres.irdirect = [];
         EDres.irgeom = [];
@@ -645,7 +653,6 @@ if nargout > 0
         EDres.tftot_ESIEBEM = [];
     end
 end
-
 
 if filehandlingparameters.savelogfile == 1
     fclose(fid);

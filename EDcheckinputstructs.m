@@ -22,6 +22,14 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                        (default:
 %                                         ones(nsources,nfrequencies))
 %                   .doallSRcombinations  (default: 1 = yes)
+%                   .sourcetype           'monopole' (default) or
+%                                         'polygonpiston'
+%                   .pistoncornercoordinates (obligatory if .sourcetype =
+%                   'polygonpiston'). Matrix size[npistoncorners,3].
+%                   .pistoncornernumbers   (obligatory if .sourcetype =
+%                   'polygonpiston'). Matrix size [npistons,maxncornersperpiston].
+%                   .pistonplanes          (obligatory if .sourcetype =
+%                   'polygonpiston'). List of size [npistons,1].
 %   Rinputdata         .coordinates         (obligatory)
 %   envdata         .cair                (default: 344)
 %                   .rhoair              (default: 1.21)
@@ -65,7 +73,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   EDmain_convex_time
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 12 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 26 Oct. 2023 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -136,6 +144,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % can be set to zero.
 % 4 Oct. 2023 Changed default difforder to 10
 % 12 Oct. 2023 Introduced the field geoinputdata.freefieldcase
+% 26 Oct. 2023 Introduced new fields in Sinputdata which define piston
+% sources.
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -272,6 +282,31 @@ ncolumns = size(Sinputdata.coordinates,2);
 if ncolumns ~= 3
    error(['ERROR: check your source coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
 end
+if ~isfield(Sinputdata,'sourcetype')
+    Sinputdata.sourcetype = 'monopole';
+end
+if strcmp(Sinputdata.sourcetype,'polygonpiston') == 1
+    if ~isfield(Sinputdata,'pistoncornercoordinates')
+        error('ERROR: When Sinputdata.sourcetype is polygonpiston, then the field .pistoncornercoordinates must be specified.')
+    end
+    if ~isfield(Sinputdata,'pistoncornernumbers')
+        error('ERROR: When Sinputdata.sourcetype is polygonpiston, then the field .pistoncornernumbers must be specified.')
+    else
+        npistons = size(Sinputdata.pistoncornernumbers,1);
+    end
+    if ~isfield(Sinputdata,'pistonplanes')
+        error('ERROR: When Sinputdata.sourcetype is polygonpiston, then the field .pistonplanes must be specified.')
+    else
+        if size(Sinputdata.pistonplanes(:),1) ~= npistons
+            error('ERROR: the fields .pistoncornernumbers and .pistonplanes must have the same number of rows.')
+        end
+    end
+    if ~isfield(Sinputdata,'pistongausspoints')
+        Sinputdata.pistongausspoints = 3;
+    end
+elseif strcmp(Sinputdata.sourcetype,'monopole') == 0
+    error('ERROR: Sinputdata.sourcetype must be monopole (default) or polygonpiston.')
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct envdata
@@ -308,7 +343,7 @@ if ~isfield(controlparameters,'difforder')
     if geoinputdata.freefieldcase == 1
         controlparameters.difforder = 0;
     else
-        disp('WARNING: controlparameters.difforder was not specified. It is given the value 10.')
+        disp('   INFO: controlparameters.difforder was not specified. It is given the value 10.')
         controlparameters.difforder = 10;
     end
 end
@@ -317,18 +352,18 @@ end
 
 if ~isfield(controlparameters,'docalctf')
     controlparameters.docalctf = 0;
-    disp('WARNING: controlparameters.docalctf was not specified. It is given the value 0.')
+%    disp('WARNING: controlparameters.docalctf was not specified. It is given the value 0.')
 end
 if ~isfield(controlparameters,'docalcir')
     controlparameters.docalcir = 0;
-    disp('WARNING: controlparameters.docalcir was not specified. It is given the value 0.')
+%    disp('WARNING: controlparameters.docalcir was not specified. It is given the value 0.')
 end
 if (controlparameters.docalctf == 1) && (controlparameters.docalcir == 1)
     error('EROR: docalcir and docalctf can not both be set to 1')
 end        
 if ~isfield(controlparameters,'docalctf_ESIEBEM')
     controlparameters.docalctf_ESIEBEM = 0;
-    disp('WARNING: controlparameters.docalctf_ESIEBEM was not specified. It is given the value 0.')
+%    disp('WARNING: controlparameters.docalctf_ESIEBEM was not specified. It is given the value 0.')
 else
     if controlparameters.docalctf_ESIEBEM == 1 
         if geoinputdata.freefieldcase == 1
@@ -351,11 +386,11 @@ if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1
         error('ERROR: controlparameters.frequencies were not specified')
     end
     if ~isfield(controlparameters,'ngauss')
-        disp('WARNING! controlparameters.ngauss wasnt set; it is given the default value 16.')
+        disp('   INFO: controlparameters.ngauss wasnt set; it is given the default value 16.')
         controlparameters.ngauss = 16;
     end
     if ~isfield(controlparameters,'discretizationtype')
-        disp('WARNING! controlparameters.discretizationtype wasnt set; it is given the default value 2.')
+%        disp('   INFO: controlparameters.discretizationtype wasnt set; it is given the default value 2.')
         controlparameters.discretizationtype = 2;
     end
 else
@@ -367,7 +402,7 @@ nfrequencies = length(controlparameters.frequencies);
 
 if controlparameters.docalctf_ESIEBEM == 1
     if ~isfield(controlparameters,'surfacegaussorder')
-        disp('WARNING! controlparameters.surfacegaussorder wasnt set; it is given the default value 5.')
+        disp('   INFO: controlparameters.surfacegaussorder wasnt set; it is given the default value 5.')
         controlparameters.surfacegaussorder = 5;
     end
 else
@@ -376,7 +411,7 @@ end
 
 if controlparameters.docalcir == 1
     if ~isfield(controlparameters,'fs')
-        disp('WARNING! controlparameters.fs wasnt set; it is given the default value 44100.')
+        disp('   INFO: controlparameters.fs wasn''t set; it is given the default value 44100.')
         controlparameters.fs = 44100;
     end   
 else

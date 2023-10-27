@@ -1,4 +1,4 @@
-function plothandles = EDplotmodel(eddatafile,varargin);
+function plothandles = EDplotmodel(eddatafile,varargin)
 % EDplotmodel - Plots a model which is given in an eddatafile.
 %
 % Input parameters:
@@ -57,7 +57,7 @@ function plothandles = EDplotmodel(eddatafile,varargin);
 %
 % Uses functions EDstrpend, EDstrpblnk
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 March 2021
+% Peter Svensson (peter.svensson@ntnu.no) 27 October 2023
 % 
 % plothandles = EDplotmodel(eddatafile,varargin);
 
@@ -74,6 +74,8 @@ function plothandles = EDplotmodel(eddatafile,varargin);
 % 3 June 2020 Fixed a bug: folder names with spaces can be handled now
 % 14 March 2021 Added plothandles as output parameter, and figurewindow as
 % optional input parameter
+% 27 Oct. 2023 Made changes to fit with the changes for structs Rdata and Sdata:
+% the field is now called coordinates instead of sources/receivers.
 
 p = inputParser;
 
@@ -257,18 +259,18 @@ end
 
 if plotsources == 1
     if isempty(sounumbers)
-        plothandles.sources = plot3(Sdata.sources(:,1),Sdata.sources(:,2),Sdata.sources(:,3),'*');
+        plothandles.sources = plot3(Sdata.coordinates(:,1),Sdata.coordinates(:,2),Sdata.coordinates(:,3),'*');
     else
-        plothandles.sources = plot3(sources(sounumbers,1),sources(sounumbers,2),sources(sounumbers,3),'*');       
+        plothandles.sources = plot3(Sdata.coordinates(sounumbers,1),Sdata.coordinates(sounumbers,2),Sdata.coordinates(sounumbers,3),'*');       
     end
     set(plothandles.sources,'LineWidth',3)
 end
 
 if plotreceivers == 1
     if isempty(recnumbers)
-        plothandles.receivers = plot3(Rdata.receivers(:,1),Rdata.receivers(:,2),Rdata.receivers(:,3),'ro');
+        plothandles.receivers = plot3(Rdata.coordinates(:,1),Rdata.coordinates(:,2),Rdata.coordinates(:,3),'ro');
     else
-        plothandles.receivers = plot3(Rdata.receivers(recnumbers,1),Rdata.receivers(recnumbers,2),Rdata.receivers(recnumbers,3),'ro');
+        plothandles.receivers = plot3(Rdata.coordinates(recnumbers,1),Rdata.coordinates(recnumbers,2),Rdata.coordinates(recnumbers,3),'ro');
     end
     set(plothandles.receivers,'LineWidth',3)
 end

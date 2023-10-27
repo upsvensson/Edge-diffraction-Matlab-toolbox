@@ -1,28 +1,17 @@
-function [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(planedata,edgedata,...
-    sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,...
-    vispartedgesfromR,difforder,directsound,doallSRcombinations,EDversionnumber,inpar)
+function [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
+    EDfindconvexGApaths(planedata,edgedata,Sdata,Rdata,controlparameters,...
+    EDversionnumber,filehandlingparameters)
 % EDfindconvexGApaths - Finds all the first-order specular and (possibly)
 % first-order diffraction paths for a convex object.
 % 
-% A version 1 of this function was used up to v 0.221 of EDtoolbox
-% and version 2 after that.
+% From v0.4 of the EDtoolbox, the input parameter list changed.
 %
 % Input parameters:
-%   planedata, edgedata                    structs
-% 	sources
-% 	visplanesfromS, vispartedgesfromS       From the Sdata struct
-%   receivers
-% 	visplanesfromR, vispartedgesfromR       From the Rdata struct
-%   difforder
-%   directsound
-%   doallSRcombinations
+%   planedata, edgedata, Sdata, Rdata       structs
+% 	controlparameters                       struct (only fields .difforder
+%                                           and .directsound are used)
 %   EDversionnumber
-%   inpar                   This parameter is different for version 1 and
-%                           version 2 of this function. 
-%       v1 inpar should be showtext (optional)
-%                           0 -> no text displayed. > 0 -> text displayed.
-%       v2 of inpar should be filehandlingparameters (obligatory)
-%                           filehandlingparameters is a struct which
+%   filehandlingparameters  filehandlingparameters is a struct which
 %                           contains the field showtext.
 %
 % Output parameters:
@@ -41,35 +30,24 @@ function [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(plan
 %                           the receiver number.
 %   .ncomponents            vector, [1,3], with the number of components
 %                           for the direct sound, specular reflections, diffraction.
-%   outpar                  This parameter is different for version 1 and
-%                           version 2 of this function. 
-%       v1 outpar = EDinputdatahash       
-%                           This is a string of characters which is
-%                           uniquely representing the input data planedata, edgedata, 
-%                           sources,visplanesfroms,vispartedgesfroms,
-%                           receivers,visplanesfromr,vispartedgesfromr,
-%                           difforder,directsound,doallSRcombinations.
-%                           An existing result file with the same value of 
-%                           this EDinputdatahash will be reused.
-%       v2 outpar = elapsedtimefindpaths
+%   elapsedtimefindpaths
 %                           This tells how long time was used inside this
 %                           function. If an existing file was reused, then
 %                           elapsedtimefindpaths has a second value which tells
 %                           how much time was used for the existing file.
-%   existingfilename        For v2 of this function, if an existing file was
-%                           found that was reused, then the reused file
-%                           name is given here. If no existing file could be 
-%                           reused then this variable is empty. For v1 of
-%                           this function, this variable is also empty.
+%   existingfilename        If an existing file was found that was reused,
+%                           then the reused file name is given here. 
+%                           If no existing file could be reused then this 
+%                           variable is empty. 
 %
 % Uses functions  EDfindis EDchkISvisible EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 12 Oct. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 27 Oct. 2023
 %
-% [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(planedata,edgedata,edgetoedgedata,...
-% sources,visplanesfromS,vispartedgesfromS,receivers,visplanesfromR,vispartedgesfromR,...
-% difforder,directsound,doallSRcombinations,EDversionnumber,inpar)
+% [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
+%    EDfindconvexGApaths(planedata,edgedata,Sdata,Rdata,controlparameters,...
+%    EDversionnumber,filehandlingparameters);
 
 % 27 Dec. 2017 First start
 % 28 Dec. 2017 Functioning version for diff
@@ -110,70 +88,50 @@ function [firstorderpathdata,outpar,existingfilename] = EDfindconvexGApaths(plan
 % 9 Oct. 2023 Corrected the description of input and output parameters
 % 12 Oct. 2023 Made small modifications so a free-field case could be
 % handled.
+% 27 Oct. 2023 Substantial change to the input parameters.
 
 t00 = clock;
 
-% if nargin < 13
-%    showtext = 0; 
-% end
-
-if nargin < 13  % Must be the old version
-	functionversion = 1;
-	showtext = 0;
-else % nargin = 13 -> could be the old or new version
-	if isstruct(inpar)
-		functionversion = 2;
-		filehandlingparameters = inpar;
-        showtext = filehandlingparameters.showtext;
-	else
-		functionversion = 1;
-		showtext = inpar;
-	end
-end
+showtext = filehandlingparameters.showtext;
+difforder = controlparameters.difforder;
+directsound = controlparameters.directsound;
 
 EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata,...
-    'sources',sources,'visplanesfromS',visplanesfromS,'vispartedgesfromS',vispartedgesfromS,...
-    'receivers',receivers,'visplanesfromR',visplanesfromR,'vispartedgesfromR',vispartedgesfromR,...
-    'difforder',difforder,'directsound',directsound,'doallSRcombinations',doallSRcombinations,...
+    'sources',Sdata.coordinates,'visplanesfroms',Sdata.visplanesfroms,'vispartedgesfroms',Sdata.vispartedgesfroms,...
+    'receivers',Rdata.coordinates,'visplanesfromr',Rdata.visplanesfromr,'vispartedgesfromr',Rdata.vispartedgesfromr,...
+    'difforder',difforder,'directsound',directsound,'doallSRcombinations',Sdata.doallSRcombinations,...
     'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
-if functionversion == 1
-	outpar = EDinputdatahash;
-	existingfilename = '';
-elseif functionversion == 2
-    %---------------------------------------------------------------
-    % Sort out the file business: can an existing file be used?
-    % Then copy the existing file to a new copy. Should the data be saved in a file? 
-    
-    if filehandlingparameters.suppressresultrecycling == 1
-        foundmatch = 0;
-        existingfilename = '';
-    else
-        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_paths',EDinputdatahash);
-    end
-    
-    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
-    
-    if foundmatch == 1
+%---------------------------------------------------------------
+% Sort out the file business: can an existing file be used?
+% Then copy the existing file to a new copy. Should the data be saved in a file? 
+
+if filehandlingparameters.suppressresultrecycling == 1
+    foundmatch = 0;
+    existingfilename = '';
+else
+    [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_paths',EDinputdatahash);
+end
+
+desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
+
+if foundmatch == 1
 %        eval(['load ''',existingfilename,''''])
-        eval(['load(''',existingfilename,''')'])
-        if ~strcmp(existingfilename,desiredname)
-            copyfile(existingfilename,desiredname);
-        end
-        elapsedtimefindpaths_new = etime(clock,t00);
-        elapsedtimefindpaths = [elapsedtimefindpaths_new elapsedtimefindpaths];
-        outpar = elapsedtimefindpaths;
-        return
+    eval(['load(''',existingfilename,''')'])
+    if ~strcmp(existingfilename,desiredname)
+        copyfile(existingfilename,desiredname);
     end
+    elapsedtimefindpaths_new = etime(clock,t00);
+    elapsedtimefindpaths = [elapsedtimefindpaths_new elapsedtimefindpaths];
+    return
 end
 
 %-----------------------------------------------------------------
-% planedata.corners = size(planedata.corners,1);
 nplanes = size(planedata.planecorners,1);
 nedges = size(edgedata.edgecorners,1);
-nsources = size(sources,1);
-nreceivers = size(receivers,1);
+nsources = size(Sdata.coordinates,1);
+nreceivers = size(Rdata.coordinates,1);
 
 numberofcomponents = zeros(1,3);
 
@@ -190,15 +148,15 @@ if difforder > 0
     edgeisactive = zeros(nedges,1,'uint8');
 
     for ii = 1:nreceivers
-        if doallSRcombinations == 1
+        if Sdata.doallSRcombinations == 1
             for jj = 1:nsources
-                tempvec = vispartedgesfromR(:,ii).*vispartedgesfromS(:,jj);
+                tempvec = Rdata.vispartedgesfromr(:,ii).*Sdata.vispartedgesfroms(:,jj);
                 edgeisactive = edgeisactive + tempvec;        
                 diffpaths(ii,jj,:)=( tempvec>0 );
             end
         else
            jj = ii; 
-           tempvec = vispartedgesfromR(:,ii).*vispartedgesfromS(:,jj);
+           tempvec = Rdata.vispartedgesfromr(:,ii).*Sdata.vispartedgesfroms(:,jj);
            edgeisactive = edgeisactive + tempvec;        
            diffpaths(ii,jj,:)=( tempvec>0 );
         end
@@ -215,8 +173,8 @@ end
 %
 % We find all potentially possible S-P-R combos.
 %
-% visplanesfromS has size [nplanes,nsources]
-% visplanesfromR has size [nplanes,nreceivers]
+% visplanesfroms has size [nplanes,nsources]
+% visplanesfromr has size [nplanes,nreceivers]
 
 if showtext >= 2
    disp(['      Finding first-order specular reflection paths']) 
@@ -228,8 +186,8 @@ if nplanes > 0
     if nsources == min_number_elements
         possibleSPR = [];
         for ii = 1:nsources
-            visplanesfromoneS = visplanesfromS(:,ii);
-            tempmatrix = visplanesfromR.*visplanesfromoneS(:,ones(1,nreceivers));
+            visplanesfromoneS = Sdata.visplanesfroms(:,ii);
+            tempmatrix = Rdata.visplanesfromr.*visplanesfromoneS(:,ones(1,nreceivers));
             ivpotential = find(tempmatrix);
             npotentialIS = length(ivpotential);
             if npotentialIS > 0
@@ -240,8 +198,8 @@ if nplanes > 0
     else 
         possibleSPR = [];
         for ii = 1:nreceivers
-            visplanesfromoneR = visplanesfromR(:,ii);
-            tempmatrix = visplanesfromS.*visplanesfromoneR(:,ones(1,nsources));
+            visplanesfromoneR = Rdata.visplanesfromr(:,ii);
+            tempmatrix = Sdata.visplanesfroms.*Rdata.visplanesfromoneR(:,ones(1,nsources));
             ivpotential = find(tempmatrix);
             npotentialIS = length(ivpotential);
             if npotentialIS > 0
@@ -254,7 +212,7 @@ else
     possibleSPR = [];
 end
 
-if doallSRcombinations == 0
+if Sdata.doallSRcombinations == 0
     if ~isempty(possibleSPR)
         iv = find(possibleSPR(:,1) ~= possibleSPR(:,3));
         possibleSPR(iv,:) = [];
@@ -267,9 +225,9 @@ else
 end
 
 if npotentialIS > 0
-    coords_potentialIS = EDfindis(sources(possibleSPR(:,1),:),possibleSPR(:,2),planedata.planeeqs);
+    coords_potentialIS = EDfindis(Sdata.coordinates(possibleSPR(:,1),:),possibleSPR(:,2),planedata.planeeqs);
     [hitplanes,hitpoints,edgehits,edgehitpoints,edgehitnumbers,cornerhits,cornerhitpoints,cornerhitnumbers] = ...
-        EDchkISvisible(coords_potentialIS,receivers(possibleSPR(:,3),:),...
+        EDchkISvisible(coords_potentialIS,Rdata.coordinates(possibleSPR(:,3),:),...
         planedata.planeeqs(possibleSPR(:,2),4),planedata.planeeqs(possibleSPR(:,2),1:3),...
         planedata.minvals(possibleSPR(:,2),:),planedata.maxvals(possibleSPR(:,2),:),...
         planedata.planecorners(possibleSPR(:,2),:),planedata.corners,planedata.ncornersperplanevec(possibleSPR(:,2)));
@@ -309,8 +267,8 @@ end
 %
 % We find all potentially obstructing S-P-R combos
 %
-% visplanesfromS has size [nplanes,nsources]
-% visplanesfromR has size [nplanes,nreceivers]
+% visplanesfroms has size [nplanes,nsources]
+% visplanesfromr has size [nplanes,nreceivers]
 
 if directsound ~= 0
     if showtext >= 2
@@ -323,8 +281,8 @@ if directsound ~= 0
         if nsources == min_number_elements
             possibleSPR_obstruct = [];
             for ii = 1:nsources
-                visplanesfromoneS = visplanesfromS(:,ii);
-                ivpotential = find(visplanesfromR ~= visplanesfromoneS(:,ones(1,nreceivers)));
+                visplanesfromoneS = Sdata.visplanesfroms(:,ii);
+                ivpotential = find(Rdata.visplanesfromr ~= visplanesfromoneS(:,ones(1,nreceivers)));
                 npotentialobstruct = length(ivpotential);
                 if npotentialobstruct > 0
                     [Pnumber_potentialobstruct, Rnumber_potentialobstruct] = ind2sub([nplanes,nreceivers], ivpotential);
@@ -334,8 +292,8 @@ if directsound ~= 0
         else 
             possibleSPR_obstruct = [];
             for ii = 1:nreceivers
-                visplanesfromoneR = visplanesfromR(:,ii);
-                ivpotential = find(visplanesfromS ~= visplanesfromoneR(:,ones(1,nsources)) );
+                visplanesfromoneR = Rdata.visplanesfromr(:,ii);
+                ivpotential = find(Sdata.visplanesfroms ~= Rdata.visplanesfromoneR(:,ones(1,nsources)) );
                 npotentialobstruct = length(ivpotential);
                 if npotentialobstruct > 0
                     [Pnumber_potentialobstruct, Snumber_potentialobstruct] = ind2sub([nplanes,nsources], ivpotential);
@@ -345,7 +303,7 @@ if directsound ~= 0
         end
     end
 
-    if doallSRcombinations == 0
+    if Sdata.doallSRcombinations == 0
         directsoundOK = eye(nreceivers);
         if ~isempty(possibleSPR_obstruct)
             iv = find(possibleSPR_obstruct(:,1) ~= possibleSPR_obstruct(:,3));
@@ -363,7 +321,7 @@ if directsound ~= 0
     if npotentialobstruct > 0
 
         [hitplanes,hitpoints,edgehits,edgehitpoints,edgehitnumbers,cornerhits,cornerhitpoints,cornerhitnumbers] = ...
-            EDchkISvisible(sources(possibleSPR_obstruct(:,1),:),receivers(possibleSPR_obstruct(:,3),:),...
+            EDchkISvisible(Sdata.coordinates(possibleSPR_obstruct(:,1),:),Rdata.coordinates(possibleSPR_obstruct(:,3),:),...
             planedata.planeeqs(possibleSPR_obstruct(:,2),4),planedata.planeeqs(possibleSPR_obstruct(:,2),1:3),...
             planedata.minvals(possibleSPR_obstruct(:,2),:),planedata.maxvals(possibleSPR_obstruct(:,2),:),...
             planedata.planecorners(possibleSPR_obstruct(:,2),:),planedata.corners,planedata.ncornersperplanevec(possibleSPR_obstruct(:,2)));
@@ -396,7 +354,7 @@ if directsound ~= 0
                 [lia,locb] = ismember(fliplr(corners_of_one_edge),edgedata.edgecorners,'rows');
                end
                edgenumber_that_was_hit = locb(1);
-               if vispartedgesfromS(edgenumber_that_was_hit)*vispartedgesfromR(edgenumber_that_was_hit) == 0
+               if Sdata.vispartedgesfroms(edgenumber_that_was_hit)*Rdata.vispartedgesfromr(edgenumber_that_was_hit) == 0
                     directsoundOK(iv(kk))=0; 
                end
             end
@@ -418,7 +376,7 @@ if directsound ~= 0
                    (possibleSPR_obstruct(ivcornerhit(kk),2),:);
                 the_hit_corner = corners_of_one_plane(cornerhitnumbers(ivcornerhit(kk)));
                 connectededges_to_hit_corner = find( sum( (edgedata.edgecorners == the_hit_corner).' ).');
-                if sum(vispartedgesfromS(connectededges_to_hit_corner).*vispartedgesfromR(connectededges_to_hit_corner)) == 0
+                if sum(Sdata.vispartedgesfroms(connectededges_to_hit_corner).*Rdata.vispartedgesfromr(connectededges_to_hit_corner)) == 0
                     directsoundOK(iv(kk))=0;
                 end
             end
@@ -448,12 +406,9 @@ firstorderpathdata.edgeisactive     = edgeisactive;
 firstorderpathdata.directsoundlist  = [Snumber_directsoundOK(:) Rnumber_directsoundOK(:) dirsoundamp(:)];
 firstorderpathdata.ncomponents      = numberofcomponents;
 
-if functionversion == 2
-	elapsedtimefindpaths = etime(clock,t00);
-    outpar = elapsedtimefindpaths;
+elapsedtimefindpaths = etime(clock,t00);
+outpar = elapsedtimefindpaths;
 
-	if filehandlingparameters.savepathsfile == 1
-    	eval(['save(''',desiredname,''',''firstorderpathdata'',''EDinputdatahash'',''elapsedtimefindpaths'');'])
-	end
+if filehandlingparameters.savepathsfile == 1
+	eval(['save(''',desiredname,''',''firstorderpathdata'',''EDinputdatahash'',''elapsedtimefindpaths'');'])
 end
-

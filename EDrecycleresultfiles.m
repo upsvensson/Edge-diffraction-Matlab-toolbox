@@ -13,12 +13,15 @@ function [foundmatch,existingfilename] = EDrecycleresultfiles(filedirectory,file
 %   foundmatch
 %   existingfilename
 %
-% Peter Svensson (peter.svensson@ntnu.no) 8 Feb 2018
+% Peter Svensson (peter.svensson@ntnu.no) 27 Oct. 2023
 % 
 % [foundmatch,existingfilename] =
 % EDrecycleresultfiles(outputdirectory,fileending,hashtocomparewith);
 
 % 8 Feb 2018 First version
+% 27 Oct. 2023 Fixed a mistake: the 'existingfilename' returned the last
+% checked file, whether foundmatch = 1 or 0. After the fix, 
+% existingfilename is empty if foundmatch = 0.
 
 listoffilestocheck = dir([filedirectory,filesep,'*',fileending,'.mat']);
 
@@ -41,3 +44,7 @@ if nfiles > 0
         end
     end
 end
+if foundmatch == 0
+    existingfilename = [];
+end
+

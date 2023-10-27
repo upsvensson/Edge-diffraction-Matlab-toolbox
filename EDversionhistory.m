@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 13 Oct. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 27 Oct. 2023
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -286,6 +286,11 @@ icounter = icounter + 1;
 versionnumbers{icounter} = '0.304';
 versiondate{icounter} = '14 Oct. 2023';
 versiontext{icounter} = ['Small change for the free-field case: only the direct sound is saved in the result file, and returned by the function.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.400';
+versiondate{icounter} = '27 Oct. 2023';
+versiontext{icounter} = ['S and R structs changed, and many function calls now use entire structs as input'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

@@ -1,35 +1,21 @@
-function [irhod,outpar,existingfilename] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
-    difforder,elemsize,edgedata,edgetoedgedata,Sdata,doaddsources,...
-    sourceamplitudes,Rdata,cair,fs,Rstart,...
-    savealldifforders,showtext,EDversionnumber,filehandlingparameters,EDsettingshash)
+function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,...
+    hodpathsalongplane,edgedata,edgetoedgedata,Sdata,Rdata,envdata,...
+    controlparameters,elemsize,EDversionnumber,filehandlingparameters,EDsettingshash)
 % EDmakeHODirs - Constructs higher-order (two and higher) diffraction impulse
 % responses from a list of paths in the input struct hodpaths.
-% 
-% A version 1 of this function was used up to v 0.221 of EDtoolbox
-% and version 2 after that.
 %
+% From v0.4 of the EDtoolbox, the input parameter list changed.
+% 
 % Input parameters:
 %   hodpaths        Cell variable with a list of all the valid
 %                   edge-sequences for each diffraction order
 %   hodpathsalongplane  Cell variable with a list of 0/1 for each edge-sequence.
-%   difforder       Value from controlparameters
-%   elemsize        Vector, [1,difforder], with values that specify how
-%                   fine edge discretization will be used for each order.
-%                   Recommended starting values are [1 0.5 0.25 0.125 ...].
-%                   Higher values give more accurate results.
-%   edgedata,edgetoedgedata,Sdata,Rdata     Structs
-%   doaddsources    0 or 1; determines if individual irs for each source
-%                   should be stored, or if they should be summed
-%   sourceamplitudes   the amplitude that will be used when all sources' 
-%                   contributions are added
-%   cair,fs,Rstart  Values from envdata and controlparameters 
-%   savealldifforders   0 or 1
-%   showtext        Value from filehandlingparameters
+%   edgedata,edgetoedgedata,Snewdata,Rnewdata,envdata,controlparameters,...
+%                   filehandlingparameters    Structs
+%   elemsize        List, size [1,difforder], of discretizing fineness for
+%                   each diffraction order
 %   EDversionnumber
-%   filehandlingparameters  Ignored in version 1 of this function and 
-%                       obligatory for version 2.
-%   EDsettingshash  Ignored in version 1 of this function and 
-%                       obligatory for version 2.
+%   EDsettingshash  (Obligatory)
 %
 % Output parameters:
 %   irhod           The ir with all the higher-order diffraction orders summed up
@@ -41,14 +27,7 @@ function [irhod,outpar,existingfilename] = EDmakeHODirs(hodpaths,hodpathsalongpl
 %                   where each irhod{ndifforder} has this size:
 %                       [nsampels,nreceivers,nsources] (if doaddsources = 0)
 %                       [nsampels,nreceivers,1] (if doaddsources = 1)
-%   outpar                  This parameter is different for version 1 and
-%                           version 2 of this function. 
-%       v1 outpar = EDinputdatahash       
-%                           This is a string of characters which is
-%                           uniquely representing the input data. An 
-%                           existing result file with the same value of 
-%                           this EDinputdatahash will be reused.
-%       v2 outpar = elapsedtimemakeirhod
+%   elapsedtimemakeirhod
 %                           This tells how long time was used inside this
 %                           function. If an existing file was reused, then
 %                           elapsedtimemakehodirs has a second value which tells
@@ -63,12 +42,12 @@ function [irhod,outpar,existingfilename] = EDmakeHODirs(hodpaths,hodpathsalongpl
 % from the EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 29 Sep. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 27 Oct. 2023
 %
-% [irhod,outpar,existingfilename] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
-%     difforder,elemsize,edgedata,edgetoedgedata,Sdata,doaddsources,...
-%     sourceamplitudes,Rdata,cair,fs,Rstart,...
-%     savealldifforders,showtext,EDversionnumber,filehandlingparameters)
+% [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
+%     edgedata,edgetoedgedata,Snewdata,Rnewdata,envdata,...
+%    controlparameters,elemsize,EDversionnumber,...
+%    filehandlingparameters,EDsettingshash)
     
 % 8 Dec. 2006 First version
 % 1 May 2017 Fixed a bug which gave an erroneous boosting of some
@@ -93,14 +72,14 @@ function [irhod,outpar,existingfilename] = EDmakeHODirs(hodpaths,hodpathsalongpl
 % compatibility with the old "version 1". v2 moves the check if an existing
 % file can be reused inside this function. Also updated load and save to
 % the function call form, which avoids problems with spaces in file names.
+% 27 Oct. 2023 Substantial change to the input parameter list.
 
 t00 = clock;
 
-if nargin < 17  % Must be the old version
-	functionversion = 1;
-else   % nargin = 6 -> must be the new version
-    functionversion = 2;
-end
+showtext = filehandlingparameters.showtext;
+difforder = controlparameters.difforder;
+fs = controlparameters.fs;
+Rstart = controlparameters.Rstart;
 
 EDinputdatastruct = struct('difforder',difforder);
 EDinputdatastruct.hodpaths = hodpaths;
@@ -108,46 +87,38 @@ EDinputdatastruct.hodpathsalongplane = hodpathsalongplane;
 EDinputdatastruct.elemsize = elemsize;
 EDinputdatastruct.edgedata = edgedata;
 EDinputdatastruct.Sdata = Sdata;
-EDinputdatastruct.doaddsources = doaddsources;
-EDinputdatastruct.sourceamplitudes = sourceamplitudes;
 EDinputdatastruct.Rdata = Rdata;
-EDinputdatastruct.cair = cair;
+EDinputdatastruct.envdata = envdata;
 EDinputdatastruct.fs = fs;
 EDinputdatastruct.Rstart = Rstart;
-EDinputdatastruct.savealldifforders = savealldifforders;
+EDinputdatastruct.savealldifforders = controlparameters.savealldifforders;
 EDinputdatastruct.EDversionnumber = EDversionnumber;
 EDinputdatahash = DataHash(EDinputdatastruct);
 
-if functionversion == 1
-	outpar = EDinputdatahash;
+%---------------------------------------------------------------
+% Sort out the file business: can an existing file be used?
+% Then copy the existing file to a new copy. Should the data be saved in a file? 
+
+if filehandlingparameters.suppressresultrecycling == 1
+	foundmatch = 0;
 	existingfilename = '';
-elseif functionversion == 2
-	%---------------------------------------------------------------
-	% Sort out the file business: can an existing file be used?
-	% Then copy the existing file to a new copy. Should the data be saved in a file? 
+else
+	[foundmatch,existingfilename] = ... 
+		EDrecycleresultfiles(filehandlingparameters.outputdirectory,...
+		'_irhod',EDinputdatahash);
+end
 
-	if filehandlingparameters.suppressresultrecycling == 1
-		foundmatch = 0;
-		existingfilename = '';
-	else
-		[foundmatch,existingfilename] = ... 
-			EDrecycleresultfiles(filehandlingparameters.outputdirectory,...
-			'_irhod',EDinputdatahash);
+desiredname = [filehandlingparameters.outputdirectory,filesep,...
+	filehandlingparameters.filestem,'_irhod.mat'];
+
+if foundmatch == 1
+	eval(['load(''',existingfilename,''')'])
+	if ~strcmp(existingfilename,desiredname)
+		copyfile(existingfilename,desiredname);
 	end
-
-	desiredname = [filehandlingparameters.outputdirectory,filesep,...
-		filehandlingparameters.filestem,'_irhod.mat'];
-
-	if foundmatch == 1
-		eval(['load(''',existingfilename,''')'])
-		if ~strcmp(existingfilename,desiredname)
-			copyfile(existingfilename,desiredname);
-		end
-		elapsedtimemakeirhod_new = etime(clock,t00);
-		elapsedtimemakeirhod = [elapsedtimemakeirhod_new elapsedtimemakeirhod];
-        outpar = elapsedtimemakeirhod;
-		return
-	end
+	elapsedtimemakeirhod_new = etime(clock,t00);
+	elapsedtimemakeirhod = [elapsedtimemakeirhod_new elapsedtimemakeirhod];
+	return
 end
 
 %----------------------------------------------------------------
@@ -159,8 +130,8 @@ nyvec = pi./(2*pi - edgedata.closwedangvec);
 
 reftoshortlistE = edgetoedgedata.reftoshortlistE;
 
-nsources = size(Sdata.sources,1);
-nreceivers = size(Rdata.receivers,1);
+nsources = size(Sdata.coordinates,1);
+nreceivers = size(Rdata.coordinates,1);
 
 %--------------------------------------------------------------------------
 
@@ -170,8 +141,8 @@ cellcounter = 1;
 for isou = 1:nsources
     for irec = 1:nreceivers
 
-        S = Sdata.sources(isou,:);
-        R = Rdata.receivers(irec,:);
+        S = Sdata.coordinates(isou,:);
+        R = Rdata.coordinates(irec,:);
 
         for Ndifforder = 2:difforder
             if showtext >= 2
@@ -181,7 +152,7 @@ for isou = 1:nsources
             if ~isempty(hodpaths{Ndifforder})
                 
 %                 disp(['   Paths found for order ',int2str(Ndifforder)])
-                if savealldifforders == 1
+                if controlparameters.savealldifforders == 1
                    cellcounter = Ndifforder; 
                 end
 
@@ -194,7 +165,7 @@ for isou = 1:nsources
                 % Calculate some general parameters that are shared for all
                 % N-diffraction calculations
 
-                divmin = cair/(fs*elemsize(Ndifforder));
+                divmin = envdata.cair/(fs*elemsize(Ndifforder));
                 ndivvec = ceil(abs( edgedata.edgelengthvec.' )/divmin);
                 dzvec = (edgedata.edgelengthvec.')./ndivvec;
 
@@ -219,7 +190,7 @@ for isou = 1:nsources
                         end
                     end
                     
-                    if savealldifforders == 1
+                    if controlparameters.savealldifforders == 1
                         if ii == 1 && isou == 1 && irec == 1
                             firstcomponentdone = 0; 
                         end            
@@ -316,14 +287,12 @@ for isou = 1:nsources
 
                         [irnew,~] = EDwedge2nd(cylS,cylR,cylE2_r1frac,cylE1_r2frac,...
                             nyvec(edgepattern(:)),[0 edgedata.edgelengthvec(edgepattern(1));0 edgedata.edgelengthvec(edgepattern(2))],dzvec(edgepattern(:)),...
-                            'n',pathalongplane(ii),Rstart,bc,cair,fs);
+                            'n',pathalongplane(ii),Rstart,bc,envdata.cair,fs);
 
         %                 IRDIFFVEC = [IRDIFFVEC;sum(irnew)];
 
                     elseif Ndifforder == 3    %   if Ndifforder == 2			
-% disp(['   Difforder: ',int2str(Ndifforder)])
-% pathalongplane(ii,:)
-% pause
+
                         for kk = 1:newndivvec(1)  
                             
                             BIGEDGE1stvalue = (kk-0.5)./newndivvec(1);
@@ -359,9 +328,6 @@ for isou = 1:nsources
                     end
 
                     if Ndifforder >= 4    
-% disp(['   Difforder: ',int2str(Ndifforder)])
-% pathalongplane(ii,:)
-% pause
 
                         for kk = 1:newndivvec(1)
                             if showtext >= 5
@@ -388,7 +354,6 @@ for isou = 1:nsources
                         end
                     end
 
-
                     % For thin plates, we must have a boost factor!
                     % This is because there will be multiple equivalent
                     % combinations passing on the rear side of the thin plate
@@ -398,8 +363,7 @@ for isou = 1:nsources
                     % diffraction involved two thin planes that
                     % were not the same.                            
 
-            %                             if all( nyvec(edgepattern(:)) == 0.5 )
-                   boostfactor = 1;
+                    boostfactor = 1;
 %                    29 May 2018: The line below caused an error for a thin
 %                    plane, so it was replaced by the line below.
 %                    if all( nyvec(edgepattern(:)) == 0.5 ) && pathalongplane==1                                
@@ -418,27 +382,27 @@ for isou = 1:nsources
                     % has a higher difforder than S/R = 1/1.
                     
                     if firstcomponentdone == 0 || size(irhod,2) < cellcounter
-                       if doaddsources == 0
+                       if Sdata.doaddsources == 0
                            irhod{cellcounter} = zeros(nnew,nreceivers,nsources);
                            irhod{cellcounter}(:,irec,isou) = irnew;
                        else
                            irhod{cellcounter} = zeros(nnew,nreceivers,1);
-                           irhod{cellcounter}(:,irec,1) = irnew*sourceamplitudes(isou);                   
+                           irhod{cellcounter}(:,irec,1) = irnew*Sdata.sourceamplitudes(isou);                   
                        end
                        firstcomponentdone = 1;
                     else
                         nold = size(irhod{cellcounter},1);
                         if nnew > nold
-                            if doaddsources == 0
+                            if Sdata.doaddsources == 0
                                irhod{cellcounter} = [irhod{cellcounter};zeros(nnew-nold,nreceivers,nsources)]; 
                             else
                                irhod{cellcounter} = [irhod{cellcounter};zeros(nnew-nold,nreceivers,1)];                         
                             end
                         end
-                        if doaddsources == 0
+                        if Sdata.doaddsources == 0
                             irhod{cellcounter}(1:nnew,irec,isou) = irhod{cellcounter}(1:nnew,irec,isou) + irnew;                
                         else
-                            irhod{cellcounter}(1:nnew,irec,1) = irhod{cellcounter}(1:nnew,irec,1) + irnew*sourceamplitudes(isou);                                    
+                            irhod{cellcounter}(1:nnew,irec,1) = irhod{cellcounter}(1:nnew,irec,1) + irnew*Sdata.sourceamplitudes(isou);                                    
                         end
                     end
 
@@ -453,7 +417,7 @@ for isou = 1:nsources
     
 end
 
-if savealldifforders == 1
+if controlparameters.savealldifforders == 1
     nirlength = 0;
    for ii = 2:difforder
        nnew = size(irhod{ii},1);
@@ -465,7 +429,7 @@ if savealldifforders == 1
    for ii = 2:difforder
        nnew = size(irhod{ii},1);
        if nnew < nirlength
-           if doaddsources == 1
+           if Sdata.doaddsources == 1
                irhod{ii} = [irhod{ii};zeros(nirlength-nnew,nreceivers)];
            else
                irhod{ii} = [irhod{ii};zeros(nirlength-nnew,nreceivers,nsources)];               
@@ -475,9 +439,6 @@ if savealldifforders == 1
       
 end
 
-if functionversion == 2
-	elapsedtimemakeirhod = etime(clock,t00);
-    outpar = elapsedtimemakeirhod;
+elapsedtimemakeirhod = etime(clock,t00);
 
-    eval(['save(''',desiredname,''',''irhod'',''EDinputdatahash'',''elapsedtimemakeirhod'',''EDsettingshash'');'])
-end
+eval(['save(''',desiredname,''',''irhod'',''EDinputdatahash'',''elapsedtimemakeirhod'',''EDsettingshash'');'])

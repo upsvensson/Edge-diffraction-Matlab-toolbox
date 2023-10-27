@@ -1,27 +1,21 @@
-function [P_receiver,timingdata,extraoutputdata,outpar,existingfilename] = ...
-    EDintegralequation_convex_tf(filehandlingparameters,envdata,planedata,...
-    edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,doaddsources,sourceamplitudes,...
-    doallSRcombinations,Rdata,controlparameters,EDversionnumber,EDsettingshash)
+function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
+    EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
+	Sdata,Rdata,envdata,controlparameters,EDversionnumber,filehandlingparameters,EDsettingshash)
 % EDintegralequation_convex_tf calculates the sound pressure representing second-
 % and higher-order diffraction, for a convex scattering object
-% 
-% A version 1 of this function was used up to v 0.221 of EDtoolbox
-% and version 2 after that.
 %
+% From v0.4 of the EDtoolbox, the input parameter list changed.
+% 
 % Input parameters:
-%   filehandlingparameters, envdata, planedata,edgedata,edgetoedgedata,...
 %   Hsubmatrixdata          Structs
-%   Sdata                   Struct 
-%   doaddsources            0 or 1
-%   sourceamplitudes
-%   doallSRcombinations     0 or 1
-%   Rdata                   Struct
-%   controlparameters       Struct
+%   planedata,edgedata,edgetoedgedata       Structs
+%   Sdata,Rdata,envdata,controlparameters   Structs
 %   EDversionnumber
-%   EDsettingshash          Used only in version 2 of this function
+%   filehandlingparameters, envdata, 
+%   EDsettingshash          
 %
 % Output parameters
-%   P_receiver      Matrix with the diffracted pressure
+%   tfinteqdiff      Matrix with the diffracted pressure
 %                   If nsources = 1, or all sources should be added, then
 %                       the size is [nfrequencies,nreceivers]
 %                   If nsources > 1, and all sources should be computed
@@ -29,14 +23,7 @@ function [P_receiver,timingdata,extraoutputdata,outpar,existingfilename] = ...
 %                       [nfrequencies,nreceivers,nsources]
 %   timingdata
 %   extraoutputdata
-%   outpar              This parameter is different for version 1 and
-%                       version 2 of this function. 
-%       v1 outpar = EDinputdatahash       
-%                       This is a string of characters which is
-%                       uniquely representing the input data.
-%                       An existing result file with the same value of this
-%                       EDinputdatahash will be reused.
-%       v2 outpar = elapsedtimehodtf
+%   elapsedtimehodtf
 %                       This tells how long time was used inside this
 %                       function. If an existing file was reused, then
 %                       elapsedtimehodtf has a second value which tells
@@ -51,12 +38,12 @@ function [P_receiver,timingdata,extraoutputdata,outpar,existingfilename] = ...
 % EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1 from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  6 Oct. 2023  
+% Peter Svensson (peter.svensson@ntnu.no)  27 Oct. 2023  
 %                       
-% [P_receiver,timingdata,extraoutputdata,outpar,existingfilename] = ...
-%     EDintegralequation_convex_tf(filehandlingparameters,envdata,planedata,...
-%     edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,doaddsources,sourceamplitudes,...
-%     doallSRcombinations,Rdata,controlparameters,EDversionnumber,EDsettingshash)
+% [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
+%     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
+%	Snewdata,Rnewdata,envdata,controlparameters,    
+%    EDversionnumber,filehandlingparameters,EDsettingshash);
 
 % 31 March 2015 Introduced detailed timing, also as output parameter.
 % 8 April 2015 Substantial speeding up by saving Hsubdata instead of Hsub
@@ -110,53 +97,41 @@ function [P_receiver,timingdata,extraoutputdata,outpar,existingfilename] = ...
 % 3 Oct. 2023 Introduced the EDsettingshash as input parameter.
 % 6 Oct. 2023 Fixed a small error: the timing data wasn't returned when an
 % existing file was reused.
+% 27 Oct. 2023 Changed the input parameter list substantially.
 
 t00 = clock;
 showtext = filehandlingparameters.showtext;
 
-if nargout == 4
-    functionversion = 1;
-else
-    functionversion = 2;
-end
-
 EDinputdatastruct = struct('envdata',envdata,...
     'planedata',planedata,'edgedata',edgedata,'edgetoedgedata',edgetoedgedata,...
-    'Hsubmatrixdata',Hsubmatrixdata,'Sdata',Sdata,'doaddsources',doaddsources,...
-    'sourceamplitudes',sourceamplitudes,'doallSRcombinations',doallSRcombinations,...
+    'Hsubmatrixdata',Hsubmatrixdata,'Sdata',Sdata,...
     'Rdata',Rdata,'controlparameters',controlparameters,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
-if functionversion == 1
-	outpar = EDinputdatahash;
-	existingfilename = '';
-elseif functionversion == 2
-    %---------------------------------------------------------------
-    % Sort out the file business: can an existing file be used?
-    % Then copy the existing file to a new copy. 
-    
-    if filehandlingparameters.suppressresultrecycling == 1
-        foundmatch = 0;
-        existingfilename = '';
-    else
-        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_tfinteq',EDinputdatahash);
-    end
+%---------------------------------------------------------------
+% Sort out the file business: can an existing file be used?
+% Then copy the existing file to a new copy. 
 
-    EDinputdatahash_tfinteq = EDinputdatahash;
-    
-    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
-    
-    if foundmatch == 1
-        eval(['load(''',existingfilename,''')'])
-        if ~strcmp(existingfilename,desiredname)
-            copyfile(existingfilename,desiredname);
-        end
-        elapsedtimehodtf_new = etime(clock,t00);
-        elapsedtimehodtf = [elapsedtimehodtf_new elapsedtimehodtf];
-        P_receiver = tfinteqdiff;
-        outpar = elapsedtimehodtf;
-        return
+if filehandlingparameters.suppressresultrecycling == 1
+    foundmatch = 0;
+    existingfilename = '';
+else
+    [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_tfinteq',EDinputdatahash);
+end
+
+EDinputdatahash_tfinteq = EDinputdatahash;
+
+desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
+
+if foundmatch == 1
+    eval(['load(''',existingfilename,''')'])
+    if ~strcmp(existingfilename,desiredname)
+        copyfile(existingfilename,desiredname);
     end
+    elapsedtimehodtf_new = etime(clock,t00);
+    elapsedtimehodtf = [elapsedtimehodtf_new elapsedtimehodtf];
+    P_receiver = tfinteqdiff;
+    return
 end
 
 extraoutputdata = struct('tfinteqdiff_nodiff2',[]);
@@ -170,8 +145,8 @@ timingdata = zeros(1,4);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Run an outer loop over all frequencies 
     
-nsources = size(Sdata.sources,1);
-nreceivers = size(Rdata.receivers,1);
+nsources = size(Sdata.coordinates,1);
+nreceivers = size(Rdata.coordinates,1);
 
 % Find if there are image sources that could see any edges
 nplanes = size(planedata.planecorners,1);
@@ -523,7 +498,7 @@ for ifreq = 1:nfrequencies
     %
     % CASE 1: doaddsources = 1, or we have only one source
     
-    if doaddsources == 1 || nsources == 1
+    if Sdata.doaddsources == 1 || nsources == 1
         if ifreq==1
             P_receiver = zeros(nfrequencies,nreceivers);
         end
@@ -544,7 +519,7 @@ for ifreq = 1:nfrequencies
                     Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
                 
 %                 Q_firstterm = Q_firstterm + Q_firstterm_addition;
-                Q_firstterm = Q_firstterm + Q_firstterm_addition*sourceamplitudes(isou,ifreq);
+                Q_firstterm = Q_firstterm + Q_firstterm_addition*Sdata.sourceamplitudes(isou,ifreq);
             end
         
             if ifreq == 1
@@ -813,15 +788,12 @@ for ifreq = 1:nfrequencies
     end
 end
 
-if functionversion == 2
-    elapsedtimehodtf = etime(clock,t00);
-    outpar = elapsedtimehodtf;
-    tfinteqdiff = P_receiver;
+elapsedtimehodtf = etime(clock,t00);
+tfinteqdiff = P_receiver;
 
-    EDinputdatahash = EDinputdatahash_tfinteq;
+EDinputdatahash = EDinputdatahash_tfinteq;
 
-    eval(['save(''',desiredname,''',''tfinteqdiff'',''extraoutputdata'',''EDinputdatahash'',''timingdata'',''elapsedtimehodtf'',''EDsettingshash'');'])
-end
+eval(['save(''',desiredname,''',''tfinteqdiff'',''extraoutputdata'',''EDinputdatahash'',''timingdata'',''elapsedtimehodtf'',''EDsettingshash'');'])
 
 
     

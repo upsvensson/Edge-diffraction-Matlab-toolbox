@@ -1,17 +1,17 @@
-function [outputstruct,outpar,existingfilename] = EDSorRgeo(planedata,edgedata,pointcoords,...
-    typeofcoords,EDversionnumber,nedgesubs,inpar)
+function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo(planedata,edgedata,inputstruct,...
+    typeofcoords,EDversionnumber,nedgesubs,filehandlingparameters)
 % EDSorRgeo - Calculates some source- or receiver-related geometrical parameters.
 % Calculates some source- or receiver-related geometrical parameters,
 % based on corners,edges and planes in an eddata-file, and on a list of
-% source/receiver coordinates. The output is saved in a .mat-file.
-% 
-% A version 1 of this function was used up to v 0.221 of EDtoolbox
-% and version 2 after that.
+% source/receiver coordinates. The output is returned as an expanded version of the input struct.
+%
+% From v0.4 of the EDtoolbox, the input parameter list changed.
 %
 % Input parameters:
 %   planedata               struct
 %   edgedata                struct
-%	pointcoords				Matrix, [nrec,3], of source or receiver coordinates.
+%	inputstruct             struct, where the field .coordinates is the only one used by this
+%                           function. The function adds new fields to this existing struct.
 %   typeofcoords            'S' or 'R' - specifying if the point coordinates are sources
 %                           or receivers. This determines what the output data in the output
 %                           file will be called.
@@ -19,17 +19,13 @@ function [outputstruct,outpar,existingfilename] = EDSorRgeo(planedata,edgedata,p
 %	nedgesubs (optional)	The number of subdivisions that each edge will be
 %							subdivided into for visibility/obstruction tests. Default: 2
 %							NB! When nedgesubs = 2, the two end points will be checked.
-%   inpar                   This parameter is different for version 1 and
-%                           version 2 of this function. 
-%       v1 inpar should be showtext (optional)
-%                           0 -> no text displayed. Value > 0 -> text displayed.
-%       v2 of inpar should be filehandlingparameters (obligatory)
+%   filehandlingparameters (obligatory)
 %                           filehandlingparameters is a struct which
 %                           contains the field showtext.
 %
 % Output parameters:
 %   outputstruct            struct with fields
-%       sources/receivers                       (renamed) copy of the input parameter 'pointcoords'
+%       coordinates         (renamed) copy of the input parameter 'pointcoords'
 %       visplanesfroms/visplanesfromr           Matrix, [nplanes,nsources]/[nplanes/nreceivers]
 %                                           with integer values 0-5:
 %                           0 means S/R behind a plane which is reflective or totabs
@@ -53,36 +49,27 @@ function [outputstruct,outpar,existingfilename] = EDSorRgeo(planedata,edgedata,p
 %                                           values of radius for sources/receivers relative to the the edges.
 %       thetaSsho/thetaRsho
 %       zSsho/zRsho
-%   outpar              This parameter is different for version 1 and
-%                           version 2 of this function. 
-%       v1 outpar = EDinputdatahash       
-%                           This is a string of characters which is
-%                           uniquely representing the input data planedata, 
-%                           edgedata, pointcoords, nedgesubs.
-%                           An existing result file with the same value of
-%                           this EDinputdatahash will be reused.
-%       v2 outpar = elapsedtimeSgeo
-%                           This tells how long time was used inside this
+%   elapsedtimeSRgeo        This tells how long time was used inside this
 %                           function. If an existing file was reused, then
 %                           elapsedtimeSgeo has a second value which tells
 %                           how much time was used for the existing file.
-%   existingfilename        For v2 of this function, if an existing file was
-%                           found that was reused, then the reused file
-%                           name is given here. If no existing file could be 
-%                           reused then this variable is empty. For v1 of
-%                           this function, this variable is also empty.
+%   existingfilename        If an existing file was found that was reused,
+%                           then the reused file name is given here. If no 
+%                           existing file could be reused then this variable
+%                           is empty. 
 %
-% NB! The text on the screeen, and in the code refers to 'R' or 'receivers' but it should be S or R.
+% NB! The text on the screeen, and in the code refers to 'R' or 'receivers'
+% but it should be S or R.
 %
-% Uses the functions 	EDinfrontofplane, EDpoinpla, EDcompress3
-% EDcoordtrans1 EDgetedgepoints, EDcheckobstr_pointtoedge, EDrecycleresultfiles
+% Uses the functions EDinfrontofplane, EDpoinpla, EDcompress3, EDcoordtrans1
+% EDgetedgepoints, EDcheckobstr_pointtoedge, EDrecycleresultfiles
 % from EDtoolbox.
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 Sep. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 27 Oct. 2023
 %
-% [outputstruct,outpar,existingfilename] = EDSorRgeo(planedata,edgedata,pointcoords,typeofcoords,...
-% EDversionnumber,nedgesubs,inpar);
+% [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo(planedata,...
+% edgedata,inputstruct,typeofcoords,EDversionnumber,nedgesubs,filehandlingparameters);
 
 %  1 June 2006 Functioning version
 %  2 Dec 2014  Introduced new output parameters in the file: reftoshortlistR,rRsho,thetaRsho,zRsho
@@ -111,35 +98,15 @@ function [outputstruct,outpar,existingfilename] = EDSorRgeo(planedata,edgedata,p
 % compatibility with the old "version 1". v2 moves the check if an existing
 % file can be reused inside this function. Also updated load and save to
 % the function call form, which avoids problems with spaces in file names.
+% 27 Oct. 2023 Renamed the field in the output struct from 'sources'/'receivers'
+% to 'coordinates'. Also, changed so that the entire Sdata/Rdata struct is
+% taken as input, so that it can be expanded.
 
 t00 = clock;
 geomacc = 1e-9;
 
-% if nargin < 7
-%     showtext = 0;
-%     if nargin < 6
-%         nedgesubs = 2;
-%     end
-% end
-% if isempty(nedgesubs)
-%     nedgesubs = 2; 
-% end
-if nargin < 7  % Must be the old version
-	functionversion = 1;
-	showtext = 0;
-	if nargin < 6
-		nedgesubs = 2;
-    end
-else % nargin = 7 -> could be the old or new version
-	if isstruct(inpar)
-		functionversion = 2;
-		filehandlingparameters = inpar;
-        showtext = filehandlingparameters.showtext;
-	else
-		functionversion = 1;
-		showtext = inpar;
-	end
-end
+showtext = filehandlingparameters.showtext;
+
 if isempty(nedgesubs)
      nedgesubs = 2; 
 end
@@ -148,55 +115,52 @@ if typeofcoords~='r' && typeofcoords~='s'
     error('ERROR: The input parameter typeofcoords must have the value S or R')    
 end
 
-EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata, 'pointcoords',pointcoords,...
-    'nedgesubs',nedgesubs,'EDversionnumber',EDversionnumber);
+if typeofcoords == 's'
+    EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata, 'coordinates',inputstruct.coordinates,...
+        'sourceamplitudes',inputstruct.sourceamplitudes,...
+        'nedgesubs',nedgesubs,'EDversionnumber',EDversionnumber);
+else
+    EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata, 'coordinates',inputstruct.coordinates,...
+        'nedgesubs',nedgesubs,'EDversionnumber',EDversionnumber);
+end    
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
+% Sort out the file business: can an existing file be used?
+% Should the data be saved in a file? 
 
-if functionversion == 1
-	outpar = EDinputdatahash;
-	existingfilename = '';
-elseif functionversion == 2
-    %---------------------------------------------------------------
-    % Sort out the file business: can an existing file be used?
-    % Should the data be saved in a file? 
-    
-    if filehandlingparameters.suppressresultrecycling == 1
-        foundmatch = 0;
-        existingfilename = '';
-    else
-        if typeofcoords == 's'
-            [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_Sdata',EDinputdatahash);
-        else
-            [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_Rdata',EDinputdatahash);
-        end    
-    end
-    
+if filehandlingparameters.suppressresultrecycling == 1
+    foundmatch = 0;
+    existingfilename = '';
+else
     if typeofcoords == 's'
-        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Sdata.mat'];
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_Sdata',EDinputdatahash);
     else
-        desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Rdata.mat'];
+        [foundmatch,existingfilename] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_Rdata',EDinputdatahash);
+    end    
+end
+
+if typeofcoords == 's'
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Sdata.mat'];
+else
+    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_Rdata.mat'];
+end
+
+if foundmatch == 1
+    eval(['load(''',existingfilename,''')'])
+    if ~strcmp(existingfilename,desiredname)
+        copyfile(existingfilename,desiredname);
     end
-    
-    if foundmatch == 1
-        eval(['load(''',existingfilename,''')'])
-        if ~strcmp(existingfilename,desiredname)
-            copyfile(existingfilename,desiredname);
-        end
-        if typeofcoords == 's'
-            outputstruct = Sdata;
-            elapsedtimeSgeo_new = etime(clock,t00);
-            elapsedtimeSRgeo = [elapsedtimeSgeo_new elapsedtimeSgeo];
-        else
-            outputstruct = Rdata;
-            elapsedtimeRgeo_new = etime(clock,t00);
-            elapsedtimeSRgeo = [elapsedtimeRgeo_new elapsedtimeRgeo];
-        end
-        outpar = elapsedtimeSRgeo;
-        return
+    if typeofcoords == 's'
+        outputstruct = Sdata;
+        elapsedtimeSgeo_new = etime(clock,t00);
+        elapsedtimeSRgeo = [elapsedtimeSgeo_new elapsedtimeSgeo];
+    else
+        outputstruct = Rdata;
+        elapsedtimeRgeo_new = etime(clock,t00);
+        elapsedtimeSRgeo = [elapsedtimeRgeo_new elapsedtimeRgeo];
     end
-    
+    return
 end
 
 %---------------------------------------------------------------
@@ -205,26 +169,15 @@ end
 nplanes = size(planedata.planecorners,1);
 maxncornersperplane = double(max(planedata.ncornersperplanevec));
 nedges = size(edgedata.edgecorners,1);
-% % % [nsources,slask] = size(sources);
-nreceivers = size(pointcoords,1);
+nreceivers = size(inputstruct.coordinates,1);
 
 n2 = size(planedata.canplaneobstruct,2);
-if n2>1
-%     canplaneobstruct = planedata.canplaneobstruct.';
-end
+% if n2>1
+% %     canplaneobstruct = planedata.canplaneobstruct.';
+% end
 
-% totalmodelmin = min(planedata.minvals);
-% totalmodelmax = max(planedata.maxvals);
-
-% zerosvecE1 = zeros(nedges,1);
-% % % zerosvec1S = zeros(1,nsources);
-%%zerosvec1R = uint8(zeros(1,nreceivers));
-% zerosvec1P = zeros(1,nplanes);
-% % % onesvec1S = ones(1,nsources);
 onesvec1R = ones(1,nreceivers,'uint8');
 onesvec1ES = ones(1,nedgesubs);
-% onesvecP1 = ones(nplanes,1);
-% onesvec1Max = ones(1,maxncornersperplane);
 
 %##################################################################
 %##################################################################
@@ -293,7 +246,8 @@ clear iv
 %   +1  if point belongs to (infinite) plane
 %    0 if point is behind plane
 
-visplanesfromr = EDinfrontofplane(pointcoords(colnumb,:),planedata.planeeqs(rownumb,1:3),...
+%%%visplanesfromr = EDinfrontofplane(pointcoords(colnumb,:),planedata.planeeqs(rownumb,1:3),...
+visplanesfromr = EDinfrontofplane(inputstruct.coordinates(colnumb,:),planedata.planeeqs(rownumb,1:3),...
 planedata.corners(planedata.planecorners(rownumb,1),:),planedata.corners(planedata.planecorners(rownumb,2),:),'','',geomacc) + 1;
 
 % If any source/receiver belongs to a plane, we should check if the S/R is
@@ -305,10 +259,7 @@ planedata.corners(planedata.planecorners(rownumb,1),:),planedata.corners(planeda
 
 iv_closetoplane = find(visplanesfromr==1);
 if any(iv_closetoplane)
-%     [hitvec,edgehit] = EDpoinpla(pointcoords(colnumb(iv_closetoplane),:),rownumb(iv_closetoplane),...
-%         planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,...
-%         planedata.ncornersperplanevec,planedata.planeeqs(:,1:3),geomacc);
-    [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(pointcoords(colnumb(iv_closetoplane),:),rownumb(iv_closetoplane),...
+    [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(inputstruct.coordinates(colnumb(iv_closetoplane),:),rownumb(iv_closetoplane),...
         planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,...
         planedata.ncornersperplanevec,planedata.planeeqs(:,1:3),geomacc);
     ivinside = find(hitvec);
@@ -373,8 +324,10 @@ if ~isempty(ivec_visR1)
     else
         rownumb = uint32(ivec_visR1 - (double(colnumb)-1)*nplanes);     % This is the plane number
     end
-%     hitvec = find(EDpoinpla(pointcoords(colnumb,:),rownumb,planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,planedata.ncornersperplanevec,planedata.planeeqs(rownumb,1:3)));
-    [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = find(EDpoinpla(pointcoords(colnumb,:),rownumb,planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,planedata.ncornersperplanevec,planedata.planeeqs(rownumb,1:3)));
+    [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = ...
+        find(EDpoinpla(inputstruct.coordinates(colnumb,:),rownumb,...
+        planedata.minvals,planedata.maxvals,planedata.planecorners,...
+        planedata.corners,planedata.ncornersperplanevec,planedata.planeeqs(rownumb,1:3)));
     if ~isempty(hitvec)
         visplanesfromr(ivec_visR1(hitvec)) = uint8(ones(size(hitvec))*4);
         if ntotabsplanes > 0
@@ -385,16 +338,6 @@ if ~isempty(ivec_visR1)
             end
         end
         ivec_visR1(hitvec) = [];
-%         if nthinplanes > 0
-%             insidethinplane = planedata.planeisthin(rownumb(hitvec));
-%             ivec2 = find(insidethinplane);
-%             if ~isempty(ivec2)
-%                 recinthinplane = colnumb(hitvec(ivec2));
-%                 thinplanenumber = rownumb(hitvec(ivec2));
-%         	    error(['ERROR: R number ',int2str(double(recinthinplane(:).')),' has been placed exactly on the thin plane ',int2str(double(thinplanenumber(:).')),...
-% 				    ' so it is undefined which side of the plane the R is. Move the R a short distance away'])
-%             end
-%         end
     end
 end
 
@@ -448,8 +391,6 @@ if showtext >= 3
     	disp('         Checking which edges are seen from S')        
     end    
 end
-
-% nbigcombs = nplanes*nreceivers;
 
 %--------------------------------------------------------------
 %
@@ -1031,7 +972,10 @@ else
                  edgedata.edgeendcoords(edgenumbers,:),nedgesubs,1);
              expandededgenumbers = edgenumbers(expandededgenumbers);
 
-            [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_pointtoedge(pointcoords,expandedrecnumbers,tocoords,reshape(repmat(checkplane.',[nedgesubs,1]),nplanes,nposs).',planedata);
+%%%            [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_pointtoedge(pointcoords,expandedrecnumbers,tocoords,reshape(repmat(checkplane.',[nedgesubs,1]),nplanes,nposs).',planedata);
+            [nonobstructedpaths,nobstructions,edgehits,cornerhits] = ...
+                EDcheckobstr_pointtoedge(inputstruct.coordinates,expandedrecnumbers,...
+                tocoords,reshape(repmat(checkplane.',[nedgesubs,1]),nplanes,nposs).',planedata);
 
     %         expandedcombnumbers = expandedcombnumbers(nonobstructedpaths);
             expandededgeweightlist = expandededgeweightlist(nonobstructedpaths);
@@ -1081,7 +1025,9 @@ thetaRcomplete = zeros(nedges,nreceivers);
 zRcomplete     = zeros(nedges,nreceivers);
 
 for ii = 1:nedges
-    [rR,thetaR,zR] = EDcoordtrans1(pointcoords,[edgedata.edgestartcoords(ii,:);edgedata.edgeendcoords(ii,:)],edgedata.edgenvecs(ii,:),reshape(edgedata.edgerelatedcoordsysmatrices(ii,:),3,3));
+    [rR,thetaR,zR] = EDcoordtrans1(inputstruct.coordinates,...
+        [edgedata.edgestartcoords(ii,:);edgedata.edgeendcoords(ii,:)],...
+        edgedata.edgenvecs(ii,:),reshape(edgedata.edgerelatedcoordsysmatrices(ii,:),3,3));
     rRcomplete(ii,:) = rR.';
     thetaRcomplete(ii,:) = thetaR.';
     zRcomplete(ii,:) = zR.';    
@@ -1108,53 +1054,46 @@ else
 end
 
 if typeofcoords=='r'
-    receivers = pointcoords;
-    
-    Rdata = struct('receivers',receivers,'visplanesfromr',visplanesfromr,...
-        'vispartedgesfromr',vispartedgesfromr,'routsidemodel',routsidemodel,...
-        'vispartedgesfromr_start',vispartedgesfromr_start,'vispartedgesfromr_end',vispartedgesfromr_end,...
-        'reftoshortlistR',reftoshortlistR,'rRsho',rRsho,'thetaRsho',thetaRsho,...
-        'zRsho',zRsho);
 
-    outputstruct = Rdata;
+    outputstruct = inputstruct;
+    outputstruct.visplanesfromr = visplanesfromr;
+    outputstruct.vispartedgesfromr = vispartedgesfromr;
+    outputstruct.routsidemodel = routsidemodel;
+    outputstruct.vispartedgesfromr_start = vispartedgesfromr_start;
+    outputstruct.vispartedgesfromr_end = vispartedgesfromr_end;
+    outputstruct.reftoshortlistR = reftoshortlistR;
+    outputstruct.rRsho = rRsho;
+    outputstruct.thetaRsho = thetaRsho;
+    outputstruct.zRsho = zRsho;
 
-    if functionversion == 2
-        elapsedtimeRgeo = etime(clock,t00);
-        elapsedtimeSRgeo = elapsedtimeRgeo;
-        outpar = elapsedtimeSRgeo;
-    
-        if filehandlingparameters.saveSRdatafiles == 1
-        	eval(['save(''',desiredname,''',''Rdata'',''EDinputdatahash'',''elapsedtimeRgeo'');'])
-        end   
-    end
+    elapsedtimeRgeo = etime(clock,t00);
+    elapsedtimeSRgeo = elapsedtimeRgeo;
+
+    if filehandlingparameters.saveSRdatafiles == 1
+        Rdata = outputstruct;
+    	eval(['save(''',desiredname,''',''Rdata'',''EDinputdatahash'',''elapsedtimeRgeo'');'])
+    end   
     
 else
-    sources = pointcoords;
-    visplanesfroms = visplanesfromr;
-    vispartedgesfroms = vispartedgesfromr;
-    vispartedgesfroms_start = vispartedgesfromr_start;
-    vispartedgesfroms_end = vispartedgesfromr_end;
-    soutsidemodel = routsidemodel;
-    reftoshortlistS = reftoshortlistR; 
-    rSsho = rRsho; 
-    thetaSsho = thetaRsho; 
-    zSsho = zRsho;
-    
-    Sdata = struct('sources',sources,'visplanesfroms',visplanesfroms,...
-        'vispartedgesfroms',vispartedgesfroms,'soutsidemodel',soutsidemodel,...
-        'vispartedgesfroms_start',vispartedgesfroms_start,'vispartedgesfroms_end',vispartedgesfroms_end,...
-        'reftoshortlistS',reftoshortlistS,'rSsho',rSsho,'thetaSsho',thetaSsho,...
-        'zSsho',zSsho);
-    outputstruct = Sdata;
 
-    if functionversion == 2
-        elapsedtimeSgeo = etime(clock,t00);
-        elapsedtimeSRgeo = elapsedtimeSgeo;
-        outpar = elapsedtimeSRgeo;
+    outputstruct = inputstruct;
+    outputstruct.visplanesfroms = visplanesfromr;
+    outputstruct.vispartedgesfroms = vispartedgesfromr;
+    outputstruct.soutsidemodel = routsidemodel;
+    outputstruct.vispartedgesfroms_start = vispartedgesfromr_start;
+    outputstruct.vispartedgesfroms_end = vispartedgesfromr_end;
+    outputstruct.reftoshortlistS = reftoshortlistR;
+    outputstruct.rSsho = rRsho;
+    outputstruct.thetaSsho = thetaRsho;
+    outputstruct.zSsho = zRsho;
+
+    elapsedtimeSgeo = etime(clock,t00);
+    elapsedtimeSRgeo = elapsedtimeSgeo;
     
-        if filehandlingparameters.saveSRdatafiles == 1
-        	eval(['save(''',desiredname,''',''Sdata'',''EDinputdatahash'',''elapsedtimeSgeo'');'])
-        end   
-    end
+    if filehandlingparameters.saveSRdatafiles == 1
+        Sdata = outputstruct;
+    	eval(['save(''',desiredname,''',''Sdata'',''EDinputdatahash'',''elapsedtimeSgeo'');'])
+    end   
     
 end
+

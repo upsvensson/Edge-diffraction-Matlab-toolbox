@@ -14,8 +14,10 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   .planerefltypes      (optional; gives the reflection
 %                                         factors of the planes: 1,0,-1.
 %                                         default: ones(nplanes,1) )
-%                   .firstcornertoskip   (default: 1e6)
-%                   .freefieldcase       (default: 0)
+%                   .firstcornertoskip   (optional, default: 1e6)
+%                   .listofcornerstoskip (optional, default [])
+%                   .freefieldcase       (optional, default: 0)
+%                   .planeseesplanestrategy  (optional, defaul: 0)
 %   Sinputdata         .coordinates         (obligatory)
 %                   .doaddsources        (default: 0 = no)
 %                   .sourceamplitudes    Only used if doaddsources = 1
@@ -30,7 +32,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   'polygonpiston'). Matrix size [npistons,maxncornersperpiston].
 %                   .pistonplanes          (obligatory if .sourcetype =
 %                   'polygonpiston'). List of size [npistons,1].
+%                   .nedgesubs           (optional, default 2)
 %   Rinputdata         .coordinates         (obligatory)
+%                   .nedgesubs           (optional, default 2)
 %   envdata         .cair                (default: 344)
 %                   .rhoair              (default: 1.21)
 %   controlparameters   .fs              (default: 44100) Ignored by
@@ -55,6 +59,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                        EDmain_convex_time)
 %                   .surfacegaussorder   (default: 5 for
 %                                         EDmain_convexESIEBEM; ignored by other EDmain versions)
+%                   .HODirelemsize       (default:
+%                                       2*2.^(-[0:controlparameters.difforder-1]))
 %   filehandlingparameters    .outputdirectory  (default: the folder of the geoinputfile)  
 %                   .filestem        (default: name of the cad-file, with an underscore + running integer)
 %                   .savecadgeofile      (default: 0)
@@ -73,7 +79,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   EDmain_convex_time
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 26 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 29 Oct. 2023 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -146,6 +152,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 12 Oct. 2023 Introduced the field geoinputdata.freefieldcase
 % 26 Oct. 2023 Introduced new fields in Sinputdata which define piston
 % sources.
+% 29 Oct. 2023 Introduced the new fields .listofcornerstoskip and 
+% .planeseesplanestrategy in geoinputdata. Introduced nedgesubs for Sdata
+% and Rdata. Added the new field .HODirelemsize
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -227,6 +236,12 @@ else
     if ~isfield(geoinputdata,'firstcornertoskip')
         geoinputdata.firstcornertoskip = 1e6;
     end
+    if ~isfield(geoinputdata,'listofcornerstoskip')
+        geoinputdata.listofcornerstoskip = [];
+    end
+    if ~isfield(geoinputdata,'planeseesplanestrategy')
+        geoinputdata.planeseesplanestrategy = 0;
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -245,6 +260,9 @@ end
 ncolumns = size(Rinputdata.coordinates,2);
 if ncolumns ~= 3
    error(['ERROR: check your receiver coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
+end
+if ~isfield(Rinputdata,'nedgesubs')
+    Rinputdata.nedgesubs = 2;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -306,6 +324,9 @@ if strcmp(Sinputdata.sourcetype,'polygonpiston') == 1
     end
 elseif strcmp(Sinputdata.sourcetype,'monopole') == 0
     error('ERROR: Sinputdata.sourcetype must be monopole (default) or polygonpiston.')
+end
+if ~isfield(Sinputdata,'nedgesubs')
+    Sinputdata.nedgesubs = 2;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -413,6 +434,9 @@ if controlparameters.docalcir == 1
     if ~isfield(controlparameters,'fs')
         disp('   INFO: controlparameters.fs wasn''t set; it is given the default value 44100.')
         controlparameters.fs = 44100;
+    end   
+    if ~isfield(controlparameters,'HODelemsize')
+        controlparameters.HODelemsize = 2*2.^(-[0:controlparameters.difforder-1]);
     end   
 else
    controlparameters.fs = 44100;

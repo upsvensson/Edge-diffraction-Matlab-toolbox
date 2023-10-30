@@ -1,14 +1,10 @@
-function [edgedata,planedata,outpar,existingfilename] = EDedgeo(planedata,EDversionnumber,...
-    firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,inpar)
+function [edgedata,planedata,elapsedtimeedgeo,existingfilename] = EDedgeo(planedata,...
+    firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,EDversionnumber,filehandlingparameters)
 % EDedgeo - Calculates some plane- and edge-related geometrical
 % parameters, based on corners and planes in the planedata struct.
-% 
-% A version 1 of this function was used up to v 0.221 of EDtoolbox
-% and version 2 after that.
 %
 % Input parameters:
 %	planedata               A struct with the corners and plane data.			
-%   EDversionnumber 
 %	firstcornertoskip (optional)	All edges including at least one corner with this number or
 %                   		higher will be excluded from the calculations. Default: 1e6
 %   listofcornerstoskip (optional) All edges including at least one corner
@@ -18,13 +14,8 @@ function [edgedata,planedata,outpar,existingfilename] = EDedgeo(planedata,EDvers
 %                           visibility check is done by checking the plane-midpoint to plane-midpoint
 %                           for obstructions, which might be enough for
 %                           some geometries. Default: 0.
-%   inpar                   This parameter is different for version 1 and
-%                           version 2 of this function. 
-%       v1 inpar should be showtext (optional)
-%                           0 -> no text displayed. Value > 0 -> text displayed.
-%       v2 of inpar should be filehandlingparameters (obligatory)
-%                           filehandlingparameters is a struct which
-%                           contains the field showtext.
+%  EDversionnumber 
+%  filehandlingparameters   a struct which contains the field showtext.
 % 
 % Output parameters:
 %	edgedata				Struct with fields as below
@@ -101,17 +92,7 @@ function [edgedata,planedata,outpar,existingfilename] = EDedgeo(planedata,EDvers
 %       rearsideplane
 %       canplaneobstruct
 %       reflfactors
-%   outpar                  This parameter is different for version 1 and
-%                           version 2 of this function. 
-%       v1 outpar = EDinputdatahash       
-%                           This is a string of characters which is
-%                           uniquely representing the input data planedata, 
-%                           firstcornertoskip, listofcornerstoskip, 
-%                           planeseesplanestrategy. An existing result file
-%                           with the same value of this EDinputdatahash
-%                           will be reused.
-%       v2 outpar = elapsedtimeedgeo
-%                           This tells how long time was used inside this
+%   elapsedtimeedgeo        This tells how long time was used inside this
 %                           function. If an existing file was reused, then
 %                           elapsedtimeedgeo has a second value which tells
 %                           how much time was used for the existing file.
@@ -125,10 +106,11 @@ function [edgedata,planedata,outpar,existingfilename] = EDedgeo(planedata,EDvers
 % from EDtoolbox
 % Uses the function Datahash from Matlab Central
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 28 Sep. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 30 Oct. 2023
 %
-% [edgedata,planedata,outpar,existingfilename] = EDedgeo(planedata,EDversionnumber,...
-% firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,inpar);
+% [edgedata,planedata,elapsedtimeedgeo,existingfilename] = EDedgeo...
+% (planedata,firstcornertoskip,listofcornerstoskip,...
+% planeseesplanestrategy,EDversionnumber,filehandlingparameters);
 
 % 9 July 2009   Stable version
 % 28 Sep. 2014  Added the optional input parameter listofcornerstoskip
@@ -168,74 +150,53 @@ function [edgedata,planedata,outpar,existingfilename] = EDedgeo(planedata,EDvers
 % compatibility with the old "version 1". v2 moves the check if an existing
 % file can be reused inside this function. Also updated load and save to
 % the function call form, which avoids problems with spaces in file names.
+% 28 Oct. 2023 Changed the set of input parameters somewhat (removed the
+% info about "version 1".
+% 30 Oct. 2023 Moved the EDversionnumber position among input parameters.
+% Fine-tuned the EDinputdatahash
 
 t00 = clock;
 geomacc = 1e-10;
 
-if nargin < 6  % Must be the old version
-	functionversion = 1;
-	showtext = 0;
-	if nargin < 5
-		planeseesplanestrategy = 0;
-		if nargin < 4
-			listofcornerstoskip = [];
-            if nargin < 3
-                firstcornertoskip = 1e6;
-            end
-        end
-	end
-else % nargin = 6 -> could be the old or new version
-	if isstruct(inpar)
-		functionversion = 2;
-		filehandlingparameters = inpar;
-        showtext = filehandlingparameters.showtext;
-	else
-		functionversion = 1;
-		showtext = inpar;
-	end
-    if isempty(firstcornertoskip)
-        firstcornertoskip = 1e6;
-    end
-    if isempty(planeseesplanestrategy)
-        planeseesplanestrategy = 0;
-    end
+showtext = filehandlingparameters.showtext;
+if isempty(firstcornertoskip)
+    firstcornertoskip = 1e6;
+end
+if isempty(planeseesplanestrategy)
+    planeseesplanestrategy = 0;
 end
 
-EDinputdatastruct = struct('planedata',planedata,'firstcornertoskip',firstcornertoskip,...
-    'listofcornerstoskip',listofcornerstoskip,'planeseesplanestrategy',planeseesplanestrategy,'EDversionnumber',EDversionnumber);
+EDinputdatastruct = struct('corners',planedata.corners,'planecorners',planedata.planecorners,...
+    'planeabstypes',planedata.planeabstypes,...
+'firstcornertoskip',firstcornertoskip,'listofcornerstoskip',listofcornerstoskip,...
+'planeseesplanestrategy',planeseesplanestrategy,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
-if functionversion == 1
-	outpar = EDinputdatahash;
+%---------------------------------------------------------------
+% Sort out the file business: can an existing file be used?
+% Then copy the existing file to a new copy. Should the data be saved in a file? 
+
+if filehandlingparameters.suppressresultrecycling == 1
+	foundmatch = 0;
 	existingfilename = '';
-elseif functionversion == 2
-	%---------------------------------------------------------------
-	% Sort out the file business: can an existing file be used?
-	% Then copy the existing file to a new copy. Should the data be saved in a file? 
+else
+	[foundmatch,existingfilename] = ... 
+		EDrecycleresultfiles(filehandlingparameters.outputdirectory,...
+		'_eddata',EDinputdatahash);
+end
 
-	if filehandlingparameters.suppressresultrecycling == 1
-		foundmatch = 0;
-		existingfilename = '';
-	else
-		[foundmatch,existingfilename] = ... 
-			EDrecycleresultfiles(filehandlingparameters.outputdirectory,...
-			'_eddata',EDinputdatahash);
-	end
+desiredname = [filehandlingparameters.outputdirectory,filesep,...
+	filehandlingparameters.filestem,'_eddata.mat'];
 
-	desiredname = [filehandlingparameters.outputdirectory,filesep,...
-		filehandlingparameters.filestem,'_eddata.mat'];
-
-	if foundmatch == 1
+if foundmatch == 1
 %		eval(['load ''',existingfilename,''''])
-		eval(['load(''',existingfilename,''')'])
-		if ~strcmp(existingfilename,desiredname)
-			copyfile(existingfilename,desiredname);
-		end
-		elapsedtimeedgeo_new = etime(clock,t00);
-		elapsedtimeedgeo = [elapsedtimeedgeo_new elapsedtimeedgeo];
-        outpar = elapsedtimeedgeo;
-		return
+	eval(['load(''',existingfilename,''')'])
+	if ~strcmp(existingfilename,desiredname)
+		copyfile(existingfilename,desiredname);
 	end
+	elapsedtimeedgeo_new = etime(clock,t00);
+	elapsedtimeedgeo = [elapsedtimeedgeo_new elapsedtimeedgeo];
+	return
 end
 
 %----------------------------------------------------------------
@@ -1535,11 +1496,8 @@ planedata.rearsideplane = rearsideplane;
 planedata.canplaneobstruct = canplaneobstruct;
 planedata.reflfactors = reflfactors;
 
-if functionversion == 2
-	elapsedtimeedgeo = etime(clock,t00);
-    outpar = elapsedtimeedgeo;
+elapsedtimeedgeo = etime(clock,t00);
 
-	if filehandlingparameters.saveeddatafile == 1
-    	eval(['save(''',desiredname,''',''planedata'',''edgedata'',''EDinputdatahash'',''elapsedtimeedgeo'');'])
-	end
+if filehandlingparameters.saveeddatafile == 1
+	eval(['save(''',desiredname,''',''planedata'',''edgedata'',''EDinputdatahash'',''elapsedtimeedgeo'');'])
 end

@@ -1,7 +1,7 @@
 function [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
     EDpropagateESIEBEM(tftot_surface,Rinputdata,fieldpoints,...
     Sinputdata,directsound_fieldpoints,controlparameters,envdata,...
-    EDversionnumber,filehandlingparameters,EDsettingshash)
+    EDversionnumber,filehandlingparameters)
 % EDpropagateESIEBEM calculates the pressure at fieldpoints from the
 % surface pressure.
 %
@@ -23,7 +23,6 @@ function [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
 %   envdata                 Input struct; field .cair is used here
 %   EDversionnumber 
 %   filehandlingparameters
-%   EDsettingshash
 % 
 % Output parameters:
 %   tftot_ESIEBEM           [nfrequencies,nreceivers,nsources]
@@ -42,12 +41,12 @@ function [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
 % Uses functions EDcalcdist, EDcalccosfi, EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash form Matlab Central
 % 
-% Peter Svensson 27 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 30 Oct. 2023 (peter.svensson@ntnu.no)
 %
 % [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
 %    EDpropagateESIEBEM(tftot_surface,surfacepoints,surfacenvecs,fieldpoints,...
 %    originalsourcecoordinates,directsound_fieldpoints,frequencies,envdata,...
-%    EDversionnumber,filehandlingparameters,EDsettingshash)
+%    EDversionnumber,filehandlingparameters)
 
 % 29 Sep. 2023 Moved code from EDmain_convexESIEBEM into this function
 % 3 Oct. 2023 Added the EDsettingnshash as input parameter
@@ -172,6 +171,6 @@ elapsedtimeESIEBEMpropagate = etime(clock,t00);
 
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfESIEBEM.mat'];
 
-eval(['save(''',desiredname,''',''tftot_ESIEBEM'',''EDinputdatahash'',''elapsedtimeESIEBEMpropagate'',''EDsettingshash'');'])
+eval(['save(''',desiredname,''',''tftot_ESIEBEM'',''EDinputdatahash'',''elapsedtimeESIEBEMpropagate'');'])
 
 

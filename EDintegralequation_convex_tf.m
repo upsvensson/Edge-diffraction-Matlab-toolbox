@@ -1,6 +1,6 @@
 function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
-	Sdata,Rdata,envdata,controlparameters,EDversionnumber,filehandlingparameters,EDsettingshash)
+	Sdata,Rdata,envdata,controlparameters,EDversionnumber,filehandlingparameters)
 % EDintegralequation_convex_tf calculates the sound pressure representing second-
 % and higher-order diffraction, for a convex scattering object
 %
@@ -12,7 +12,6 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %   Sdata,Rdata,envdata,controlparameters   Structs
 %   EDversionnumber
 %   filehandlingparameters, envdata, 
-%   EDsettingshash          
 %
 % Output parameters
 %   tfinteqdiff      Matrix with the diffracted pressure
@@ -42,8 +41,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                       
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
-%	Snewdata,Rnewdata,envdata,controlparameters,    
-%    EDversionnumber,filehandlingparameters,EDsettingshash);
+%	Snewdata,Rnewdata,envdata,controlparameters,EDversionnumber,filehandlingparameters);
 
 % 31 March 2015 Introduced detailed timing, also as output parameter.
 % 8 April 2015 Substantial speeding up by saving Hsubdata instead of Hsub
@@ -98,14 +96,19 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % 6 Oct. 2023 Fixed a small error: the timing data wasn't returned when an
 % existing file was reused.
 % 27 Oct. 2023 Changed the input parameter list substantially.
+% 30 Oct. 2023 Fine-tuned the EDinputdatahash
 
 t00 = clock;
 showtext = filehandlingparameters.showtext;
 
-EDinputdatastruct = struct('envdata',envdata,...
-    'planedata',planedata,'edgedata',edgedata,'edgetoedgedata',edgetoedgedata,...
-    'Hsubmatrixdata',Hsubmatrixdata,'Sdata',Sdata,...
-    'Rdata',Rdata,'controlparameters',controlparameters,'EDversionnumber',EDversionnumber);
+EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
+    planedata.planecorners,'offedges',edgedata.offedges,...
+    'sources',Sdata.coordinates,'Snedgesubs',Sdata.nedgesubs,...
+    'receivers',Rdata.coordinates,'Rnedgesubs',Rdata.nedgesubs,...
+    'difforder',controlparameters.difforder,'frequencies',...
+    controlparameters.frequencies,'ngauss',controlparameters.ngauss, ...
+    'discretizationtype',controlparameters.discretizationtype,...
+    'Rstart',controlparameters.Rstart,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -793,7 +796,6 @@ tfinteqdiff = P_receiver;
 
 EDinputdatahash = EDinputdatahash_tfinteq;
 
-eval(['save(''',desiredname,''',''tfinteqdiff'',''extraoutputdata'',''EDinputdatahash'',''timingdata'',''elapsedtimehodtf'',''EDsettingshash'');'])
-
+eval(['save(''',desiredname,''',''tfinteqdiff'',''extraoutputdata'',''EDinputdatahash'',''timingdata'',''elapsedtimehodtf'');'])
 
     

@@ -1,6 +1,6 @@
 function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,...
     hodpathsalongplane,edgedata,edgetoedgedata,Sdata,Rdata,envdata,...
-    controlparameters,elemsize,EDversionnumber,filehandlingparameters,EDsettingshash)
+    controlparameters,EDversionnumber,filehandlingparameters)
 % EDmakeHODirs - Constructs higher-order (two and higher) diffraction impulse
 % responses from a list of paths in the input struct hodpaths.
 %
@@ -12,10 +12,7 @@ function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,.
 %   hodpathsalongplane  Cell variable with a list of 0/1 for each edge-sequence.
 %   edgedata,edgetoedgedata,Snewdata,Rnewdata,envdata,controlparameters,...
 %                   filehandlingparameters    Structs
-%   elemsize        List, size [1,difforder], of discretizing fineness for
-%                   each diffraction order
 %   EDversionnumber
-%   EDsettingshash  (Obligatory)
 %
 % Output parameters:
 %   irhod           The ir with all the higher-order diffraction orders summed up
@@ -42,12 +39,12 @@ function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,.
 % from the EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 27 Oct. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 29 Oct. 2023
 %
 % [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
 %     edgedata,edgetoedgedata,Snewdata,Rnewdata,envdata,...
-%    controlparameters,elemsize,EDversionnumber,...
-%    filehandlingparameters,EDsettingshash)
+%    controlparameters,EDversionnumber,...
+%    filehandlingparameters)
     
 % 8 Dec. 2006 First version
 % 1 May 2017 Fixed a bug which gave an erroneous boosting of some
@@ -73,6 +70,8 @@ function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,.
 % file can be reused inside this function. Also updated load and save to
 % the function call form, which avoids problems with spaces in file names.
 % 27 Oct. 2023 Substantial change to the input parameter list.
+% 29 Oct. 2023 Some more change to the input parameter list. elemsize is
+% now a field in controlparameters.
 
 t00 = clock;
 
@@ -80,6 +79,7 @@ showtext = filehandlingparameters.showtext;
 difforder = controlparameters.difforder;
 fs = controlparameters.fs;
 Rstart = controlparameters.Rstart;
+elemsize = controlparameters.HODelemsize;
 
 EDinputdatastruct = struct('difforder',difforder);
 EDinputdatastruct.hodpaths = hodpaths;
@@ -441,4 +441,4 @@ end
 
 elapsedtimemakeirhod = etime(clock,t00);
 
-eval(['save(''',desiredname,''',''irhod'',''EDinputdatahash'',''elapsedtimemakeirhod'',''EDsettingshash'');'])
+eval(['save(''',desiredname,''',''irhod'',''EDinputdatahash'',''elapsedtimemakeirhod'');'])

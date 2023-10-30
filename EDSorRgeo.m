@@ -1,5 +1,5 @@
-function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo(planedata,edgedata,inputstruct,...
-    typeofcoords,EDversionnumber,nedgesubs,filehandlingparameters)
+function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
+    (planedata,edgedata,inputstruct,typeofcoords,EDversionnumber,filehandlingparameters)
 % EDSorRgeo - Calculates some source- or receiver-related geometrical parameters.
 % Calculates some source- or receiver-related geometrical parameters,
 % based on corners,edges and planes in an eddata-file, and on a list of
@@ -10,15 +10,15 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo(planedata,
 % Input parameters:
 %   planedata               struct
 %   edgedata                struct
-%	inputstruct             struct, where the field .coordinates is the only one used by this
+%	inputstruct             struct, where the field .coordinates and .nedgesubs is the only one used by this
 %                           function. The function adds new fields to this existing struct.
+%                           .nedgesubs: the number of subdivisions that each edge will be
+%							subdivided into for visibility/obstruction tests. Default: 2
+%							NB! When nedgesubs = 2, the two end points will be checked.
 %   typeofcoords            'S' or 'R' - specifying if the point coordinates are sources
 %                           or receivers. This determines what the output data in the output
 %                           file will be called.
 %   EDversionnumber
-%	nedgesubs (optional)	The number of subdivisions that each edge will be
-%							subdivided into for visibility/obstruction tests. Default: 2
-%							NB! When nedgesubs = 2, the two end points will be checked.
 %   filehandlingparameters (obligatory)
 %                           filehandlingparameters is a struct which
 %                           contains the field showtext.
@@ -66,10 +66,10 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo(planedata,
 % from EDtoolbox.
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 27 Oct. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 30 Oct. 2023
 %
 % [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo(planedata,...
-% edgedata,inputstruct,typeofcoords,EDversionnumber,nedgesubs,filehandlingparameters);
+% edgedata,inputstruct,typeofcoords,EDversionnumber,filehandlingparameters);
 
 %  1 June 2006 Functioning version
 %  2 Dec 2014  Introduced new output parameters in the file: reftoshortlistR,rRsho,thetaRsho,zRsho
@@ -101,27 +101,31 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo(planedata,
 % 27 Oct. 2023 Renamed the field in the output struct from 'sources'/'receivers'
 % to 'coordinates'. Also, changed so that the entire Sdata/Rdata struct is
 % taken as input, so that it can be expanded.
+% 29 Oct. 2023 nedgesubs was made into a field in the inputstruct
+% 30 Oct. 2023 Fine-tuned the EDinputdatahash
 
 t00 = clock;
 geomacc = 1e-9;
 
 showtext = filehandlingparameters.showtext;
 
-if isempty(nedgesubs)
-     nedgesubs = 2; 
-end
+nedgesubs = inputstruct.nedgesubs;
+
 typeofcoords = lower(typeofcoords(1));
 if typeofcoords~='r' && typeofcoords~='s'
     error('ERROR: The input parameter typeofcoords must have the value S or R')    
 end
 
 if typeofcoords == 's'
-    EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata, 'coordinates',inputstruct.coordinates,...
-        'sourceamplitudes',inputstruct.sourceamplitudes,...
-        'nedgesubs',nedgesubs,'EDversionnumber',EDversionnumber);
+    EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
+        planedata.planecorners,'offedges',edgedata.offedges,...
+        'coordinates',inputstruct.coordinates,...
+        'nedgesubs',inputstruct.nedgesubs,'EDversionnumber',EDversionnumber);
 else
-    EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata, 'coordinates',inputstruct.coordinates,...
-        'nedgesubs',nedgesubs,'EDversionnumber',EDversionnumber);
+    EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
+        planedata.planecorners,'offedges',edgedata.offedges,...
+        'coordinates',inputstruct.coordinates,...
+        'nedgesubs',inputstruct.nedgesubs,'EDversionnumber',EDversionnumber);
 end    
 EDinputdatahash = DataHash(EDinputdatastruct);
 

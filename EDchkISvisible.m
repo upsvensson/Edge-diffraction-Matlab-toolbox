@@ -1,5 +1,6 @@
 function [hitplanes,hitpoints,edgehits,edgehitpoints,edgehitnumbers,cornerhits,...
-    cornerhitpoints,cornerhitnumbers] = EDchkISvisible(ISlist,R,planeeqs_lastvalue,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec)
+    cornerhitpoints,cornerhitnumbers] = EDchkISvisible(ISlist,R,...
+    planeeqs_lastvalue,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec)
 % EDchkISvisible - Checks if paths from a set of IS to a set of R pass through their refl. planes. 
 % EDchkISvisible checks if the paths between a number of IS and a single R, or a number of R, 
 % pass through their respective reflecting planes.

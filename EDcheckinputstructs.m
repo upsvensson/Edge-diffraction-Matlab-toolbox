@@ -79,7 +79,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   EDmain_convex_time
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 29 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 30 Oct. 2023 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -155,6 +155,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 29 Oct. 2023 Introduced the new fields .listofcornerstoskip and 
 % .planeseesplanestrategy in geoinputdata. Introduced nedgesubs for Sdata
 % and Rdata. Added the new field .HODirelemsize
+% 30 Oct. 2023 Introduced the piston source checking
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -271,10 +272,28 @@ end
 % case.
 
 if ~isstruct(Sinputdata)
-    error('ERROR 1: source coordinates were not specified')
+    error('ERROR: the source was not specified')
 end
 if ~isfield(Sinputdata,'coordinates')
-    error('ERROR 2: source coordinates were not specified')
+    if ~isfield(Sinputdata,'sourcetype')
+        error('ERROR: you must specify monopole source coordinates, or define a piston')
+    end
+    if strcmp(Sinputdata.sourcetype,'monopole')
+        error('ERROR: you must specify monopole source coordinates')
+    elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
+        if ~isfield(Sinputdata,'pistoncornercoordinates') || ~isfield(Sinputdata,'pistoncornernumbers') || ~isfield(Sinputdata,'pistonplanes')
+            error('ERROR: when you specify a polygonpiston sources, you must specify corner coordinates and numbers, and piston plane.')
+        end
+        npistons = size(Sinputdata.pistoncornernumbers,1);
+        pistonmidpointcoordinates = zeros(npistons,3);   
+        ncornersperpiston = sum(Sinputdata.pistoncornernumbers.'>0).';
+        for ii = 1:npistons
+            pistonmidpointcoordinates(ii,:) = mean(Sinputdata.pistoncornercoordinates...
+                (Sinputdata.pistoncornernumbers(ii,1:ncornersperpiston(ii)),:));
+        end
+        Sinputdata.coordinates = pistonmidpointcoordinates;
+        Sinputdata.ncornersperpiston = ncornersperpiston;
+    end
 end
 nsources = size(Sinputdata.coordinates,1);
 if nsources == 0
@@ -322,12 +341,17 @@ if strcmp(Sinputdata.sourcetype,'polygonpiston') == 1
     if ~isfield(Sinputdata,'pistongausspoints')
         Sinputdata.pistongausspoints = 3;
     end
-elseif strcmp(Sinputdata.sourcetype,'monopole') == 0
+elseif strcmp(Sinputdata.sourcetype,'monopole') == 1
+    Sinputdata.pistoncornercoordinates = [];
+    Sinputdata.pistoncornernumbers = [];
+    Sinputdata.pistonplanes = [];    
+else
     error('ERROR: Sinputdata.sourcetype must be monopole (default) or polygonpiston.')
 end
 if ~isfield(Sinputdata,'nedgesubs')
     Sinputdata.nedgesubs = 2;
 end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct envdata
@@ -588,15 +612,4 @@ end
 if ~isfield(filehandlingparameters,'savelogfile')
     filehandlingparameters.savelogfile = 1;
 end
-
-
-    
-
-    
-
-
-
-
-
-
 

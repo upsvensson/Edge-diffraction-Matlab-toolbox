@@ -201,7 +201,10 @@ if nplanes > 0
         possibleSPR = [];
         for ii = 1:nreceivers
             visplanesfromoneR = Rdata.visplanesfromr(:,ii);
-            tempmatrix = Sdata.visplanesfroms.*Rdata.visplanesfromoneR(:,ones(1,nsources));
+            % 30 Oct. 2023 Fixed a bug on the line below. visplanesfromoneR
+            % is not a field in Rdata. This section has not been run often.
+            %            tempmatrix = Sdata.visplanesfroms.*Rdata.visplanesfromoneR(:,ones(1,nsources));
+            tempmatrix = Sdata.visplanesfroms.*visplanesfromoneR(:,ones(1,nsources));
             ivpotential = find(tempmatrix);
             npotentialIS = length(ivpotential);
             if npotentialIS > 0
@@ -295,7 +298,10 @@ if directsound ~= 0
             possibleSPR_obstruct = [];
             for ii = 1:nreceivers
                 visplanesfromoneR = Rdata.visplanesfromr(:,ii);
-                ivpotential = find(Sdata.visplanesfroms ~= Rdata.visplanesfromoneR(:,ones(1,nsources)) );
+                % 30 Oct. 2023 Fixed a bug on the line below. visplanesfromoneR
+                % is not a field in Rdata. This section has not been run often.
+%                ivpotential = find(Sdata.visplanesfroms ~= Rdata.visplanesfromoneR(:,ones(1,nsources)) );
+                ivpotential = find(Sdata.visplanesfroms ~= visplanesfromoneR(:,ones(1,nsources)) );
                 npotentialobstruct = length(ivpotential);
                 if npotentialobstruct > 0
                     [Pnumber_potentialobstruct, Snumber_potentialobstruct] = ind2sub([nplanes,nsources], ivpotential);

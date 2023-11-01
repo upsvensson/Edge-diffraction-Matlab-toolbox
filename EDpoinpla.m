@@ -1,4 +1,6 @@
-function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs,geomacc,showtext)
+function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = ...
+    EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,...
+    ncornersperplanevec,planenvecs,geomacc,showtext)
 % EDpoinpla - Detects if one or more points are inside a number of finite planes. 
 % If one point is given as input, it will be checked against all
 % planes in a list of planes. If N points are given as inputs, a list of
@@ -10,7 +12,7 @@ function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(
 %
 % Input parameters:
 %   xpoints         Matrix, [N,3], of coordinates for the N points to check
-%   planelist       List, [nplanes,1], of planes to check the N points
+%   planelist       List, [nplanes,1], of plane numbers to check the N points
 %                   against. If N~= 1, then nplanes must be equal to N.
 %                   NB! 
 %   minvals, maxvals, planecorners, corners, ncornersperplanevec, planenvecs
@@ -42,9 +44,10 @@ function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(
 %
 % Uses no special subroutines
 %
-% Peter Svensson (peter.svensson@ntnu.no) 8 June 2022
+% Peter Svensson (peter.svensson@ntnu.no) 31 Oct. 2023
 % 
-% [hitvec,edgehit,edgehitnumbers,cornerhit] = EDpoinpla(xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs,geomacc,showtext);
+% [hitvec,edgehit,edgehitnumbers,cornerhit] = EDpoinpla(xpoints,planelist,...
+% minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs,geomacc,showtext);
 
 % 100204 Functioning version
 % 111201 Fixed a bug: when the ray (from the hitpoint in the positive x-direction) passed exactly
@@ -63,6 +66,10 @@ function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = EDpoinpla(
 % addto_closetoedge) to double since Matlab 2018 protested, but Matlab 2020 did not.
 % 8 June 2022: Fixed a bug that made the function crash when planes with different numbers
 % of corners ended up in the same xysubset etc.
+% 31 Oct. 2023 Added the possibility that this function is called with some
+% 3-corner planes and some 4-corner planes etc.
+% 31 Oct. 2023 Found a bug which would happen rarely: if the ray goes
+% exactly through a corner, then the hit was micounted.
 
 if nargin < 10
     showtext = 0;
@@ -96,6 +103,20 @@ if ncolumnswithdata < size(planecorners,2)
    planecorners = planecorners(:,1:ncolumnswithdata);
 end
 planecorners = [planecorners planecorners(:,1)];
+
+% For some uses of this function, the rows in planecorners might have
+% different numbers of corners. That is fixed here (31 Oct. 2023).
+
+columnswithzeros = sum(planecorners==0);
+
+if any(columnswithzeros)
+    iv = find(columnswithzeros);
+    for ii = 1:length(iv)
+        colwzero = iv(ii);
+        rowswzero = find(planecorners(:,colwzero)==0);
+        planecorners(rowswzero,colwzero) = planecorners(rowswzero,1);
+    end
+end
 
 %------------------------------------------------------------
 % First test: are the points inside the cubic boxes?
@@ -251,7 +272,11 @@ if nposs>0
                 talmostzero = abs(tedgecrossing)<geomacc;
                 talmostone  = abs(tedgecrossing-1)<geomacc;
                 tinside = tedgecrossing > 0 & tedgecrossing < 1 & talmostzero == 0 & talmostone == 0;
-                tendpoint_countablehit = (talmostzero==1 & y2 < 0) + (talmostone==1 & y1 < 0);
+                % Error found 31 Oct. 2023: a corner hit should be
+                % countable if the other edge endpoint is below **the ray**, 
+                % not below zero!
+                % tendpoint_countablehit = (talmostzero==1 & y2 < 0) + (talmostone==1 & y1 < 0);
+                tendpoint_countablehit = (talmostzero==1 & y2 < yray) + (talmostone==1 & y1 < yray);
     
                 x1 = corners(planecorners(planelist(xysubsubsets{jj}),ii),1);
                 x2 = corners(planecorners(planelist(xysubsubsets{jj}),ii+1),1);
@@ -389,7 +414,11 @@ if nposs>0
                 talmostzero = abs(tedgecrossing)<geomacc;
                 talmostone  = abs(tedgecrossing-1)<geomacc;
                 tinside = tedgecrossing > 0 & tedgecrossing < 1 & talmostzero == 0 & talmostone == 0;
-                tendpoint_countablehit = (talmostzero==1 & z2 < 0) + (talmostone==1 & z1 < 0);
+                % Error found 31 Oct. 2023: a corner hit should be
+                % countable if the other edge endpoint is below **the ray**, 
+                % not below zero!
+                % tendpoint_countablehit = (talmostzero==1 & z2 < 0) + (talmostone==1 & z1 < 0);
+                tendpoint_countablehit = (talmostzero==1 & z2 < zray) + (talmostone==1 & z1 < zray);
         
                 x1 = corners(planecorners(planelist(xzsubsubsets{jj}),ii),1);
                 x2 = corners(planecorners(planelist(xzsubsubsets{jj}),ii+1),1);
@@ -525,7 +554,11 @@ if nposs>0
                 talmostzero = abs(tedgecrossing)<geomacc;
                 talmostone  = abs(tedgecrossing-1)<geomacc;
                 tinside = tedgecrossing > 0 & tedgecrossing < 1 & talmostzero == 0 & talmostone == 0;
-                tendpoint_countablehit = (talmostzero==1 & z2 < 0) + (talmostone==1 & z1 < 0);
+                % Error found 31 Oct. 2023: a corner hit should be
+                % countable if the other edge endpoint is below **the ray**, 
+                % not below zero!
+                % tendpoint_countablehit = (talmostzero==1 & z2 < 0) + (talmostone==1 & z1 < 0);
+                tendpoint_countablehit = (talmostzero==1 & z2 < zray) + (talmostone==1 & z1 < zray);
         
                 y1 = corners(planecorners(planelist(yzsubsubsets{jj}),ii),2);
                 y2 = corners(planecorners(planelist(yzsubsubsets{jj}),ii+1),2);

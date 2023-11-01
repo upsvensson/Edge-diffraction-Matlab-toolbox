@@ -3,14 +3,19 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
 % EDSorRgeo - Calculates some source- or receiver-related geometrical parameters.
 % Calculates some source- or receiver-related geometrical parameters,
 % based on corners,edges and planes in an eddata-file, and on a list of
-% source/receiver coordinates. The output is returned as an expanded version of the input struct.
+% source/receiver coordinates. The output is returned as an expanded version
+% of the input struct. For piston sources only one point of the piston is
+% checked (the center point). The position is nudged a little bit in the
+% direction of the plane normal vector.
 %
 % From v0.4 of the EDtoolbox, the input parameter list changed.
 %
 % Input parameters:
 %   planedata               struct
 %   edgedata                struct
-%	inputstruct             struct, where the field .coordinates and .nedgesubs is the only one used by this
+%	inputstruct             struct (Sdata or Rdata) where the fields
+%                           .coordinates, .nedgesubs, .sourcetype and 
+%                           .pistonplanes (if Sdata) are the only ones used by this
 %                           function. The function adds new fields to this existing struct.
 %                           .nedgesubs: the number of subdivisions that each edge will be
 %							subdivided into for visibility/obstruction tests. Default: 2
@@ -19,9 +24,7 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
 %                           or receivers. This determines what the output data in the output
 %                           file will be called.
 %   EDversionnumber
-%   filehandlingparameters (obligatory)
-%                           filehandlingparameters is a struct which
-%                           contains the field showtext.
+%   filehandlingparameters  a struct which contains the field showtext.
 %
 % Output parameters:
 %   outputstruct            struct with fields
@@ -66,7 +69,7 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
 % from EDtoolbox.
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 30 Oct. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 31 Oct. 2023
 %
 % [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo(planedata,...
 % edgedata,inputstruct,typeofcoords,EDversionnumber,filehandlingparameters);
@@ -102,10 +105,12 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
 % to 'coordinates'. Also, changed so that the entire Sdata/Rdata struct is
 % taken as input, so that it can be expanded.
 % 29 Oct. 2023 nedgesubs was made into a field in the inputstruct
-% 30 Oct. 2023 Fine-tuned the EDinputdatahash
+% 30 Oct. 2023 Fine-tuned the EDinputdatahash. Adjusts the piston center
+% point a little bit for the visibility test; then nudges it back.
 
 t00 = clock;
 geomacc = 1e-9;
+nudgedist = 1e-5;   % for piston sources
 
 showtext = filehandlingparameters.showtext;
 
@@ -168,6 +173,7 @@ if foundmatch == 1
 end
 
 %---------------------------------------------------------------
+% No file was found, so thie function should be run.
 
 % ncorners = size(planedata.corners,1);
 nplanes = size(planedata.planecorners,1);
@@ -182,6 +188,21 @@ n2 = size(planedata.canplaneobstruct,2);
 
 onesvec1R = ones(1,nreceivers,'uint8');
 onesvec1ES = ones(1,nedgesubs);
+
+% If a pistonsource was defined, then we need to nudge the center position
+% away from the plane.
+
+if typeofcoords == 's'
+    if strcmp(inputstruct.sourcetype,'polygonpiston') == 1
+        disp('Nudging!!')
+        npistons = size(inputstruct.coordinates,1);
+        for ii = 1:npistons
+            nvec = planedata.planeeqs(inputstruct.pistonplanes(ii),1:3);
+            inputstruct.coordinates(ii,:) = inputstruct.coordinates(ii,:) + ...
+                nudgedist*nvec;
+        end
+    end
+end
 
 %##################################################################
 %##################################################################
@@ -1079,6 +1100,51 @@ if typeofcoords=='r'
     end   
     
 else
+
+    if strcmp(inputstruct.sourcetype,'polygonpiston') == 1
+        disp('Nudging back!!')
+        npistons = size(inputstruct.coordinates,1);
+        for ii = 1:npistons
+            nvec = planedata.planeeqs(inputstruct.pistonplanes(ii),1:3);
+            inputstruct.coordinates(ii,:) = inputstruct.coordinates(ii,:) - ...
+                nudgedist*nvec;
+        end
+
+        % Create rotation matrices, one for each pistonedge
+        nmaxcornernumbersperpiston = size(inputstruct.pistoncornernumbers,2);
+        nrotationmatrices = numel(inputstruct.pistoncornernumbers);
+        rotationmatrices = cell(nrotationmatrices,1);
+        reftorotationmatrices = [1:nrotationmatrices].';
+        reftorotationmatrices = reshape(reftorotationmatrices,nmaxcornernumbersperpiston,npistons).';
+
+        for ii = 1:npistons
+            nvec = planedata.planeeqs(inputstruct.pistonplanes(ii),1:3);
+            for jj = 1:nmaxcornernumbersperpiston
+                startnumber = inputstruct.pistoncornernumbers(ii,jj);
+                if startnumber > 0
+                    if jj == nmaxcornernumbersperpiston
+                        endnumber = inputstruct.pistoncornernumbers(ii,1);
+                    else
+                        endnumber = inputstruct.pistoncornernumbers(ii,jj+1);
+                        if endnumber == 0
+                            endnumber = inputstruct.pistoncornernumbers(ii,1);
+                        end
+                    end
+                    disp(['ii = ',int2str(ii),', jj = ',int2str(jj),' start no. = ',int2str(startnumber),' end no. = ',int2str(endnumber)])
+                    disp(['   Rot. matrix no. ',int2str(reftorotationmatrices(ii,jj))])
+                    pistonedgevec = inputstruct.pistoncornercoordinates(endnumber,:) - ...
+                        inputstruct.pistoncornercoordinates(startnumber,:);
+                    pistonedgevec = pistonedgevec/norm(pistonedgevec);
+                    yvec = cross(nvec,pistonedgevec);
+                    singlerotmatrix = [0 1 0;0 0 1;1 0 0]*inv([nvec(:) pistonedgevec(:) yvec(:)]);
+                    rotationmatrices{reftorotationmatrices(ii,jj)} = singlerotmatrix;
+                else
+                end
+            end
+        end
+        inputstruct.pistonrotationmatrices = rotationmatrices;
+        inputstruct.reftorotationmatrices = reftorotationmatrices;
+    end
 
     outputstruct = inputstruct;
     outputstruct.visplanesfroms = visplanesfromr;

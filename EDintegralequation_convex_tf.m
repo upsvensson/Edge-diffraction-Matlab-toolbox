@@ -37,7 +37,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1 from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  27 Oct. 2023  
+% Peter Svensson (peter.svensson@ntnu.no)  20 Nov. 2023  
 %                       
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
@@ -97,6 +97,9 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % existing file was reused.
 % 27 Oct. 2023 Changed the input parameter list substantially.
 % 30 Oct. 2023 Fine-tuned the EDinputdatahash
+% 1 Nov. 2023 Fixed a small error: doaddsources and sourceamplitudes and 
+% doallSRcombinations were missing the Sdata. in one location.
+% 20 Nov. 2023 Implemented the piston source
 
 t00 = clock;
 showtext = filehandlingparameters.showtext;
@@ -146,12 +149,13 @@ timingdata = zeros(1,4);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Run an outer loop over all frequencies 
+% Detect special cases: check if the object is thin
     
 nsources = size(Sdata.coordinates,1);
 nreceivers = size(Rdata.coordinates,1);
 
 % Find if there are image sources that could see any edges
+% (NB! This is not relevant for convex scattering objects)
 nplanes = size(planedata.planecorners,1);
 nedges = size(edgedata.edgecorners,1);
 vispartedgesfromIS = sparse(zeros(nplanes,nedges));
@@ -202,7 +206,7 @@ isthinhole = 0;
 % ----------------------------------------------------------------------------------------------
 % ----------------------------------------------------------------------------------------------
 % We must have an outer loop over frequency, since all matrices change with
-% frequency
+% frequency. The for-loop stretches to the end of this function.
 
 if showtext >= 1
     freqstep = round(nfrequencies/10);
@@ -211,7 +215,6 @@ if showtext >= 1
     end
 end
 
-
 for ifreq = 1:nfrequencies     
     frequency = controlparameters.frequencies(ifreq);
     if showtext >= 1
@@ -219,6 +222,10 @@ for ifreq = 1:nfrequencies
             disp(['      Frequency no. ',int2str(ifreq),' (of ',int2str(nfrequencies),'): ',num2str(frequency),' Hz'])
         end
     end
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % PART 1: Build the H-matrix
 
     if showtext >= 2 && controlparameters.difforder > 2
         disp(' ')
@@ -404,7 +411,7 @@ for ifreq = 1:nfrequencies
     %            re1_re2 = edgetoedgedata.re1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.re2sho(refto(edge1,edge2))-edgetoedgedata.re1sho(refto(edge1,edge2))   );
 
 
-               if acrossface_in*acrossface_out == 0
+               if acrossface_in*acrossface_out == 0 % This case is a preparation for non-convex objects.
                     % Reconvert the cylindrical coordinates of
                     % edge1-re2 into cartesian! Then we can use the EDcoordtrans.
                     % We define our own cartesian coord syst such that the reference
@@ -492,14 +499,13 @@ for ifreq = 1:nfrequencies
         t00 = clock;
     end
 
-    %-----------------------------------------------------------------
-    %-----------------------------------------------------------------
-    %-----------------------------------------------------------------
-    % Now all the Hsub have been calculated. The next step is to calculate
-    % the edge source signals, Qfinal. Loop over all sources and
-    % receivers since they can all use the same Hsubs.
-    %
-    % CASE 1: doaddsources = 1, or we have only one source
+    % End of PART 1: All the H submatrices have been built (for one freq.)
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % CASE 1: A single source, or many sources' contributions should be
+    % added to give the the edge source signals
+    % (doaddsources = 1, or we have only one source)
+    % PART 2: Create Q_firstterm 
     
     if Sdata.doaddsources == 1 || nsources == 1
         if ifreq==1
@@ -507,20 +513,27 @@ for ifreq = 1:nfrequencies
         end
         
         if filehandlingparameters.loadinteqsousigs == 0
-            
-            %-----------------------------------------------------------------
-            %-----------------------------------------------------------------
-            % CASE 1: Compute the first term of the source signal (independent of H)            
-            
+                        
             Q_firstterm = 0;
             for isou = 1:nsources
                 ISOU = int2str(isou);
 
-                Q_firstterm_addition = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...                    
-                    controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
-                Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
-                    Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
-                
+                if strcmp(Sdata.sourcetype,'monopole') == 1
+                     Q_firstterm_addition = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...                    
+                        controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
+                        Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
+                        Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
+                elseif strcmp(Sdata.sourcetype,'polygonpiston') == 1
+                    Q_firstterm_sumpistongausspoints = 0;
+                    for np = 1:size(Sdata.pistongausscoordinates{1},1)
+                        Q_firstterm_addition = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...                    
+                            controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
+                            Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou,np)),...
+                            Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou,np)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou,np)),filehandlingparameters.showtext);
+                        Q_firstterm_sumpistongausspoints = Q_firstterm_sumpistongausspoints + Q_firstterm_addition*squeeze(Sdata.pistongaussweights{isou}(np,1));
+                    end
+                    Q_firstterm_addition = Q_firstterm_sumpistongausspoints;
+                end
 %                 Q_firstterm = Q_firstterm + Q_firstterm_addition;
                 Q_firstterm = Q_firstterm + Q_firstterm_addition*Sdata.sourceamplitudes(isou,ifreq);
             end
@@ -530,10 +543,10 @@ for ifreq = 1:nfrequencies
                 t00 = clock;
             end
             
-            %-----------------------------------------------------------------
-            %-----------------------------------------------------------------
-            % CASE 1: The first term of the edge source signals has been computed. 
-            % Start to iterate to find Qfinal.
+            % End of CASE 1, PART 2 
+            % Q_firstterm has been computed
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % CASE 1,PART 3: Starting from Q_firstterm, iterate to find Qfinal.
             %
             % Two for-loops: iterations (iiter) and submatrices (nn)
 
@@ -584,10 +597,8 @@ for ifreq = 1:nfrequencies
                 t00 = clock;
             end
 
-            %-----------------------------------------------------------------
-            %-----------------------------------------------------------------
-            % CASE 1: Qfinal has been computed
-            %
+            % End of CASE 1, PART 3 
+            % Qfinal has been computed
             % Possibly save to a file
             
             if filehandlingparameters.saveinteqsousigs == 1
@@ -601,9 +612,8 @@ for ifreq = 1:nfrequencies
 			disp(['      Using existing edgesourcesignalsfile: ',filename_sousigs])
         end
 
-        %-----------------------------------------------------------------
-        %-----------------------------------------------------------------
-        % CASE 1: Qfinal has been computed, or loaded from a file
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % CASE 1, PART 4: Qfinal has been computed, or loaded from a file
         %
         % Propagate Qfinal to the external receiver(s)
         
@@ -625,30 +635,24 @@ for ifreq = 1:nfrequencies
                 timingdata(4) = etime(clock,t00);
             end
         end % for irec = 1:nreceivers
-                    
-    %-----------------------------------------------------------------
-    %-----------------------------------------------------------------
-    %-----------------------------------------------------------------
-    % Now all the Hsub have been calculated. The next step is to calculate
-    % the edge source signals, Qfinal. Loop over all sources and
-    % receivers since they can all use the same Hsubs.
-    %
+    
+        % End of CASE 1, PART 4
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % CASE 2: doaddsources = 0  and we have several sources
+    % We might also have the case that doallSRcombinations = 0.
+    % 
+    % PART 2: Create Q_firstterm for each source
     % There will be an outer loop over sources
-    %     
-    % Here, we might also have the case that doallSRcombinations = 0.
-
-    elseif doaddsources == 0   % This means we have several sources, and they should not be added
+         
+    elseif Sdata.doaddsources == 0   % This means we have several sources, and they should not be added
         if ifreq==1
             P_receiver = zeros(nfrequencies,nreceivers,nsources);
         end
         for isou = 1:nsources
             
             if filehandlingparameters.loadinteqsousigs == 0
-
-                %-----------------------------------------------------------------
-                %-----------------------------------------------------------------
-                % CASE 2: Compute the first term of the source signals (independent of H)            
                 
                 ISOU = int2str(isou); 
     
@@ -656,21 +660,33 @@ for ifreq = 1:nfrequencies
                     disp(['Source no. ',ISOU,' of ',int2str(nsources)])
                 end
                 
-                Q_firstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
-                    controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
-                    Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
-                    Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
- 
-                Q_firstterm = Q_firstterm*sourceamplitudes(isou,ifreq);
-                
-                
-                %-----------------------------------------------------------------
-                %-----------------------------------------------------------------
-                % CASE 2: The first term of the edge source signals has been computed. 
-                % Start to iterate to find Qfinal.
+                if strcmp(Sdata.sourcetype,'monopole') == 1
+                    Q_firstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
+                        controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
+                        Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
+                        Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
+                elseif strcmp(Sdata.sourcetype,'polygonpiston') == 1
+                    Q_firstterm_sumpistongausspoints = 0;
+                    for np = 1:size(Sdata.pistongausscoordinates{1},1)
+                            Q_firstterm_addition = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...                    
+                            controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
+                            Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou,np)),...
+                            Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou,np)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou,np)),filehandlingparameters.showtext);
+                        Q_firstterm_sumpistongausspoints = Q_firstterm_sumpistongausspoints + Q_firstterm_addition*squeeze(Sdata.pistongaussweights{isou}(np,1));
+                    end
+                    Q_firstterm = Q_firstterm_sumpistongausspoints;
+
+                end
+
+                Q_firstterm = Q_firstterm*Sdata.sourceamplitudes(isou,ifreq);
+                              
+                % End of CASE 2, PART 2 
+                % Q_firstterm has been computed
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                % CASE 2,PART 3: Starting from Q_firstterm, iterate to find Qfinal.
                 %
                 % Two for-loops: iterations (iiter) and submatrices (nn)
-                
+                  
                 if showtext >= 2
                     disp('      Starting to iterate')
                 end
@@ -710,10 +726,8 @@ for ifreq = 1:nfrequencies
                    doesQsegmenthavevalues(iicounter) = any(Qfinal(sectionofbigmatrix));
                 end
 
-                %-----------------------------------------------------------------
-                %-----------------------------------------------------------------
-                % CASE 2: Qfinal has been computed
-                %
+                % End of CASE 2, PART 3 
+                % Qfinal has been computed
                 % Possibly save to a file
 
                 if filehandlingparameters.saveinteqsousigs == 1
@@ -727,15 +741,14 @@ for ifreq = 1:nfrequencies
                 disp(['   Using existing edgesourcesignalsfile: ',filename_sousigs])
             end  
 
-            %-----------------------------------------------------------------
-            %-----------------------------------------------------------------
-            % CASE 2: Qfinal has been computed, or loaded from a file
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % CASE 2, PART 4: Qfinal has been computed, or loaded from a file
             %
             % Propagate Qfinal to the external receiver(s)
             
 %             if inteqsettings.handlepropagation < 3
             
-            if doallSRcombinations == 1
+            if Sdata.doallSRcombinations == 1
                 for irec = 1:nreceivers
 
                      if showtext >=2
@@ -786,10 +799,10 @@ for ifreq = 1:nfrequencies
                  end
                
             end
-        end
+        end   % for isou = 1:nsources
 
-    end
-end
+    end  % if Sdata.doaddsources == 1 || nsources == 1
+end  % for ifreq = 1:nfrequencies     
 
 elapsedtimehodtf = etime(clock,t00);
 tfinteqdiff = P_receiver;

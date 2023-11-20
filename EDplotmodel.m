@@ -57,7 +57,7 @@ function plothandles = EDplotmodel(eddatafile,varargin)
 %
 % Uses functions EDstrpend, EDstrpblnk
 %
-% Peter Svensson (peter.svensson@ntnu.no) 27 October 2023
+% Peter Svensson (peter.svensson@ntnu.no) 1 Nov. 2023
 % 
 % plothandles = EDplotmodel(eddatafile,varargin);
 
@@ -76,6 +76,7 @@ function plothandles = EDplotmodel(eddatafile,varargin)
 % optional input parameter
 % 27 Oct. 2023 Made changes to fit with the changes for structs Rdata and Sdata:
 % the field is now called coordinates instead of sources/receivers.
+% 1 Nov. 2023 Made it possible to plot free-field cases.
 
 p = inputParser;
 
@@ -143,14 +144,20 @@ else
     eval(['load ''',eddatafile,''''])    
 end
     
-ncornersperplanevec = double(planedata.ncornersperplanevec);
+if isempty(planedata.planecorners)
+    freefieldcase = 1;
+else
+    freefieldcase = 0;
+    ncornersperplanevec = double(planedata.ncornersperplanevec);
+end
+
 if plotsources
     sdatafile = EDstrpblnk([eddatafilepath,Filestem,'_Sdata.mat']);
     if exist(sdatafile) == 2
         eval(['load ''',sdatafile,''''])
     else
         error(['ERROR: The sdata file named ',sdatafile,' could not be opened'])    
-    end
+    end    
 end
 if plotreceivers
     rdatafile = EDstrpblnk([eddatafilepath,Filestem,'_Rdata.mat']);
@@ -161,109 +168,139 @@ if plotreceivers
     end
 end
 
-if plotplCADnumbers || plotcoCADnumbers
-    cadgeofile = EDstrpblnk([eddatafilepath,Filestem,'_cadgeo.mat']);
-    if exist(cadgeofile) == 2
-        eval(['load ''',cadgeofile,''''])
-    else
-        error(['ERROR: The cadgeo file named ',cadgeofile,' could not be opened'])            
+if freefieldcase == 0
+    if plotplCADnumbers || plotcoCADnumbers
+        cadgeofile = EDstrpblnk([eddatafilepath,Filestem,'_cadgeo.mat']);
+        if exist(cadgeofile) == 2
+            eval(['load ''',cadgeofile,''''])
+        else
+            error(['ERROR: The cadgeo file named ',cadgeofile,' could not be opened'])            
+        end
     end
 end
 %--------------------------------------------------------------
-
-ncorners = size(planedata.corners,1);
-nedges = size(edgedata.edgecorners,1);
-nplanes = size(planedata.planeeqs,1);
-
-planelist = 1:nplanes;
 
 viewpos = [1 1 1];
 
-%--------------------------------------------------------------
-% Plot the edges. Check if some should have dashed lines
+if freefieldcase == 0
 
-if isempty(edgenumbers)
-    linemarker = ones(nedges,1);
-else
-    linemarker = 2*ones(nedges,1);    
-    linemarker(edgenumbers) = 1;
+    ncorners = size(planedata.corners,1);
+    nedges = size(edgedata.edgecorners,1);
+    nplanes = size(planedata.planeeqs,1);
+    
+    planelist = 1:nplanes;
+    
+    %--------------------------------------------------------------
+    % Plot the edges. Check if some should have dashed lines
+    
+    if isempty(edgenumbers)
+        linemarker = ones(nedges,1);
+    else
+        linemarker = 2*ones(nedges,1);    
+        linemarker(edgenumbers) = 1;
+    end
+    linemarkertype = ['k- ';'k--'];
+    linewidthvalues = [2 1];
+
 end
-linemarkertype = ['k- ';'k--'];
-linewidthvalues = [2 1];
 
 figure(figurewindow)
 clf(figurewindow)
-for ii = 1:nedges
-	co1 = edgedata.edgecorners(ii,1);
-	co2 = edgedata.edgecorners(ii,2);
-	iv = [co1;co2];
-	plothandles.edges(ii) = plot3(planedata.corners(iv,1),planedata.corners(iv,2),planedata.corners(iv,3),linemarkertype(linemarker(ii),:));
-    set(plothandles.edges(ii),'LineWidth',linewidthvalues(linemarker(ii)));
-    if ii ==1
-        view(viewpos)
-        hold on
-        plothandles.parent = get(plothandles.edges(1),'Parent');
-    end
-    if plotednumbers
-        costart = planedata.corners(co1,:) + 0.1*(planedata.corners(co2,:)-planedata.corners(co1,:));
-        plothandles.edgecircles(ii) = plot3(costart(1),costart(2),costart(3),'ko');    
-    end
-end
 
-if plotnvecs
-	for ii = 1:nplanes
-        midpoint = mean(planedata.corners(planedata.planecorners(ii,1:(planedata.ncornersperplanevec(ii))),:));
-        
-        endpoint = midpoint + planedata.planeeqs(ii,1:3);
-        bothpoints = [midpoint;endpoint];
-        plothandles.nvecs(ii) = plot3(bothpoints(:,1),bothpoints(:,2),bothpoints(:,3));
-        plothandles.nveccircles(ii) = plot3(midpoint(1),midpoint(2),midpoint(3),'ro');
-	end
-end
-
-if plotplnumbers
-	for ii = 1:nplanes
-        midpoint = mean(planedata.corners(planedata.planecorners(ii,1:planedata.ncornersperplanevec(ii)),:));
-        endpoint = midpoint + planedata.planeeqs(ii,1:3)*0.1;
-        if plotplCADnumbers == 1
-            plothandles.planenumbers(ii) = text(endpoint(1),endpoint(2),endpoint(3),['p',int2str(planenumbers(ii))]);
-            set(plothandles.planenumbers(ii),'FontSize',14);
-        else
-            plothandles.planenumbers(ii) = text(endpoint(1),endpoint(2),endpoint(3),['p',int2str(ii)]);
-            set(plothandles.planenumbers(ii),'FontSize',14);
-        end
+if freefieldcase == 0
     
-	end
-end
-
-if plotednumbers
     for ii = 1:nedges
-        midpoint = mean(planedata.corners(edgedata.edgecorners(ii,1:2),:));
-        plothandles.edgenumbers(ii) = text(midpoint(1),midpoint(2),midpoint(3),['e',int2str(ii)]);
-            set(plothandles.edgenumbers(ii),'FontSize',18);
-    end
-end
-
-if plotconumbers
-    for ii = 1:ncorners
-        if plotcoCADnumbers == 1
-            plothandles.conumbers(ii) = text(planedata.corners(ii,1),planedata.corners(ii,2),planedata.corners(ii,3),['c',int2str(cornernumbers(ii))]); 
-            set(plothandles.conumbers(ii),'FontSize',18);
-        else
-            plothandles.conumbers(ii) = text(planedata.corners(ii,1),planedata.corners(ii,2),planedata.corners(ii,3),['c',int2str(ii)]);    
-            set(plothandles.conumbers(ii),'FontSize',18);
+	    co1 = edgedata.edgecorners(ii,1);
+	    co2 = edgedata.edgecorners(ii,2);
+	    iv = [co1;co2];
+	    plothandles.edges(ii) = plot3(planedata.corners(iv,1),planedata.corners(iv,2),planedata.corners(iv,3),linemarkertype(linemarker(ii),:));
+        set(plothandles.edges(ii),'LineWidth',linewidthvalues(linemarker(ii)));
+        if ii ==1
+            view(viewpos)
+            hold on
+            plothandles.parent = get(plothandles.edges(1),'Parent');
+        end
+        if plotednumbers
+            costart = planedata.corners(co1,:) + 0.1*(planedata.corners(co2,:)-planedata.corners(co1,:));
+            plothandles.edgecircles(ii) = plot3(costart(1),costart(2),costart(3),'ko');    
         end
     end
     
+    if plotnvecs
+	    for ii = 1:nplanes
+            midpoint = mean(planedata.corners(planedata.planecorners(ii,1:(planedata.ncornersperplanevec(ii))),:));
+            
+            endpoint = midpoint + planedata.planeeqs(ii,1:3);
+            bothpoints = [midpoint;endpoint];
+            plothandles.nvecs(ii) = plot3(bothpoints(:,1),bothpoints(:,2),bothpoints(:,3));
+            plothandles.nveccircles(ii) = plot3(midpoint(1),midpoint(2),midpoint(3),'ro');
+	    end
+    end
+    
+    if plotplnumbers
+	    for ii = 1:nplanes
+            midpoint = mean(planedata.corners(planedata.planecorners(ii,1:planedata.ncornersperplanevec(ii)),:));
+            endpoint = midpoint + planedata.planeeqs(ii,1:3)*0.1;
+            if plotplCADnumbers == 1
+                plothandles.planenumbers(ii) = text(endpoint(1),endpoint(2),endpoint(3),['p',int2str(planenumbers(ii))]);
+                set(plothandles.planenumbers(ii),'FontSize',14);
+            else
+                plothandles.planenumbers(ii) = text(endpoint(1),endpoint(2),endpoint(3),['p',int2str(ii)]);
+                set(plothandles.planenumbers(ii),'FontSize',14);
+            end
+        
+	    end
+    end
+    
+    if plotednumbers
+        for ii = 1:nedges
+            midpoint = mean(planedata.corners(edgedata.edgecorners(ii,1:2),:));
+            plothandles.edgenumbers(ii) = text(midpoint(1),midpoint(2),midpoint(3),['e',int2str(ii)]);
+                set(plothandles.edgenumbers(ii),'FontSize',18);
+        end
+    end
+    
+    if plotconumbers
+        for ii = 1:ncorners
+            if plotcoCADnumbers == 1
+                plothandles.conumbers(ii) = text(planedata.corners(ii,1),planedata.corners(ii,2),planedata.corners(ii,3),['c',int2str(cornernumbers(ii))]); 
+                set(plothandles.conumbers(ii),'FontSize',18);
+            else
+                plothandles.conumbers(ii) = text(planedata.corners(ii,1),planedata.corners(ii,2),planedata.corners(ii,3),['c',int2str(ii)]);    
+                set(plothandles.conumbers(ii),'FontSize',18);
+            end
+        end
+        
+    end
 end
 
 if plotsources == 1
     if isempty(sounumbers)
-        plothandles.sources = plot3(Sdata.coordinates(:,1),Sdata.coordinates(:,2),Sdata.coordinates(:,3),'*');
+        if strcmp(Sdata.sourcetype,'polygonpiston') == 1
+            npistons = size(Sdata.pistoncornernumbers,1);
+            for ii = 1:npistons
+                onepistonlist = Sdata.pistoncornercoordinates(Sdata.pistoncornernumbers(ii,1:Sdata.ncornersperpiston(ii)),:);
+                onepistonlist = [onepistonlist;onepistonlist(1,:)];
+                plothandles.sources(ii) = plot3(onepistonlist(:,1),onepistonlist(:,2),onepistonlist(:,3),'k-','LineWidth',0.5);
+            end
+        else
+            plothandles.sources = plot3(Sdata.coordinates(:,1),Sdata.coordinates(:,2),Sdata.coordinates(:,3),'*');
+        end
     else
-        plothandles.sources = plot3(Sdata.coordinates(sounumbers,1),Sdata.coordinates(sounumbers,2),Sdata.coordinates(sounumbers,3),'*');       
+        if strcmp(Sdata.sourcetype,'polygonpiston') == 1
+            for ii = sounumbers
+                onepistonlist = Sdata.pistoncornercoordinates(Sdata.pistoncornernumbers(ii,1:Sdata.ncornersperpiston(ii)),:);
+                onepistonlist = [onepistonlist;onepistonlist(1,:)];
+                plothandles.sources(ii) = plot3(onepistonlist(:,1),onepistonlist(:,2),onepistonlist(:,3),'k-','LineWidth',0.5);
+            end
+        else
+            plothandles.sources = plot3(Sdata.coordinates(sounumbers,1),Sdata.coordinates(sounumbers,2),Sdata.coordinates(sounumbers,3),'*');       
+        end
     end
     set(plothandles.sources,'LineWidth',3)
+    if freefieldcase == 1
+        hold on
+    end
 end
 
 if plotreceivers == 1

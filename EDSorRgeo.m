@@ -69,7 +69,7 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
 % from EDtoolbox.
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 31 Oct. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 20 Nov. 2023
 %
 % [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo(planedata,...
 % edgedata,inputstruct,typeofcoords,EDversionnumber,filehandlingparameters);
@@ -107,6 +107,15 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
 % 29 Oct. 2023 nedgesubs was made into a field in the inputstruct
 % 30 Oct. 2023 Fine-tuned the EDinputdatahash. Adjusts the piston center
 % point a little bit for the visibility test; then nudges it back.
+% 6 Nov. 2023 Added the piston coordinates and piston gauss order to the
+% EDinputdatahash. And the source amplitudes.
+% 10 Nov. 2023 Added a check which reduced the size of rrsho, thetarsho,
+% zrsho. Previously, the edge-related coordinates were calculated for all
+% S/R vs. all edges. Now a multiplication with (vispartedgesfromSR>0)
+% reduces the number of values significantly, which makes the subesequent
+% compression generate much shorter shortlists.
+% 12 Nov. 2023 Introduced piston corner coordinates
+% 20 Nov. 2023 Another reduction of the size of rrsho etc.
 
 t00 = clock;
 geomacc = 1e-9;
@@ -125,6 +134,9 @@ if typeofcoords == 's'
     EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
         planedata.planecorners,'offedges',edgedata.offedges,...
         'coordinates',inputstruct.coordinates,...
+        'amplitudes',inputstruct.sourceamplitudes,...
+        'pistoncoordinates',inputstruct.pistoncornercoordinates,...
+        'pistongausspoints',inputstruct.pistongausspoints,...
         'nedgesubs',inputstruct.nedgesubs,'EDversionnumber',EDversionnumber);
 else
     EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
@@ -173,7 +185,7 @@ if foundmatch == 1
 end
 
 %---------------------------------------------------------------
-% No file was found, so thie function should be run.
+% No file was found, so this function should be run.
 
 % ncorners = size(planedata.corners,1);
 nplanes = size(planedata.planecorners,1);
@@ -1045,22 +1057,60 @@ end
 %     reftoshortlistR = zeros(nedges,nreceivers,'uint32');    
 % end
 
-rRcomplete     = zeros(nedges,nreceivers);
-thetaRcomplete = zeros(nedges,nreceivers);
-zRcomplete     = zeros(nedges,nreceivers);
-
-for ii = 1:nedges
-    [rR,thetaR,zR] = EDcoordtrans1(inputstruct.coordinates,...
-        [edgedata.edgestartcoords(ii,:);edgedata.edgeendcoords(ii,:)],...
-        edgedata.edgenvecs(ii,:),reshape(edgedata.edgerelatedcoordsysmatrices(ii,:),3,3));
-    rRcomplete(ii,:) = rR.';
-    thetaRcomplete(ii,:) = thetaR.';
-    zRcomplete(ii,:) = zR.';    
+subcoordinates = 0;
+if typeofcoords == 's'
+    if strcmp(inputstruct.sourcetype,'polygonpiston') == 1
+        subcoordinates = 1;
+    end
 end
 
-[reftoshortlistR,rRsho,thetaRsho,zRsho,~] = ...
-EDcompress3(rRcomplete,thetaRcomplete,zRcomplete);
+if subcoordinates == 0
+    rRcomplete     = zeros(nedges,nreceivers);
+    thetaRcomplete = zeros(nedges,nreceivers);
+    zRcomplete     = zeros(nedges,nreceivers);
+    
+    for ii = 1:nedges
+        % New 20 Nov. 2023: if one edge doesn't see a single S/R, then
+        % don't compute the edge-related coordinates for that edge
+        if any(vispartedgesfromr(ii,:))
+            [rR,thetaR,zR] = EDcoordtrans1(inputstruct.coordinates,...
+                [edgedata.edgestartcoords(ii,:);edgedata.edgeendcoords(ii,:)],...
+                edgedata.edgenvecs(ii,:),reshape(edgedata.edgerelatedcoordsysmatrices(ii,:),3,3));
+            rRcomplete(ii,:) = rR.';
+            thetaRcomplete(ii,:) = thetaR.';
+            zRcomplete(ii,:) = zR.';    
+        end
+    end
+    
+    % New 10 Nov. 2023:
+    rRcomplete = rRcomplete.*(vispartedgesfromr>0);
+    thetaRcomplete = thetaRcomplete.*(vispartedgesfromr>0);
+    zRcomplete = zRcomplete.*(vispartedgesfromr>0);
+    
+    [reftoshortlistR,rRsho,thetaRsho,zRsho,~] = ...
+    EDcompress3(rRcomplete,thetaRcomplete,zRcomplete);
+else
+    nsubcoordinates = size(inputstruct.pistongausscoordinates{1},1)
+    rRcomplete     = zeros(nedges,nreceivers,nsubcoordinates);
+    thetaRcomplete = zeros(nedges,nreceivers,nsubcoordinates);
+    zRcomplete     = zeros(nedges,nreceivers,nsubcoordinates);
+    for ii = 1:nedges
+        for jj = 1:nreceivers
+            if vispartedgesfromr(ii,jj) > 0
+                [rR,thetaR,zR] = EDcoordtrans1(inputstruct.pistongausscoordinates{jj},...
+                    [edgedata.edgestartcoords(ii,:);edgedata.edgeendcoords(ii,:)],...
+                    edgedata.edgenvecs(ii,:),reshape(edgedata.edgerelatedcoordsysmatrices(ii,:),3,3));
+                rRcomplete(ii,jj,:) = rR.';
+                thetaRcomplete(ii,jj,:) = thetaR.';
+                zRcomplete(ii,jj,:) = zR.';  
+            end
+        end
+    end
+    
+    [reftoshortlistR,rRsho,thetaRsho,zRsho,~] = ...
+    EDcompress3(rRcomplete,thetaRcomplete,zRcomplete);
 
+end
 %----------------------------------------------------------------------------
 %
 %		STORE THE VARIABLES IN THE STRUCT
@@ -1116,7 +1166,6 @@ else
         rotationmatrices = cell(nrotationmatrices,1);
         reftorotationmatrices = [1:nrotationmatrices].';
         reftorotationmatrices = reshape(reftorotationmatrices,nmaxcornernumbersperpiston,npistons).';
-
         for ii = 1:npistons
             nvec = planedata.planeeqs(inputstruct.pistonplanes(ii),1:3);
             for jj = 1:nmaxcornernumbersperpiston
@@ -1130,8 +1179,8 @@ else
                             endnumber = inputstruct.pistoncornernumbers(ii,1);
                         end
                     end
-                    disp(['ii = ',int2str(ii),', jj = ',int2str(jj),' start no. = ',int2str(startnumber),' end no. = ',int2str(endnumber)])
-                    disp(['   Rot. matrix no. ',int2str(reftorotationmatrices(ii,jj))])
+%                     disp(['ii = ',int2str(ii),', jj = ',int2str(jj),' start no. = ',int2str(startnumber),' end no. = ',int2str(endnumber)])
+%                     disp(['   Rot. matrix no. ',int2str(reftorotationmatrices(ii,jj))])
                     pistonedgevec = inputstruct.pistoncornercoordinates(endnumber,:) - ...
                         inputstruct.pistoncornercoordinates(startnumber,:);
                     pistonedgevec = pistonedgevec/norm(pistonedgevec);

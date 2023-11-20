@@ -34,7 +34,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 % Uses functions EDcoordtrans2, EDwedge1st_fd, EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash form Matlab Central
 % 
-% Peter Svensson 1 Nov. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 20 Nov. 2023 (peter.svensson@ntnu.no)
 %
 % [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename] = ...
 % EDmakefirstordertfs(firstorderpathdata,planedata,edgedata,Snewdata,...
@@ -71,6 +71,12 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 % 30 Oct. 2023 Fine-tuned the EDinputdatahash
 % 30 Oct. 2023 Introduced the piston source
 % 1 Nov. 2023 Finished the piston source for the direct sound
+% 9 Nov. 2023 Added the piston gauss order and the source amplitudes to the
+% EDinputdatahash.
+% 10 Nov. 2023 For the diffraction, an unnecessary recalculation of the
+% edge-related coordinates was done. The values were already computed and
+% stored in the rSsho, thetaSsho, zSsho etc with the reftoshortlistS etc.
+% 20 Nov. 2023 Same as on 10 Nov., but now for piston sources
 
 t00 = clock;
 
@@ -88,8 +94,10 @@ EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
     planedata.planecorners,'offedges',edgedata.offedges,...
     'sources',Sdata.coordinates,'Snedgesubs',Sdata.nedgesubs,...
     'doallSRcombinations',Sdata.doallSRcombinations,...
-    'sourcetype',Sdata.sourcetype,'pistoncornercoordinates',Sdata.pistoncornercoordinates,...
+    'sourcetype',Sdata.sourcetype,...
+    'pistoncornercoordinates',Sdata.pistoncornercoordinates,...
     'pistoncornernumbers',Sdata.pistoncornernumbers,...
+    'piatongausspoints',Sdata.pistongausspoints,...
     'receivers',Rdata.coordinates,'Rnedgesubs',Rdata.nedgesubs,...
     'cair',envdata.cair,'frequencies',frequencies,'Rstart',Rstart,...
      'difforder',difforder,'directsound',directsound,'EDversionnumber',EDversionnumber);
@@ -170,7 +178,7 @@ if firstorderpathdata.ncomponents(1) > 0
          if ncomponents > nfrequencies && Sdata.doaddsources == 1
             for kk = 1:nfrequencies  
                 alltfs = exp(-1i*kvec(kk)*(alldists-Rstart))./alldists...
-                    .*firstorderpathdata.directsoundlist(:,3).*Sdata.sourceamplitudes( firstorderpathdata.directsoundlist(:,1),ikki );
+                    .*firstorderpathdata.directsoundlist(:,3).*Sdata.sourceamplitudes( firstorderpathdata.directsoundlist(:,1),kk );
                 %            if Sdata.doaddsources == 1
                 tfdirect(kk,1:maxrecnumber) = accumarray(firstorderpathdata.directsoundlist(:,2),alltfs);
                 %            else
@@ -204,7 +212,6 @@ if firstorderpathdata.ncomponents(1) > 0
             disp(['WARNING! Rstart is not zero. Are you sure that is what you want, for the polygon piston source?'])
             pause
         end
-
         % We calculate all the vertical distances from the piston plane to
         % all the receivers = zreceiver.
         %           zreceiver = r*cos(theta)
@@ -263,7 +270,7 @@ if firstorderpathdata.ncomponents(1) > 0
                 Rmod = rotmat*Rshift(:);
                 if Rplanemod(2) < 0
                     checkinsidehit = 0;
-                else
+                elseif Rplanemod(2) == 0
                     checkedgehit = 1;
                 end
                 % nvecmod will be [0 0 1]
@@ -279,15 +286,18 @@ if firstorderpathdata.ncomponents(1) > 0
                 % psi = Rplanemod(2)
 
                 for kk = 1:length(kvec)
-                    intval = integral(@(x) EDpistonedgeintegrand(x,Rplanemod(2)^2,Rplanemod(1),Rmod(3)^2,kvec(kk)),0,edgelength);
+                    intval = integral(@(x) EDpistonedgeintegrand(x,Rplanemod(2)^2,Rmod(3)^2,kvec(kk)),0-Rplanemod(1),edgelength-Rplanemod(1),'RelTol',1e-8);
                     lineintsummation(kk) = lineintsummation(kk) + intval*Rplanemod(2);
                 end
             end
             alltfs = -lineintsummation/2/pi;
+                          
             if checkinsidehit == 1
-                alltfs = alltfs + exp(-1i*kvec*(Rmod(3)-Rstart));
+                 alltfs = alltfs + exp(-1i*kvec*(Rmod(3)-Rstart));
             end
-                           
+
+            alltfs = alltfs.*(-2i)*envdata.cair/Sdata.pistonareas(pistonnumber)./frequencies(:);
+            
            if Sdata.doaddsources == 1
               tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) = ...
                   tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) + alltfs;
@@ -409,24 +419,79 @@ if difforder > 0
 
         ivS = find(sou_vs_edges(:,edgenumber));
         ivR = find(rec_vs_edges(:,edgenumber));
-        [rs,thetas,zs,rr,thetar,zr] = EDcoordtrans2(Sdata.coordinates(ivS,:),Rdata.coordinates(ivR,:),edgecoords,edgedata.edgenvecs(edgenumber,:));
+ 
+        if strcmp(Sdata.sourcetype,'monopole')
+ 
+            % 10 Nov. 2023 Instead of recalculating the edge-related
+            % coordinates, they are read from the available shortlists
+%            [rs,thetas,zs,rr,thetar,zr] = EDcoordtrans2(Sdata.coordinates(ivS,:),Rdata.coordinates(ivR,:),edgecoords,edgedata.edgenvecs(edgenumber,:));
+            rs     = Sdata.rSsho(Sdata.reftoshortlistS(edgenumber,ivS));
+            thetas = Sdata.thetaSsho(Sdata.reftoshortlistS(edgenumber,ivS));
+            zs     = Sdata.zSsho(Sdata.reftoshortlistS(edgenumber,ivS));
 
-        cylcoordS(ivS,:) = [rs thetas zs];
-        cylcoordR(ivR,:) = [rr thetar zr];
+            rr     = Rdata.rRsho(Rdata.reftoshortlistR(edgenumber,ivR));
+            thetar = Rdata.thetaRsho(Rdata.reftoshortlistR(edgenumber,ivR));
+            zr     = Rdata.zRsho(Rdata.reftoshortlistR(edgenumber,ivR));
 
-        for jj = 1:length(iv2)
-            [tfnew,singularterm,zfirst] = EDwedge1st_fd(envdata.cair,frequencies,edgedata.closwedangvec(edgenumber),...
-                cylcoordS(Snumber(jj),1),cylcoordS(Snumber(jj),2),cylcoordS(Snumber(jj),3),...
-                cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
-                edgedata.edgelengthvec(edgenumber)*[0 1],'n',Rstart,[1 1]);  
 
-            tfnew = tfnew.*(Sdata.sourceamplitudes( Snumber(jj),: ).');
-            if Sdata.doaddsources == 1
-                tfdiff(:,Rnumber(jj)) =  tfdiff(:,Rnumber(jj)) + tfnew;                       
-            else
-                tfdiff(:,Rnumber(jj),Snumber(jj)) =  tfdiff(:,Rnumber(jj),Snumber(jj)) + tfnew;           
+            cylcoordS(ivS,:) = [rs thetas zs];
+            cylcoordR(ivR,:) = [rr thetar zr];
+    
+            for jj = 1:length(iv2)
+                [tfnew,singularterm,zfirst] = EDwedge1st_fd(envdata.cair,frequencies,edgedata.closwedangvec(edgenumber),...
+                    cylcoordS(Snumber(jj),1),cylcoordS(Snumber(jj),2),cylcoordS(Snumber(jj),3),...
+                    cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
+                    edgedata.edgelengthvec(edgenumber)*[0 1],'n',Rstart,[1 1]);  
+    
+                tfnew = tfnew.*(Sdata.sourceamplitudes( Snumber(jj),: ).');
+
+                if Sdata.doaddsources == 1
+                    tfdiff(:,Rnumber(jj)) =  tfdiff(:,Rnumber(jj)) + tfnew;                       
+                else
+                    tfdiff(:,Rnumber(jj),Snumber(jj)) =  tfdiff(:,Rnumber(jj),Snumber(jj)) + tfnew;           
+                end
             end
-        end
+        else % polygonpiston
+            npistonpoints = size(Sdata.pistongausscoordinates{ivS},1);
+
+            % 20 Nov. 2023 Use the already existing short lists of
+            % edge-related coordinates instead of recalculating them
+%            [rr,thetar,zr] = EDcoordtrans1(Rdata.coordinates(ivR,:),edgecoords,edgedata.edgenvecs(edgenumber,:));
+            rr = Rdata.rRsho(Rdata.reftoshortlistR(edgenumber,ivR));
+            thetar = Rdata.thetaRsho(Rdata.reftoshortlistR(edgenumber,ivR));
+            zr = Rdata.zRsho(Rdata.reftoshortlistR(edgenumber,ivR));
+
+            cylcoordR(ivR,:) = [rr(:) thetar(:) zr(:)];
+                
+            for jj = 1:length(iv2)
+
+                tfsumpiston = zeros(length(frequencies),1); 
+                for np = 1:npistonpoints
+                    % 20 Nov. 2023 Use the already existing short lists of
+                    % edge-related coordinates instead of recalculating them
+%                    [rs,thetas,zs] = EDcoordtrans1(Sdata.pistongausscoordinates{ivS}(np,:),edgecoords,edgedata.edgenvecs(edgenumber,:));
+                    rs     = Sdata.rSsho(Sdata.reftoshortlistS(edgenumber,ivS,np));
+                    thetas = Sdata.thetaSsho(Sdata.reftoshortlistS(edgenumber,ivS,np));
+                    zs     = Sdata.zSsho(Sdata.reftoshortlistS(edgenumber,ivS,np));
+
+                    [tfonepistonpoint,singularterm,zfirst] = EDwedge1st_fd(envdata.cair,frequencies,edgedata.closwedangvec(edgenumber),...
+                        rs(:),thetas(:),zs(:    ),cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
+                        edgedata.edgelengthvec(edgenumber)*[0 1],'n',Rstart,[1 1]);  
+                    tfsumpiston = tfsumpiston + tfonepistonpoint*Sdata.pistongaussweights{ivS}(np);
+                end
+
+                tfnew = tfsumpiston.*(Sdata.sourceamplitudes( Snumber(jj),: ).');
+                if Sdata.doaddsources == 1
+                    tfdiff(:,Rnumber(jj)) =  tfdiff(:,Rnumber(jj)) + tfnew;                       
+                else
+                    tfdiff(:,Rnumber(jj),Snumber(jj)) =  tfdiff(:,Rnumber(jj),Snumber(jj)) + tfnew;           
+                end
+            end
+
+
+%            pause
+
+        end        
 
     end
 else

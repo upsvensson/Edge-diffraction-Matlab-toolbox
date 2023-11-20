@@ -29,7 +29,7 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 %
 % Uses functions EDdistelements  EDcoordtrans1
 %
-% Peter Svensson 29 May 2018 (peter.svensson@ntnu.no)
+% Peter Svensson 20 Nov. 2023 (peter.svensson@ntnu.no)
 %
 % Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,inteq_ngauss,inteq_discretizationtype,...
 %     vispartedgesfroms,vispartedgesfroms_start,vispartedgesfroms_end,frequency,gaussvectors,rSvec,thetaSvec,zSvec,showtext);
@@ -59,6 +59,11 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 % >= 2"
 % 22 May 2018 Fixed a mistake "in2str" instead of "int2str".
 % 29 May 2018 Implemented LCN for the highest sample (if it stands out).
+% 2 Nov. 2023 Changed so that showtext = 3 is needed instead of 2 to show
+% the "Startrow...." messages
+% 20 Nov. 2023 Changed so that showtext = 3 is needed instead of 2 to show
+% the "Building the G matrix" messages and showtext = 4 needed for the
+% "Startrow" meassages.
 
 if nargin < 14
     showtext = 0;
@@ -76,7 +81,7 @@ refto = edgetoedgedata.reftoshortlistE;
 
 k = 2*pi*frequency/envdata.cair;
 
-if showtext >= 2
+if showtext >= 3
     disp(' ')
     disp('      Calculating the ESIE source term')%: symmetrycompression = ',int2str(symmetrycompression)])    
     disp(['      Building the G matrix of size (',int2str(Hsubmatrixdata.bigmatrixendnums(end)),',1)'])
@@ -95,7 +100,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
     
     if vispartedgesfroms(edge2) ~= 0
         edge3 = Hsubmatrixdata.edgepairlist(ii,1);
-        if showtext >= 2
+        if showtext >= 4
 %         if showtext >= 1
             disp(' ')
             disp(['         From S via edge ',int2str(edge2),' to edge ',int2str(edge3)])
@@ -142,7 +147,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         else            
             skewedges = 1;
         end
-        if showtext >= 3
+        if showtext >= 4
             disp(['         Acrossface_out = ',int2str(acrossface_out)])
         end
 

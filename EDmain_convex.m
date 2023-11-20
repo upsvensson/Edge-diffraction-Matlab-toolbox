@@ -69,7 +69,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 27 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 1 Nov. 2023 (peter.svensson@ntnu.no)
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -179,6 +179,8 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % 27 Oct. 2023 v0.4: quite large changes, with using a single struct for S
 % and R, instead of Sinputdata/Sdata. Also, entire structs are given as
 % inputs to functions, so function calls are all modified.
+% 1 Nov. 2023 Added an empty .offedges field to edgedata, when a
+% freefieldcase is run.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -298,8 +300,13 @@ if geoinputdata.freefieldcase == 0
         filehandlingparameters,fid,'',[int2str(nedges),' edges.'])
     timingstruct.edgedata = elapsedtimeedgeo(1);
 else
-    edgedata = struct('edgecorners','');
-    timingstruct.edgedata = 0;
+     edgedata = struct('edgecorners','','offedges','');
+     desiredname = [filehandlingparameters.outputdirectory,filesep,...
+	    filehandlingparameters.filestem,'_eddata.mat'];
+     elapsedtimeedgeo = 0;
+     EDinputdatahash = '00000000';
+     eval(['save(''',desiredname,''',''planedata'',''edgedata'',''EDinputdatahash'',''elapsedtimeedgeo'');'])
+     timingstruct.edgedata = 0;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -320,6 +327,12 @@ if geoinputdata.freefieldcase == 0
 else
     Snewdata.visplanesfroms = [];
     Snewdata.vispartedgesfroms = [];
+    Sdata = Snewdata;
+     desiredname = [filehandlingparameters.outputdirectory,filesep,...
+	    filehandlingparameters.filestem,'_Sdata.mat'];
+     elapsedtimeSRgeo = 0;
+     EDinputdatahash = '00000000';
+     eval(['save(''',desiredname,''',''Sdata'',''EDinputdatahash'',''elapsedtimeSRgeo'');'])
     timingstruct.Sdata = 0;    
 end
 
@@ -341,6 +354,12 @@ if geoinputdata.freefieldcase == 0
 else
     Rnewdata.visplanesfromr = [];
     Rnewdata.vispartedgesfromr = [];
+    Rdata = Rnewdata;
+     desiredname = [filehandlingparameters.outputdirectory,filesep,...
+	    filehandlingparameters.filestem,'_Rdata.mat'];
+     elapsedtimeSRgeo = 0;
+     EDinputdatahash = '00000000';
+     eval(['save(''',desiredname,''',''Rdata'',''EDinputdatahash'',''elapsedtimeSRgeo'');'])
     timingstruct.Rdata = 0;
 end
 
@@ -349,7 +368,7 @@ DIF = int2str(controlparameters.difforder);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Find the paths for direct sound, first-order specular, and first-order
 % diffraction paths.
- 
+
 if controlparameters.skipfirstorder == 0
     EDmessage(filehandlingparameters,'s',fid,1,'',['Find the (first-order) GA paths']);
     [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...

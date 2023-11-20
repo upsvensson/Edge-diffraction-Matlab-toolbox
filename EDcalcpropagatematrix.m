@@ -19,7 +19,7 @@ isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegment
 %
 % Uses EDcoordtrans1. 
 %
-% Peter Svensson (peter.svensson@ntnu.no) 13 Apr 2018
+% Peter Svensson (peter.svensson@ntnu.no) 2 Nov 2023
 %
 % [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
 %     isthinhole,vispartedgesfromr,frequency,Rstart,...
@@ -47,6 +47,8 @@ isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegment
 % 28 Nov. 2017 Introduced the non-global input parameter showtext
 % 13 Apr 2018 Fixed a small bug; thinplaneboostvec got the format uint8 by
 % mistake. Found by Antoine.
+% 2 Nov 2023 Changed that showtext must be 3 instead of 2 to show all the
+% annoying "Building...."
 
 if nargin < 13
     showtext = 0;
@@ -63,7 +65,7 @@ refto = edgetoedgedata.reftoshortlistE;
 % k = 2*pi*frequency/CAIR;
 k = 2*pi*frequency/envdata.cair;
 
-if showtext >= 2
+if showtext >= 3
     disp(' ')
     disp(['      Building the F matrix of size (1,',int2str(nbig),')'])
 end

@@ -79,7 +79,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   EDmain_convex_time
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 30 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 4 Nov. 2023 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -156,6 +156,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % .planeseesplanestrategy in geoinputdata. Introduced nedgesubs for Sdata
 % and Rdata. Added the new field .HODirelemsize
 % 30 Oct. 2023 Introduced the piston source checking
+% 4 Nov. 2023 Calculates the piston areas.
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -274,31 +275,246 @@ end
 if ~isstruct(Sinputdata)
     error('ERROR: the source was not specified')
 end
-if ~isfield(Sinputdata,'coordinates')
-    if ~isfield(Sinputdata,'sourcetype')
-        error('ERROR: you must specify monopole source coordinates, or define a piston')
-    end
-    if strcmp(Sinputdata.sourcetype,'monopole')
+% sourcetype is not specified, the default is monopole
+if ~isfield(Sinputdata,'sourcetype')
+    Sinputdata.sourcetype = 'monopole';
+    Sinputdata.pistoncornercoordinates = [];
+    Sinputdata.pistoncornernumbers = [];
+    Sinputdata.pistonplanes = [];    
+
+end
+if strcmp(Sinputdata.sourcetype,'monopole')
+    if ~isfield(Sinputdata,'coordinates') 
         error('ERROR: you must specify monopole source coordinates')
-    elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
-        if ~isfield(Sinputdata,'pistoncornercoordinates') || ~isfield(Sinputdata,'pistoncornernumbers') || ~isfield(Sinputdata,'pistonplanes')
-            error('ERROR: when you specify a polygonpiston sources, you must specify corner coordinates and numbers, and piston plane.')
-        end
-        npistons = size(Sinputdata.pistoncornernumbers,1);
-        pistonmidpointcoordinates = zeros(npistons,3);   
-        ncornersperpiston = sum(Sinputdata.pistoncornernumbers.'>0).';
-        for ii = 1:npistons
-            pistonmidpointcoordinates(ii,:) = mean(Sinputdata.pistoncornercoordinates...
-                (Sinputdata.pistoncornernumbers(ii,1:ncornersperpiston(ii)),:));
-        end
-        Sinputdata.coordinates = pistonmidpointcoordinates;
-        Sinputdata.ncornersperpiston = ncornersperpiston;
     end
+    [nsources,ncolumns] = size(Sinputdata.coordinates);
+    if nsources == 0
+         error('ERROR: source coordinates were not specified')            
+    end
+    if ncolumns ~= 3
+       error(['ERROR: check your sources coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
+    end
+    Sinputdata.pistoncornercoordinates = [];
+    Sinputdata.pistoncornernumbers = [];
+    Sinputdata.pistonplanes = []; 
+    Sinputdata.pistongausspoints = 0;
+    
+elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
+   if ~isfield(Sinputdata,'pistoncornercoordinates') || ~isfield(Sinputdata,'pistoncornernumbers') || ~isfield(Sinputdata,'pistonplanes')
+        error('ERROR: when you specify a polygonpiston sources, you must specify corner coordinates and numbers, and piston plane(s).')
+    end
+    npistons = size(Sinputdata.pistoncornernumbers,1);
+    [npoints,ncolumns] = size(Sinputdata.pistoncornercoordinates);
+    if npistons == 0
+        error('ERROR: You must define at least one piston source by specifying the corner numbers')
+    else
+        nsources = npistons;
+    end
+    if npoints < 3
+        error('ERROR: You must define at least three pistoncornercoordinates')
+    end
+    if ncolumns ~= 3
+        error('ERROR: There should be 3 columns for the pistoncornercoordinates')
+    end        
+    if ~isfield(Sinputdata,'pistongausspoints')
+        Sinputdata.pistongausspoints = 3;
+    end
+
+    pistonmidpointcoordinates = zeros(npistons,3);   
+    ncornersperpiston = sum(Sinputdata.pistoncornernumbers.'>0).';
+    pistonareavec = zeros(npistons,1);
+
+    Sinputdata.pistongausscoordinates = cell(npistons,1);
+    Sinputdata.pistongaussweights = cell(npistons,1);
+
+    for ii = 1:npistons
+        corners_onepiston = Sinputdata.pistoncornercoordinates...
+            (Sinputdata.pistoncornernumbers(ii,1:ncornersperpiston(ii)),:);
+        pistonmidpointcoordinates(ii,:) = mean(corners_onepiston);
+
+        % Calculate the area of each piston. Implemented for triangles
+        % and rectangles, using a version of Heron's formula for the
+        % triangle: A = 1/4*sqrt( 4*a^2*b^2 - (a^2 + b^2 - c^2)^2 )
+        % where a,b,c = triangle side lengths
+        corners_onepiston_expanded = [corners_onepiston;corners_onepiston(1,:)];
+        sidevectors = diff(corners_onepiston_expanded);
+        sidelengthsquared = sum(sidevectors.^2,2);
+
+        if ncornersperpiston(ii) == 3
+            pistonarea = 1/4*sqrt( 4*sidelengthsquared(1)*sidelengthsquared(2) ...
+                - (sidelengthsquared(1) + sidelengthsquared(2) - sidelengthsquared(3))^2  );
+            switch Sinputdata.pistongausspoints
+                case {0,1}
+                   gaussvalues = [1/3 1/3 1]; 
+                case {2}
+                    gaussvalues = [2/3 1/6 1/3;...
+                                   1/6 2/3 1/3;
+                                   1/6 1/6 1/3];
+                case {3}
+                    gaussvalues = [1/3 1/3 -9/32; ...
+                        0.2 0.6 25/96; ...
+                        0.2 0.2 25/96; ...
+                        0.6 0.2 25/96];
+                case {4}
+                    gaussvalues = [0.108103018168070  0.445948490915965 0.223381589678011; ...
+                                   0.445948490915965  0.108103018168070 0.223381589678011; ...
+                                   0.445948490915965  0.445948490915965 0.223381589678011; ...
+                                   0.816847572980459  0.091576213509771 0.109951743655322; ...
+                                   0.091576213509771  0.816847572980459 0.109951743655322; ...
+                                   0.091576213509771  0.091576213509771 0.109951743655322];
+                case {5}   % 7 gauss points
+                    gaussvalues = [1/3  1/3  0.225;...
+                                   0.059715871789770 0.470142064105115 0.132394152788506;...
+                                   0.470142064105115 0.059715871789770 0.132394152788506;...
+                                   0.470142064105115 0.470142064105115 0.132394152788506;...
+                                   0.797426985353087 0.101286507323456 0.125939180544827;...
+                                   0.101286507323456 0.797426985353087 0.125939180544827;...
+                                   0.101286507323456 0.101286507323456 0.125939180544827];
+                case{6}  % 12 gauss points
+                    gaussvalues = [0.501426509658179 0.249286745170910 0.116786275726379;...
+                                   0.249286745170910 0.501426509658179 0.116786275726379;...
+                                   0.249286745170910 0.249286745170910 0.116786275726379;...
+                                   0.873821971016996 0.063089014491502 0.050844906370207;...
+                                   0.063089014491502 0.873821971016996 0.050844906370207;...
+                                   0.063089014491502 0.063089014491502 0.050844906370207;...                           
+                                   0.053145049844817 0.310352451033784 0.082851075618374;...
+                                   0.310352451033784 0.053145049844817 0.082851075618374;...
+                                   0.053145049844817 0.636502499121399 0.082851075618374;...
+                                   0.636502499121399 0.053145049844817 0.082851075618374;...
+                                   0.636502499121399 0.310352451033784 0.082851075618374;...
+                                   0.310352451033784 0.636502499121399 0.082851075618374];
+                case{7,8} % 16 gauss points 
+                      gaussvalues = [1/3 1/3 0.144315607677787;...
+                                     0.081414823414554 0.459292588292723 0.095091634267285;...
+                                     0.459292588292723 0.081414823414554  0.095091634267285;...
+                                     0.459292588292723 0.459292588292723 0.095091634267285;...
+                                     0.658861384496480 0.170569307751760 0.103217370534718;...
+                                     0.170569307751760 0.658861384496480 0.103217370534718;...
+                                     0.170569307751760 0.170569307751760 0.103217370534718;...
+                                     0.898905543365938 0.050547228317031 0.032458497623198;...
+                                     0.050547228317031 0.898905543365938 0.032458497623198;...
+                                     0.050547228317031 0.050547228317031 0.032458497623198;...
+                                     0.008394777409958 0.263112829634638 0.027230314174435;...
+                                     0.728492392955404 0.008394777409958 0.027230314174435;...
+                                     0.008394777409958 0.728492392955404 0.027230314174435;...
+                                     0.728492392955404 0.263112829634638 0.027230314174435;...
+                                     0.263112829634638 0.008394777409958 0.027230314174435;...
+                                     0.263112829634638 0.728492392955404 0.027230314174435];
+                                                               
+                otherwise
+                    error(['ERROR: triangle quadrature not implemented for this number: ',int2str(surfacegaussorder)])
+            end
+            n2 = size(gaussvalues,1);  
+%             corners_x = planedata.corners(planedata.planecorners(planenumber,1:3),1);
+%             corners_y = planedata.corners(planedata.planecorners(planenumber,1:3),2);
+%             corners_z = planedata.corners(planedata.planecorners(planenumber,1:3),3);
+            corners_x = corners_onepiston(:,1);
+            corners_y = corners_onepiston(:,2);
+            corners_z = corners_onepiston(:,3);
+            
+            % Convert the normalized triangle coordinates to the 3D coordinates
+            
+            psi=[gaussvalues(:,1) gaussvalues(:,2) 1-gaussvalues(:,1)-gaussvalues(:,2)];
+            
+            xgausspoints = psi*corners_x;
+            ygausspoints = psi*corners_y;
+            zgausspoints = psi*corners_z;
+            Sinputdata.pistongausscoordinates{ii} = [xgausspoints ygausspoints zgausspoints];
+
+            Sinputdata.pistongaussweights{ii} = gaussvalues(:,3);
+
+        elseif ncornersperpiston(ii) == 4
+            extradistsquared = sum( (corners_onepiston_expanded(2,:) - corners_onepiston_expanded(4,:)).^2 );
+            triarea1 =  1/4*sqrt( 4*sidelengthsquared(1)*sidelengthsquared(2) ...
+                - (sidelengthsquared(1) + sidelengthsquared(2) -extradistsquared)^2  );
+            triarea2 =  1/4*sqrt( 4*sidelengthsquared(3)*sidelengthsquared(4) ...
+                - (sidelengthsquared(3) + sidelengthsquared(3) -extradistsquared)^2  );
+            pistonarea = triarea1 + triarea2;
+
+           n2 = Sinputdata.pistongausspoints^2;
+           [x,w] = lgwt(Sinputdata.pistongausspoints,0,1);
+           
+           x = x(end:-1:1);
+           xy = [repmat(x,Sinputdata.pistongausspoints,1) reshape(x(:,ones(1,Sinputdata.pistongausspoints)).',n2,1)];
+           ww = prod([repmat(w,Sinputdata.pistongausspoints,1) reshape(w(:,ones(1,Sinputdata.pistongausspoints)).',n2,1)],2);   
+            
+           c1 = corners_onepiston(1,:);
+           c2 = corners_onepiston(2,:);
+           c3 = corners_onepiston(3,:);
+           c4 = corners_onepiston(4,:);
+           xvec1 = c2 - c1;
+           alen = norm(xvec1);
+           xvec2 = c3 - c4;
+           clen = norm(xvec2);
+           yvec1 = c4 - c1;
+           dlen = norm(yvec1);
+           yvec2 = c3 - c2;
+           blen = norm(yvec2);
+           crossvec1 = c3 - c1;
+           plen = norm(crossvec1);
+           crossvec2 = c4 - c2;
+           qlen = norm(crossvec2);         
+
+           startpointsx = c1(ones(n2,1),:);
+           startpointsx = startpointsx + xvec1(ones(n2,1),:).*xy(:,[1 1 1]);
+    
+           endpointsx = c4(ones(n2,1),:);
+           endpointsx = endpointsx + xvec2(ones(n2,1),:).*xy(:,[1 1 1]);
+           
+           startpointsy = c1(ones(n2,1),:);
+           startpointsy = startpointsy + yvec1(ones(n2,1),:).*xy(:,[2 2 2]);
+    
+           endpointsy = c2(ones(n2,1),:);
+           endpointsy = endpointsy + yvec2(ones(n2,1),:).*xy(:,[2 2 2]);
+
+           startpointsx = c1(ones(n2,1),:);
+           startpointsx = startpointsx + xvec1(ones(n2,1),:).*xy(:,[1 1 1]);
+    
+           endpointsx = c4(ones(n2,1),:);
+           endpointsx = endpointsx + xvec2(ones(n2,1),:).*xy(:,[1 1 1]);
+           
+           startpointsy = c1(ones(n2,1),:);
+           startpointsy = startpointsy + yvec1(ones(n2,1),:).*xy(:,[2 2 2]);
+    
+           endpointsy = c2(ones(n2,1),:);
+           endpointsy = endpointsy + yvec2(ones(n2,1),:).*xy(:,[2 2 2]);
+    
+           Sinputdata.pistongausscoordinates{ii} = startpointsx + (endpointsx - startpointsx).*xy(:,[2 2 2]);
+           Sinputdata.pistongaussweights{ii} = ww;
+        else
+            % Check if the polygon is regular; then we can compute its area
+            if std(sidelengthsquared)/mean(sidelengthsquared) > 1e-9
+                error('ERROR: piston areas can only be calculated for 3- and 4-sided pistons, and regular polygons.')
+            else
+                cornerradius = mean( EDcalcdist(corners_onepiston,pistonmidpointcoordinates(ii,:)) );
+                pistonarea = ncornersperpiston(ii)/2*cornerradius^2*sin(2*pi/ncornersperpiston(ii));
+
+                % We should not use cornerradius; it would be a bit more
+                % accurate to use the theoretical circle radius
+                circlecoordinates = GEOcirclepoints(cornerradius,Sinputdata.pistongausspoints);
+                Sinputdata.pistongausscoordinates{ii} = circlecoordinates + pistonmidpointcoordinates(ii,:)
+                Sinputdata.pistongaussweights{ii} = 1/size(circlecoordinates,1);
+                disp('WARNING! Regular polygon piston has only been properly implemented in the plane with nvec = [0 0 1]')
+            end
+        end
+        pistonareavec(ii) = pistonarea;
+    end
+    Sinputdata.coordinates = pistonmidpointcoordinates;
+    Sinputdata.ncornersperpiston = ncornersperpiston;
+    Sinputdata.pistonareas = pistonareavec;
+
+    if ~isfield(Sinputdata,'pistonplanes')
+        error('ERROR: When Sinputdata.sourcetype is polygonpiston, then the field .pistonplanes must be specified.')
+    else
+        if size(Sinputdata.pistonplanes(:),1) ~= npistons
+            error('ERROR: the fields .pistoncornernumbers and .pistonplanes must have the same number of rows.')
+        end
+    end
+
+else
+    error('ERROR: Only monopole and polygonpistonsources have been defined')
 end
-nsources = size(Sinputdata.coordinates,1);
-if nsources == 0
-     error('ERROR 3: source coordinates were not specified')            
-end
+
 if ~isfield(Sinputdata,'doaddsources')
     Sinputdata.doaddsources = 0;
 end
@@ -315,43 +531,10 @@ else
        error('ERROR: doallSRcombinations was set to 0, but the number of sources was not the same as the number of receivers'); 
     end
 end
-ncolumns = size(Sinputdata.coordinates,2);
-if ncolumns ~= 3
-   error(['ERROR: check your source coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
-end
-if ~isfield(Sinputdata,'sourcetype')
-    Sinputdata.sourcetype = 'monopole';
-end
-if strcmp(Sinputdata.sourcetype,'polygonpiston') == 1
-    if ~isfield(Sinputdata,'pistoncornercoordinates')
-        error('ERROR: When Sinputdata.sourcetype is polygonpiston, then the field .pistoncornercoordinates must be specified.')
-    end
-    if ~isfield(Sinputdata,'pistoncornernumbers')
-        error('ERROR: When Sinputdata.sourcetype is polygonpiston, then the field .pistoncornernumbers must be specified.')
-    else
-        npistons = size(Sinputdata.pistoncornernumbers,1);
-    end
-    if ~isfield(Sinputdata,'pistonplanes')
-        error('ERROR: When Sinputdata.sourcetype is polygonpiston, then the field .pistonplanes must be specified.')
-    else
-        if size(Sinputdata.pistonplanes(:),1) ~= npistons
-            error('ERROR: the fields .pistoncornernumbers and .pistonplanes must have the same number of rows.')
-        end
-    end
-    if ~isfield(Sinputdata,'pistongausspoints')
-        Sinputdata.pistongausspoints = 3;
-    end
-elseif strcmp(Sinputdata.sourcetype,'monopole') == 1
-    Sinputdata.pistoncornercoordinates = [];
-    Sinputdata.pistoncornernumbers = [];
-    Sinputdata.pistonplanes = [];    
-else
-    error('ERROR: Sinputdata.sourcetype must be monopole (default) or polygonpiston.')
-end
+
 if ~isfield(Sinputdata,'nedgesubs')
     Sinputdata.nedgesubs = 2;
 end
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct envdata

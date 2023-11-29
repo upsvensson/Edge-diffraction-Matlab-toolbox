@@ -39,7 +39,7 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 %
 % Uses the built-in function QUADGK and the function EDbetaoverml_fd for numerical integration.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 March 2021
+% Peter Svensson (peter.svensson@ntnu.no) 22 Nov. 2023
 %
 % [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc);
 
@@ -64,6 +64,7 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 % arrival. 
 % 15 March 2021 Fixed bug: the code was tf2 = tf2/2; but should be 
 % tf2(jj) = tf2(jj)/2;
+% 22 Nov. 2023 Changed the criterion for singularity
 
 localshowtext = 0;
 
@@ -132,6 +133,9 @@ zr = zr - za;
 zw = zw - za;                       % zw is a two-element vector
 % za = 0;
 % disp(['Positive edge-end z-value is ',num2str(zw(2))])
+if localshowtext == 1
+    disp(['            Shifted edge extension is ',num2str(zw(1)),' to ',num2str(zw(2))])
+end
 
 % rs2 = rs^2;
 % rr2 = rr^2;
@@ -171,6 +175,9 @@ apexincluded = 1;
 if sign( zw(1)*zw(2) ) == 1
     apexincluded = 0;
 end
+if localshowtext == 1
+    disp(['            apexincluded = ',int2str(apexincluded)])
+end
 
 %------------------------------------------------------------------
 %
@@ -208,11 +215,18 @@ if apexincluded == 1
     else
         exacthalf = 0;
     end
-
+    if localshowtext == 1
+        disp(['            zrangespecial = ',num2str(zrangespecial)])
+        disp(['            exacthalf = ',int2str(exacthalf)])
+    end
     if includepart1*includepart2 == 0 && exacthalf == 0
        analyticalsymmetry = 0;
     else
        analyticalsymmetry = 1;        
+    end
+    if localshowtext == 1
+        disp(['            analyticalsymmetry = ',num2str(analyticalsymmetry)])
+        disp(['             '])
     end
 
 %     if localshowtext
@@ -226,11 +240,11 @@ end
 % the entire wedge extension. 
 
 % singularterm = [0 0 0 0];
-
-singularterm = absnyfivec < 10*eps | abs(absnyfivec - 2*pi) < 10*eps;
+% 22 Nov. 2023 Changed the criterion for singularity by a factor of 1e3
+singularterm = absnyfivec < 1e4*eps | abs(absnyfivec - 2*pi) < 1e4*eps;
 useterm = 1 - singularterm;
 if any(singularterm) && localshowtext
-     disp(['      Singularity for term ',int2str(find(singularterm))])   
+     disp(['            Singularity for term ',int2str(find(singularterm))])   
 end
 
 tf = zeros(nfrequencies,1);
@@ -262,7 +276,8 @@ if apexincluded == 0
        zfirst = zw(2)-zw(1); 
     end
     
-else
+else  % if apexincluded == 0
+
     if bc(1) == 1
         for ii = 1:nfrequencies
             k = 2*pi*frequencies(ii)/cair;
@@ -272,19 +287,27 @@ else
                 if includepart1 == 1
                     tf1 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol);
                     tf1 = tf1*(-ny/4/pi);
+                    if localshowtext
+                       disp(['            Part1 included, from ',num2str(zw(1)),' to ',num2str(-zrangespecial)]);
+                       disp(['            tf1 = ',num2str(tf1)])
+                    end
                 else
                    tf1 = 0; 
                    if localshowtext
-                       disp('   Part1 not included');
+                       disp('            Part1 not included');
                    end
                 end
                 if includepart2 == 1
                     tf3 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol);
                     tf3 = tf3*(-ny/4/pi);
+                    if localshowtext
+                       disp(['            Part2 included, from ',num2str(zrangespecial),' to ',num2str(zw(2))]);
+                       disp(['            tf3 = ',num2str(tf3)])
+                   end
                 else
                    tf3 = 0; 
                    if localshowtext
-                       disp('   Part2 not included');
+                       disp('            Part2 not included');
                    end
                 end                
                 
@@ -294,9 +317,9 @@ else
                 useserialexp1 = absnyfivec < 0.01;
                 useserialexp2 = abs(absnyfivec - 2*pi) < 0.01;
                 useserialexp = (useserialexp1 | useserialexp2) & (~singularterm);
-                 if localshowtext && useserialexp
-                       disp('   Using serial expansion for the cosnyfivec');
-                   end
+                if localshowtext==1 && any(useserialexp)==1
+                       disp('            Using series expansion for the cosnyfivec');
+                end
 
                 if ~any(singularterm)
                     cosnyfifactor = ny./sqrt(2*(1-cosnyfivec)).*(useserialexp==0) + ...
@@ -310,35 +333,66 @@ else
                         if exacthalf == 1
                             tf2 = tf2/2;
                         end
+                        if localshowtext == 1
+                            disp(['            Analytical approx from -zrangespecial to +zrangespecial'])
+                            if exacthalf == 1
+                                disp(['               with exacthalf = 1 -> half the amplitude'])                            
+                            end
+                        end
                     else
                         tf2 = -sinovercosnyfifactor/pi/R0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;        
+                        if localshowtext == 1
+                            disp(['            Analytical approx from ',num2str(-zanalyticalstart),' to ',num2str(zanalyticalend)])
+                        end
                     end
-                else
+                    if localshowtext == 1
+                        disp(['            tf2 = ',num2str(tf2)])
+                    end
+                else   % ~any(singularterm)
                   if localshowtext 
-                       disp('   Some term is zero due to singularity');
+                       disp('            Some term is zero due to singularity -> for-loop over the 4 terms');
                    end
-                  tf2 = zeros(1,4); 
+                   tf2 = zeros(1,4); 
                    for jj = 1:4
                        if ~singularterm(jj)
-                        cosnyfifactor = ny./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...
-                                    1./abs(fivec(jj)).*(useserialexp1(jj)==1);
-                        sinovercosnyfifactor =  sinnyfivec(jj)./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...          
-                                    sign(fivec(jj)).*(1- (ny*fivec(jj)).^2/6).*(useserialexp1(jj)==1);
-                        if analyticalsymmetry == 1  
-                            tf2(jj) = -sinovercosnyfifactor/pi/R0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
-                            if exacthalf == 1
-                                % Fixed a bug 15.3.2021; the old wrong
-                                % version was the line below, which changed
-                                % all 4 beta-values
-                                % tf2 = tf2/2;
-                                tf2(jj) = tf2(jj)/2;
-                            end
-                        else
-                            tf2(jj) = -sinovercosnyfifactor/pi/R0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;                            
-                        end
-                       end   
-                   end
-                end
+                            cosnyfifactor = ny./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...
+                                        1./abs(fivec(jj)).*(useserialexp1(jj)==1);
+                            sinovercosnyfifactor =  sinnyfivec(jj)./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...          
+                                        sign(fivec(jj)).*(1- (ny*fivec(jj)).^2/6).*(useserialexp1(jj)==1);
+                            if analyticalsymmetry == 1  
+                                tf2(jj) = -sinovercosnyfifactor/pi/R0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
+                                if exacthalf == 1
+                                    % Fixed a bug 15.3.2021; the old wrong
+                                    % version was the line below, which changed
+                                    % all 4 beta-values
+                                    % tf2 = tf2/2;
+                                    tf2(jj) = tf2(jj)/2;
+                                end
+                                if localshowtext == 1
+                                    disp(['            Term ',int2str(jj),': Analytical approx from -zrangespecial to +zrangespecial'])
+                                    if exacthalf == 1
+                                        disp(['               with exacthalf = 1 -> half the amplitude'])                            
+                                    end
+                                end
+                                
+                            else  % if analyticalsymmetry == 1 
+                                tf2(jj) = -sinovercosnyfifactor/pi/R0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;                            
+                                if localshowtext == 1
+                                    disp(['            Term ',int2str(jj),': Analytical approx from ',num2str(-zanalyticalstart),' to ',num2str(zanalyticalend)])
+                                end
+
+                            end   % if analyticalsymmetry == 1 
+                       else
+                            if localshowtext == 1
+                                disp(['            Term ',int2str(jj),': zero due to singularity'])
+                            end                           
+                       end   % if ~singularterm(jj)
+                       if localshowtext == 1
+                            disp(['            tf2(',int2str(jj),') = ',num2str(tf2(jj))])
+                       end
+
+                   end  % for jj = 1:4
+                end   % if ~any(singularterm)
 
                 tf2 = sum(tf2);
                 
@@ -346,7 +400,7 @@ else
 
             end
         end
-    else
+    else   % if bc(1) == 1
         error('ERROR: Not implemented the integration properly for the Dirichlet wedge yet');
 %         for ii = 1:nfrequencies
 %             k = 2*pi*frequencies(ii)/cair;

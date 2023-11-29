@@ -38,7 +38,7 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % Uses the functions  EDdistelements, EDrecycleresultfiles from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 27 Oct. 2023 
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2023 
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 % EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
@@ -67,6 +67,8 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % file can be reused inside this function. Also updated load and save to
 % the function call form, which avoids problems with spaces in file names.
 % 27 Oct. 2023 Changed the input parameters substantially.
+% 21 Nov. 2023 One missing conversion of closwedangvec to
+% edgedata.closwedangvec and planesatedge to edgedata.planesatedge
 
 t00 = clock;
 
@@ -311,9 +313,9 @@ if isempty(iv)
     isthinplaneedgepair = zeros(nedgepairs,1,'int8');
     thinplanecheckready = 1;
 else
-    if length(iv) == length(closwedangvec)
+    if length(iv) == length(edgedata.closwedangvec)
         % Only thin edges - then we have to check if it is a disc.
-        allplanes = reshape(planesatedge,size(planesatedge,1)*size(planesatedge,2),1);
+        allplanes = reshape(edgedata.planesatedge,size(edgedata.planesatedge,1)*size(edgedata.planesatedge,2),1);
         if length(unique(allplanes)) == 2
             isthinplanetriplet  = ones(submatrixcounter,1);
             isthinplaneedgepair = ones(nedgepairs,1);
@@ -323,11 +325,11 @@ else
 end
 
 if thinplanecheckready == 0
-    involvedplanes = [planesatedge(edgepairlist(:,1),:) planesatedge(edgepairlist(:,2),:)];
+    involvedplanes = [edgedata.planesatedge(edgepairlist(:,1),:) edgedata.planesatedge(edgepairlist(:,2),:)];
     diffinvolved = diff(sort(involvedplanes.'));
     isthinplaneedgepair = int8(sum(diffinvolved>0)==1);
     
-    involvedplanes = [planesatedge(edgetripletlist(:,1),:) planesatedge(edgetripletlist(:,2),:) planesatedge(edgetripletlist(:,3),:)];
+    involvedplanes = [edgedata.planesatedge(edgetripletlist(:,1),:) edgedata.planesatedge(edgetripletlist(:,2),:) edgedata.planesatedge(edgetripletlist(:,3),:)];
     diffinvolved = diff(sort(involvedplanes.'));
     isthinplanetriplet = int8(sum(diffinvolved>0)==1);
 end

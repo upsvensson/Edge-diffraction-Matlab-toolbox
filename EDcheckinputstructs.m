@@ -79,7 +79,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   EDmain_convex_time
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 4 Nov. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 29 Nov. 2023 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -157,6 +157,10 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % and Rdata. Added the new field .HODirelemsize
 % 30 Oct. 2023 Introduced the piston source checking
 % 4 Nov. 2023 Calculates the piston areas.
+% 22 Nov. 2023 Fixed a bug: regular polygons had not got the gaussweights
+% as a vector, only as a single value.
+% 29 Nov. 2023 Changed the name of the filed pistongausspoints to
+% pistongaussorder.
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -297,7 +301,7 @@ if strcmp(Sinputdata.sourcetype,'monopole')
     Sinputdata.pistoncornercoordinates = [];
     Sinputdata.pistoncornernumbers = [];
     Sinputdata.pistonplanes = []; 
-    Sinputdata.pistongausspoints = 0;
+    Sinputdata.pistongaussorder = 0;
     
 elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
    if ~isfield(Sinputdata,'pistoncornercoordinates') || ~isfield(Sinputdata,'pistoncornernumbers') || ~isfield(Sinputdata,'pistonplanes')
@@ -316,8 +320,8 @@ elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
     if ncolumns ~= 3
         error('ERROR: There should be 3 columns for the pistoncornercoordinates')
     end        
-    if ~isfield(Sinputdata,'pistongausspoints')
-        Sinputdata.pistongausspoints = 3;
+    if ~isfield(Sinputdata,'pistongaussorder')
+        Sinputdata.pistongaussorder = 3;
     end
 
     pistonmidpointcoordinates = zeros(npistons,3);   
@@ -343,7 +347,7 @@ elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
         if ncornersperpiston(ii) == 3
             pistonarea = 1/4*sqrt( 4*sidelengthsquared(1)*sidelengthsquared(2) ...
                 - (sidelengthsquared(1) + sidelengthsquared(2) - sidelengthsquared(3))^2  );
-            switch Sinputdata.pistongausspoints
+            switch Sinputdata.pistongaussorder
                 case {0,1}
                    gaussvalues = [1/3 1/3 1]; 
                 case {2}
@@ -431,12 +435,12 @@ elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
                 - (sidelengthsquared(3) + sidelengthsquared(3) -extradistsquared)^2  );
             pistonarea = triarea1 + triarea2;
 
-           n2 = Sinputdata.pistongausspoints^2;
-           [x,w] = lgwt(Sinputdata.pistongausspoints,0,1);
+           n2 = Sinputdata.pistongaussorder^2;
+           [x,w] = lgwt(Sinputdata.pistongaussorder,0,1);
            
            x = x(end:-1:1);
-           xy = [repmat(x,Sinputdata.pistongausspoints,1) reshape(x(:,ones(1,Sinputdata.pistongausspoints)).',n2,1)];
-           ww = prod([repmat(w,Sinputdata.pistongausspoints,1) reshape(w(:,ones(1,Sinputdata.pistongausspoints)).',n2,1)],2);   
+           xy = [repmat(x,Sinputdata.pistongaussorder,1) reshape(x(:,ones(1,Sinputdata.pistongaussorder)).',n2,1)];
+           ww = prod([repmat(w,Sinputdata.pistongaussorder,1) reshape(w(:,ones(1,Sinputdata.pistongaussorder)).',n2,1)],2);   
             
            c1 = corners_onepiston(1,:);
            c2 = corners_onepiston(2,:);
@@ -491,9 +495,10 @@ elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
 
                 % We should not use cornerradius; it would be a bit more
                 % accurate to use the theoretical circle radius
-                circlecoordinates = GEOcirclepoints(cornerradius,Sinputdata.pistongausspoints);
+                circlecoordinates = GEOcirclepoints(cornerradius,Sinputdata.pistongaussorder);
+                
                 Sinputdata.pistongausscoordinates{ii} = circlecoordinates + pistonmidpointcoordinates(ii,:)
-                Sinputdata.pistongaussweights{ii} = 1/size(circlecoordinates,1);
+                Sinputdata.pistongaussweights{ii} = 1/size(circlecoordinates,1)*ones(size(circlecoordinates,1),1);
                 disp('WARNING! Regular polygon piston has only been properly implemented in the plane with nvec = [0 0 1]')
             end
         end

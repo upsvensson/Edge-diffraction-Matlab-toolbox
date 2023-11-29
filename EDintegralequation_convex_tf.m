@@ -37,7 +37,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1 from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  20 Nov. 2023  
+% Peter Svensson (peter.svensson@ntnu.no)  29 Nov. 2023  
 %                       
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
@@ -100,6 +100,9 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % 1 Nov. 2023 Fixed a small error: doaddsources and sourceamplitudes and 
 % doallSRcombinations were missing the Sdata. in one location.
 % 20 Nov. 2023 Implemented the piston source
+% 24 Nov. 2023 Stores many gaussvalues, up to the max. needed
+% 29 Nov. 2023 Adapted to the name change of the field pistongausspoints to
+% pistongaussorder
 
 t00 = clock;
 showtext = filehandlingparameters.showtext;
@@ -160,8 +163,11 @@ nplanes = size(planedata.planecorners,1);
 nedges = size(edgedata.edgecorners,1);
 vispartedgesfromIS = sparse(zeros(nplanes,nedges));
 
-[gaussvec1,gaussvec2] = EDdistelements(controlparameters.ngauss,controlparameters.discretizationtype);
-gaussvectors = [gaussvec1 gaussvec2];
+gaussvectors = cell(controlparameters.ngauss,1);
+for ii = 2:controlparameters.ngauss
+    [gaussvec1,gaussvec2] = EDdistelements(ii,controlparameters.discretizationtype);
+    gaussvectors{ii} = [gaussvec1 gaussvec2];
+end
 
 ivproblematicmatrix = zeros(nreceivers,100);
 
@@ -524,15 +530,15 @@ for ifreq = 1:nfrequencies
                         Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
                         Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
                 elseif strcmp(Sdata.sourcetype,'polygonpiston') == 1
-                    Q_firstterm_sumpistongausspoints = 0;
+                    Q_firstterm_sumpistongaussorder = 0;
                     for np = 1:size(Sdata.pistongausscoordinates{1},1)
                         Q_firstterm_addition = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...                    
                             controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
                             Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou,np)),...
                             Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou,np)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou,np)),filehandlingparameters.showtext);
-                        Q_firstterm_sumpistongausspoints = Q_firstterm_sumpistongausspoints + Q_firstterm_addition*squeeze(Sdata.pistongaussweights{isou}(np,1));
+                        Q_firstterm_sumpistongaussorder = Q_firstterm_sumpistongaussorder + Q_firstterm_addition*squeeze(Sdata.pistongaussweights{isou}(np,1));
                     end
-                    Q_firstterm_addition = Q_firstterm_sumpistongausspoints;
+                    Q_firstterm_addition = Q_firstterm_sumpistongaussorder;
                 end
 %                 Q_firstterm = Q_firstterm + Q_firstterm_addition;
                 Q_firstterm = Q_firstterm + Q_firstterm_addition*Sdata.sourceamplitudes(isou,ifreq);
@@ -666,15 +672,15 @@ for ifreq = 1:nfrequencies
                         Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
                         Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
                 elseif strcmp(Sdata.sourcetype,'polygonpiston') == 1
-                    Q_firstterm_sumpistongausspoints = 0;
+                    Q_firstterm_sumpistongaussorder = 0;
                     for np = 1:size(Sdata.pistongausscoordinates{1},1)
                             Q_firstterm_addition = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...                    
                             controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
                             Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou,np)),...
                             Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou,np)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou,np)),filehandlingparameters.showtext);
-                        Q_firstterm_sumpistongausspoints = Q_firstterm_sumpistongausspoints + Q_firstterm_addition*squeeze(Sdata.pistongaussweights{isou}(np,1));
+                        Q_firstterm_sumpistongaussorder = Q_firstterm_sumpistongaussorder + Q_firstterm_addition*squeeze(Sdata.pistongaussweights{isou}(np,1));
                     end
-                    Q_firstterm = Q_firstterm_sumpistongausspoints;
+                    Q_firstterm = Q_firstterm_sumpistongaussorder;
 
                 end
 

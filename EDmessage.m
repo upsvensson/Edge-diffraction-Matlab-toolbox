@@ -114,22 +114,23 @@ if writetofile == 1
     	        return
             end
         end
-    end    
-    if ~isempty(pretext)
-        fwrite(fid,[pretext,lineending],'char');
-    end
-    fwrite(fid,[textstr1,lineending],'char');
-    if ~isempty(existingfilename)
-        fwrite(fid,['   (Recycled and duplicated ',existingfilename,')',lineending],'char');
-        for ii = 2:ntextstrings
-            fwrite(fid,['   (',setstr(varargin{ii}),')',lineending],'char');
+    
+        if ~isempty(pretext)
+            fwrite(fid,[pretext,lineending],'char');
         end
-    else
-        for ii = 2:ntextstrings
-            fwrite(fid,['   ',setstr(varargin{ii}),lineending],'char');
+        fwrite(fid,[textstr1,lineending],'char');
+        if ~isempty(existingfilename)
+            fwrite(fid,['   (Recycled and duplicated ',existingfilename,')',lineending],'char');
+            for ii = 2:ntextstrings
+                fwrite(fid,['   (',setstr(varargin{ii}),')',lineending],'char');
+            end
+        else
+            for ii = 2:ntextstrings
+                fwrite(fid,['   ',setstr(varargin{ii}),lineending],'char');
+            end
         end
-    end
-    if ~isempty(pretext)
-        fwrite(fid,[' ',lineending],'char');
+        if ~isempty(pretext)
+            fwrite(fid,[' ',lineending],'char');
+        end
     end
 end

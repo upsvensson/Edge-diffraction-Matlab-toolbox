@@ -215,7 +215,6 @@ end
 % The tf files
 
 if controlparameters.docalctf == 1
-    
     filetolookfor = [outputdirectory,filestem,'_tf.mat'];
     if exist(filetolookfor,'file') == 2
         foundmatch = 1;

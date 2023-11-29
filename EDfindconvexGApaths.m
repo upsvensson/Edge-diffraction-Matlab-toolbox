@@ -43,7 +43,7 @@ function [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
 % Uses functions  EDfindis EDchkISvisible EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 9 Nov. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2023
 %
 % [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
 %    EDfindconvexGApaths(planedata,edgedata,Sdata,Rdata,controlparameters,...
@@ -92,6 +92,8 @@ function [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
 % 30 Oct. 2023 Fine-tuned the EDinputdatahash
 % 9 Nov. 2023 Added the piston coordinates and piston gauss order to the
 % EDinputdatahash.
+% 29 Nov. 2023 Adapted to the name change of the field pistongausspoints to
+% pistongaussorder
 
 t00 = clock;
 
@@ -103,7 +105,7 @@ EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
     planedata.planecorners,'offedges',edgedata.offedges,...
     'sources',Sdata.coordinates,'Snedgesubs',Sdata.nedgesubs,...
     'pistoncoordinates',Sdata.pistoncornercoordinates,...
-    'pistongausspoints',Sdata.pistongausspoints,...
+    'pistongaussorder',Sdata.pistongaussorder,...
     'receivers',Rdata.coordinates,'Rnedgesubs',Rdata.nedgesubs,...
     'difforder',difforder,'directsound',directsound,'doallSRcombinations',...
     Sdata.doallSRcombinations,'EDversionnumber',EDversionnumber);
@@ -202,18 +204,46 @@ if nplanes > 0
             end
         end
     else 
-        possibleSPR = [];
-        for ii = 1:nreceivers
-            visplanesfromoneR = Rdata.visplanesfromr(:,ii);
-            % 30 Oct. 2023 Fixed a bug on the line below. visplanesfromoneR
-            % is not a field in Rdata. This section has not been run often.
-            %            tempmatrix = Sdata.visplanesfroms.*Rdata.visplanesfromoneR(:,ones(1,nsources));
-            tempmatrix = Sdata.visplanesfroms.*visplanesfromoneR(:,ones(1,nsources));
-            ivpotential = find(tempmatrix);
-            npotentialIS = length(ivpotential);
-            if npotentialIS > 0
-                [Pnumber_potentialIS, Snumber_potentialIS ] = ind2sub([nplanes,nsources], ivpotential);
-                possibleSPR = [possibleSPR;[ Snumber_potentialIS  Pnumber_potentialIS ii*ones(npotentialIS,1)]];            
+        % 27 Nov. 2023 preallocated space for cases when nsources =
+        % nreceivers because quite possibly, there will be many cases
+        if nsources == nreceivers
+            possibleSPR = zeros(nreceivers^2,3);
+            startrow = 1;            
+            for ii = 1:nreceivers
+                visplanesfromoneR = Rdata.visplanesfromr(:,ii);
+                % 30 Oct. 2023 Fixed a bug on the line below. visplanesfromoneR
+                % is not a field in Rdata. This section has not been run often.
+                %            tempmatrix = Sdata.visplanesfroms.*Rdata.visplanesfromoneR(:,ones(1,nsources));
+                tempmatrix = Sdata.visplanesfroms.*visplanesfromoneR(:,ones(1,nsources));
+                ivpotential = find(tempmatrix);
+                npotentialIS = length(ivpotential);
+                if npotentialIS > 0
+                    [Pnumber_potentialIS, Snumber_potentialIS ] = ind2sub([nplanes,nsources], ivpotential);
+                    matrixaddition = [ Snumber_potentialIS  Pnumber_potentialIS ii*ones(npotentialIS,1)];
+                    nnewrows = size(matrixaddition,1);
+                    endrow = startrow + nnewrows -1;
+                    if endrow <= size(possibleSPR,1)
+                        possibleSPR(startrow:endrow,:) =  matrixaddition;
+                    else
+                        error('ERROR: need to expand possibleSPR')
+                    end
+                    startrow = endrow + 1;
+                end
+            end
+        else
+            possibleSPR = [];
+            for ii = 1:nreceivers
+                visplanesfromoneR = Rdata.visplanesfromr(:,ii);
+                % 30 Oct. 2023 Fixed a bug on the line below. visplanesfromoneR
+                % is not a field in Rdata. This section has not been run often.
+                %            tempmatrix = Sdata.visplanesfroms.*Rdata.visplanesfromoneR(:,ones(1,nsources));
+                tempmatrix = Sdata.visplanesfroms.*visplanesfromoneR(:,ones(1,nsources));
+                ivpotential = find(tempmatrix);
+                npotentialIS = length(ivpotential);
+                if npotentialIS > 0
+                    [Pnumber_potentialIS, Snumber_potentialIS ] = ind2sub([nplanes,nsources], ivpotential);
+                    possibleSPR = [possibleSPR;[ Snumber_potentialIS  Pnumber_potentialIS ii*ones(npotentialIS,1)]];            
+                end
             end
         end
     end

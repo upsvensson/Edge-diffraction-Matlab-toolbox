@@ -35,7 +35,7 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 7. Direct sound obscuring for a corner-on hit of an octahedron.
 % 8. Direct sound obscuring for an edge-on hit of a cube.
 % 
-% Peter Svensson 7 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 21 Nov. 2023 (peter.svensson@ntnu.no)
 % 
 % passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams);
 

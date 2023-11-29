@@ -11,7 +11,8 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 %   vispartedgesfroms_start
 %   vispartedgesfroms_end
 %   frequency
-%   gaussvectors
+%   gaussvectors            A cell variable, with nodes and weights up to
+%                           the max. ngauss that could occur.
 %   rSvec,thetaSvec,zSvec
 %   showtext (optional)     0 -> no text displayed on screen. Default: 0
 %
@@ -29,7 +30,7 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 %
 % Uses functions EDdistelements  EDcoordtrans1
 %
-% Peter Svensson 20 Nov. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 24 Nov. 2023 (peter.svensson@ntnu.no)
 %
 % Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,inteq_ngauss,inteq_discretizationtype,...
 %     vispartedgesfroms,vispartedgesfroms_start,vispartedgesfroms_end,frequency,gaussvectors,rSvec,thetaSvec,zSvec,showtext);
@@ -64,6 +65,8 @@ function Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,...
 % 20 Nov. 2023 Changed so that showtext = 3 is needed instead of 2 to show
 % the "Building the G matrix" messages and showtext = 4 needed for the
 % "Startrow" meassages.
+% 24 Nov. 2023 The input parameter gaussvectors was changed to include all
+% gauss order values up to the maximum one.
 
 if nargin < 14
     showtext = 0;
@@ -113,23 +116,32 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         len2 = edgedata.edgelengthvec(edge2);
         n2 = Hsubmatrixdata.nedgeelems(edge2);
         n3 = Hsubmatrixdata.nedgeelems(edge3);
-                
-        if size(gaussvectors,1) == n2
-            n2vec = gaussvectors(:,1);
-            weight2vec = gaussvectors(:,2);
-        else
-           [n2vec,weight2vec] = EDdistelements(n2,discretizationtype);
-        end
+
+        % Changed 24 Nov. 2023: All gauss nodes and weights up to a max
+        % value are stored in a cell variable
+%         if size(gaussvectors,1) == n2
+%             n2vec = gaussvectors(:,1);
+%             weight2vec = gaussvectors(:,2);
+%         else
+%             disp('   Calling EDdistelements')
+%            [n2vec,weight2vec] = EDdistelements(n2,discretizationtype);
+%         end
+        n2vec = gaussvectors{n2}(:,1);
+        weight2vec = gaussvectors{n2}(:,2);
         % New 4 Nov. 2017: here we zero out the edge points that are not
         % visible.
         if vispartedgesfroms(edge2) ~= 1
             n2vec = n2vec.*(n2vec >= vispartedgesfroms_start(edge2)).*(n2vec <= vispartedgesfroms_end(edge2));
         end
-        if size(gaussvectors,1) == n3
-            n3vec = gaussvectors(:,1);
-        else
-           [n3vec,~] = EDdistelements(n3,discretizationtype);
-        end
+        % Change 24 Nov. 2023 gaussvectors is now a cell variable
+        % containing gauss nodes and weights for all orders up to the
+        % maximum one.
+%         if size(gaussvectors,1) == n3
+%             n3vec = gaussvectors(:,1);
+%         else
+%            [n3vec,~] = EDdistelements(n3,discretizationtype);
+%         end
+        n3vec = gaussvectors{n3}(:,1);
         
         % FOund bug 23 Sep. 2014: did not take into account that the other
         % end of the edge might have a different theta value.

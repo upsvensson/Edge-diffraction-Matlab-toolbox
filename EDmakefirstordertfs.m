@@ -34,7 +34,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 % Uses functions EDcoordtrans2, EDwedge1st_fd, EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash form Matlab Central
 % 
-% Peter Svensson 20 Nov. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 29 Nov. 2023 (peter.svensson@ntnu.no)
 %
 % [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename] = ...
 % EDmakefirstordertfs(firstorderpathdata,planedata,edgedata,Snewdata,...
@@ -77,6 +77,10 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 % edge-related coordinates was done. The values were already computed and
 % stored in the rSsho, thetaSsho, zSsho etc with the reftoshortlistS etc.
 % 20 Nov. 2023 Same as on 10 Nov., but now for piston sources
+% 24 Nov. 2023 For piston sources, a check is made if the direct sound is
+% identical for many components. Major time savings for mesh geometries.
+% 29 Nov. 2023 Adapted to the name change of the field pistongausspoints to
+% pistongaussorder
 
 t00 = clock;
 
@@ -97,7 +101,7 @@ EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
     'sourcetype',Sdata.sourcetype,...
     'pistoncornercoordinates',Sdata.pistoncornercoordinates,...
     'pistoncornernumbers',Sdata.pistoncornernumbers,...
-    'piatongausspoints',Sdata.pistongausspoints,...
+    'pistongaussorder',Sdata.pistongaussorder,...
     'receivers',Rdata.coordinates,'Rnedgesubs',Rdata.nedgesubs,...
     'cair',envdata.cair,'frequencies',frequencies,'Rstart',Rstart,...
      'difforder',difforder,'directsound',directsound,'EDversionnumber',EDversionnumber);
@@ -146,6 +150,8 @@ if showtext >= 2
 end
 t00sub = clock;
 
+pistonmethod = 'new';
+
 if Sdata.doaddsources == 1
     tfdirect = zeros(nfrequencies,nreceivers);
 else
@@ -160,12 +166,13 @@ if firstorderpathdata.ncomponents(1) > 0
     distvecs = Rdata.coordinates(firstorderpathdata.directsoundlist(:,2),:) - ... 
             Sdata.coordinates(firstorderpathdata.directsoundlist(:,1),:);
 
-    % alldists will be a matrix of size [nreceivers,nsources]
-    if ncomponents == 1
-        alldists = norm(distvecs);
-    else
-        alldists = sqrt( sum(distvecs.^2,2) ); 
-    end
+    %     Moved to inside the monopole if-test
+% % %     % alldists will be a matrix of size [nreceivers,nsources]
+% % %     if ncomponents == 1
+% % %         alldists = norm(distvecs);
+% % %     else
+% % %         alldists = sqrt( sum(distvecs.^2,2) ); 
+% % %     end
     
     maxrecnumber = max( firstorderpathdata.directsoundlist(:,2) );   
 
@@ -174,7 +181,14 @@ if firstorderpathdata.ncomponents(1) > 0
      % Monopole
 
      if strcmp(Sdata.sourcetype,'monopole') == 1
-         
+
+         % alldists will be a matrix of size [nreceivers,nsources]
+        if ncomponents == 1
+            alldists = norm(distvecs);
+        else
+            alldists = sqrt( sum(distvecs.^2,2) ); 
+        end
+
          if ncomponents > nfrequencies && Sdata.doaddsources == 1
             for kk = 1:nfrequencies  
                 alltfs = exp(-1i*kvec(kk)*(alldists-Rstart))./alldists...
@@ -222,6 +236,8 @@ if firstorderpathdata.ncomponents(1) > 0
         %               = the expression below
         zreceiver = sum(distvecs.*planedata.planeeqs(Sdata.pistonplanes...
             (firstorderpathdata.directsoundlist(:,1)),1:3),2 );
+        clear distvecs
+         
         % We also calculate all the pistonplane receiver projection
         % positions = Rplane. This projection is (with receiver = Rpos)
         %             Rplane = Rpos + t*nvec
@@ -238,73 +254,209 @@ if firstorderpathdata.ncomponents(1) > 0
         %          = Rpos - nvec*dot(nvec,Rpos - Spos)
         %          = Rpos - nvec*zreceiver
 
-        pistonnumber = firstorderpathdata.directsoundlist(:,1);
-        pistonplanenumber = Sdata.pistonplanes(pistonnumber);
+        longlistpistonnumber = firstorderpathdata.directsoundlist(:,1);
+        pistonplanenumber = Sdata.pistonplanes(longlistpistonnumber);
         Rplane = Rdata.coordinates(firstorderpathdata.directsoundlist(:,2),:) - ...
         zreceiver.*planedata.planeeqs(pistonplanenumber,1:3);
 
-        for ii = 1:ncomponents 
-            pistonnumber = firstorderpathdata.directsoundlist(ii,1);
-            recnumber = firstorderpathdata.directsoundlist(ii,2);
-            npistonedges = Sdata.ncornersperpiston(pistonnumber);
-            pistonplane = Sdata.pistonplanes(pistonnumber);
-                    
-            checkinsidehit = 1;
-            checkedgehit = 0;
-            lineintsummation = zeros(length(kvec),1);
-            for jj = 1:npistonedges
-%                        disp(['           Edge ',int2str(jj)])
-                startnumber = Sdata.pistoncornernumbers(pistonnumber,jj);
-                if jj < Sdata.ncornersperpiston(pistonnumber)
-                    endnumber = Sdata.pistoncornernumbers(pistonnumber,jj+1);
+        if pistonmethod == 'new'
+
+            % Addition 24 Nov. 2023: identify identical piston-to-receiver
+            % geometries and create a shortlist. Combinations where abs(dx),
+            % abs(dy), abs(dz) and piston-dx, piston-dy, piston-dz are identical can use the same
+            % tf. dx = distance between piston center point and receiver point.
+    
+            longlistrecnumber = firstorderpathdata.directsoundlist(:,2);
+    
+            dx = Sdata.coordinates(longlistpistonnumber,1) - Rdata.coordinates(longlistrecnumber,1);
+            dy = Sdata.coordinates(longlistpistonnumber,2) - Rdata.coordinates(longlistrecnumber,2);
+            dz = Sdata.coordinates(longlistpistonnumber,3) - Rdata.coordinates(longlistrecnumber,3);
+            npistons = size(Sdata.pistoncornernumbers,1);
+            pistonsizes = zeros(npistons,3);
+            for jj = 1:npistons
+                pistonsizes(jj,:) = range(Sdata.pistoncornercoordinates(Sdata.pistoncornernumbers(jj,:),:));
+            end
+            pistonsizes = round(pistonsizes*1e5)/1e5;
+    
+% %             A = [round( abs(dx(:))*1e5)/1e5 round(abs(dy(:))*1e5)/1e5 round(abs(dz(:))*1e5)/1e5 pistonsizes(longlistpistonnumber)];
+% %             [shortlist_pistontorec,examplefromshortlist_pistontorec,reftoshortlist_pistontorec] = unique(A,'rows');
+            [shortlist_pistontorec,examplefromshortlist_pistontorec,reftoshortlist_pistontorec] = ...
+                unique([round( abs(dx(:))*1e5)/1e5 round(abs(dy(:))*1e5)/1e5 round(abs(dz(:))*1e5)/1e5 pistonsizes(longlistpistonnumber)],'rows');
+  
+            [sortedvec,isort] = sort(reftoshortlist_pistontorec);
+    
+%             dsort = diff(sortedvec);
+%             istep = find(dsort);
+            istep = find(diff(sortedvec));
+            listofalloccurences = cell(length(istep)+1,1);
+            for jj = 1:length(istep)+1
+                if jj == 1
+                    istart = 1;
                 else
-                    endnumber = Sdata.pistoncornernumbers(pistonnumber,1);
+                    istart = istep(jj-1)+1;
                 end
-                c1 = Sdata.pistoncornercoordinates(startnumber,:);
-                c2 = Sdata.pistoncornercoordinates(endnumber,:);
-                edgelength = norm( c2-c1 );
-                Rplaneshift = Rplane(ii,:) - c1;
-                Rshift = Rdata.coordinates(firstorderpathdata.directsoundlist(ii,2),:) - c1;
-                rotmat = Sdata.pistonrotationmatrices{Sdata.reftorotationmatrices(pistonnumber,jj)};
-                Rplanemod = rotmat*Rplaneshift(:);
-                Rmod = rotmat*Rshift(:);
-                if Rplanemod(2) < 0
-                    checkinsidehit = 0;
-                elseif Rplanemod(2) == 0
-                    checkedgehit = 1;
+                if jj == length(istep)+1
+                   iend = length(sortedvec);
+                else
+                   iend = istep(jj); 
                 end
-                % nvecmod will be [0 0 1]
-                % Rplanemod will always have z = 0
-                % For inside-piston receivers, Rplanemod(2) is
-                % positive for all edges.
-                % Rmod will have z = zreceiver which was calculated
-                % further up (maybe it wasn't needed up there and 
-                % can be skipped?).
-                % Integration: x will be the axis along the edge;
-                % range: 0,edgelength.
-                % dist to rec = sqrt( (x-Rmod(1)).^2 + Rmod(2)^2 + Rmod(3)^2 )
-                % psi = Rplanemod(2)
-
-                for kk = 1:length(kvec)
-                    intval = integral(@(x) EDpistonedgeintegrand(x,Rplanemod(2)^2,Rmod(3)^2,kvec(kk)),0-Rplanemod(1),edgelength-Rplanemod(1),'RelTol',1e-8);
-                    lineintsummation(kk) = lineintsummation(kk) + intval*Rplanemod(2);
-                end
-            end
-            alltfs = -lineintsummation/2/pi;
-                          
-            if checkinsidehit == 1
-                 alltfs = alltfs + exp(-1i*kvec*(Rmod(3)-Rstart));
-            end
-
-            alltfs = alltfs.*(-2i)*envdata.cair/Sdata.pistonareas(pistonnumber)./frequencies(:);
             
-           if Sdata.doaddsources == 1
-              tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) = ...
-                  tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) + alltfs;
-           else             
-              tfdirect(:,firstorderpathdata.directsoundlist(ii,2),firstorderpathdata.directsoundlist(ii,1)) = alltfs;
-           end
-        end    % for ii = 1:ncomponents 
+                listofalloccurences{jj} = uint32(isort(istart:iend));        
+            end
+    
+            nshortlistcomponents = size(shortlist_pistontorec,1);
+            if showtext >= 2
+                disp(['      Calculating tfs for ',int2str(nshortlistcomponents),' unique piston-to-points tfs instead of all ',int2str(ncomponents)])
+            end
+    
+            for nn = 1:nshortlistcomponents
+                examplepistonnumber = longlistpistonnumber(examplefromshortlist_pistontorec(nn));
+                examplerecnumber = longlistrecnumber(examplefromshortlist_pistontorec(nn));
+                npistonedges = Sdata.ncornersperpiston(examplepistonnumber);
+                pistonplane = Sdata.pistonplanes(examplepistonnumber);
+                        
+                checkinsidehit = 1;
+                checkedgehit = 0;
+                lineintsummation = zeros(length(kvec),1);
+                for jj = 1:npistonedges
+    %                        disp(['           Edge ',int2str(jj)])
+                    startnumber = Sdata.pistoncornernumbers(examplepistonnumber,jj);
+                    if jj < Sdata.ncornersperpiston(examplepistonnumber)
+                        endnumber = Sdata.pistoncornernumbers(examplepistonnumber,jj+1);
+                    else
+                        endnumber = Sdata.pistoncornernumbers(examplepistonnumber,1);
+                    end
+                    c1 = Sdata.pistoncornercoordinates(startnumber,:);
+                    c2 = Sdata.pistoncornercoordinates(endnumber,:);
+                    edgelength = norm( c2-c1 );
+                    Rplaneshift = Rplane(examplefromshortlist_pistontorec(nn),:) - c1;
+                    Rshift = Rdata.coordinates(examplerecnumber,:) - c1;
+                    rotmat = Sdata.pistonrotationmatrices{Sdata.reftorotationmatrices(examplepistonnumber,jj)};
+                    Rplanemod = rotmat*Rplaneshift(:);
+                    Rmod = rotmat*Rshift(:);
+                    if Rplanemod(2) < 0
+                        checkinsidehit = 0;
+                    elseif Rplanemod(2) == 0
+                        checkedgehit = 1;
+                    end
+                    % nvecmod will be [0 0 1]
+                    % Rplanemod will always have z = 0
+                    % For inside-piston receivers, Rplanemod(2) is
+                    % positive for all edges.
+                    % Rmod will have z = zreceiver which was calculated
+                    % further up (maybe it wasn't needed up there and 
+                    % can be skipped?).
+                    % Integration: x will be the axis along the edge;
+                    % range: 0,edgelength.
+                    % dist to rec = sqrt( (x-Rmod(1)).^2 + Rmod(2)^2 + Rmod(3)^2 )
+                    % psi = Rplanemod(2)
+    
+                    for kk = 1:length(kvec)
+                        intval = integral(@(x) EDpistonedgeintegrand(x,Rplanemod(2)^2,Rmod(3)^2,kvec(kk)),0-Rplanemod(1),edgelength-Rplanemod(1),'RelTol',1e-8);
+                        lineintsummation(kk) = lineintsummation(kk) + intval*Rplanemod(2);
+                    end
+                    
+                end
+                alltfs = -lineintsummation/2/pi;
+     
+                if checkinsidehit == 1
+                     alltfs = alltfs + exp(-1i*kvec*(Rmod(3)-Rstart));
+                end
+    
+                alltfs = alltfs.*(-2i)*envdata.cair/Sdata.pistonareas(examplepistonnumber)./frequencies(:);
+             
+                if Sdata.doaddsources == 1
+                    % old pistonmethod:
+%                     tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) = ...
+%                       tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) + alltfs;
+                    for mm = 1:length(listofalloccurences{nn})
+                        rep_recno = longlistrecnumber(listofalloccurences{nn}(mm));
+                        tfdirect(:,rep_recno) = tfdirect(:,rep_recno) + alltfs;
+                    end
+                else    
+                    % old pistonmethod:
+     %               tfdirect(:,firstorderpathdata.directsoundlist(ii,2),firstorderpathdata.directsoundlist(ii,1)) = alltfs;
+
+                    rep_recno = longlistrecnumber(listofalloccurences{nn});
+                    rep_pistonno = longlistpistonnumber(listofalloccurences{nn});
+%                     savetemp
+%                     pause
+                    for nf = 1:nfrequencies
+                        addmatrix = accumarray([rep_recno rep_pistonno],alltfs(nf));
+                        [nadd1,nadd2] = size(addmatrix);
+                        tfdirect(nf,1:nadd1,1:nadd2) = tfdirect(nf,1:nadd1,1:nadd2) + reshape(addmatrix,1,nadd1,nadd2);
+                    end
+    
+                end   % if Sdata.doaddsources == 1
+            
+            end     % for nn = 1:nshortlistcomponents
+        end   % if pistonmethod == 'new'
+
+        if pistonmethod == 'old'
+            for ii = 1:ncomponents 
+                pistonnumber = firstorderpathdata.directsoundlist(ii,1);
+                recnumber = firstorderpathdata.directsoundlist(ii,2);
+                npistonedges = Sdata.ncornersperpiston(pistonnumber);
+                pistonplane = Sdata.pistonplanes(pistonnumber);
+                        
+                checkinsidehit = 1;
+                checkedgehit = 0;
+                lineintsummation = zeros(length(kvec),1);
+                for jj = 1:npistonedges
+    %                        disp(['           Edge ',int2str(jj)])
+                    startnumber = Sdata.pistoncornernumbers(pistonnumber,jj);
+                    if jj < Sdata.ncornersperpiston(pistonnumber)
+                        endnumber = Sdata.pistoncornernumbers(pistonnumber,jj+1);
+                    else
+                        endnumber = Sdata.pistoncornernumbers(pistonnumber,1);
+                    end
+                    c1 = Sdata.pistoncornercoordinates(startnumber,:);
+                    c2 = Sdata.pistoncornercoordinates(endnumber,:);
+                    edgelength = norm( c2-c1 );
+                    Rplaneshift = Rplane(ii,:) - c1;
+                    Rshift = Rdata.coordinates(firstorderpathdata.directsoundlist(ii,2),:) - c1;
+                    rotmat = Sdata.pistonrotationmatrices{Sdata.reftorotationmatrices(pistonnumber,jj)};
+                    Rplanemod = rotmat*Rplaneshift(:);
+                    Rmod = rotmat*Rshift(:);
+                    if Rplanemod(2) < 0
+                        checkinsidehit = 0;
+                    elseif Rplanemod(2) == 0
+                        checkedgehit = 1;
+                    end
+                    % nvecmod will be [0 0 1]
+                    % Rplanemod will always have z = 0
+                    % For inside-piston receivers, Rplanemod(2) is
+                    % positive for all edges.
+                    % Rmod will have z = zreceiver which was calculated
+                    % further up (maybe it wasn't needed up there and 
+                    % can be skipped?).
+                    % Integration: x will be the axis along the edge;
+                    % range: 0,edgelength.
+                    % dist to rec = sqrt( (x-Rmod(1)).^2 + Rmod(2)^2 + Rmod(3)^2 )
+                    % psi = Rplanemod(2)
+    
+                    for kk = 1:length(kvec)
+                        intval = integral(@(x) EDpistonedgeintegrand(x,Rplanemod(2)^2,Rmod(3)^2,kvec(kk)),0-Rplanemod(1),edgelength-Rplanemod(1),'RelTol',1e-8);
+                        lineintsummation(kk) = lineintsummation(kk) + intval*Rplanemod(2);
+                    end
+                end
+                alltfs = -lineintsummation/2/pi;
+                              
+                if checkinsidehit == 1
+                     alltfs = alltfs + exp(-1i*kvec*(Rmod(3)-Rstart));
+                end
+    
+                alltfs = alltfs.*(-2i)*envdata.cair/Sdata.pistonareas(pistonnumber)./frequencies(:);
+                
+               if Sdata.doaddsources == 1
+                  tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) = ...
+                      tfdirect(:,firstorderpathdata.directsoundlist(ii,2)) + alltfs;
+               else             
+                  tfdirect(:,firstorderpathdata.directsoundlist(ii,2),firstorderpathdata.directsoundlist(ii,1)) = alltfs;
+               end
+            end    % for ii = 1:ncomponents 
+
+        end    % if pistonmethod == 'old'
 
      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -411,6 +563,9 @@ if difforder > 0
         cylcoordR = zeros(nreceivers,3);
 
         edgenumber = iv(ii);
+        if showtext >= 2
+            disp(['         Edge no. ',int2str(edgenumber)])
+        end
         edgecoords = [edgedata.edgestartcoords(edgenumber,:);edgedata.edgeendcoords(edgenumber,:)];
 
         sourceandreceivercombos = squeeze(firstorderpathdata.diffpaths(:,:,edgenumber));
@@ -438,6 +593,9 @@ if difforder > 0
             cylcoordR(ivR,:) = [rr thetar zr];
     
             for jj = 1:length(iv2)
+               if showtext >= 2
+                    disp(['   Source no. ',int2str(Snumber(jj)),', Rec. no. ',int2str(Rnumber(jj))])
+               end
                 [tfnew,singularterm,zfirst] = EDwedge1st_fd(envdata.cair,frequencies,edgedata.closwedangvec(edgenumber),...
                     cylcoordS(Snumber(jj),1),cylcoordS(Snumber(jj),2),cylcoordS(Snumber(jj),3),...
                     cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
@@ -467,6 +625,7 @@ if difforder > 0
 
                 tfsumpiston = zeros(length(frequencies),1); 
                 for np = 1:npistonpoints
+
                     % 20 Nov. 2023 Use the already existing short lists of
                     % edge-related coordinates instead of recalculating them
 %                    [rs,thetas,zs] = EDcoordtrans1(Sdata.pistongausscoordinates{ivS}(np,:),edgecoords,edgedata.edgenvecs(edgenumber,:));

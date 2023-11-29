@@ -42,7 +42,7 @@ This project is licensed under the BSD License - see the [LICENSE.md](LICENSE.md
 
 ## Acknowledgments
 
-Many people have contributed on a smaller and larger scale during more than twenty years of work. The last year, the collaboration with Sara Martin, Jan Slechta and Jason Summers is acknowledged in particular.
+Many people have contributed on a smaller and larger scale during more than twenty years of work. Since 2017, the collaboration with Sara Martin, Jan Slechta and Jason Summers is acknowledged in particular.
 Parts of this work have been financed through Sara Martin’s project ”Hybrid methods” funded by the Research Council of Norway, and through Jan Slechta’s stipend from the ERCIM Alain Bensoussan Fellowship Programme.
 
 

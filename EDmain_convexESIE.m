@@ -235,8 +235,6 @@ if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planeda
     error('ERROR: EDmain_convexESIE can only be used for convex scatterers, including a single thin plate')
 end
 
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create the Sdata struct
 

@@ -302,6 +302,11 @@ versionnumbers{icounter} = '0.402';
 versiondate{icounter} = '29 Nov. 2023';
 versiontext{icounter} = ['Implemented piston sources, in the FD.'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.500';
+versiondate{icounter} = '29 Nov. 2023';
+versiontext{icounter} = ['Changed directory structure.'];
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

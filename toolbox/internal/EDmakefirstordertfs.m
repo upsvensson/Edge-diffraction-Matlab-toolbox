@@ -80,7 +80,8 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 % 24 Nov. 2023 For piston sources, a check is made if the direct sound is
 % identical for many components. Major time savings for mesh geometries.
 % 29 Nov. 2023 Adapted to the name change of the field pistongausspoints to
-% pistongaussorder
+% pistongaussorder. Fixed a small bug related to the size of a matrix which
+% generates a short list for polygon pistons.
 
 t00 = clock;
 
@@ -149,8 +150,6 @@ if showtext >= 2
    disp(['      Generating direct sound components']) 
 end
 t00sub = clock;
-
-pistonmethod = 'new';
 
 if Sdata.doaddsources == 1
     tfdirect = zeros(nfrequencies,nreceivers);
@@ -226,6 +225,9 @@ if firstorderpathdata.ncomponents(1) > 0
             disp(['WARNING! Rstart is not zero. Are you sure that is what you want, for the polygon piston source?'])
             pause
         end
+
+        pistonmethod = 'new';
+
         % We calculate all the vertical distances from the piston plane to
         % all the receivers = zreceiver.
         %           zreceiver = r*cos(theta)
@@ -281,7 +283,7 @@ if firstorderpathdata.ncomponents(1) > 0
 % %             A = [round( abs(dx(:))*1e5)/1e5 round(abs(dy(:))*1e5)/1e5 round(abs(dz(:))*1e5)/1e5 pistonsizes(longlistpistonnumber)];
 % %             [shortlist_pistontorec,examplefromshortlist_pistontorec,reftoshortlist_pistontorec] = unique(A,'rows');
             [shortlist_pistontorec,examplefromshortlist_pistontorec,reftoshortlist_pistontorec] = ...
-                unique([round( abs(dx(:))*1e5)/1e5 round(abs(dy(:))*1e5)/1e5 round(abs(dz(:))*1e5)/1e5 pistonsizes(longlistpistonnumber)],'rows');
+                unique([round( abs(dx(:))*1e5)/1e5 round(abs(dy(:))*1e5)/1e5 round(abs(dz(:))*1e5)/1e5 pistonsizes(longlistpistonnumber,:)],'rows');
   
             [sortedvec,isort] = sort(reftoshortlist_pistontorec);
     

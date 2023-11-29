@@ -39,7 +39,7 @@ function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,.
 % from the EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 29 Oct. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2023
 %
 % [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
 %     edgedata,edgetoedgedata,Snewdata,Rnewdata,envdata,...
@@ -72,6 +72,8 @@ function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,.
 % 27 Oct. 2023 Substantial change to the input parameter list.
 % 29 Oct. 2023 Some more change to the input parameter list. elemsize is
 % now a field in controlparameters.
+% 29 Nov. 2023 Fixed small bug: the parameter cair was changed to
+% envdata.cair for difforders 3 and higher.
 
 t00 = clock;
 
@@ -300,7 +302,7 @@ for isou = 1:nsources
 
                             [irnewpartition,~] = EDwedgeN(cylS,cylR,wedgeparams,ncylrows,...
                                 nyvec(edgepattern(:)),edgedata.edgelengthvec(edgepattern(:)).',...
-                                dzvec(edgepattern(:)),'n',pathalongplane(ii,:),nedgeelcombs,Rstart,bc,cair,fs,BIGEDGE1stvalue);
+                                dzvec(edgepattern(:)),'n',pathalongplane(ii,:),nedgeelcombs,Rstart,bc,envdata.cair,fs,BIGEDGE1stvalue);
                             irnewpartition = real(irnewpartition);
 
                             if kk == 1
@@ -338,7 +340,7 @@ for isou = 1:nsources
 
                             [irnewpartition,~] = EDwedgeN(cylS,cylR,wedgeparams,ncylrows,...
                                 nyvec(edgepattern(:)),edgedata.edgelengthvec(edgepattern(:)).',...
-                                dzvec(edgepattern(:)),'n',pathalongplane(ii,:),nedgeelcombs,Rstart,bc,cair,fs,BIGEDGE1stvalue);
+                                dzvec(edgepattern(:)),'n',pathalongplane(ii,:),nedgeelcombs,Rstart,bc,envdata.cair,fs,BIGEDGE1stvalue);
                             irnewpartition = real(irnewpartition);
 
                             if kk == 1

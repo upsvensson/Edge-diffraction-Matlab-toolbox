@@ -69,7 +69,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 1 Nov. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 29 Nov. 2023 (peter.svensson@ntnu.no)
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -181,6 +181,8 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % inputs to functions, so function calls are all modified.
 % 1 Nov. 2023 Added an empty .offedges field to edgedata, when a
 % freefieldcase is run.
+% 29 Nov. 2023 Fixed small bug: the HOD irs lengths were not handled
+% correctly when summed with irdirect etc.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -553,8 +555,8 @@ if nargout > 0
             [nold,nrec,nsou] = size(irtot);  
             if iscell(irhod)
                 ncells = length(irhod);
-                irhodsum = irhod{1};
-                for ii = 2:ncells
+                irhodsum = irhod{2};
+                for ii = 3:ncells
                     irhodsum = irhodsum + irhod{ii};
                 end
             else

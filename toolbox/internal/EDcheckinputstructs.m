@@ -37,28 +37,27 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   .nedgesubs           (optional, default 2)
 %   envdata         .cair                (default: 344)
 %                   .rhoair              (default: 1.21)
-%   controlparameters   .fs              (default: 44100) Ignored by
-%                                        EDmain_convexESIE, but used by
-%                                        EDmain_convexESIE_ir
+%   controlparameters   .fs              (default: 44100) Only relevant if
+%                                        controlparameters.docalcir = 1.
 %                   .directsound         (default: 1 = yes)
 %                   .difforder           (default: 10)
-%                   .savealldifforders   (default: 0) Used only by
-%                                        EDmain_convex_time
-%                   .saveindividualfirstdiff (default: 0) Used only by
-%                                        EDmain_convex_time
+%                   .savealldifforders   (default: 0) Only relevant if
+%                                        controlparameters.docalcir = 1.
+%                   .saveindividualfirstdiff (default: 0) Only relevant if
+%                                        controlparameters.docalcir = 1.
 %                   .skipfirstorder      (default: 0)
-%                   .docalctf            (default: 1 for EDmain_convexESIE,
-%                                                  ignored by EDmain_convexESIE_ir)
-%                   .docalcir            (default: 1 for EDMain_convexESIE_ir,
-%                                                  ignored by EDmain_convexESIE)
+%             Maximum one of .docalctf,.docalcir,docalctf_ESIEBEM can be 1.
+%                   .docalctf            (default: 0) Only on 
+%                   .docalcir            (default: 0)
+%                   .docalctf_ESIEBEM    (default: 0)
 %                   .Rstart              (default: 0)
-%                   .frequencies         (obligatory for EDmain_convexESIE,
-%                                         ignored by EDmain_convexESIE_ir)
+%                   .frequencies         (obligatory if .docalctf = 1 or
+%                                        docalctf_ESIEBEM = 1)
 %                   .discretizationtype  (default: 2 = G-L)
-%                   .ngauss              (default: 16, but ignored by
-%                                        EDmain_convex_time)
-%                   .surfacegaussorder   (default: 5 for
-%                                         EDmain_convexESIEBEM; ignored by other EDmain versions)
+%                   .ngauss              (default: 16, but ignored if
+%                                        .docalcir = 1)
+%                   .surfacegaussorder   (default: 5, but ignored if 
+%                                         .docalctf_ESIEBEM = 0)
 %                   .HODirelemsize       (default:
 %                                       2*2.^(-[0:controlparameters.difforder-1]))
 %   filehandlingparameters    .outputdirectory  (default: the folder of the geoinputfile)  
@@ -75,11 +74,11 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                         EDmain_convexESIE
 %                   .savelogfile          (default: 1)
 %                   .savediff2result      (default: 0)
-%                   .savehodpaths         (default: 0) Used only by
-%                   EDmain_convex_time
+%                   .savehodpaths         (default: 0) Used only if
+%                                         .docalcir = 1
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 29 Nov. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 22 March 2024 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -161,6 +160,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % as a vector, only as a single value.
 % 29 Nov. 2023 Changed the name of the filed pistongausspoints to
 % pistongaussorder.
+% 22 March 2024 Updated the function header (there were references to
+% EDmain_convexESIE etc, which was removed).
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')

@@ -7,7 +7,7 @@ mfile = mfilename('fullpath');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % A 10m*10m dummy plate is generated, acting as an infinite baffle
 
-corners = 5*[1 1 0;-1 1 0;-1 -1 0; 1 -1 0];
+corners = 1*[1 1 0;-1 1 0;-1 -1 0; 1 -1 0];
 planecorners = [1 2 3 4;4 3 2 1];
 geoinputdata = struct('corners',corners,'planecorners',planecorners);
 
@@ -62,6 +62,8 @@ EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameter
 % Present the results
 
 tftot_piston = EDres.tftot*Rdistance/2;
+cair = 343;
+kavec = 2*pi*fvec/cair*circpistonradius;
 
 figure(2)
 clf(2)
@@ -77,11 +79,17 @@ g = title('Directivity function of a 20 cm piston');
 set(g,'FontSize',14)
 %xlim([50 5000])
 grid
-g = legend('100 Hz','1 kHz','5 kHz');
+g = legend(['100 Hz (ka=',num2str(kavec(1)),')'],...
+           ['1 kHz (ka=',num2str(kavec(2)),')'],...
+           ['5 kHz (ka=',num2str(kavec(3)),')']);
 set(g,'Location','best')
 set(g,'FontSize',14)
 
 figure(1)
 clf(1)
 eddatafile = [infilepath,filesep,'results',filesep,filehandlingparameters.filestem,'_eddata.mat']; 
-EDplotmodel(eddatafile,3);
+EDplotmodel(eddatafile,'plotoption',3,'figurewindow',1);
+
+figure(3)
+clf(3)
+EDplotmodel(eddatafile,'plotoption',1,'figurewindow',3);

@@ -35,7 +35,7 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 7. Direct sound obscuring for a corner-on hit of an octahedron.
 % 8. Direct sound obscuring for an edge-on hit of a cube.
 % 
-% Peter Svensson 21 Nov. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 22 March 2024 (peter.svensson@ntnu.no)
 % 
 % passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams);
 
@@ -57,6 +57,8 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 22 May 2019 Fixed a bug: ntests was still set to 7.
 % 3 June 2020 Fixed a bug: folder names with spaces can be handled now
 % 7 Oct. 2023 Adapted to the EDmain_convex of v0.300
+% 22 March 2024 Removed a few text printouts which mentioned
+% EDmain_convexESIE.
 
 ntests = 8;
 
@@ -339,7 +341,7 @@ if runtest(2) == 1
     if savelogfile == 1
         fwrite(fid,[' ',lineending],'char');
         fwrite(fid,['####################################################################',lineending],'char');
-        fwrite(fid,['Test ',II,': EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz',lineending],'char');
+        fwrite(fid,['Test ',II,': EDmain_convex, diff1 continuity across zone boundary, at 100 Hz',lineending],'char');
         fwrite(fid,['Single edge; receivers distributed at, and very near, zone boundaries',lineending],'char');
         fwrite(fid,['Perpendicular edge hit.',lineending],'char');
         fwrite(fid,['Computed value at ZB should be very close to the mean value of the two',lineending],'char');
@@ -359,7 +361,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Test 3: EDmain_convexESIE, diff1 continuity across zone boundary, at 100 Hz
+%  Test 3: EDmain_convex, diff1 continuity across zone boundary, at 100 Hz
 %          Skewed edge hit
 
 if runtest(3) == 1
@@ -484,7 +486,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Test 4: EDmain_convexESIE, diff1 continuity across corner zone boundary, at 100 Hz
+%  Test 4: EDmain_convex, diff1 continuity across corner zone boundary, at 100 Hz
 %
 
 if runtest(4) == 1
@@ -725,7 +727,7 @@ if runtest(6) == 1
         disp('Entire cube surface gets sources')
         disp('Radiated field should be within [0.996,1.008] around a circle of receivers')
     else
-        disp(['Test ',II,': EDmain_convexESIE, replicate internal monopole, at 0.1 Hz']);    
+        disp(['Test ',II,': EDmain_convex, replicate internal monopole, at 0.1 Hz']);    
     end
 
     mfile = mfilename('fullpath');

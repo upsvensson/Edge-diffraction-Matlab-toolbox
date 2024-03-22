@@ -56,12 +56,12 @@ filehandlingparameters.filestem = filestem;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 % Run the calculations, for the piston case
 
-EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
+EDres_piston = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,filehandlingparameters);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 % Present the results
 
-tftot_piston = EDres.tftot; 
+tftot_piston = EDres_piston.tftot; 
 
 figure(2)
 clf(2)

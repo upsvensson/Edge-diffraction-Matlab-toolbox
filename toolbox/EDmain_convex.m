@@ -69,7 +69,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 29 Nov. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 24 March 2024 (peter.svensson@ntnu.no)
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -183,6 +183,8 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % freefieldcase is run.
 % 29 Nov. 2023 Fixed small bug: the HOD irs lengths were not handled
 % correctly when summed with irdirect etc.
+% 24 March 2024 Changed the call syntax for the function EDedgeo (because
+% one more input parameter was added to that function).
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -293,9 +295,12 @@ end
 
 if geoinputdata.freefieldcase == 0
     EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the edgedata struct']);
+%     [edgedata,planedata,elapsedtimeedgeo,existingfilename]...
+%         = EDedgeo(planedata,geoinputdata.firstcornertoskip,...
+%         geoinputdata.listofcornerstoskip,geoinputdata.planeseesplanestrategy,...
+%         EDversionnumber,filehandlingparameters);
     [edgedata,planedata,elapsedtimeedgeo,existingfilename]...
-        = EDedgeo(planedata,geoinputdata.firstcornertoskip,...
-        geoinputdata.listofcornerstoskip,geoinputdata.planeseesplanestrategy,...
+        = EDedgeo(planedata,geoinputdata,...
         EDversionnumber,filehandlingparameters);
     nedges = size(edgedata.edgecorners,1);
     EDpostfunctext('EDedgeo',elapsedtimeedgeo,existingfilename,...

@@ -33,6 +33,11 @@ function plothandles = EDplotmodel(eddatafile,varargin)
 %                           followed by a vector of integers, only those
 %                           edge numbers are plotted with a solid line.
 %                           The others are plotted with dashed lines. 
+%   'offedges'              If the text-string 'offedges' is given, followed 
+%                           by the value 1, then the edges that are turned
+%                           off are plotted with dashed lines. If both
+%                           'offedges' is set to 1, and 'edgenumbers' is
+%                           given values, then 'offedges' will be used.
 %   'figurewindow' a desired figure number. If not specified, figure number
 %   1 will be used.
 % 
@@ -57,7 +62,7 @@ function plothandles = EDplotmodel(eddatafile,varargin)
 %
 % Uses functions EDstrpend, EDstrpblnk
 %
-% Peter Svensson (peter.svensson@ntnu.no) 1 Nov. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 22 March 2024
 % 
 % plothandles = EDplotmodel(eddatafile,varargin);
 
@@ -77,13 +82,18 @@ function plothandles = EDplotmodel(eddatafile,varargin)
 % 27 Oct. 2023 Made changes to fit with the changes for structs Rdata and Sdata:
 % the field is now called coordinates instead of sources/receivers.
 % 1 Nov. 2023 Made it possible to plot free-field cases.
-
+% 22 March 2024 Adjusted the length of the plane normal vectors, and
+% the distance of the plane number, to the general size of the object. 
+% Also plotted the plane normal vectors in black. Introduced 'offedges' as
+% a plotoption
+ 
 p = inputParser;
 
 p.addOptional('plotoptions',0,@isscalar);
 p.addParamValue('sounumbers',[],@isnumeric);
 p.addParamValue('recnumbers',[],@isnumeric);
 p.addParamValue('edgenumbers',[],@isnumeric);
+p.addParamValue('offedges',[],@isnumeric);
 p.addParamValue('figurewindow',1,@isscalar);
 
 p.parse(varargin{:})
@@ -93,6 +103,7 @@ plotoptions = inputs.plotoptions;
 sounumbers = inputs.sounumbers;
 recnumbers = inputs.recnumbers;
 edgenumbers = inputs.edgenumbers;
+plotoffedges = inputs.offedges;
 figurewindow = inputs.figurewindow;
 
 %--------------------------------------------------------------
@@ -192,7 +203,14 @@ if freefieldcase == 0
     
     %--------------------------------------------------------------
     % Plot the edges. Check if some should have dashed lines
+    % If 'offedges' is specified, then offedges takes priority over
+    % 'edgenumbers'.
     
+    if plotoffedges == 1
+        edgenumbers = [1:nedges];
+        edgenumbers(edgedata.offedges) = [];
+    end
+
     if isempty(edgenumbers)
         linemarker = ones(nedges,1);
     else
@@ -226,21 +244,28 @@ if freefieldcase == 0
         end
     end
     
+    boundingboxsize = max(planedata.corners) - min(planedata.corners);
+    boundingboxdiagonal = norm(boundingboxsize);
     if plotnvecs
+        % Set the length of the nvec relative to the maximum size of the entire
+        % object
+        nveclength = boundingboxdiagonal*0.3;
 	    for ii = 1:nplanes
             midpoint = mean(planedata.corners(planedata.planecorners(ii,1:(planedata.ncornersperplanevec(ii))),:));
             
-            endpoint = midpoint + planedata.planeeqs(ii,1:3);
+            endpoint = midpoint + nveclength*planedata.planeeqs(ii,1:3);
             bothpoints = [midpoint;endpoint];
-            plothandles.nvecs(ii) = plot3(bothpoints(:,1),bothpoints(:,2),bothpoints(:,3));
-            plothandles.nveccircles(ii) = plot3(midpoint(1),midpoint(2),midpoint(3),'ro');
+            plothandles.nvecs(ii) = plot3(bothpoints(:,1),bothpoints(:,2),bothpoints(:,3),'k-');
+            plothandles.nveccircles(ii) = plot3(midpoint(1),midpoint(2),midpoint(3),'ko');
 	    end
     end
     
     if plotplnumbers
+        % Adjust the text printing to the size of the object
+        textshift = boundingboxdiagonal*0.05;
 	    for ii = 1:nplanes
             midpoint = mean(planedata.corners(planedata.planecorners(ii,1:planedata.ncornersperplanevec(ii)),:));
-            endpoint = midpoint + planedata.planeeqs(ii,1:3)*0.1;
+            endpoint = midpoint + planedata.planeeqs(ii,1:3)*textshift;
             if plotplCADnumbers == 1
                 plothandles.planenumbers(ii) = text(endpoint(1),endpoint(2),endpoint(3),['p',int2str(planenumbers(ii))]);
                 set(plothandles.planenumbers(ii),'FontSize',14);

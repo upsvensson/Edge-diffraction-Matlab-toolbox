@@ -162,6 +162,11 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % pistongaussorder.
 % 22 March 2024 Updated the function header (there were references to
 % EDmain_convexESIE etc, which was removed).
+% 22 March 2024 Removed the requirement that one of the calculation options
+% must be 1. If no calculation option is set to 1, then only geometry files
+% will be generated, and that is very useful when the geometry is being
+% developed.
+% 22 March 2024 Added the field listofedgestoskip to geoinputdata
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -246,6 +251,18 @@ else
     if ~isfield(geoinputdata,'listofcornerstoskip')
         geoinputdata.listofcornerstoskip = [];
     end
+    if ~isfield(geoinputdata,'listofedgestoskip')
+        geoinputdata.listofedgestoskip = [];
+    else
+        ncols = size(geoinputdata.listofedgestoskip,2);
+        if ncols > 2
+            error('ERROR: geoinputdata.listofedgestoskip has more than two columns')
+        else
+            if any(any(geoinputdata.listofedgestoskip==0))
+                error('ERROR: geoinputdata.listofedgestoskip contains some zeros')
+            end
+        end
+    end
     if ~isfield(geoinputdata,'planeseesplanestrategy')
         geoinputdata.planeseesplanestrategy = 0;
     end
@@ -286,7 +303,6 @@ if ~isfield(Sinputdata,'sourcetype')
     Sinputdata.pistoncornercoordinates = [];
     Sinputdata.pistoncornernumbers = [];
     Sinputdata.pistonplanes = [];    
-
 end
 if strcmp(Sinputdata.sourcetype,'monopole')
     if ~isfield(Sinputdata,'coordinates') 
@@ -611,9 +627,9 @@ else
         end
     end
 end
-if (controlparameters.docalctf == 0) && (controlparameters.docalcir == 0) && (controlparameters.docalctf_ESIEBEM == 0)
-    error('ERROR: You must choose a calulcation method: one of (docalcir, docalctf, docalctf_ESIEBEM) must be 1')
-end
+% if (controlparameters.docalctf == 0) && (controlparameters.docalcir == 0) && (controlparameters.docalctf_ESIEBEM == 0)
+%     error('ERROR: You must choose a calulcation method: one of (docalcir, docalctf, docalctf_ESIEBEM) must be 1')
+% end
 
 if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1
     if ~isfield(controlparameters,'frequencies')

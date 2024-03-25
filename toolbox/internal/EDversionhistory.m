@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 25 March 2024
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -306,6 +306,11 @@ icounter = icounter + 1;
 versionnumbers{icounter} = '0.500';
 versiondate{icounter} = '29 Nov. 2023';
 versiontext{icounter} = ['Changed directory structure.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.501';
+versiondate{icounter} = '25 March 2024';
+versiontext{icounter} = ['Implemented the new input parameter geoinputdata.listofedgestoskip'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

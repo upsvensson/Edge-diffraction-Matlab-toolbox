@@ -1,16 +1,24 @@
 function [edgedata,planedata,elapsedtimeedgeo,existingfilename] = EDedgeo(planedata,...
-    firstcornertoskip,listofcornerstoskip,planeseesplanestrategy,EDversionnumber,filehandlingparameters)
+    geoinputdata,EDversionnumber,filehandlingparameters)
 % EDedgeo - Calculates some plane- and edge-related geometrical
 % parameters, based on corners and planes in the planedata struct.
 %
 % Input parameters:
-%	planedata               A struct with the corners and plane data.			
-%	firstcornertoskip (optional)	All edges including at least one corner with this number or
+%	planedata               A struct with the corners and plane data.
+%   geoinputdata            A struct where these fields are optionally used
+%	.firstcornertoskip 	    All edges including at least one corner with this number or
 %                   		higher will be excluded from the calculations. Default: 1e6
-%   listofcornerstoskip (optional) All edges including at least one corner
+%   .listofcornerstoskip    All edges including at least one corner
 %                           in this list will be excluded from the
 %                           calculations. Default: [].
-%   planeseesplanestrategy (optional)   If this parameter is given the value 1, a plane-to-plane
+%   .listofedgestoskip      This is a vertical matrix with one or two
+%                           columns. If it has one column, then edges with
+%                           these numbers will be turned off. If the matrix
+%                           has two columns, then edges with the corner
+%                           pairs will be turned off. .listofedgestoskip
+%                           takes precedence over .firstcornertoskip and
+%                           .listofcornerstoskip. Default: [].
+%   .planeseesplanestrategy If this parameter is given the value 1, a plane-to-plane
 %                           visibility check is done by checking the plane-midpoint to plane-midpoint
 %                           for obstructions, which might be enough for
 %                           some geometries. Default: 0.
@@ -106,11 +114,10 @@ function [edgedata,planedata,elapsedtimeedgeo,existingfilename] = EDedgeo(planed
 % from EDtoolbox
 % Uses the function Datahash from Matlab Central
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 30 Oct. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 25 March 2024
 %
 % [edgedata,planedata,elapsedtimeedgeo,existingfilename] = EDedgeo...
-% (planedata,firstcornertoskip,listofcornerstoskip,...
-% planeseesplanestrategy,EDversionnumber,filehandlingparameters);
+% (planedata,geoinputdata,EDversionnumber,filehandlingparameters);
 
 % 9 July 2009   Stable version
 % 28 Sep. 2014  Added the optional input parameter listofcornerstoskip
@@ -154,21 +161,37 @@ function [edgedata,planedata,elapsedtimeedgeo,existingfilename] = EDedgeo(planed
 % info about "version 1".
 % 30 Oct. 2023 Moved the EDversionnumber position among input parameters.
 % Fine-tuned the EDinputdatahash
+% 25 March 2024 Implemented the new input parameter listofedgestoskip
 
 t00 = clock;
 geomacc = 1e-10;
 
 showtext = filehandlingparameters.showtext;
-if isempty(firstcornertoskip)
+if isempty(geoinputdata.firstcornertoskip)
     firstcornertoskip = 1e6;
+else
+    firstcornertoskip = geoinputdata.firstcornertoskip;
 end
-if isempty(planeseesplanestrategy)
+if isempty(geoinputdata.listofcornerstoskip)
+    listofcornerstoskip = [];
+else
+    listofcornerstoskip = geoinputdata.listofcornerstoskip;
+end
+if isempty(geoinputdata.listofedgestoskip)
+    listofedgestoskip = [];
+else
+    listofedgestoskip = geoinputdata.listofedgestoskip;
+end
+if isempty(geoinputdata.planeseesplanestrategy)
     planeseesplanestrategy = 0;
+else
+    planeseesplanestrategy = geoinputdata.planeseesplanestrategy;
 end
 
 EDinputdatastruct = struct('corners',planedata.corners,'planecorners',planedata.planecorners,...
     'planeabstypes',planedata.planeabstypes,...
 'firstcornertoskip',firstcornertoskip,'listofcornerstoskip',listofcornerstoskip,...
+'listofedgestoskip',listofedgestoskip,...
 'planeseesplanestrategy',planeseesplanestrategy,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
@@ -975,28 +998,65 @@ end
 %---------------------------------------------------------------
 %
 % Which edges should be switched off?
-% (1) Go through the list edgecorners. If any edge contains one of the
+% (1) If the list listofedgestoskip contains values, then the variable
+%     firstcornerskip and the list listofcornerstoskip are ignored. If
+%     listofedgestoskip is empty, then step (2) will be carried out.
+% (2) Go through the list edgecorners. If any edge contains one of the
 %     corners, whose numbers are in switchoffcorners, then that edge should be
 %     stored in the list offedges.
-% (2) If an edge has an integer ny-value, then it should be switched off.
-% (3) If one of the two connecting planes has reflfactors = 0, then it should
+% (3) If an edge has an integer ny-value, then it should be switched off.
+% (4) If one of the two connecting planes has reflfactors = 0, then it should
 %     be switched off.
-
-% disp('   switching off possibly unwanted edges...')
 
 offedges = zerosvec3;
 
-% (1) Go through the list edgecorners. If any edge contains one of the
+% (1) If the list listofedgestoskip contains values, then the variable
+%     firstcornerskip and the list listofcornerstoskip are ignored. If
+%     listofedgestoskip is empty, then step (2) will be carried out.
+% (2) Go through the list edgecorners. If any edge contains one of the
 %     corners, whose numbers are in switchoffcorners, then that edge should be
 %     stored in the list offedges.
 
-if ~isempty(switchoffcorners)   
-  	for ii = 1:nedges
-	   corner1 = edgecorners(ii,1);
-	   corner2 = edgecorners(ii,2);
-	   remove = sum( corner1 == switchoffcorners ) + sum( corner2 == switchoffcorners );
-	   offedges(ii) = sign(remove);
-	end
+if ~isempty(listofedgestoskip)   
+    ncols = size(listofedgestoskip,2);
+    if ncols == 1  % listofedgestoskip simply contains edge numbers
+        if max(listofedgestoskip) > nedges
+            error('ERROR: listofedgestoskip contains an edge number which is too large.')
+        end
+        if min(listofedgestoskip) < 1
+            error('ERROR: listofedgestoskip contains an edge number which is < 1')
+        end
+        offedges(listofedgestoskip) = 1;
+    else  % listofedgestoskip contains corner pairs
+        if max(max(listofedgestoskip)) > ncorners
+            error('ERROR: listofedgestoskip contains a corner number which is too large.')
+        end
+        if min(min(listofedgestoskip)) < 1
+            error('ERROR: listofedgestoskip contains a corner number which is < 1')
+        end
+        for ii = 1:size(listofedgestoskip,1)
+            cornerpair = listofedgestoskip(ii,:);
+            [lia,locb] = ismember(cornerpair,edgecorners,'rows');
+            if lia == 1
+                offedges(locb) = 1;
+            else
+                [lia,locb] = ismember(cornerpair([2 1]),edgecorners,'rows');
+                if lia == 1
+                    offedges(locb) = 1;               
+                end
+            end        
+        end
+
+    end
+else
+    if ~isempty(switchoffcorners)   
+  	    for ii = 1:nedges
+	       corner1 = edgecorners(ii,1);
+	       corner2 = edgecorners(ii,2);
+	       remove = sum( corner1 == switchoffcorners ) + sum( corner2 == switchoffcorners );
+	       offedges(ii) = sign(remove);
+	    end
+    end
 end
 
 % (2) If an edge has an integer ny-value, then it should be switched off.
@@ -1011,7 +1071,6 @@ reflectingedges = reflectingedges(:,1).*reflectingedges(:,2);
 offedges = offedges + (1-reflectingedges);
 
 offedges = find(offedges ~= 0);
-
 
 %--------------------------------------------------------------------------------
 %

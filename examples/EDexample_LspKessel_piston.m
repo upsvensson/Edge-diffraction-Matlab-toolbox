@@ -6,9 +6,10 @@ mfile = mfilename('fullpath');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Here the size of the shoebox−shaped enclosure is defined 
-% The function EDmakegeo_shoebox centers the box around the origin but we
-% shift it in the x−direction so that the origin (where the source will be
-% has 0.2m to all edges)
+% The function EDmakegeo_shoebox centers the box around the origin in the
+% xy-direction but one face is at z = 0 and the opposite face at -l_z.
+% We shift it in the y−direction so that the origin (where the source will
+% be) has 0.2m to all edges.
 
 [corners,planecorners] = EDmakegeo_shoebox(0.4,0.64,0.32); 
 corners(:,2) = corners(:,2) - 0.12;

@@ -35,9 +35,15 @@ function EDres = EDgetresults(inpar1,inpar2,geoinputdata,Rindata,Sindata,envdata
 %               tftot_fft   NOT IMPL. YET 
 %               fvec_fft    NOT IMPL. YET 
 %               nfft        NOT IMPL. YET 
-%               controlparameters   A struct NOT IMPL. YET 
+%               geoinputdata                Input data 
+%               Sinputdata                  Input data
+%               Rinputdata                  Input data
+%               envdata                     Input data
+%               controlparameters           Input data
+%               filehandlingsparameters     Input data
+%               EDversionnumber 
 % 
-% Peter Svensson 3 Oct. 2023   (peter.svensson@ntnu.no)
+% Peter Svensson 16 Apr. 2024   (peter.svensson@ntnu.no)
 % 
 % EDres =
 % EDgetresults(inpar1,inpar2,geofiledata,Rindata,Sindata,envdata,EDversionnumber);
@@ -46,6 +52,7 @@ function EDres = EDgetresults(inpar1,inpar2,geoinputdata,Rindata,Sindata,envdata
 % 16 Sep. 2021 A few more output fields added
 % 29 Sep. 2023 Fixed a bug with the size of the ir matrices
 % 3 Oct 2023 Made a version 2 with more input parameters
+% 16 Apr. 2024 Added the input data structs to EDres
 
 if nargin == 2   % Version 1 of this function
     functionversion = 1;
@@ -279,6 +286,21 @@ if exist(filetolookfor,'file') == 2
         EDres.tftot_ESIEBEM = full(tftot_ESIEBEM);
     end
 end    
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The settings file
+
+filetolookfor = [outputdirectory,filestem,'_settings.mat'];
+if exist(filetolookfor,'file') == 2
+   eval(['load ',filetolookfor])
+   EDres.geoinputdata = geoinputdata;
+   EDres.Sinputdata = Sinputdata;
+   EDres.Rinputdata = Rinputdata;
+   EDres.envdata = envdata;
+   EDres.controlparameters = controlparameters;
+   EDres.filehandlingparameters = filehandlingparameters;
+   EDres.EDversionnumber = EDversionnumber;   
+end 
 
 
 

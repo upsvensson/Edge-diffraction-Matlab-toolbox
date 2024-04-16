@@ -69,7 +69,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 24 March 2024 (peter.svensson@ntnu.no)
+% Peter Svensson 16 Apr 2024 (peter.svensson@ntnu.no)
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -185,6 +185,9 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % correctly when summed with irdirect etc.
 % 24 March 2024 Changed the call syntax for the function EDedgeo (because
 % one more input parameter was added to that function).
+% 16 Apr. 2024 Created a new obligatory output file: _settings.mat
+% which contains the six input structs (after EDcheckinputstructs has been
+% run) and the EDversionnumber.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -205,6 +208,17 @@ else
 end
 [geoinputdata,Snewdata,Rnewdata,envdata,controlparameters,filehandlingparameters] ...
     = EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Save the input structs in the _settings file.
+
+Sinputdata = Snewdata;
+Rinputdata = Rnewdata;
+
+desiredname = [filehandlingparameters.outputdirectory,filesep,...
+	filehandlingparameters.filestem,'_settings.mat'];
+
+eval(['save(''',desiredname,''',''geoinputdata'',''Sinputdata'',''Rinputdata'',''envdata'',''controlparameters'',''filehandlingparameters'',''EDversionnumber'');'])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -622,6 +636,13 @@ if nargout > 0
     else
         EDres.tftot_ESIEBEM = [];
     end
+    EDres.geoinputdata = geoinputdata;
+    EDres.Sinputdata = Sinputdata;
+    EDres.Rinputdata = Rinputdata;
+    EDres.envdata = envdata;
+    EDres.controlparameters = controlparameters;
+    EDres.filehandlingparameters = filehandlingparameters;
+    EDres.EDversionnumber = EDversionnumber;
 end
 
 if filehandlingparameters.savelogfile == 1

@@ -86,7 +86,7 @@ nyveclist,edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs)
 %
 % Uses the subroutine EDcoordtrans1
 %
-% Peter Svensson (peter.svensson@ntnu.no) 21 May 2019
+% Peter Svensson (peter.svensson@ntnu.no) 17 Apr 2024
 %
 % [ir,ninit] = EDwedge2nd(cylS,cylR,cylE2_r1,cylE1_r2,...
 % nyveclist,edgelengthlist,dzvec,method,pathalongplane,BigB,R_irstart,bc,cair,fs);
@@ -100,6 +100,9 @@ nyveclist,edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs)
 % 21 May 2019 Clarified a bit that theta is computed correctly for
 % non-plane edge combinations - but still not if swapbigmatrix = 1?
 % (which never seems to occur??)
+% 17 Apr 2024 Removed (commented out) 3 lines that cleared variables, which
+% cut the calculation time drastically for one text case (time 44% after
+% the change for on-axis receivers and a polygonal disc).
 
 global BIGEDGESTEPMATRIX
 
@@ -237,7 +240,7 @@ if method == 'n'
 	B2 = ( sqrt( B2.^2-1) + B2 ).^nyveclist(2);
 	B2 = real( B2 + 1./B2)/2;
     
-    clear redge1_re2 zedge1_re2
+%    clear redge1_re2 zedge1_re2
     
 	%-----------------------------------------------------------------------
 	% In directivity function 1, DF1, we need the quantity
@@ -253,7 +256,7 @@ if method == 'n'
  	B1 = ( real(sqrt( B1.^2-1)) + B1 ).^nyveclist(1);
  	B1 = ( B1 + 1./B1)/2;
 
-    clear zedge2_re1 redge2_re1
+ %   clear zedge2_re1 redge2_re1
 
 else
 	B1 = 1;   B2 = 1;
@@ -299,7 +302,7 @@ end
 % B2 is number of sample slots as non-integers
 
 B2 = ( S2Edist + E2Edist + E2Rdist - R_irstart)/(cair/fs)+1;
-clear S2Edist E2Edist E2Rdist
+% clear S2Edist E2Edist E2Rdist
 
 % B1 is the sampleslot numbers in integer number
 B1 = floor(B2);

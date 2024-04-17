@@ -317,6 +317,15 @@ versionnumbers{icounter} = '0.502';
 versiondate{icounter} = '16 April 2024';
 versiontext{icounter} = ['Saved the input data in a new _settings file, and returned those settings in the EDres struct.'];
 
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.503';
+versiondate{icounter} = '17 April 2024';
+versiontext{icounter} = ['Fixed a small bug in EDmain_convex that caused '...
+    'an error for IR of difforder 2 or higher, and controlparameters.'...
+    'savealldifforders = 0. Also removed lines in EDwedge2nd that cleared '...
+    'variable and removing that clearing save lots of time for one test '...
+    'case: many on-axis receivers and a polygonal circular disc (save 56%).'];
+
 nversions = size(versiontext,2);
 txtwidth = 80;
 

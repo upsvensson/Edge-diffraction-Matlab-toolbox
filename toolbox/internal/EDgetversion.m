@@ -17,6 +17,6 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % variable name
 % After 16 Jan 2018: Updated date and/or time (and/or version)
 
-versionnumber = 0.502;
-lastchangedate = '16April2024';
-lastchangetime = '22h21';
+versionnumber = 0.503;
+lastchangedate = '17April2024';
+lastchangetime = '18h27';

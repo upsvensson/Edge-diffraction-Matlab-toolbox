@@ -69,7 +69,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 16 Apr 2024 (peter.svensson@ntnu.no)
+% Peter Svensson 17 Apr 2024 (peter.svensson@ntnu.no)
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -188,6 +188,8 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % 16 Apr. 2024 Created a new obligatory output file: _settings.mat
 % which contains the six input structs (after EDcheckinputstructs has been
 % run) and the EDversionnumber.
+% 17 Apr 2024 Fixed a small bug that caused an error for IR of difforder 2
+% or higher, and controlparameters.savealldifforders = 0.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -574,10 +576,14 @@ if nargout > 0
             [nold,nrec,nsou] = size(irtot);  
             if iscell(irhod)
                 ncells = length(irhod);
-                irhodsum = irhod{2};
-                for ii = 3:ncells
-                    irhodsum = irhodsum + irhod{ii};
-                end
+                if controlparameters.savealldifforders == 0  % This should correspond to ncells == 1
+                    irhodsum = irhod{1};
+                else
+                    irhodsum = irhod{2};
+                    for ii = 3:ncells
+                        irhodsum = irhodsum + irhod{ii};
+                    end
+                end                
             else
                 irhodsum = irhod;
             end

@@ -35,7 +35,7 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 7. Direct sound obscuring for a corner-on hit of an octahedron.
 % 8. Direct sound obscuring for an edge-on hit of a cube.
 % 
-% Peter Svensson 22 March 2024 (peter.svensson@ntnu.no)
+% Peter Svensson 18 April 2024 (peter.svensson@ntnu.no)
 % 
 % passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams);
 
@@ -59,6 +59,7 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 7 Oct. 2023 Adapted to the EDmain_convex of v0.300
 % 22 March 2024 Removed a few text printouts which mentioned
 % EDmain_convexESIE.
+% 18 Apr. 2024 Reaplced some calls to GEOcalccosfi with EDcalccosfi.
 
 ntests = 8;
 
@@ -795,7 +796,7 @@ if runtest(6) == 1
 
     % Gauss point 1 = center point
     patchquadraturepoints = patchpoints;
-    [distances,cosfi] = GEOcalccosfi(internalmonopole,patchquadraturepoints,patchnvecs);
+    [distances,cosfi] = EDcalccosfi(internalmonopole,patchquadraturepoints,patchnvecs);
     pmono_patch = exp(-1i*k*distances)./distances;
     umono_radial_patch = pmono_patch/envdata.cair/envdata.rhoair.*(1 + 1./(1i*k*distances));
     umono_normal_patch =  quadweights(1)*umono_radial_patch.*cosfi;
@@ -803,7 +804,7 @@ if runtest(6) == 1
     % Gauss points 2-5 = from center point, towards corners
     for ii = 1:4
         patchquadraturepoints = patchpoints + quadshift*(patchcorners(:,[1:3] + 3*(ii-1)) - patchpoints);
-        [distances,cosfi] = GEOcalccosfi(internalmonopole,patchquadraturepoints,patchnvecs);
+        [distances,cosfi] = EDcalccosfi(internalmonopole,patchquadraturepoints,patchnvecs);
         pmono_patch = exp(-1i*k*distances)./distances;
         umono_radial_patch = pmono_patch/envdata.cair/envdata.rhoair.*(1 + 1./(1i*k*distances));
         umono_normal_patch = umono_normal_patch + quadweights(ii+1)*umono_radial_patch.*cosfi;    
@@ -817,7 +818,7 @@ if runtest(6) == 1
             patchedgemidpoint = 0.5*( patchcorners(:,10:12) + patchcorners(:,1:3) );        
         end
         patchquadraturepoints = patchpoints + quadshift*(patchedgemidpoint - patchpoints);
-        [distances,cosfi] = GEOcalccosfi(internalmonopole,patchquadraturepoints,patchnvecs);
+        [distances,cosfi] = EDcalccosfi(internalmonopole,patchquadraturepoints,patchnvecs);
         pmono_patch = exp(-1i*k*distances)./distances;
         umono_radial_patch = pmono_patch/envdata.cair/envdata.rhoair.*(1 + 1./(1i*k*distances));
         umono_normal_patch = umono_normal_patch + quadweights(ii+5)*umono_radial_patch.*cosfi;    

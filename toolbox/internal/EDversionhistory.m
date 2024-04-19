@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 16 April 2024
+% Peter Svensson (peter.svensson@ntnu.no) 19 April 2024
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -325,6 +325,15 @@ versiontext{icounter} = ['Fixed a small bug in EDmain_convex that caused '...
     'savealldifforders = 0. Also removed lines in EDwedge2nd that cleared '...
     'variable and removing that clearing save lots of time for one test '...
     'case: many on-axis receivers and a polygonal circular disc (save 56%).'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.504';
+versiondate{icounter} = '19 April 2024';
+versiontext{icounter} = ['Replaced the numerical integration in EDwedge1st_fd.' ...
+    'Instead of the built-in quadgk, a stripped-down version, EDquadgk, was '...
+    'made, where the integrand is written directly into the function. This ' ...
+    'saves substantial amounts of time. One test case: 64-sided disc, 10 rec., ' ...
+    '100 freq., new calc. time was 29% of old time.'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

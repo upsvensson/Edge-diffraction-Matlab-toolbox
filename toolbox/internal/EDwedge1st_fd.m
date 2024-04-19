@@ -39,7 +39,7 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 %
 % Uses the built-in function QUADGK and the function EDbetaoverml_fd for numerical integration.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 22 Nov. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 19 April 2024
 %
 % [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc);
 
@@ -65,6 +65,8 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 % 15 March 2021 Fixed bug: the code was tf2 = tf2/2; but should be 
 % tf2(jj) = tf2(jj)/2;
 % 22 Nov. 2023 Changed the criterion for singularity
+% 19 April 2024 Changed the numerical integration function from Matlab's
+% built-in quadgk to a stripped-down version, EDquadgk.
 
 localshowtext = 0;
 
@@ -111,8 +113,7 @@ end
 
 nfrequencies = length(frequencies);
 
-tol = 1e-11;                         % The relative accuracy for the numerical integration
-                                     % The relative accuracy for the numerical integration
+tol = 1e-11;                        % The relative accuracy for the numerical integration
                                     % It was found that 1e-6 generated a
                                     % substantial error for some cases (PC
                                     % 041129)
@@ -154,12 +155,6 @@ absnyfivec = abs(ny*fivec);
 sinnyfivec = sin(ny*fivec);
 cosnyfivec = cos(ny*fivec);
 
-% if localshowtext >= 2
-%     disp(' ')
-%     disp(['      absnyfivec = ',num2str(absnyfivec)])
-%     disp(['      cosnyfivec = ',num2str(cosnyfivec)])
-% end
-
 %------------------------------------------------------------------
 % Check which category we have.
 %
@@ -168,8 +163,6 @@ cosnyfivec = cos(ny*fivec);
 % an ordinary numerical integration for the rest of the wedge).
 %
 %       apexincluded        0 or 1
-%
-%
 
 apexincluded = 1;
 if sign( zw(1)*zw(2) ) == 1
@@ -228,10 +221,6 @@ if apexincluded == 1
         disp(['            analyticalsymmetry = ',num2str(analyticalsymmetry)])
         disp(['             '])
     end
-
-%     if localshowtext
-%          disp(['      Analyticalsymmetry =  ',int2str(analyticalsymmetry),' and exacthalf = ',int2str(exacthalf)])   
-%     end
     
 end
 
@@ -248,21 +237,36 @@ if any(singularterm) && localshowtext
 end
 
 tf = zeros(nfrequencies,1);
+integralparameters = struct;
+integralparameters.rs = rs;
+integralparameters.rr = rr;
+integralparameters.zs = zs;
+integralparameters.zr = zr;
+integralparameters.ny = ny;
+integralparameters.sinnyfivec = sinnyfivec;
+integralparameters.cosnyfivec = cosnyfivec;
+integralparameters.useterm = useterm;
+
 
 Rextra = R0 - Rstart;
 Rstarttemp = R0;
+integralparameters.Rstart = Rstarttemp;
 
 if apexincluded == 0
     if bc(1) == 1
         for ii = 1:nfrequencies
             k = 2*pi*frequencies(ii)/cair;
-            tf(ii) = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi);
+            integralparameters.k = k;
+%              tf(ii) = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi);
+           tf(ii) = EDquadgk(integralparameters,zw(1),zw(2),tol)*(-ny/4/pi);
             tf(ii) = tf(ii)*exp(-1i*k*Rextra);
         end
     else
         for ii = 1:nfrequencies
             k = 2*pi*frequencies(ii)/cair;
-            tf(ii) = quadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi);
+            integralparameters.k = k;
+%              tf(ii) = quadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi);
+           tf(ii) = EDquadgk(@(x)EDbetaoverml_fd_dirichlet(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),tol)*(-ny/4/pi);
             tf(ii) = tf(ii)*exp(-1i*k*Rextra);
         end        
     end
@@ -281,11 +285,15 @@ else  % if apexincluded == 0
     if bc(1) == 1
         for ii = 1:nfrequencies
             k = 2*pi*frequencies(ii)/cair;
+            integralparameters.k = k;
             if localselectanalytical == 0
-                tf(ii) = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi)*exp(-1i*k*Rextra);
+%                 tf(ii) = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi)*exp(-1i*k*Rextra);
+               tf(ii) = EDquadgk(integralparameters,zw(1),zw(2),tol)*(-ny/4/pi)*exp(-1i*k*Rextra);
+
             else
                 if includepart1 == 1
-                    tf1 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol);
+%                     tf1 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol);
+                    tf1 = EDquadgk(integralparameters,zw(1),-zrangespecial,tol);
                     tf1 = tf1*(-ny/4/pi);
                     if localshowtext
                        disp(['            Part1 included, from ',num2str(zw(1)),' to ',num2str(-zrangespecial)]);
@@ -298,7 +306,8 @@ else  % if apexincluded == 0
                    end
                 end
                 if includepart2 == 1
-                    tf3 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol);
+%                     tf3 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol);
+                   tf3 = EDquadgk(integralparameters,zrangespecial,zw(2),tol);
                     tf3 = tf3*(-ny/4/pi);
                     if localshowtext
                        disp(['            Part2 included, from ',num2str(zrangespecial),' to ',num2str(zw(2))]);

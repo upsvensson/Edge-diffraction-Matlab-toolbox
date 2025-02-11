@@ -37,7 +37,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1 from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  29 Nov. 2023  
+% Peter Svensson (peter.svensson@ntnu.no)  11 Feb. 2025  
 %                       
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
@@ -103,6 +103,9 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % 24 Nov. 2023 Stores many gaussvalues, up to the max. needed
 % 29 Nov. 2023 Adapted to the name change of the field pistongausspoints to
 % pistongaussorder
+% 11 Feb. 2025 Pre-calculate one higher order of quadrature points, just in
+% case an odd number of quadrature points is enforced. Also, handle the
+% hidden feature that the number of gauss points can be negative.
 
 t00 = clock;
 showtext = filehandlingparameters.showtext;
@@ -163,8 +166,14 @@ nplanes = size(planedata.planecorners,1);
 nedges = size(edgedata.edgecorners,1);
 vispartedgesfromIS = sparse(zeros(nplanes,nedges));
 
-gaussvectors = cell(controlparameters.ngauss,1);
-for ii = 2:controlparameters.ngauss
+% 11 Feb. 2025 by PS Make sure that one higher quadrature order than before
+% has its weights and nodes pre-calculated.
+maxngauss = abs(controlparameters.ngauss);
+if controlparameters.ngauss < 0
+    maxngauss = maxngauss +2;
+end
+gaussvectors = cell(maxngauss,1);
+for ii = 2:maxngauss
     [gaussvec1,gaussvec2] = EDdistelements(ii,controlparameters.discretizationtype);
     gaussvectors{ii} = [gaussvec1 gaussvec2];
 end

@@ -38,7 +38,7 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % Uses the functions  EDdistelements, EDrecycleresultfiles from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2023 
+% Peter Svensson (peter.svensson@ntnu.no) 5 Feb. 2025 
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 % EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
@@ -69,12 +69,19 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % 27 Oct. 2023 Changed the input parameters substantially.
 % 21 Nov. 2023 One missing conversion of closwedangvec to
 % edgedata.closwedangvec and planesatedge to edgedata.planesatedge
+% 5 Feb. 2025 Introduced hidden feature: if ngauss is given a negative
+% odd value, then an odd value will be enforced for every edge.
 
 t00 = clock;
 
 showtext = filehandlingparameters.showtext;
 
-inteq_ngauss = controlparameters.ngauss;
+inteq_ngauss = abs(controlparameters.ngauss);
+if controlparameters.ngauss < 0
+    enforceoddngauss = 1;
+else
+    enforceoddngauss = 0;    
+end
 inteq_discretizationtype = controlparameters.discretizationtype;
 
 EDinputdatastruct = struct('edgelengthvec',edgedata.edgelengthvec,'closwedangvec',edgedata.closwedangvec,...
@@ -159,7 +166,12 @@ end
 
 % Before 5 Dec. 2017: only even numbers of edge points were used
 %  nedgeelems = ceil(inteq_ngauss*(edgelengthvec/max(edgelengthvec))/2)*2;
-nedgeelems = ceil(inteq_ngauss*(edgedata.edgelengthvec/max(edgedata.edgelengthvec)));
+% 5 Feb. 2025: introduced the hidden enforceoddngauss feature
+if enforceoddngauss == 0
+    nedgeelems = ceil(inteq_ngauss*(edgedata.edgelengthvec/max(edgedata.edgelengthvec)));
+else
+    nedgeelems = ceil(inteq_ngauss*(edgedata.edgelengthvec/max(edgedata.edgelengthvec))/2)*2+1;
+end
 
 % 25 Jan 2018: Make sure there are at least 2 edge elements per edge.
 iv = (nedgeelems == 1);

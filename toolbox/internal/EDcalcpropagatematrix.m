@@ -19,7 +19,7 @@ isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegment
 %
 % Uses EDcoordtrans1. 
 %
-% Peter Svensson (peter.svensson@ntnu.no) 2 Nov 2023
+% Peter Svensson (peter.svensson@ntnu.no) 11 Feb 2025
 %
 % [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
 %     isthinhole,vispartedgesfromr,frequency,Rstart,...
@@ -49,6 +49,8 @@ isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegment
 % mistake. Found by Antoine.
 % 2 Nov 2023 Changed that showtext must be 3 instead of 2 to show all the
 % annoying "Building...."
+% 11 Feb 2025 Made a small step towards handling singularities, by
+% explicitly calculating the absnyfivec.
 
 if nargin < 13
     showtext = 0;
@@ -196,6 +198,12 @@ for iicounter = 1:length(ivrelevantedgepairs)
                 n1previous = n1;
             end
 
+            % New 11 Feb. 2025 by PS: create absnyfivec for each
+            % edge-to-edge pair, as a preparation for handling
+            % singularities in the propagation integral.
+            fivec = pi + thetain*[1 1 -1 -1] + thetaout*[1 -1 1 -1];
+            absnyfivec = abs(ny*fivec);
+
             ldist = (zR - ze2_re2(n2vertmat)).^2   + rR.^2;
             ldist = sqrt(ldist);
 
@@ -244,16 +252,21 @@ for iicounter = 1:length(ivrelevantedgepairs)
             end
 
             if showtext >= 3
-                fivec = pi + thetain*[1 1 -1 -1] + thetaout*[1 -1 1 -1];
-                absnyfivec = abs(ny*fivec); 
-                useserialexp1 = absnyfivec < 0.01;
-                useserialexp2 = abs(absnyfivec - 2*pi) < 0.01;
+                % 11 Feb 2025 by PS: fivec was moved to always be
+                % calculated, not only of showtext >= 3.
+%                 fivec = pi + thetain*[1 1 -1 -1] + thetaout*[1 -1 1 -1];
+%                 absnyfivec = abs(ny*fivec); 
+                useserialexp1 = absnyfivec < 0.1;
+                useserialexp2 = abs(absnyfivec - 2*pi) < 0.1;
                 useserialexp = useserialexp1 | useserialexp2;
                 if any(useserialexp)
                     disp('WARNING! Analytical approximation should be used')
+                    format long
+                    absnyfivec
+                    figure(77)
+                    plot(abs(Fsub),'-o')
+                    pause
                 end
-                plot(abs(Fsub))
-
             end
 
             Fmatrix(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) =     Fmatrix(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) + Fsub.';

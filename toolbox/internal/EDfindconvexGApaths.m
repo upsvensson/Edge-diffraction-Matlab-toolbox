@@ -43,7 +43,7 @@ function [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
 % Uses functions  EDfindis EDchkISvisible EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 28 Apr. 2025
 %
 % [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
 %    EDfindconvexGApaths(planedata,edgedata,Sdata,Rdata,controlparameters,...
@@ -94,6 +94,9 @@ function [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
 % EDinputdatahash.
 % 29 Nov. 2023 Adapted to the name change of the field pistongausspoints to
 % pistongaussorder
+% 28 Apr. 2025 Fixed a bug: when the sources were the same as the
+% receivers, a matrix 'possibleSPR' erroneously got a lot of zero rows,
+% which had to be removed.
 
 t00 = clock;
 
@@ -250,6 +253,14 @@ if nplanes > 0
 else
     possibleSPR = [];
 end
+
+% 28 Apr. 2025 Fixed a bug: when the sources were the same as the
+% receivers, a matrix 'possibleSPR' erroneously got a lot of zero rows,
+% which had to be removed.
+
+ivzerorows = find(prod(possibleSPR,2)==0);
+possibleSPR(ivzerorows,:) = [];
+npotentialIS = size(possibleSPR,1);
 
 if Sdata.doallSRcombinations == 0
     if ~isempty(possibleSPR)

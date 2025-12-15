@@ -44,9 +44,9 @@ function [ir,initdelay,singularterm,zfirst] = EDwedge1st_ir(fs,cair,closwedang,r
 % Peter Svensson (peter.svensson@ntnu.no) 7 Apr 2018
 %
 % [ir,initdelay,singularterm,zfirst] =
-% EDwedge1st_ir(fs,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,R_irstart,bc);
+% EDwedge1st_ir(fs,cair,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,R_irstart,bc);
 
-% 7 June 2006 FUnctioning version in EDB toolbox
+% 7 June 2006 Functioning version in EDB toolbox
 % 29 Dec. 2016 Renamed to ESIE2, without making any changes.
 % 28 Jan 2018 Copied from ESIE2wedge1st_int
 % 7 Apr 2018 Introduced the zfirst output parameter

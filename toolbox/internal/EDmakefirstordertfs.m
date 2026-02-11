@@ -84,6 +84,8 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 % generates a short list for polygon pistons.
 % 11 Feb. 2026 Fixed two bugs for first-order diffraction of polygonpistons
 % which made the calculations stop.
+% 11 Feb. 2026 Fixed a bug with the hash check: difforder was stored in the
+% hash but it should be calcfirstorderdiff
 
 t00 = clock;
 
@@ -107,7 +109,7 @@ EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
     'pistongaussorder',Sdata.pistongaussorder,...
     'receivers',Rdata.coordinates,'Rnedgesubs',Rdata.nedgesubs,...
     'cair',envdata.cair,'frequencies',frequencies,'Rstart',Rstart,...
-     'difforder',difforder,'directsound',directsound,'EDversionnumber',EDversionnumber);
+     'calcfirstorderdiff',calcfirstorderdiff,'directsound',directsound,'EDversionnumber',EDversionnumber);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------

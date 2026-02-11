@@ -34,7 +34,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 % Uses functions EDcoordtrans2, EDwedge1st_fd, EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash form Matlab Central
 % 
-% Peter Svensson 29 Nov. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 11 Feb. 2026 (peter.svensson@ntnu.no)
 %
 % [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename] = ...
 % EDmakefirstordertfs(firstorderpathdata,planedata,edgedata,Snewdata,...
@@ -82,6 +82,8 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 % 29 Nov. 2023 Adapted to the name change of the field pistongausspoints to
 % pistongaussorder. Fixed a small bug related to the size of a matrix which
 % generates a short list for polygon pistons.
+% 11 Feb. 2026 Fixed two bugs for first-order diffraction of polygonpistons
+% which made the calculations stop.
 
 t00 = clock;
 
@@ -612,7 +614,8 @@ if difforder > 0
                 end
             end
         else % polygonpiston
-            npistonpoints = size(Sdata.pistongausscoordinates{ivS},1);
+
+            npistonpoints = size(Sdata.pistongausscoordinates{ivS(1)},1);
 
             % 20 Nov. 2023 Use the already existing short lists of
             % edge-related coordinates instead of recalculating them
@@ -621,8 +624,8 @@ if difforder > 0
             thetar = Rdata.thetaRsho(Rdata.reftoshortlistR(edgenumber,ivR));
             zr = Rdata.zRsho(Rdata.reftoshortlistR(edgenumber,ivR));
 
-            cylcoordR(ivR,:) = [rr(:) thetar(:) zr(:)];
-                
+            cylcoordR(ivR,:) = [rr(:) thetar(:) zr(:)];                
+            
             for jj = 1:length(iv2)
 
                 tfsumpiston = zeros(length(frequencies),1); 
@@ -636,9 +639,9 @@ if difforder > 0
                     zs     = Sdata.zSsho(Sdata.reftoshortlistS(edgenumber,ivS,np));
 
                     [tfonepistonpoint,singularterm,zfirst] = EDwedge1st_fd(envdata.cair,frequencies,edgedata.closwedangvec(edgenumber),...
-                        rs(:),thetas(:),zs(:    ),cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
+                        rs(Snumber(jj)),thetas(Snumber(jj)),zs(Snumber(jj)),cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
                         edgedata.edgelengthvec(edgenumber)*[0 1],'n',Rstart,[1 1]);  
-                    tfsumpiston = tfsumpiston + tfonepistonpoint*Sdata.pistongaussweights{ivS}(np);
+                    tfsumpiston = tfsumpiston + tfonepistonpoint*Sdata.pistongaussweights{Snumber(jj)}(np);
                 end
 
                 tfnew = tfsumpiston.*(Sdata.sourceamplitudes( Snumber(jj),: ).');

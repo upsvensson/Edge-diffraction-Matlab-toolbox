@@ -208,7 +208,7 @@ onesvec1ES = ones(1,nedgesubs);
 
 if typeofcoords == 's'
     if strcmp(inputstruct.sourcetype,'polygonpiston') == 1
-        disp('Nudging!!')
+%        disp('Nudging!!')
         npistons = size(inputstruct.coordinates,1);
         for ii = 1:npistons
             nvec = planedata.planeeqs(inputstruct.pistonplanes(ii),1:3);
@@ -1092,7 +1092,7 @@ if subcoordinates == 0
     [reftoshortlistR,rRsho,thetaRsho,zRsho,~] = ...
     EDcompress3(rRcomplete,thetaRcomplete,zRcomplete);
 else
-    nsubcoordinates = size(inputstruct.pistongausscoordinates{1},1)
+    nsubcoordinates = size(inputstruct.pistongausscoordinates{1},1);
     rRcomplete     = zeros(nedges,nreceivers,nsubcoordinates);
     thetaRcomplete = zeros(nedges,nreceivers,nsubcoordinates);
     zRcomplete     = zeros(nedges,nreceivers,nsubcoordinates);
@@ -1154,7 +1154,7 @@ if typeofcoords=='r'
 else
 
     if strcmp(inputstruct.sourcetype,'polygonpiston') == 1
-        disp('Nudging back!!')
+ %       disp('Nudging back!!')
         npistons = size(inputstruct.coordinates,1);
         for ii = 1:npistons
             nvec = planedata.planeeqs(inputstruct.pistonplanes(ii),1:3);

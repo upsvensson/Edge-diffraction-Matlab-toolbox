@@ -67,7 +67,7 @@ function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedat
 %                    EDcheckobstr_edgetoedge EDgetedgepoints in EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 30 Oct. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 15 March 2026
 %
 % [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedata,edgedata,Sdata,...
 %    Rdata,controlparameters,EDversionnumber,ndiff2batches,filehandlingparameters)
@@ -102,6 +102,7 @@ function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedat
 % 29 Oct. 2023 Made a change to the list of input parameters: .nedgesubs is
 % a field in the Sdata input struct.
 % 30 Oct. 2023 Fine-tuned the EDinputdatahash
+% 15 March 2026 The code to find aligned edges did not work. Fixed it.
 
 t00 = clock;
 
@@ -371,98 +372,147 @@ edgealignedwithedge = [];
 
 % Changed 050504 to specorder >= 2
 % if specorder >= 3
-if specorder >= 2
+%if specorder >= 2
+if difforder >= 2
     edgealignedwithedge = sparse(eye(nedges));
 	if showtext >= 4
 		disp('         checking which edges are aligned with other edges ...')
-	end
-    
-    listofactiveedges = [1:nedges].';
-    listofactiveedges(edgedata.offedges) = [];
-    vecstocheck = edgenormvecs(listofactiveedges,:);
-    iv = find(vecstocheck(:,1)<0);
-    vecstocheck(iv,:) = -vecstocheck(iv,:);
-    iv = find(vecstocheck(:,1)==0 & vecstocheck(:,2)<0);
-    vecstocheck(iv,:) = -vecstocheck(iv,:);
-    iv = find(vecstocheck(:,1)==0 & vecstocheck(:,2)==0 & vecstocheck(:,3)<0);
-    vecstocheck(iv,:) = -vecstocheck(iv,:);
-    
-    % Changed 12 Nov. 2014:
-    % round off to 6 decimals
-    
-    vecstocheck = round(vecstocheck*1e6)/1e6;
-    
-    if ~isempty(listofactiveedges)
-        [~,~,JJ] = unique(vecstocheck,'rows');
-        N = histc(JJ,[1:length(listofactiveedges)]);
-        iv = find(N>1);
-        for ii = 1:length(iv)
-            iv2 = JJ==iv(ii);
-            edgestocheck = listofactiveedges(iv2);
-            ntocheck = length(edgestocheck);
-            cornernumberstocheck = edgedata.edgecorners(edgestocheck,:);
-%             cornernumberstocheck = sort(cornernumberstocheck.').';
-%             expandedcornermatrix = [reshape(repmat(cornernumberstocheck(:,1).',[ntocheck 1]),ntocheck^2,1) repmat(cornernumberstocheck(:,2),[ntocheck 1])]
-            expandedstartcornermatrix = [reshape(repmat(cornernumberstocheck(:,1).',[ntocheck 1]),ntocheck^2,1) repmat(cornernumberstocheck(:,1),[ntocheck 1])];
-            expandedendcornermatrix   = [reshape(repmat(cornernumberstocheck(:,2).',[ntocheck 1]),ntocheck^2,1) repmat(cornernumberstocheck(:,2),[ntocheck 1])];
-            toexpandededgestocheck   =         repmat(edgestocheck,  [ntocheck 1]);
-            fromexpandededgestocheck = reshape(repmat(edgestocheck.',[ntocheck 1]),ntocheck^2,1);
-            
-            % Now we don't need to check edges against themselves, or edge1
-            % vs edge2 if edge2 vs edge1 has already been tested.
-            
-            indmat = reshape([1:ntocheck^2],ntocheck,ntocheck);
-            indmat = triu(indmat,1);
-            indmat = indmat(indmat);
-            
-%             expandedcornermatrix = expandedcornermatrix(indmat,:);
-             expandedstartcornermatrix = expandedstartcornermatrix(indmat,:);
-             expandedendcornermatrix   = expandedendcornermatrix(indmat,:);
-            fromexpandededgestocheck = fromexpandededgestocheck(indmat,:);
-            toexpandededgestocheck = toexpandededgestocheck(indmat,:);
-            
-            % We make the easiest check first: if two edges with the same
-            % direction vector share one corner, they must be aligned.
-
-            A = [expandedstartcornermatrix expandedendcornermatrix];
-            A = sort(A.').';
-            A = diff(A.').';
-            iv3 = find(sum(A.'==0).');            
-            validcombs = [fromexpandededgestocheck(iv3) toexpandededgestocheck(iv3)];
-            if ~isempty(validcombs)
-                indexvals = (validcombs(:,2)-1)*nedges + validcombs(:,1);
-                edgealignedwithedge(indexvals) =  edgealignedwithedge(indexvals) + 1;     
-                indexvals = (validcombs(:,1)-1)*nedges + validcombs(:,2);
-                edgealignedwithedge(indexvals) =  edgealignedwithedge(indexvals) + 1;
-                fromexpandededgestocheck(iv3) = [];
-                toexpandededgestocheck(iv3) = [];
-                expandedstartcornermatrix(iv3,:) = [];
-                expandedendcornermatrix(iv3,:) = [];
-            end
-            
-            % For the other edge-pair combinations we must check if the two
-            % edges are really aligned. We do this by checking if two
-            % vectors are aligned: edge1-vector and the vector from
-            % edge1start to edge2start.            
-                        
-            direcvec = planedata.corners(expandedstartcornermatrix(:,2),:) - planedata.corners(expandedstartcornermatrix(:,1),:);
-            direcveclengths = sqrt( sum(direcvec.'.^2) ).';
-            direcvec = direcvec./(direcveclengths(:,ones(1,3)) + eps*10);
-            test = abs(sum( (direcvec.*edgenormvecs(fromexpandededgestocheck,:)).' ));
-            iv3 = find(abs(test-1)< 1e-8);
-            validcombs = [fromexpandededgestocheck(iv3) toexpandededgestocheck(iv3)];
-            if ~isempty(validcombs)
-                indexvals = (validcombs(:,2)-1)*nedges + validcombs(:,1);
-                edgealignedwithedge(indexvals) =  edgealignedwithedge(indexvals) + 1;     
-                indexvals = (validcombs(:,1)-1)*nedges + validcombs(:,2);
-                edgealignedwithedge(indexvals) =  edgealignedwithedge(indexvals) + 1;
-                fromexpandededgestocheck(iv3) = [];
-                toexpandededgestocheck(iv3) = [];
-                expandedstartcornermatrix(iv3,:) = [];
-                expandedendcornermatrix(iv3,:) = [];
-            end            
-        end
     end
+
+    % New code 15 March 2026. Sugges5tion from ChatGPT
+    % edgenormvecs: [Nedges,3], assumed normalized
+
+    tol = 1e-10;   % choose a tolerance suitable for your geometry
+
+    % Pairwise dot products between all edge vectors
+    D = edgenormvecs * edgenormvecs.';   % [Nedges,Nedges]
+
+    % Aligned if abs(dot product) is close to 1
+    alignedMask = abs(abs(D) - 1) < tol;
+
+    % Remove diagonal (each edge compared with itself)
+    alignedMask(1:size(alignedMask,1)+1:end) = false;
+
+    % Keep only upper triangle to avoid duplicate pairs
+    alignedMask = triu(alignedMask,1);
+    
+    % Extract edge index pairs
+    [iEdge, jEdge] = find(alignedMask);
+    
+    alignedPairs = [iEdge, jEdge];
+    %alignedPairs now contains all pairs of edges whose direction vectors are parallel or anti-parallel.
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    startPts = planedata.corners(edgedata.edgecorners(:,1), :);
+
+    isCollinear = false(size(iEdge));
+
+    for kk = 1:length(iEdge)
+        ii = iEdge(kk);
+        jj = jEdge(kk);
+
+        diffVec = startPts(jj,:) - startPts(ii,:);
+        c = cross(diffVec, edgedata.edgenormvecs(ii,:));
+
+        isCollinear(kk) = norm(c) < tol;
+    end
+
+    collinearPairs = [iEdge(isCollinear), jEdge(isCollinear)];
+
+    for ii = 1:size(collinearPairs,1)
+        edgealignedwithedge(collinearPairs(ii,1),collinearPairs(ii,2)) = 1;
+        edgealignedwithedge(collinearPairs(ii,2),collinearPairs(ii,1)) = 1;
+    end
+    
+    %parallelButNotCollinearPairs = [iEdge(~isCollinear), jEdge(~isCollinear)];
+
+% % %     listofactiveedges = [1:nedges].';
+% % %     listofactiveedges(edgedata.offedges) = [];
+% % %     vecstocheck = edgenormvecs(listofactiveedges,:);
+% % %     iv = find(vecstocheck(:,1)<0);
+% % %     vecstocheck(iv,:) = -vecstocheck(iv,:);
+% % %     iv = find(vecstocheck(:,1)==0 & vecstocheck(:,2)<0);
+% % %     vecstocheck(iv,:) = -vecstocheck(iv,:);
+% % %     iv = find(vecstocheck(:,1)==0 & vecstocheck(:,2)==0 & vecstocheck(:,3)<0);
+% % %     vecstocheck(iv,:) = -vecstocheck(iv,:);
+% % %     
+% % %     % Changed 12 Nov. 2014:
+% % %     % round off to 6 decimals
+% % %     
+% % %     vecstocheck = round(vecstocheck*1e6)/1e6;
+% % %     
+% % %     if ~isempty(listofactiveedges)
+% % %         [~,~,JJ] = unique(vecstocheck,'rows');
+% % %         N = histc(JJ,[1:length(listofactiveedges)]);
+% % %         iv = find(N>1);
+% % %         for ii = 1:length(iv)
+% % %             iv2 = JJ==iv(ii);
+% % %             edgestocheck = listofactiveedges(iv2);
+% % %             ntocheck = length(edgestocheck);
+% % %             cornernumberstocheck = edgedata.edgecorners(edgestocheck,:);
+% % % %             cornernumberstocheck = sort(cornernumberstocheck.').';
+% % % %             expandedcornermatrix = [reshape(repmat(cornernumberstocheck(:,1).',[ntocheck 1]),ntocheck^2,1) repmat(cornernumberstocheck(:,2),[ntocheck 1])]
+% % %             expandedstartcornermatrix = [reshape(repmat(cornernumberstocheck(:,1).',[ntocheck 1]),ntocheck^2,1) repmat(cornernumberstocheck(:,1),[ntocheck 1])];
+% % %             expandedendcornermatrix   = [reshape(repmat(cornernumberstocheck(:,2).',[ntocheck 1]),ntocheck^2,1) repmat(cornernumberstocheck(:,2),[ntocheck 1])];
+% % %             toexpandededgestocheck   =         repmat(edgestocheck,  [ntocheck 1]);
+% % %             fromexpandededgestocheck = reshape(repmat(edgestocheck.',[ntocheck 1]),ntocheck^2,1);
+% % %             
+% % %             % Now we don't need to check edges against themselves, or edge1
+% % %             % vs edge2 if edge2 vs edge1 has already been tested.
+% % %             
+% % %             indmat = reshape([1:ntocheck^2],ntocheck,ntocheck);
+% % %             indmat = triu(indmat,1);
+% % %             indmat = indmat(indmat);
+% % %             
+% % % %             expandedcornermatrix = expandedcornermatrix(indmat,:);
+% % %              expandedstartcornermatrix = expandedstartcornermatrix(indmat,:);
+% % %              expandedendcornermatrix   = expandedendcornermatrix(indmat,:);
+% % %             fromexpandededgestocheck = fromexpandededgestocheck(indmat,:);
+% % %             toexpandededgestocheck = toexpandededgestocheck(indmat,:);
+% % %             
+% % %             % We make the easiest check first: if two edges with the same
+% % %             % direction vector share one corner, they must be aligned.
+% % % 
+% % %             A = [expandedstartcornermatrix expandedendcornermatrix];
+% % %             A = sort(A.').';
+% % %             A = diff(A.').';
+% % %             iv3 = find(sum(A.'==0).');            
+% % %             validcombs = [fromexpandededgestocheck(iv3) toexpandededgestocheck(iv3)];
+% % %             if ~isempty(validcombs)
+% % %                 indexvals = (validcombs(:,2)-1)*nedges + validcombs(:,1);
+% % %                 edgealignedwithedge(indexvals) =  edgealignedwithedge(indexvals) + 1;     
+% % %                 indexvals = (validcombs(:,1)-1)*nedges + validcombs(:,2);
+% % %                 edgealignedwithedge(indexvals) =  edgealignedwithedge(indexvals) + 1;
+% % %                 fromexpandededgestocheck(iv3) = [];
+% % %                 toexpandededgestocheck(iv3) = [];
+% % %                 expandedstartcornermatrix(iv3,:) = [];
+% % %                 expandedendcornermatrix(iv3,:) = [];
+% % %             end
+% % %             
+% % %             % For the other edge-pair combinations we must check if the two
+% % %             % edges are really aligned. We do this by checking if two
+% % %             % vectors are aligned: edge1-vector and the vector from
+% % %             % edge1start to edge2start.            
+% % %                         
+% % %             direcvec = planedata.corners(expandedstartcornermatrix(:,2),:) - planedata.corners(expandedstartcornermatrix(:,1),:);
+% % %             direcveclengths = sqrt( sum(direcvec.'.^2) ).';
+% % %             direcvec = direcvec./(direcveclengths(:,ones(1,3)) + eps*10);
+% % %             test = abs(sum( (direcvec.*edgenormvecs(fromexpandededgestocheck,:)).' ));
+% % %             iv3 = find(abs(test-1)< 1e-8);
+% % %             validcombs = [fromexpandededgestocheck(iv3) toexpandededgestocheck(iv3)];
+% % %             if ~isempty(validcombs)
+% % %                 indexvals = (validcombs(:,2)-1)*nedges + validcombs(:,1);
+% % %                 edgealignedwithedge(indexvals) =  edgealignedwithedge(indexvals) + 1;     
+% % %                 indexvals = (validcombs(:,1)-1)*nedges + validcombs(:,2);
+% % %                 edgealignedwithedge(indexvals) =  edgealignedwithedge(indexvals) + 1;
+% % %                 fromexpandededgestocheck(iv3) = [];
+% % %                 toexpandededgestocheck(iv3) = [];
+% % %                 expandedstartcornermatrix(iv3,:) = [];
+% % %                 expandedendcornermatrix(iv3,:) = [];
+% % %             end            
+% % %         end
+% % %     end
     
 end
 

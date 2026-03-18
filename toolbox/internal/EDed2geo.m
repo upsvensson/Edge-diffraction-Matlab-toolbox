@@ -102,7 +102,8 @@ function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedat
 % 29 Oct. 2023 Made a change to the list of input parameters: .nedgesubs is
 % a field in the Sdata input struct.
 % 30 Oct. 2023 Fine-tuned the EDinputdatahash
-% 15 March 2026 The code to find aligned edges did not work. Fixed it.
+% 15 March 2026 The code to find aligned edges did not work. Fixed it, so a
+% new output field is .edgealignedwithedge.
 
 t00 = clock;
 

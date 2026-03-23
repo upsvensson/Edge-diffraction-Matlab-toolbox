@@ -67,7 +67,7 @@ function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedat
 %                    EDcheckobstr_edgetoedge EDgetedgepoints in EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 March 2026
+% Peter Svensson (peter.svensson@ntnu.no) 23 March 2026
 %
 % [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedata,edgedata,Sdata,...
 %    Rdata,controlparameters,EDversionnumber,ndiff2batches,filehandlingparameters)
@@ -104,6 +104,10 @@ function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedat
 % 30 Oct. 2023 Fine-tuned the EDinputdatahash
 % 15 March 2026 The code to find aligned edges did not work. Fixed it, so a
 % new output field is .edgealignedwithedge.
+% 20 March 2026 Introduced a new output field .edgeconnectedwithedge, which
+% will be zero for aligned edge pairs.
+% 26 Mar. 26 Introduced a new output field .edgeconnectionangle, a sparse
+% matrix for all edge pairs with non-zero values in .edgeconnectedwithedge.
 
 t00 = clock;
 
@@ -516,6 +520,69 @@ if difforder >= 2
 % % %     end
     
 end
+
+%---------------------------------------------------------------
+%
+%			edgeconnectedwithedge
+%
+%---------------------------------------------------------------
+
+c1 = edgedata.edgecorners(:,1);
+c2 = edgedata.edgecorners(:,2);
+
+edgeconnectedwithedge = ...
+    (c1 == c1.') | (c1 == c2.') | ...
+    (c2 == c1.') | (c2 == c2.');
+
+edgeconnectedwithedge(1:size(edgeconnectedwithedge,1)+1:end) = false;
+
+edgeconnectedwithedge = edgeconnectedwithedge & ~edgealignedwithedge;
+
+%---------------------------------------------------------------
+%
+%			edgeconnectionangle
+%
+%---------------------------------------------------------------
+
+% Only upper triangle
+[ii,jj] = find(triu(edgeconnectedwithedge,1));
+
+gamma_vals = zeros(length(ii),1);
+
+for k = 1:length(ii)
+    i = ii(k);
+    j = jj(k);
+
+    ec_i = edgedata.edgecorners(i,:);
+    ec_j = edgedata.edgecorners(j,:);
+
+    sharedcorner = intersect(ec_i,ec_j);
+
+    if numel(sharedcorner) ~= 1
+        error('Edges %d and %d should share exactly one corner.',i,j);
+    end
+
+    sharedcorner = sharedcorner(1);
+
+    other_i = ec_i(ec_i ~= sharedcorner);
+    other_j = ec_j(ec_j ~= sharedcorner);
+
+    p0  = planedata.corners(sharedcorner,:);
+    pi_ = planedata.corners(other_i,:);
+    pj_ = planedata.corners(other_j,:);
+
+    vi = pi_ - p0;
+    vj = pj_ - p0;
+
+    cang = dot(vi,vj)/(norm(vi)*norm(vj));
+    cang = max(-1,min(1,cang));
+
+    gamma_vals(k) = acos(cang);
+end
+
+% Build upper triangle and mirror it
+edgeconnectionangle = sparse(ii,jj,gamma_vals,nedges,nedges);
+edgeconnectionangle = edgeconnectionangle + edgeconnectionangle.';
 
 %---------------------------------------------------------------
 %
@@ -1525,6 +1592,7 @@ edgetoedgedata = struct('reftoshortlistE',reftoshortlistE,'re1sho',re1sho,...
     're2sho',re2sho,'thetae1sho',thetae1sho,'thetae2sho',thetae2sho,...
     'ze1sho',ze1sho,'ze2sho',ze2sho,'examplecombE',examplecombE,...
     'edgeseespartialedge',edgeseespartialedge,'edgealignedwithedge',edgealignedwithedge,...
+    'edgeconnectedwithedge',edgeconnectedwithedge,'edgeconnectionangle',edgeconnectionangle,...
     'edgeperptoplane',edgeperptoplane,'edgeplaneperptoplane1',edgeplaneperptoplane1,...
     'edgeplaneperptoplane2',edgeplaneperptoplane2);
 

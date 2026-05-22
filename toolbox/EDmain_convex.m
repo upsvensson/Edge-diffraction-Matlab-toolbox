@@ -231,16 +231,21 @@ fid = EDmessage(filehandlingparameters,'sf',0,1,'',textline1,textline2,textline3
 
 if controlparameters.docalctf_ESIEBEM == 1
     textline1 = ['Calculating transfer functions with the ESIEBEM method'];
+    textline2 = ['nfrequencies = ',int2str(length(controlparameters.frequencies)),', ngauss = ',int2str(controlparameters.ngauss),...
+        ', cair = ',num2str(envdata.cair)];
 else
     if controlparameters.docalctf == 1
         textline1 = ['Calculating transfer functions with the ESIE method'];
+        textline2 = ['nfrequencies = ',int2str(length(controlparameters.frequencies)),', ngauss = ',int2str(controlparameters.ngauss),...
+        ', cair = ',num2str(envdata.cair)];
     else
         if controlparameters.docalcir == 1
             textline1 = ['Calculating impulse responses with the repeated-order method'];
+            textline2 = ['fs = ',num2str(controlparameters.fs),', cair = ',num2str(envdata.cair)];
         end
     end
 end
-fid = EDmessage(filehandlingparameters,'sf',fid,1,'',textline1,[]);
+fid = EDmessage(filehandlingparameters,'sf',fid,1,'',textline1,textline2,[]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Read the input CAD-file, or input matrices, and create the planedata struct
@@ -411,20 +416,37 @@ end
 % Generate the first-order specular, and first-order
 % diffraction tfs.
 
-if ( controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1)...
-        && controlparameters.skipfirstorder == 0
-    EDmessage(filehandlingparameters,'s',fid,1,'',['Generate the (first-order) GA and diff tfs']);
+if ( controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1)
     nfrequencies = length(controlparameters.frequencies);
-    [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename] ...
-	    = EDmakefirstordertfs(firstorderpathdata,...
-        planedata,edgedata,Snewdata,Rnewdata,envdata,controlparameters,...
-        EDversionnumber,filehandlingparameters);  
-    EDpostfunctext('EDmakefirstordertfs',elapsedtimemaketfs,existingfilename,...
-        filehandlingparameters,fid,'',...
-        [int2str(nfrequencies),' frequencies.'],...
-        ['Direct sound: ',num2str(timingdata(1)),'s, spec.refl.: ',...
-        num2str(timingdata(2)),'s, first-order diff.: ',num2str(timingdata(3)),'s'])
-    timingstruct.maketfs = elapsedtimemaketfs;
+    if controlparameters.skipfirstorder == 0
+        EDmessage(filehandlingparameters,'s',fid,1,'',['Generate the (first-order) GA and diff tfs']);
+        [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename] ...
+	        = EDmakefirstordertfs(firstorderpathdata,...
+            planedata,edgedata,Snewdata,Rnewdata,envdata,controlparameters,...
+            EDversionnumber,filehandlingparameters);  
+        EDpostfunctext('EDmakefirstordertfs',elapsedtimemaketfs,existingfilename,...
+            filehandlingparameters,fid,'',...
+            [int2str(nfrequencies),' frequencies.'],...
+            ['Direct sound: ',num2str(timingdata(1)),'s, spec.refl.: ',...
+            num2str(timingdata(2)),'s, first-order diff.: ',num2str(timingdata(3)),'s'])
+        timingstruct.maketfs = elapsedtimemaketfs;
+    else
+        if nsources == 1
+            tfdirect = zeros(nfrequencies,nreceivers);
+            tfgeom = zeros(nfrequencies,nreceivers);
+            tfdiff = zeros(nfrequencies,nreceivers);
+        else
+            if nreceivers == 1
+                tfdirect = zeros(nfrequencies,nsources);
+                tfgeom = zeros(nfrequencies,nsources);
+                tfdiff = zeros(nfrequencies,nsources);
+            else
+                tfdirect = zeros(nfrequencies,nreceivers,nsources);
+                tfgeom = zeros(nfrequencies,nreceivers,nsources);
+                tfdiff = zeros(nfrequencies,nreceivers,nsources);
+            end
+        end
+    end
 else
     timingstruct.maketfs = 0;
 end

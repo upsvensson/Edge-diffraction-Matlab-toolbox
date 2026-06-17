@@ -24,6 +24,9 @@ controlparameters,EDversionnumber,filehandlingparameters)
 %       shortlist
 %       reftoshortlist
 %       isthinplanetriplet
+%       edgepairsharecorner
+%       edgepairsharedcornertype
+%       edgepairangle
 %   elapsedtimesubmatrix
 %                       This tells how long time was used inside this
 %                       function. If an existing file was reused, then
@@ -38,7 +41,7 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % Uses the functions  EDdistelements, EDrecycleresultfiles from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 5 Feb. 2025 
+% Peter Svensson (peter.svensson@ntnu.no) 17 June 2026 
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 % EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
@@ -71,6 +74,8 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % edgedata.closwedangvec and planesatedge to edgedata.planesatedge
 % 5 Feb. 2025 Introduced hidden feature: if ngauss is given a negative
 % odd value, then an odd value will be enforced for every edge.
+% 17 June 2026 Introduced new fields of the Hsubmatrixdata:
+% .edgepairsharecorner, .edgepairangle, .edgepairsharedcornertype
 
 t00 = clock;
 
@@ -179,6 +184,41 @@ nedgeelems(iv) = 2;
 
 [~,sortvec] = sortrows([nedgeelems(edgepairlist(:,1)) nedgeelems(edgepairlist(:,2))]);
 edgepairlist = [edgepairlist(sortvec,1) edgepairlist(sortvec,2)];
+
+% ----------------------------------------------------------------------------------------------
+% New 17 June 2026: indicate for each edgepair:
+% • if the two edges share a corner, in the list edgepairsharecorner, 
+% • the angle at that shared corner, in the list edgepairangle
+% • the llist edgepairsharedcornertype tells if the from-edge has the
+%   shared corner as an:
+%   - edge starting point (the list has the value 0) 
+%   - edge ending point (the list has the value 1)
+%   for edge pairs without a shared corner the list has the value -1
+
+inds = sub2ind(size(edgetoedgedata.edgeconnectedwithedge), edgepairlist(:,1), edgepairlist(:,2));
+edgepairsharecorner = full(edgetoedgedata.edgeconnectedwithedge(inds));
+edgepairangle       = full(edgetoedgedata.edgeconnectionangle(inds));
+
+Nedgepairs = size(edgepairlist,1);
+edgepairsharedcornertype = -ones(Nedgepairs,1);   % NaN = "empty" (no shared corner)
+
+ivec      = find(edgepairsharecorner == 1);
+toedges   = edgepairlist(ivec,1);
+fromedges = edgepairlist(ivec,2);
+
+fromstart = edgedata.edgecorners(fromedges,1);
+fromend   = edgedata.edgecorners(fromedges,2);
+tostart   = edgedata.edgecorners(toedges,1);
+toend     = edgedata.edgecorners(toedges,2);
+
+startmatch = (fromstart == tostart) | (fromstart == toend);
+endmatch   = (fromend   == tostart) | (fromend   == toend);
+
+vals = NaN(numel(ivec),1);
+vals(startmatch) = 0;
+vals(endmatch)   = 1;
+
+edgepairsharedcornertype(ivec) = vals;
 
 % ----------------------------------------------------------------------------------------------
 % Make two lists, bigmatrixstartnums and bigmatrixendnums, which for each
@@ -376,6 +416,9 @@ Hsubmatrixdata.isthinplanetriplet = isthinplanetriplet;
 Hsubmatrixdata.isthinplaneedgepair = isthinplaneedgepair;
 Hsubmatrixdata.quadraturematrix_pos = quadraturematrix_pos;
 Hsubmatrixdata.quadraturematrix_weights = quadraturematrix_weights;
+Hsubmatrixdata.edgepairsharecorner = edgepairsharecorner;
+Hsubmatrixdata.edgepairsharedcornertype = edgepairsharedcornertype;
+Hsubmatrixdata.edgepairangle = edgepairangle;
 
 elapsedtimesubmatrix = etime(clock,t00);
 

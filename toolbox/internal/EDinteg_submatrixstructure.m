@@ -41,7 +41,7 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % Uses the functions  EDdistelements, EDrecycleresultfiles from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 17 June 2026 
+% Peter Svensson (peter.svensson@ntnu.no) 18 June 2026 
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 % EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
@@ -76,6 +76,8 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % odd value, then an odd value will be enforced for every edge.
 % 17 June 2026 Introduced new fields of the Hsubmatrixdata:
 % .edgepairsharecorner, .edgepairangle, .edgepairsharedcornertype
+% 18 June 2026 Modified the new fields to .edgepairsharedcornertype_from
+% and .edgepairsharedcornertype_to
 
 t00 = clock;
 
@@ -194,13 +196,17 @@ edgepairlist = [edgepairlist(sortvec,1) edgepairlist(sortvec,2)];
 %   - edge starting point (the list has the value 0) 
 %   - edge ending point (the list has the value 1)
 %   for edge pairs without a shared corner the list has the value -1
+% Modification 18 June 2026: stored both edgepairsharedcornertype_from (=
+% the edgepairsharedcornertype from the day before) and 
+% edgepairsharedcornertype_to.
 
 inds = sub2ind(size(edgetoedgedata.edgeconnectedwithedge), edgepairlist(:,1), edgepairlist(:,2));
 edgepairsharecorner = full(edgetoedgedata.edgeconnectedwithedge(inds));
 edgepairangle       = full(edgetoedgedata.edgeconnectionangle(inds));
 
 Nedgepairs = size(edgepairlist,1);
-edgepairsharedcornertype = -ones(Nedgepairs,1);   % NaN = "empty" (no shared corner)
+edgepairsharedcornertype_from = -ones(Nedgepairs,1);   % NaN = "empty" (no shared corner)
+edgepairsharedcornertype_to = -ones(Nedgepairs,1);   % NaN = "empty" (no shared corner)
 
 ivec      = find(edgepairsharecorner == 1);
 toedges   = edgepairlist(ivec,1);
@@ -211,14 +217,23 @@ fromend   = edgedata.edgecorners(fromedges,2);
 tostart   = edgedata.edgecorners(toedges,1);
 toend     = edgedata.edgecorners(toedges,2);
 
-startmatch = (fromstart == tostart) | (fromstart == toend);
-endmatch   = (fromend   == tostart) | (fromend   == toend);
+startmatch_from = (fromstart == tostart) | (fromstart == toend);
+endmatch_from   = (fromend   == tostart) | (fromend   == toend);
 
 vals = NaN(numel(ivec),1);
-vals(startmatch) = 0;
-vals(endmatch)   = 1;
+vals(startmatch_from) = 0;
+vals(endmatch_from)   = 1;
 
-edgepairsharedcornertype(ivec) = vals;
+edgepairsharedcornertype_from(ivec) = vals;
+
+startmatch_to = (fromstart == tostart) | (fromend == tostart);
+endmatch_to   = (fromstart   == toend) | (fromend   == toend);
+
+vals = NaN(numel(ivec),1);
+vals(startmatch_to) = 0;
+vals(endmatch_to)   = 1;
+
+edgepairsharedcornertype_to(ivec) = vals;
 
 % ----------------------------------------------------------------------------------------------
 % Make two lists, bigmatrixstartnums and bigmatrixendnums, which for each
@@ -417,7 +432,8 @@ Hsubmatrixdata.isthinplaneedgepair = isthinplaneedgepair;
 Hsubmatrixdata.quadraturematrix_pos = quadraturematrix_pos;
 Hsubmatrixdata.quadraturematrix_weights = quadraturematrix_weights;
 Hsubmatrixdata.edgepairsharecorner = edgepairsharecorner;
-Hsubmatrixdata.edgepairsharedcornertype = edgepairsharedcornertype;
+Hsubmatrixdata.edgepairsharedcornertype_from = edgepairsharedcornertype_from;
+Hsubmatrixdata.edgepairsharedcornertype_to = edgepairsharedcornertype_to;
 Hsubmatrixdata.edgepairangle = edgepairangle;
 
 elapsedtimesubmatrix = etime(clock,t00);

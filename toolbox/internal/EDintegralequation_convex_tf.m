@@ -12,6 +12,26 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %   Sdata,Rdata,envdata,controlparameters   Structs
 %   EDversionnumber
 %   filehandlingparameters, envdata, 
+% New fields in the struct controlparameters on 10 Sept. 2025
+%   .skipreceiverpropagation optional, default 0. If given the value 1,
+%                           then there will be no propagation to the receivers
+%   .inteqsolutionmethod = optional, 'GMRES' | 'iterative_auto' |
+%                          'iterative_fixeddifforder' (default)
+%   ..difforder            Slightly changed meaning: fixed order under
+%                          'iterative_fixeddifforder' (same as previous
+%                          versions) but also acts as the maxdifforder
+%                          backstop under 'iterative_auto'
+%   .inteqtargettol        used by GMRES and 'iterative_auto'; ignored
+%                          (warn if set) for 'iterative_fixeddifforder'
+%   .inteqnconsecutive     optional, default 2. How many terms must have a
+%                          estimated final energy below the target tol?
+%   .inteqrestimate        optional, default empty. If given a numeric
+%                          value, then this r-estiamte will be used for 
+%                          estimating the final energy.
+%   .intequsemaxcheck      optional, default 0. If given the value 1, then
+%                          max(abs(Q))/norm(Q) "peakiness" tracking
+%                          influence stopping, not just diagnose
+%   .inteqgmresmaxiter     optional, default 50. 
 %
 % Output parameters
 %   tfinteqdiff      Matrix with the diffracted pressure
@@ -21,9 +41,34 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                       separately, then the size is
 %                       [nfrequencies,nreceivers,nsources]
 %   timingdata
-%   extraoutputdata
-%   elapsedtimehodtf
-%                       This tells how long time was used inside this
+%   extraoutputdata     A struct with fields
+%                       .tfinteqdiff_nodiff2
+%                       .inteqdiagnostics = a struct w fields:
+%                         .solutionmethod
+%                         .nq
+%                         .nnzH % NaN if never explicitly assembled
+%                           (matrix-free GMRES)
+%                         .achievedaccuracy      % GMRES relres, or
+%                           iterative's est. tail error
+%                         .decayrate             % r, from the term-ratio
+%                           tracking (recent addition)
+%                         .warnings              % cell array of strings
+%                         % GMRES-specific (NaN/empty otherwise)
+%                         .assemblytime
+%                         .gmresflag
+%                         .gmresrelres
+%                         .gmresiter
+%                         iterative-specific (NaN/empty otherwise):
+%                         .difforderused
+%                         .hitmaxdifforder
+%                         .finaltermratio
+%                         .esttailerror
+%                         power-user / diagnostic-only: (populated only if
+%                           .usemaxcheck is on)
+%                         .peakinessratio
+%                         .worstelementindex
+%                         .worstedgepair
+%   elapsedtimehodtf    This tells how long time was used inside this
 %                       function. If an existing file was reused, then
 %                       elapsedtimehodtf has a second value which tells
 %                       how much time was used for the existing file.
@@ -34,10 +79,10 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                       this function, this variable is also empty.
 %
 % Uses functions EDdistelements, EDcalcedgeinteqmatrixsub2_mex, EDinteg_souterm, 
-% EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1 from EDtoolbox
+% EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1, EDmatvecH from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  11 Feb. 2025  
+% Peter Svensson (peter.svensson@ntnu.no)  11 Sep. 2026  
 %                       
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
@@ -106,6 +151,10 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % 11 Feb. 2025 Pre-calculate one higher order of quadrature points, just in
 % case an odd number of quadrature points is enforced. Also, handle the
 % hidden feature that the number of gauss points can be negative.
+% 10 Sep. 2026 Implemented the GMRES solution approach and also the
+% tracking of term decay in the iterative series. Exports an
+% inteqdiagnostics struct for analysis of the calculation performance.
+% Also introduced the possibility to skip the propagation step.
 
 t00 = clock;
 showtext = filehandlingparameters.showtext;
@@ -151,6 +200,14 @@ extraoutputdata = struct('tfinteqdiff_nodiff2',[]);
 nfrequencies = length(controlparameters.frequencies);
 
 timingdata = zeros(1,4);
+
+inteqdiagnostics = edinteqdiagnosticstemplate;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if ~isfield(controlparameters,'skipreceiverpropagation')
+    controlparameters.skipreceiverpropagation = 0;
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -229,6 +286,11 @@ if showtext >= 1
        freqstep = 1; 
     end
 end
+
+inteqdiagnostics.normQ = zeros(100,nfrequencies);
+inteqdiagnostics.normQfinal = zeros(100,nfrequencies);
+inteqdiagnostics.r_hat = zeros(100,nfrequencies);
+inteqdiagnostics.esttail = zeros(100,nfrequencies);
 
 for ifreq = 1:nfrequencies     
     frequency = controlparameters.frequencies(ifreq);
@@ -514,6 +576,9 @@ for ifreq = 1:nfrequencies
         t00 = clock;
     end
 
+    % savetemp
+    % pause
+
     % End of PART 1: All the H submatrices have been built (for one freq.)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -563,44 +628,91 @@ for ifreq = 1:nfrequencies
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % CASE 1,PART 3: Starting from Q_firstterm, iterate to find Qfinal.
             %
-            % Two for-loops: iterations (iiter) and submatrices (nn)
-
-            if showtext >= 2
-                disp('      Starting to iterate')
-            end
+            % Two for-loops: iterations (iiter) and submatrices (nn)            
         
             Q = Q_firstterm;
             Qfinal = Q;   
-            
-            for iiter = 1:(controlparameters.difforder-2)
-                if showtext >= 3
-                   disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
+               % controlparameters.inteqsolutionmethod = 'GMRES'; 
+               % controlparameters.inteqtargettol = 1e-12;
+               % controlparameters.inteqgmresmaxiter = 100;
+            if strcmp(controlparameters.inteqsolutionmethod,'iterative_auto') == 1 || strcmp(controlparameters.inteqsolutionmethod,'iterative_fixeddifforder') == 1
+                if showtext >= 2
+                    disp('      Starting to solve the int.eq. with the iterative method')
                 end
-                Q_ackum = Q*0;              
-                shortlistprev = 0;
-                Hsubdata = [];
-                ivuse = [];
+                normQ = zeros(max([100 controlparameters.difforder]),1);
+                normQfinal = zeros(max([100 controlparameters.difforder]),1);
+                r_hat = zeros(max([100 controlparameters.difforder]),1);
+                esttail = zeros(max([100 controlparameters.difforder]),1);
 
-                for nn = 1:size(Hsubmatrixdata.listofsubmatrices,1)
-                    ivoutvec = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,2)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,2));
-                    ivinvec  = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,3)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,3));
-                      
-                    shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
-                    if shortlistnumber ~= shortlistprev
-                           Hsubdata = Hsubdatalists{nn}; 
-                           ivuse = ivuselists{nn}; 
-                           nHsub1 = length(ivoutvec);
-                           row_Hsub = rem(ivuse-1, nHsub1) + 1;
-                           col_Hsub = (ivuse-row_Hsub)/nHsub1 + 1;
-                           shortlistprev = shortlistnumber;                   
+                for iiter = 1:(controlparameters.difforder-2)
+                    if showtext >= 3
+                       disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
                     end
-                    
-                    Q_ackum(1:ivoutvec(end)) = Q_ackum(1:ivoutvec(end)) + accumarray(ivoutvec(1)-1+row_Hsub,Hsubdata.*Q(ivinvec(1)-1+col_Hsub));                      
+                    % % Q_ackum = Q*0;              
+                    % % shortlistprev = 0;
+                    % % Hsubdata = [];
+                    % % ivuse = [];
+                    % % 
+                    % % for nn = 1:size(Hsubmatrixdata.listofsubmatrices,1)
+                    % %     ivoutvec = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,2)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,2));
+                    % %     ivinvec  = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,3)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,3));
+                    % % 
+                    % %     shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
+                    % %     if shortlistnumber ~= shortlistprev
+                    % %            Hsubdata = Hsubdatalists{nn}; 
+                    % %            ivuse = ivuselists{nn}; 
+                    % %            nHsub1 = length(ivoutvec);
+                    % %            row_Hsub = rem(ivuse-1, nHsub1) + 1;
+                    % %            col_Hsub = (ivuse-row_Hsub)/nHsub1 + 1;
+                    % %            shortlistprev = shortlistnumber;                   
+                    % %     end
+                    % % 
+                    % %     Q_ackum(1:ivoutvec(end)) = Q_ackum(1:ivoutvec(end)) + accumarray(ivoutvec(1)-1+row_Hsub,Hsubdata.*Q(ivinvec(1)-1+col_Hsub));                      
+                    % % end
+                    % % Q = Q_ackum; 
+                    Q = EDmatvecH(Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
+                    Qfinal = Qfinal + Q; 
+                    normQ(iiter) = norm(Q);
+                    normQfinal(iiter) = norm(Qfinal);
+                    if iiter >= 2
+                        r_hat(iiter) = normQ(iiter)/normQ(iiter-1);
+                        esttail(iiter) = normQ(iiter)*r_hat(iiter)/(1-r_hat(iiter));
+                        % fprintf('%2d  Qterm,Qfinal,ratio,r,esttail: %.5g %.5g %.5g %.5g %.5g\n', ...
+                        % iiter, normQ(iiter), normQfinal(iiter), normQ(iiter)/normQfinal(iiter), r_hat(iiter), esttail(iiter)/normQfinal(iiter));
+                    end
                 end
-                Q = Q_ackum; 
-                Qfinal = Qfinal + Q; 
-            end
+                inteqdiagnostics.normQ(1:length(normQ),ifreq) = normQ;
+                inteqdiagnostics.normQfinal(1:length(normQfinal),ifreq) = normQfinal;
+                inteqdiagnostics.r_hat(1:length(r_hat),ifreq) = r_hat;
+                inteqdiagnostics.esttail(1:length(esttail),ifreq) = esttail;
+
+            elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 % Here we do the GMRES, fast version
+               if showtext >= 2
+                    disp('      Starting to solve the int.eq. with GMRES, fast version (for smaller problems)')
+                end
+
+                  Hsp = EDbuildHsparse_fast(Hsubmatrixdata,Hsubdatalists,ivuselists);
+                  N = size(Hsp,1);
+                  A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
                     
+                  [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+                  inteqdiagnostics.gmresiter = iter;
+                  inteqdiagnostics.gmresflag = flag;
+                  inteqdiagnostics.gmresrelres = relres;
+                  
+            elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_large') == 1 % Here we do the GMRES for large problems
+
+               if showtext >= 2
+                    disp('      Starting to solve the int.eq. with GMRES, the version for larger problems')
+               end
+               afun = @(q) q - EDmatvecH(q, Hsubmatrixdata, Hsubdatalists, ivuselists);
+               [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+               inteqdiagnostics.gmresiter = iter;
+               inteqdiagnostics.gmresflag = flag;
+               inteqdiagnostics.gmresrelres = relres;
+
+            end
+
             doesQsegmenthavevalues = zeros(length(Hsubmatrixdata.edgepairlist(:,1)),1);
             for iicounter = 1:length(Hsubmatrixdata.edgepairlist(:,1))
                sectionofbigmatrix = (Hsubmatrixdata.bigmatrixstartnums(iicounter):Hsubmatrixdata.bigmatrixendnums(iicounter)); 
@@ -632,25 +744,27 @@ for ifreq = 1:nfrequencies
         %
         % Propagate Qfinal to the external receiver(s)
         
-        for irec = 1:nreceivers
-            if showtext >=2
-                disp(['      Receiver number ',int2str(irec)]) 
-            end
-            
-            [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,Rdata.vispartedgesfromr(:,irec),...
-                    frequency,controlparameters.Rstart,...
-                    Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext);
+        if controlparameters.skipreceiverpropagation == 0
+            for irec = 1:nreceivers
+                if showtext >=2
+                    disp(['      Receiver number ',int2str(irec)]) 
+                end
                 
-             P_receiver(ifreq,irec) = Fmatrix*Qfinal;
-             if filehandlingparameters.savediff2result == 1
-                extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec) = Fmatrix*(Qfinal-Q_firstterm);
-             end
-             
-            if ifreq == 1
-                timingdata(4) = etime(clock,t00);
-            end
-        end % for irec = 1:nreceivers
-    
+                [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,Rdata.vispartedgesfromr(:,irec),...
+                        frequency,controlparameters.Rstart,...
+                        Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext);
+                    
+                 P_receiver(ifreq,irec) = Fmatrix*Qfinal;
+                 if filehandlingparameters.savediff2result == 1
+                    extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec) = Fmatrix*(Qfinal-Q_firstterm);
+                 end
+                 
+                if ifreq == 1
+                    timingdata(4) = etime(clock,t00);
+                end
+            end % for irec = 1:nreceivers
+        end
+
         % End of CASE 1, PART 4
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -702,39 +816,87 @@ for ifreq = 1:nfrequencies
                 %
                 % Two for-loops: iterations (iiter) and submatrices (nn)
                   
-                if showtext >= 2
-                    disp('      Starting to iterate')
-                end
-                Q = Q_firstterm;
+
+                 Q = Q_firstterm;
                 Qfinal = Q;   
                 
-                for iiter = 1:(controlparameters.difforder-2)
-                   if showtext >= 3
-                       disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
-                   end
-                   Q_ackum = Q*0;              
-                   shortlistprev = 0;
-                   Hsubdata = [];
-                   ivuse = [];
-                   for nn = 1:size(Hsubmatrixdata.listofsubmatrices,1)
-                        ivoutvec = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,2)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,2));
-                        ivinvec  = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,3)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,3));
-
-                        shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
-                        if shortlistnumber ~= shortlistprev
-                           Hsubdata = Hsubdatalists{nn}; 
-                           ivuse = ivuselists{nn}; 
-                           nHsub1 = length(ivoutvec);
-                           row_Hsub = rem(ivuse-1, nHsub1) + 1;
-                           col_Hsub = (ivuse-row_Hsub)/nHsub1 + 1;
-                           shortlistprev = shortlistnumber;                   
-                        end
-                         Q_ackum(1:ivoutvec(end)) = Q_ackum(1:ivoutvec(end)) + accumarray(ivoutvec(1)-1+row_Hsub,Hsubdata.*Q(ivinvec(1)-1+col_Hsub));                      
+                if strcmp(controlparameters.inteqsolutionmethod,'iterative_auto') == 1 || strcmp(controlparameters.inteqsolutionmethod,'iterative_fixeddifforder') == 1
+                   if showtext >= 2
+                        disp('      Starting to solve the int.eq. with the iterative method')
                     end
-                    Q = Q_ackum; 
-                    Qfinal = Qfinal + Q; 
-                end % for iiter = ....
-                       
+
+                    for iiter = 1:(controlparameters.difforder-2)
+                       if showtext >= 3
+                           disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
+                       end
+                       % % % Q_ackum = Q*0;              
+                       % % % shortlistprev = 0;
+                       % % % Hsubdata = [];
+                       % % % ivuse = [];
+                       % % % for nn = 1:size(Hsubmatrixdata.listofsubmatrices,1)
+                       % % %      ivoutvec = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,2)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,2));
+                       % % %      ivinvec  = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,3)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,3));
+                       % % % 
+                       % % %      shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
+                       % % %      if shortlistnumber ~= shortlistprev
+                       % % %         Hsubdata = Hsubdatalists{nn}; 
+                       % % %         ivuse = ivuselists{nn}; 
+                       % % %         nHsub1 = length(ivoutvec);
+                       % % %         row_Hsub = rem(ivuse-1, nHsub1) + 1;
+                       % % %         col_Hsub = (ivuse-row_Hsub)/nHsub1 + 1;
+                       % % %         shortlistprev = shortlistnumber;                   
+                       % % %      end
+                       % % %       Q_ackum(1:ivoutvec(end)) = Q_ackum(1:ivoutvec(end)) + accumarray(ivoutvec(1)-1+row_Hsub,Hsubdata.*Q(ivinvec(1)-1+col_Hsub));                      
+                       % % %  end
+                       % % %  Q = Q_ackum; 
+                       Q = EDmatvecH(Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
+                        Qfinal = Qfinal + Q; 
+
+                        normQ(iiter) = norm(Q);
+                        normQfinal(iiter) = norm(Qfinal);
+                        if iiter >= 2
+                            r_hat(iiter) = normQ(iiter)/normQ(iiter-1);
+                            esttail(iiter) = normQ(iiter)*r_hat(iiter)/(1-r_hat(iiter));
+                            % fprintf('%2d  Qterm,Qfinal,ratio,r,esttail: %.5g %.5g %.5g %.5g %.5g\n', ...
+                            % iiter, normQ(iiter), normQfinal(iiter), normQ(iiter)/normQfinal(iiter), r_hat(iiter), esttail(iiter)/normQfinal(iiter));
+                        end
+                        
+                    end % for iiter = ....
+                    inteqdiagnostics.normQ(:,ifreq) = normQ;
+                    inteqdiagnostics.normQfinal(:,ifreq) = normQfinal;
+                    inteqdiagnostics.r_hat(:,ifreq) = r_hat;
+                    inteqdiagnostics.esttail(:,ifreq) = esttail;
+ 
+                elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 
+                   if showtext >= 2
+                        disp('      Starting to solve the int.eq. with GMRES, fast version (for smaller problems)')
+                    end
+                     Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
+                     N = size(Hsp,1);
+                     A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
+                     
+                     [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+                     inteqdiagnostics.gmresiter = iter;
+                     inteqdiagnostics.gmresflag = flag;
+                     inteqdiagnostics.gmresrelres = relres;
+                    
+                elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_large') == 1 
+                   if showtext >= 2
+                        disp('      Starting to solve the int.eq. with GMRES, the version for larger problems')
+                    end
+                     
+                    afun = @(q) q - EDmatvecH(q, Hsubmatrixdata, Hsubdatalists, ivuselists);
+                    [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+                    inteqdiagnostics.gmresiter = iter;
+                    inteqdiagnostics.gmresflag = flag;
+                    inteqdiagnostics.gmresrelres = relres;
+
+                end
+
+                % savetemp
+                % pause
+                % 
+
                 doesQsegmenthavevalues = zeros(length(Hsubmatrixdata.edgepairlist(:,1)),1);
                 for iicounter = 1:length(Hsubmatrixdata.edgepairlist(:,1))
                    sectionofbigmatrix = (Hsubmatrixdata.bigmatrixstartnums(iicounter):Hsubmatrixdata.bigmatrixendnums(iicounter)); 
@@ -762,18 +924,43 @@ for ifreq = 1:nfrequencies
             % Propagate Qfinal to the external receiver(s)
             
 %             if inteqsettings.handlepropagation < 3
-            
-            if Sdata.doallSRcombinations == 1
-                for irec = 1:nreceivers
-
-                     if showtext >=2
+            if controlparameters.skipreceiverpropagation == 0
+                if Sdata.doallSRcombinations == 1
+                    for irec = 1:nreceivers
+    
+                         if showtext >=2
+                            disp(['Receiver number ',int2str(irec)]) 
+                         end
+                         [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,...
+                            Rdata.vispartedgesfromr(:,irec),frequency,controlparameters.Rstart,...
+                            Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),...
+                            Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext);
+    
+                        if ifreq == 1 && ~isempty(ivproblematic)
+                            existinglength = size(ivproblematicmatrix,2);
+                            newlength = length(ivproblematic);
+                            if newlength > existinglength
+                                ivproblematicmatrix = [ivproblematicmatrix zeros(nreceivers,newlength-existinglength)];
+                            end
+                            ivproblematicmatrix(irec,1:newlength) = ivproblematic;
+                        end
+    
+                         P_receiver(ifreq,irec,isou) = Fmatrix*Qfinal;
+                         if filehandlingparameters.savediff2result == 1
+                             extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec,isou) = Fmatrix*(Qfinal-Q_firstterm);
+                         end
+    
+                    end %  for irec = 1:nreceivers
+                else
+                    irec = isou;
+                      if showtext >=2
                         disp(['Receiver number ',int2str(irec)]) 
                      end
                      [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,...
                         Rdata.vispartedgesfromr(:,irec),frequency,controlparameters.Rstart,...
                         Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),...
                         Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext);
-
+    
                     if ifreq == 1 && ~isempty(ivproblematic)
                         existinglength = size(ivproblematicmatrix,2);
                         newlength = length(ivproblematic);
@@ -782,37 +969,13 @@ for ifreq = 1:nfrequencies
                         end
                         ivproblematicmatrix(irec,1:newlength) = ivproblematic;
                     end
-
+    
                      P_receiver(ifreq,irec,isou) = Fmatrix*Qfinal;
                      if filehandlingparameters.savediff2result == 1
                          extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec,isou) = Fmatrix*(Qfinal-Q_firstterm);
                      end
-
-                end %  for irec = 1:nreceivers
-            else
-                irec = isou;
-                  if showtext >=2
-                    disp(['Receiver number ',int2str(irec)]) 
-                 end
-                 [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,...
-                    Rdata.vispartedgesfromr(:,irec),frequency,controlparameters.Rstart,...
-                    Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),...
-                    Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext);
-
-                if ifreq == 1 && ~isempty(ivproblematic)
-                    existinglength = size(ivproblematicmatrix,2);
-                    newlength = length(ivproblematic);
-                    if newlength > existinglength
-                        ivproblematicmatrix = [ivproblematicmatrix zeros(nreceivers,newlength-existinglength)];
-                    end
-                    ivproblematicmatrix(irec,1:newlength) = ivproblematic;
+                   
                 end
-
-                 P_receiver(ifreq,irec,isou) = Fmatrix*Qfinal;
-                 if filehandlingparameters.savediff2result == 1
-                     extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec,isou) = Fmatrix*(Qfinal-Q_firstterm);
-                 end
-               
             end
         end   % for isou = 1:nsources
 
@@ -823,7 +986,37 @@ elapsedtimehodtf = etime(clock,t00);
 tfinteqdiff = P_receiver;
 
 EDinputdatahash = EDinputdatahash_tfinteq;
+extraoutputdata.inteqdiagnostics = inteqdiagnostics;
 
 eval(['save(''',desiredname,''',''tfinteqdiff'',''extraoutputdata'',''EDinputdatahash'',''timingdata'',''elapsedtimehodtf'');'])
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function inteqdiagnosticstruct = edinteqdiagnosticstemplate
+
+inteqdiagnosticstruct = struct(...
+    'solutionmethod',    [], ...
+    'nq',                NaN,...
+    'nnzH',              NaN, ...
+    'achievedaccuracy',  NaN, ...
+    'decarate',         NaN, ...
+    'warnings',          [], ...
+    'gmresflag',         [], ...
+    'gmresrelres',       NaN, ...
+    'gmresiter',         NaN, ...
+    'difforderused',     NaN, ...
+    'hitmaxdifforder',   NaN, ...
+    'finaltermratio',    NaN, ...
+    'esttailerror',      NaN, ...
+    'peakinessratio',    NaN, ...
+    'worstelementindex', NaN, ...
+    'worstedgepair',     [], ...
+    'normQ',             NaN, ...
+    'normQfinal',        NaN, ...
+    'r_hat',             NaN, ...
+    'esttail',           NaN);
+end
     
+end

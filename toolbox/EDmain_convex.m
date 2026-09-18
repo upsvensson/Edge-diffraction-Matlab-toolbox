@@ -69,7 +69,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 17 Apr 2024 (peter.svensson@ntnu.no)
+% Peter Svensson 17 Sep. 2026 (peter.svensson@ntnu.no)
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -190,6 +190,10 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % run) and the EDversionnumber.
 % 17 Apr 2024 Fixed a small bug that caused an error for IR of difforder 2
 % or higher, and controlparameters.savealldifforders = 0.
+% 10 Sep. 2026 Adapted to changes in EDintegralequation_convex by storing
+% the inteqdiagnostics struct in EDres.
+% 17 Sep. 2026 Introduced controlparameters.generalmethod instead of
+% '.docalcir' etc.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -229,17 +233,20 @@ textline2 = ['filestem for results: ',filehandlingparameters.filestem];
 textline3 = ['directory for results: ',filehandlingparameters.outputdirectory];
 fid = EDmessage(filehandlingparameters,'sf',0,1,'',textline1,textline2,textline3);
 
-if controlparameters.docalctf_ESIEBEM == 1
+%if controlparameters.docalctf_ESIEBEM == 1
+if strcmp(controlparameters.generalmethod,'tf_ESIEBEM') == 1
     textline1 = ['Calculating transfer functions with the ESIEBEM method'];
     textline2 = ['nfrequencies = ',int2str(length(controlparameters.frequencies)),', ngauss = ',int2str(controlparameters.ngauss),...
         ', cair = ',num2str(envdata.cair)];
 else
-    if controlparameters.docalctf == 1
+%    if controlparameters.docalctf == 1
+    if strcmp(controlparameters.generalmethod,'tf') == 1
         textline1 = ['Calculating transfer functions with the ESIE method'];
         textline2 = ['nfrequencies = ',int2str(length(controlparameters.frequencies)),', ngauss = ',int2str(controlparameters.ngauss),...
         ', cair = ',num2str(envdata.cair)];
     else
-        if controlparameters.docalcir == 1
+ %       if controlparameters.docalcir == 1
+    if strcmp(controlparameters.generalmethod,'ir') == 1 
             textline1 = ['Calculating impulse responses with the repeated-order method'];
             textline2 = ['fs = ',num2str(controlparameters.fs),', cair = ',num2str(envdata.cair)];
         end
@@ -262,9 +269,10 @@ if geoinputdata.freefieldcase == 0
         textline1start = ['EDreadgeomatrices: '];
         t01 = elapsedtimegeomatrices;
    end
-    %%%% disp('WARNING! Test for geometry convexity has been turned off!!')
-    if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
-        error('ERROR: EDmain_convex can only be used for convex scatterers, including a single thin plate')
+    if geoinputdata.allownonconvex == 0
+        if isempty(strfind(planedata.modeltype,'convex_ext')) && isempty(strfind(planedata.modeltype,'singleplate'))
+         error('ERROR: EDmain_convex can only be used for convex scatterers, including a single thin plate')
+        end
     end
     ncorners = size(planedata.corners,1);
     nplanes = (size(planedata.planecorners,1));
@@ -286,7 +294,8 @@ end
 
 nsources = size(Snewdata.coordinates,1);
 
-if controlparameters.docalctf_ESIEBEM == 1
+%if controlparameters.docalctf_ESIEBEM == 1
+if strcmp(controlparameters.generalmethod,'tf_ESIEBEM') == 1
     if nsources > 1
         error('ERROR: Unfortunately, ESIEBEM does nt yet support several source positions')
     end
@@ -320,6 +329,10 @@ if geoinputdata.freefieldcase == 0
 %         = EDedgeo(planedata,geoinputdata.firstcornertoskip,...
 %         geoinputdata.listofcornerstoskip,geoinputdata.planeseesplanestrategy,...
 %         EDversionnumber,filehandlingparameters);
+    % [edgedata,planedata,elapsedtimeedgeo,existingfilename,edgedatahash]...
+    %     = EDedgeo(planedata,geoinputdata.firstcornertoskip,...
+    %     geoinputdata.listofcornerstoskip,geoinputdata.planeseesplanestrategy,...
+    %     EDversionnumber,filehandlingparameters);
     [edgedata,planedata,elapsedtimeedgeo,existingfilename]...
         = EDedgeo(planedata,geoinputdata,...
         EDversionnumber,filehandlingparameters);
@@ -343,8 +356,8 @@ end
 
 if geoinputdata.freefieldcase == 0
     EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the Sdata struct']);
-    [Snewdata,elapsedtimeSgeo,existingfilename] = EDSorRgeo(planedata,edgedata,Snewdata,...
-         'S',EDversionnumber,filehandlingparameters);
+     [Snewdata,elapsedtimeSgeo,existingfilename] = EDSorRgeo(planedata,edgedata,Snewdata,...
+          'S',EDversionnumber,filehandlingparameters);
     if any(any(Snewdata.visplanesfroms)) == 0
         error('ERROR: No source can see any of the planes of the scattering object. ',...
             'Please check your geometry.') 
@@ -370,7 +383,7 @@ end
 if geoinputdata.freefieldcase == 0
     EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the Rdata struct']);
     [Rnewdata,elapsedtimeRgeo,existingfilename] = EDSorRgeo(planedata,edgedata,Rnewdata,...
-         'R',EDversionnumber,filehandlingparameters);
+          'R',EDversionnumber,filehandlingparameters);
     if any(any(Rnewdata.visplanesfromr)) == 0
        error('ERROR: No receiver can see any of the planes of the scattering object. ',...
              'Please check your geometry.') 
@@ -416,7 +429,8 @@ end
 % Generate the first-order specular, and first-order
 % diffraction tfs.
 
-if ( controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1)
+%if ( controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1)
+if ( strcmp(controlparameters.generalmethod,'tf') == 1 || strcmp(controlparameters.generalmethod,'tf_ESIEBEM') == 1)
     nfrequencies = length(controlparameters.frequencies);
     if controlparameters.skipfirstorder == 0
         EDmessage(filehandlingparameters,'s',fid,1,'',['Generate the (first-order) GA and diff tfs']);
@@ -455,7 +469,8 @@ end
 % Generate the first-order specular, and first-order
 % diffraction irs.
 
-if controlparameters.docalcir == 1 && controlparameters.skipfirstorder == 0
+%if controlparameters.docalcir == 1 && controlparameters.skipfirstorder == 0
+if strcmp(controlparameters.generalmethod,'ir') == 1 && controlparameters.skipfirstorder == 0
     EDmessage(filehandlingparameters,'s',fid,1,'',['Generate the (first-order) GA and diff irs']);
     [irdirect,irgeom,irdiff,timingdata,elapsedtimemakeirs,existingfilename] ...
         = EDmakefirstorderirs(firstorderpathdata,...
@@ -492,7 +507,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Prepare for the integral equation: set up the submatrix structure
 
-if controlparameters.difforder > 1 && ( controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1)
+%if controlparameters.difforder > 1 && ( controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1)
+if controlparameters.difforder > 1 && ( strcmp(controlparameters.generalmethod,'tf') == 1 || strcmp(controlparameters.generalmethod,'tf_ESIEBEM') == 1)
     EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the integral equation Hsubmatrixdata struct']);
     [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 	    EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
@@ -514,18 +530,21 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate the HOD contribution with the integral equation
 
-if controlparameters.difforder > 1 && ( controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1)
+%if controlparameters.difforder > 1 && ( controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1)
+if controlparameters.difforder > 1 && ( strcmp(controlparameters.generalmethod,'tf') == 1 || strcmp(controlparameters.generalmethod,'tf_ESIEBEM') == 1)
     textline2 = ['      ',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',DIF];
     EDmessage(filehandlingparameters,'s',fid,1,'',['Calculating the HOD contribution with the FD integral equation'],textline2);
     [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
         EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
     	Snewdata,Rnewdata,envdata,controlparameters,EDversionnumber,filehandlingparameters);
+
     EDpostfunctext('EDintegralequation_convex_tf',elapsedtimehodtf,existingfilename,...
         filehandlingparameters,fid,'',...
         [int2str(nfrequencies),' frequencies. Diffraction order: ',DIF,'.'],...
         ['H-matrix: ',num2str(timingdata(1)),' s. Q_firstterm: ',num2str(timingdata(2)),' s (per freq.)'],...
         ['Qfinal: ',num2str(timingdata(3)),' s. P at receiver: ',num2str(timingdata(4)),' s.'])    
-    timingstruct.integralequation = elapsedtimehodtf;
+%    timingstruct.integralequation = elapsedtimehodtf;
+    timingstruct.integralequation = timingdata;
 else
     tfinteqdiff = [];
     timingstruct.integralequation = [0 0 0 0 0];
@@ -535,7 +554,8 @@ end
 % Propagate the ESIEBEM surface pressure to the field points = the
 % original receiver points.
 
-if controlparameters.docalctf_ESIEBEM == 1     
+%if controlparameters.docalctf_ESIEBEM == 1     
+if strcmp(controlparameters.generalmethod,'tf_ESIEBEM') == 1     
     EDmessage(filehandlingparameters,'s',fid,1,'',['Calculating the field at the field points with the ESIEBEM method']);
     [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
         EDpropagateESIEBEM(tfdirect+tfgeom+tfdiff+tfinteqdiff,...
@@ -553,7 +573,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Find the higher-order diffraction paths for the ir calculation
 
-if controlparameters.docalcir == 1 && controlparameters.difforder > 1
+%if controlparameters.docalcir == 1 && controlparameters.difforder > 1
+if strcmp(controlparameters.generalmethod,'ir') == 1 && controlparameters.difforder > 1
     EDmessage(filehandlingparameters,'s',fid,1,'',['   Finding the higher-order diffraction paths']);
     [hodpaths,hodpathsalongplane,elapsedtimehodpaths,existingfilename] ...
         = EDfindHODpaths(int8(sign(edgetoedgedata.edgeseespartialedge)),...
@@ -570,7 +591,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate the ir HOD contributions one order at a time
 
-if controlparameters.difforder > 1 && controlparameters.docalcir == 1
+%if controlparameters.difforder > 1 && controlparameters.docalcir == 1
+if strcmp(controlparameters.generalmethod,'ir') == 1 && controlparameters.difforder > 1
    EDmessage(filehandlingparameters,'s',fid,1,'',['   Generating the higher-order diffraction irs ']);
      
 %    elemsize = 2.^(-[0:controlparameters.difforder-1]);
@@ -592,7 +614,8 @@ end
 if nargout > 0
     EDres = struct;
     EDres.timingstruct = timingstruct;
-    if controlparameters.docalcir == 1
+%    if controlparameters.docalcir == 1
+    if strcmp(controlparameters.generalmethod,'ir') == 1
         if geoinputdata.freefieldcase == 0
             irtot = irdirect + irgeom + irdiff;
             [nold,nrec,nsou] = size(irtot);  
@@ -642,7 +665,8 @@ if nargout > 0
         EDres.irhod = [];
         EDres.irtot = [];
     end
-    if controlparameters.docalctf == 1
+%    if controlparameters.docalctf == 1
+    if strcmp(controlparameters.generalmethod,'tf') == 1
         if isempty(tfinteqdiff)
             tfinteqdiff = zeros(size(tfdirect));
         end
@@ -652,6 +676,7 @@ if nargout > 0
         EDres.tfdiff = tfdiff;
         EDres.tfinteqdiff = tfinteqdiff;
         EDres.tftot = tftot;
+        EDres.inteqdiagnostics = extraoutputdata.inteqdiagnostics;
     else
         EDres.tfdirect = [];
         EDres.tfgeom = [];
@@ -659,8 +684,9 @@ if nargout > 0
         EDres.tfinteqdiff = [];
         EDres.tftot = [];
     end
-    if controlparameters.docalctf_ESIEBEM == 1
-        EDres.tftot_ESIEBEM = tftot_ESIEBEM;
+%    if controlparameters.docalctf_ESIEBEM == 1
+     if strcmp(controlparameters.generalmethod,'tf_ESIEBEM') == 1
+       EDres.tftot_ESIEBEM = tftot_ESIEBEM;
     else
         EDres.tftot_ESIEBEM = [];
     end

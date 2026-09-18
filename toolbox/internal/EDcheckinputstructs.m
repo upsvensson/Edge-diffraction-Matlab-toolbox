@@ -78,7 +78,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                         .docalcir = 1
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 22 March 2024 (peter.svensson@ntnu.no)
+% Peter Svensson 17 Sep. 2026 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -167,6 +167,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % will be generated, and that is very useful when the geometry is being
 % developed.
 % 22 March 2024 Added the field listofedgestoskip to geoinputdata
+% 17 Sep. 2026 Tried to systematize, using suggestion by Claude. Also
+% introduced field .generalmethod = 'tf' or 'ir' or 'tf_ESIEBEM'
+% and geoinputdata.allownonconvex
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -189,84 +192,246 @@ if file2ok == 0
    error('ERROR: Matlab can not find the function lgwt.m. Please download it from Mathworks') 
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Replace controlparameters.docalctf = 1 etc with 
+% controlparameters.generalmethod = 'tf' or 'ir' or 'tf_ESIEBEM'
+
+if ~isfield(controlparameters,'generalmethod') && any(isfield(controlparameters,{'docalctf','docalcir','docalctf_ESIEBEM'}))
+    tf         = isfield(controlparameters,'docalctf')         && controlparameters.docalctf==1;
+    ir         = isfield(controlparameters,'docalcir')         && controlparameters.docalcir==1;
+    tf_ESIEBEM = isfield(controlparameters,'docalctf_ESIEBEM') && controlparameters.docalctf_ESIEBEM==1;
+
+    if sum([tf,ir,tf_ESIEBEM]) ~= 1
+        error('EDinputcheck:calcmethod', ...
+            'Exactly one of .docalctf, .docalcir, .docalctf_ESIEBEM must be set to 1')
+    elseif tf
+        controlparameters.generalmethod = 'tf';
+    elseif ir
+        controlparameters.generalmethod = 'ir';
+    else
+        controlparameters.generalmethod = 'tf_ESIEBEM';
+    end
+
+    warning('EDinputcheck:deprecated', ...
+        ['controlparameters.docalctf/.docalcir/.docalctf_ESIEBEM are deprecated. ', ...
+        'This run will keep working via automatic translation, but please update your script to set ', ...
+        'controlparameters.generalmethod = ''%s'' directly.'], controlparameters.generalmethod)
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Specify allowed values and default values for the controlparameters struct 
+
+if ~isstruct(controlparameters)
+     error('ERROR: the struct controlparameters was not specified')           
+end
+
+% columns: name, validator, default, applicability, required
+paramspec = {
+    'generalmethod',       @(x) ismember(x,{'ir','tf','tf_ESIEBEM'}),                             'tf', @(cp) true, true;
+    'frequencies',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       NaN, @(cp) cp.generalmethod(1:2) == 'tf', false; 
+    'fs',                  @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, NaN, @(cp) cp.generalmethod(1:2) == 'ir', false; 
+    'Rstart',              @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 0,               0,   @(cp) true, false;
+    'directsound',         @(x) isnumeric(x) && (x == 0 | x == 1),                                1,   @(cp) true, false;
+    'skipfirstorder',      @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) true, false;
+    'difforder',           @(x) isnumeric(x) && isscalar(x) && x>=0 && x==round(x),               10,  @(cp) true, true;
+    'inteqsolutionmethod', @(x) ismember(x,{'GMRES_fast','GMRES_large','iterative_fixeddifforder'}), 'GMRES', @(cp) cp.difforder>=2, false;
+    'ngauss',              @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 16,  @(cp) true, false;
+    'discretizationtype',  @(x) isnumeric(x) && (x == 0 | x == 1 | x == 2),                       2,   @(cp) true, false;
+    'surfacegaussorder',   @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 5,   @(cp) cp.generalmethod(end-1:end) == 'EM', false; 
+    'HODelemsize',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       2*2.^(-[0:controlparameters.difforder-1]), @(cp) cp.generalmethod(1:2) == 'ir', false;
+    'savealldifforders',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) cp.generalmethod(1:2) == 'ir', false;
+    'saveindividualfirstdiff',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) cp.generalmethod(1:2) == 'ir', false;
+
+    % a genuinely mandatory field -- default value is irrelevant/unused here, so [] is just a placeholder
+%    'sourcecoordinates',   @(x) isnumeric(x)&&size(x,2)==3, [], @(cp) true, true;
+};
+
+
+for k = 1:size(paramspec,1)
+    name       = paramspec{k,1};
+    validator  = paramspec{k,2};
+    defaultval = paramspec{k,3};
+    applicable = paramspec{k,4}(controlparameters);
+    required   = paramspec{k,5};
+
+    if applicable
+        if ~isfield(controlparameters,name)
+            if required
+                error('EDinputcheck:missingparam', ...
+                    'controlparameters.%s is required and must be supplied by the user (no default exists)', name)
+            else
+                controlparameters.(name) = defaultval;
+            end
+        elseif ~validator(controlparameters.(name))
+            error('EDinputcheck:badparam','Invalid value for controlparameters.%s',name)
+        end
+    elseif isfield(controlparameters,name)
+        warning('EDinputcheck:irrelevantparam', ...
+            'controlparameters.%s is set but has no effect for the current settings (ignored)', name)
+    end
+end
+
+nfrequencies = numel(controlparameters.frequencies);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check the struct geoinputdata
+% Specify allowed values and default values for the envdata struct 
 
-if ~isstruct(geoinputdata)
+if ~isstruct(envdata)
+    error('ERROR: the struct envdata was not specified')
+end
+% if ~isfield(envdata,'cair')
+%     envdata.cair = 344;
+% end
+% if ~isfield(envdata,'rhoair')
+%     envdata.rhoair = 1.21;
+% end
+% columns: name, validator, default, applicability, required
+paramspec = {
+    'cair',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 344,  @(cp) true, false; 
+    'rhoair',       @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 1.21, @(cp) true, false; 
+};
 
-	[CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
-    [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
+for k = 1:size(paramspec,1)
+    name       = paramspec{k,1};
+    validator  = paramspec{k,2};
+    defaultval = paramspec{k,3};
+    applicable = paramspec{k,4}(envdata);
+    required   = paramspec{k,5};
 
-    CADfile = [CADfilepath,CADfile];
-    geoinputdata = struct ('geoinputfile',CADfile);
-
-    [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
-    if ~isfield(filehandlingparameters,'outputdirectory')
-        filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
-    end   
-    if ~isfield(filehandlingparameters,'filestem')
-        filehandlingparameters.filestem = CADfilestem;
+    if applicable
+        if ~isfield(envdata,name)
+            if required
+                error('EDinputcheck:missingparam', ...
+                    'envdata.%s is required and must be supplied by the user (no default exists)', name)
+            else
+                envdata.(name) = defaultval;
+            end
+        elseif ~validator(envdata.(name))
+            error('EDinputcheck:badparam','Invalid value for envdata.%s',name)
+        end
+    elseif isfield(envdata,name)
+        warning('EDinputcheck:irrelevantparam', ...
+            'envdata.%s is set but has no effect for the current settings (ignored)', name)
     end
 end
-if ~isfield(geoinputdata,'freefieldcase')
-    geoinputdata.freefieldcase = 0;
-end
-if geoinputdata.freefieldcase == 1
-    geoinputdata.corners = [];
-    geoinputdata.planecorners = [];
-else
-    if isfield(geoinputdata,'geoinputfile')
-        [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
-        if ~isfield(filehandlingparameters,'outputdirectory')
-            filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
-        end    
-        if ~isfield(filehandlingparameters,'filestem')
-            filehandlingparameters.filestem = CADfilestem;
-        end
-    else
-    
-        if ~isfield(geoinputdata,'corners') || ~isfield(geoinputdata,'planecorners')
-    	    [CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
-            [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
-    
-            CADfile = [CADfilepath,CADfile];
-            geoinputdata.geoinputfile = CADfile;
-            [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);        
-            if ~isfield(filehandlingparameters,'outputdirectory')
-                filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
-            end    
-        else
-            if isfield(filehandlingparameters,'outputdirectory') == 0 || isfield(filehandlingparameters,'filestem') == 0
-                error('ERROR: When you give the geometry input in the form of data matrices, you must specify filehandlingparameters.outputdirectory and .filestem')            
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Specify allowed values and default values for the geoinputdata struct 
+
+% columns: name, validator, default, applicability, required
+paramspec = {
+    'freefieldcase',          @(x) isnumeric(x) && (x==0 | x==1),                                  0, @(cp) true, false;
+    'corners',                @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,         NaN, @(cp) true, true; 
+    'planecorners',           @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,1)>=2,         NaN, @(cp) true, true; 
+    'planerefltypes',         @(x) isnumeric(x) && isreal(x) && numel(x)==size(geoinputdata.planecorners,1),   ones(size(geoinputdata.planecorners,1),1), @(cp) true false;
+    'firstcornertoskip',      @(x) isnumeric(x) && isreal(x) && x>0,                                 1e6, @(cp) true, false;
+    'listofcornerstoskip',    @(x) isnumeric(x) && isreal(x) && all(x(:) >= 0),                      [], @(cp) true, false;
+    'listofedgestoskip',      @(x) isnumeric(x) && isreal(x) && x>0,                                 [], @(cp) true, false;
+    'planeseesplanestrategy', @(x) isnumeric(x) && (x==0) | (xx==1),                               0, @(cp) true, false;
+    'allownonconvex',         @(x) isnumeric(x) && (x==0) | (xx==1),                               0, @(cp) true, false;
+    };
+
+for k = 1:size(paramspec,1)
+    name       = paramspec{k,1};
+    validator  = paramspec{k,2};
+    defaultval = paramspec{k,3};
+    applicable = paramspec{k,4}(geoinputdata);
+    required   = paramspec{k,5};
+
+    if applicable
+        if ~isfield(geoinputdata,name)
+            if required
+                error('EDinputcheck:missingparam', ...
+                    'geoinputdata.%s is required and must be supplied by the user (no default exists)', name)
+            else
+                geoinputdata.(name) = defaultval;
             end
-            if ~isfield(geoinputdata,'planerefltypes')
-               nplanes = size(geoinputdata.planecorners,1);
-               geoinputdata.planerefltypes = ones(nplanes,1);
-            end
+        elseif ~validator(geoinputdata.(name))
+            error('EDinputcheck:badparam','Invalid value for geoinputdata.%s',name)
         end
-    end
-    if ~isfield(geoinputdata,'firstcornertoskip')
-        geoinputdata.firstcornertoskip = 1e6;
-    end
-    if ~isfield(geoinputdata,'listofcornerstoskip')
-        geoinputdata.listofcornerstoskip = [];
-    end
-    if ~isfield(geoinputdata,'listofedgestoskip')
-        geoinputdata.listofedgestoskip = [];
-    else
-        ncols = size(geoinputdata.listofedgestoskip,2);
-        if ncols > 2
-            error('ERROR: geoinputdata.listofedgestoskip has more than two columns')
-        else
-            if any(any(geoinputdata.listofedgestoskip==0))
-                error('ERROR: geoinputdata.listofedgestoskip contains some zeros')
-            end
-        end
-    end
-    if ~isfield(geoinputdata,'planeseesplanestrategy')
-        geoinputdata.planeseesplanestrategy = 0;
+    elseif isfield(geoinputdata,name)
+        warning('EDinputcheck:irrelevantparam', ...
+            'geoinputdata.%s is set but has no effect for the current settings (ignored)', name)
     end
 end
+
+
+% if ~isstruct(geoinputdata)
+% 
+% 	[CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
+%     [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
+% 
+%     CADfile = [CADfilepath,CADfile];
+%     geoinputdata = struct ('geoinputfile',CADfile);
+% 
+%     [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
+%     if ~isfield(filehandlingparameters,'outputdirectory')
+%         filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
+%     end   
+%     if ~isfield(filehandlingparameters,'filestem')
+%         filehandlingparameters.filestem = CADfilestem;
+%     end
+% end
+% if ~isfield(geoinputdata,'freefieldcase')
+%     geoinputdata.freefieldcase = 0;
+% end
+% % if geoinputdata.freefieldcase == 1
+% %     geoinputdata.corners = [];
+% %     geoinputdata.planecorners = [];
+% % else
+% %     if isfield(geoinputdata,'geoinputfile')
+% %         [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
+% %         if ~isfield(filehandlingparameters,'outputdirectory')
+% %             filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
+% %         end    
+% %         if ~isfield(filehandlingparameters,'filestem')
+% %             filehandlingparameters.filestem = CADfilestem;
+% %         end
+% %     else
+% % 
+% %         if ~isfield(geoinputdata,'corners') || ~isfield(geoinputdata,'planecorners')
+% %     	    [CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
+% %             [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
+% % 
+% %             CADfile = [CADfilepath,CADfile];
+% %             geoinputdata.geoinputfile = CADfile;
+% %             [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);        
+% %             if ~isfield(filehandlingparameters,'outputdirectory')
+% %                 filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
+% %             end    
+% %         else
+% %             if isfield(filehandlingparameters,'outputdirectory') == 0 || isfield(filehandlingparameters,'filestem') == 0
+% %                 error('ERROR: When you give the geometry input in the form of data matrices, you must specify filehandlingparameters.outputdirectory and .filestem')            
+% %             end
+% %             if ~isfield(geoinputdata,'planerefltypes')
+% %                nplanes = size(geoinputdata.planecorners,1);
+% %                geoinputdata.planerefltypes = ones(nplanes,1);
+% %             end
+% %         end
+% %     end
+% %     if ~isfield(geoinputdata,'firstcornertoskip')
+% %         geoinputdata.firstcornertoskip = 1e6;
+% %     end
+% %     if ~isfield(geoinputdata,'listofcornerstoskip')
+% %         geoinputdata.listofcornerstoskip = [];
+% %     end
+% %     if ~isfield(geoinputdata,'listofedgestoskip')
+% %         geoinputdata.listofedgestoskip = [];
+% %     else
+% %         ncols = size(geoinputdata.listofedgestoskip,2);
+% %         if ncols > 2
+% %             error('ERROR: geoinputdata.listofedgestoskip has more than two columns')
+% %         else
+% %             if any(any(geoinputdata.listofedgestoskip==0))
+% %                 error('ERROR: geoinputdata.listofedgestoskip contains some zeros')
+% %             end
+% %         end
+% %     end
+% %     if ~isfield(geoinputdata,'planeseesplanestrategy')
+% %         geoinputdata.planeseesplanestrategy = 0;
+% %     end
+% % end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct Rinputdata
@@ -274,25 +439,92 @@ end
 if ~isstruct(Rinputdata)
     error('ERROR 1: receiver coordinates were not specified')
 end
-if ~isfield(Rinputdata,'coordinates')
-    error('ERROR 2: receiver coordinates were not specified')
+
+% columns: name, validator, default, applicability, required
+paramspec = {
+    'coordinates',         @(x) isnumeric(x) && isreal(x) &&  size(x,2)==3,                     NaN, @(cp) true, true; 
+    'nedgesubs',           @(x) isnumeric(x) && isreal(x) &&  x >= 2 && round(x) == x,          2, @(cp) true, false; 
+    };
+
+for k = 1:size(paramspec,1)
+    name       = paramspec{k,1};
+    validator  = paramspec{k,2};
+    defaultval = paramspec{k,3};
+    applicable = paramspec{k,4}(Rinputdata);
+    required   = paramspec{k,5};
+
+    if applicable
+        if ~isfield(Rinputdata,name)
+            if required
+                error('EDinputcheck:missingparam', ...
+                    'Rinputdata.%s is required and must be supplied by the user (no default exists)', name)
+            else
+                Rinputdata.(name) = defaultval;
+            end
+        elseif ~validator(Rinputdata.(name))
+            error('EDinputcheck:badparam','Invalid value for Rinputdata.%s',name)
+        end
+    elseif isfield(Rinputdata,name)
+        warning('EDinputcheck:irrelevantparam', ...
+            'Rinputdata.%s is set but has no effect for the current settings (ignored)', name)
+    end
 end
-nreceivers = size(Rinputdata.coordinates,1);
-if nreceivers == 0
-     error('ERROR 3: receiver coordinates were not specified')            
-end
-ncolumns = size(Rinputdata.coordinates,2);
-if ncolumns ~= 3
-   error(['ERROR: check your receiver coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
-end
-if ~isfield(Rinputdata,'nedgesubs')
-    Rinputdata.nedgesubs = 2;
-end
+
+
+% if ~isfield(Rinputdata,'coordinates')
+%     error('ERROR 2: receiver coordinates were not specified')
+% end
+% nreceivers = size(Rinputdata.coordinates,1);
+% if nreceivers == 0
+%      error('ERROR 3: receiver coordinates were not specified')            
+% end
+% ncolumns = size(Rinputdata.coordinates,2);
+% if ncolumns ~= 3
+%    error(['ERROR: check your receiver coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
+% end
+% if ~isfield(Rinputdata,'nedgesubs')
+%     Rinputdata.nedgesubs = 2;
+% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct Sinputdata, but the field .sourceamplitudes is handled
 % further down, since the values depend on whether it is a TD case or an FD
 % case.
+
+% columns: name, validator, default, applicability, required
+paramspec = {
+    'coordinates',         @(x) isnumeric(x) && isreal(x) &&  size(x,2)==3,                     NaN, @(cp) true, true; 
+    'doaddsources',        @(x) isnumerix(x) && (x==0 | x==1),                                  0, @(cp) true, false;
+    'doallSRcombinations', @(x) isnumeric(x) && (x==0 | x==1),                                  1, @(cp) true, false;
+    'sourcetype',          @(x) ismember(x,{'monopole','polygonpiston'}),                       'monopole', @(cp) true, false;
+    'sourceamplitudes',    @(x) isnumeric(x) && size(x,1) == size(Sinputdata.coordinates,1) && size(x,2) == nfrequencies,    ones(size(Sinputdata.coordinates,1),numel(controlparameters.frequencies)), @(cp) true, false;    
+    'nedgesubs',           @(x) isnumeric(x) && isreal(x) &&  x >= 2 && round(x) == x,          2, @(cp) true, false; 
+    };
+
+for k = 1:size(paramspec,1)
+    name       = paramspec{k,1};
+    validator  = paramspec{k,2};
+    defaultval = paramspec{k,3};
+    applicable = paramspec{k,4}(Sinputdata);
+    required   = paramspec{k,5};
+
+    if applicable
+        if ~isfield(Sinputdata,name)
+            if required
+                error('EDinputcheck:missingparam', ...
+                    'Sinputdata.%s is required and must be supplied by the user (no default exists)', name)
+            else
+                Sinputdata.(name) = defaultval;
+            end
+        elseif ~validator(Sinputdata.(name))
+            error('EDinputcheck:badparam','Invalid value for Sinputdata.%s',name)
+        end
+    elseif isfield(Sinputdata,name)
+        warning('EDinputcheck:irrelevantparam', ...
+            'Sinputdata.%s is set but has no effect for the current settings (ignored)', name)
+    end
+end
+
 
 if ~isstruct(Sinputdata)
     error('ERROR: the source was not specified')
@@ -558,263 +790,313 @@ if ~isfield(Sinputdata,'nedgesubs')
     Sinputdata.nedgesubs = 2;
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check the struct envdata
-
-if ~isstruct(envdata)
-    error('ERROR: the struct envdata was not specified')
-end
-if ~isfield(envdata,'cair')
-    envdata.cair = 344;
-end
-if ~isfield(envdata,'rhoair')
-    envdata.rhoair = 1.21;
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct controlparameters
 
-if ~isstruct(controlparameters)
-     error('ERROR: the struct controlparameters was not specified')           
-end
+% if ~isstruct(controlparameters)
+%      error('ERROR: the struct controlparameters was not specified')           
+% end
 
 % First some general parameters 
 
-if ~isfield(controlparameters,'directsound')
-    controlparameters.directsound = 1;
-end
-if ~isfield(controlparameters,'skipfirstorder')
-    controlparameters.skipfirstorder = 0;
-end
-if ~isfield(controlparameters,'Rstart')
-    controlparameters.Rstart = 0;
-end
-if ~isfield(controlparameters,'difforder') 
-    if geoinputdata.freefieldcase == 1
-        controlparameters.difforder = 0;
-    else
-        disp('   INFO: controlparameters.difforder was not specified. It is given the value 10.')
-        controlparameters.difforder = 10;
-    end
-end
+% if ~isfield(controlparameters,'directsound')
+%     controlparameters.directsound = 1;
+% end
+% if ~isfield(controlparameters,'skipfirstorder')
+%     controlparameters.skipfirstorder = 0;
+% end
+% if ~isfield(controlparameters,'Rstart')
+%     controlparameters.Rstart = 0;
+% end
+% if ~isfield(controlparameters,'difforder') 
+%     if geoinputdata.freefieldcase == 1
+%         controlparameters.difforder = 0;
+%     else
+%         disp('   INFO: controlparameters.difforder was not specified. It is given the value 10.')
+%         controlparameters.difforder = 10;
+%     end
+% end
 
 % Then other parameters 
 
-if ~isfield(controlparameters,'docalctf')
-    controlparameters.docalctf = 0;
-%    disp('WARNING: controlparameters.docalctf was not specified. It is given the value 0.')
-end
-if ~isfield(controlparameters,'docalcir')
-    controlparameters.docalcir = 0;
-%    disp('WARNING: controlparameters.docalcir was not specified. It is given the value 0.')
-end
-if (controlparameters.docalctf == 1) && (controlparameters.docalcir == 1)
-    error('EROR: docalcir and docalctf can not both be set to 1')
-end        
-if ~isfield(controlparameters,'docalctf_ESIEBEM')
-    controlparameters.docalctf_ESIEBEM = 0;
-%    disp('WARNING: controlparameters.docalctf_ESIEBEM was not specified. It is given the value 0.')
-else
-    if controlparameters.docalctf_ESIEBEM == 1 
-        if geoinputdata.freefieldcase == 1
-            error('ERROR: controlparameters.docalctf_ESIEBEM and geoinputdata.freefieldcase can not both be set to 1')
-        end
-        if controlparameters.docalctf == 1
-            error('ERROR: controlparameters.docalctf and controlparameters.docalctf_ESIEBEM can not both be set to 1')
-        end
-        if controlparameters.docalcir == 1
-            error('ERROR: controlparameters.docalcir and controlparameters.docalctf_ESIEBEM can not both be set to 1')
-        end
-    end
-end
+% if ~isfield(controlparameters,'docalctf')
+%     controlparameters.docalctf = 0;
+% %    disp('WARNING: controlparameters.docalctf was not specified. It is given the value 0.')
+% end
+% if ~isfield(controlparameters,'docalcir')
+%     controlparameters.docalcir = 0;
+% %    disp('WARNING: controlparameters.docalcir was not specified. It is given the value 0.')
+% end
+% if (controlparameters.docalctf == 1) && (controlparameters.docalcir == 1)
+%     error('EROR: docalcir and docalctf can not both be set to 1')
+% end        
+% if ~isfield(controlparameters,'docalctf_ESIEBEM')
+%     controlparameters.docalctf_ESIEBEM = 0;
+% %    disp('WARNING: controlparameters.docalctf_ESIEBEM was not specified. It is given the value 0.')
+% else
+%     if controlparameters.docalctf_ESIEBEM == 1 
+%         if geoinputdata.freefieldcase == 1
+%             error('ERROR: controlparameters.docalctf_ESIEBEM and geoinputdata.freefieldcase can not both be set to 1')
+%         end
+%         if controlparameters.docalctf == 1
+%             error('ERROR: controlparameters.docalctf and controlparameters.docalctf_ESIEBEM can not both be set to 1')
+%         end
+%         if controlparameters.docalcir == 1
+%             error('ERROR: controlparameters.docalcir and controlparameters.docalctf_ESIEBEM can not both be set to 1')
+%         end
+%     end
+% end
 % if (controlparameters.docalctf == 0) && (controlparameters.docalcir == 0) && (controlparameters.docalctf_ESIEBEM == 0)
 %     error('ERROR: You must choose a calulcation method: one of (docalcir, docalctf, docalctf_ESIEBEM) must be 1')
 % end
 
-if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1
-    if ~isfield(controlparameters,'frequencies')
-        error('ERROR: controlparameters.frequencies were not specified')
-    end
-    if ~isfield(controlparameters,'ngauss')
-        disp('   INFO: controlparameters.ngauss wasnt set; it is given the default value 16.')
-        controlparameters.ngauss = 16;
-    end
-    if ~isfield(controlparameters,'discretizationtype')
-%        disp('   INFO: controlparameters.discretizationtype wasnt set; it is given the default value 2.')
-        controlparameters.discretizationtype = 2;
-    end
-else
-    controlparameters.frequencies = [];
-    controlparameters.ngauss = 0;
-    controlparameters.discretizationtype = 0;
-end
-nfrequencies = length(controlparameters.frequencies);
+% if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1
+%     if ~isfield(controlparameters,'frequencies')
+%         error('ERROR: controlparameters.frequencies were not specified')
+%     end
+%     if ~isfield(controlparameters,'ngauss')
+%         disp('   INFO: controlparameters.ngauss wasnt set; it is given the default value 16.')
+%         controlparameters.ngauss = 16;
+%     end
+%     if ~isfield(controlparameters,'discretizationtype')
+% %        disp('   INFO: controlparameters.discretizationtype wasnt set; it is given the default value 2.')
+%         controlparameters.discretizationtype = 2;
+%     end
+% else
+%     controlparameters.frequencies = [];
+%     controlparameters.ngauss = 0;
+%     controlparameters.discretizationtype = 0;
+% end
+% nfrequencies = length(controlparameters.frequencies);
 
-if controlparameters.docalctf_ESIEBEM == 1
-    if ~isfield(controlparameters,'surfacegaussorder')
-        disp('   INFO: controlparameters.surfacegaussorder wasnt set; it is given the default value 5.')
-        controlparameters.surfacegaussorder = 5;
-    end
-else
-    controlparameters.surfacegaussorder = 0;
-end
+% if controlparameters.docalctf_ESIEBEM == 1
+%     if ~isfield(controlparameters,'surfacegaussorder')
+%         disp('   INFO: controlparameters.surfacegaussorder wasnt set; it is given the default value 5.')
+%         controlparameters.surfacegaussorder = 5;
+%     end
+% else
+%     controlparameters.surfacegaussorder = 0;
+% end
 
-if controlparameters.docalcir == 1
-    if ~isfield(controlparameters,'fs')
-        disp('   INFO: controlparameters.fs wasn''t set; it is given the default value 44100.')
-        controlparameters.fs = 44100;
-    end   
-    if ~isfield(controlparameters,'HODelemsize')
-        controlparameters.HODelemsize = 2*2.^(-[0:controlparameters.difforder-1]);
-    end   
-else
-   controlparameters.fs = 44100;
-end
+% if controlparameters.docalcir == 1
+%     if ~isfield(controlparameters,'fs')
+%         disp('   INFO: controlparameters.fs wasn''t set; it is given the default value 44100.')
+%         controlparameters.fs = 44100;
+%     end   
+%     if ~isfield(controlparameters,'HODelemsize')
+%         controlparameters.HODelemsize = 2*2.^(-[0:controlparameters.difforder-1]);
+%     end   
+% else
+%    controlparameters.fs = 44100;
+% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the field .sourceamplitudes of the struct Sinputdata
 
-sourceamplitudes_default = 0;
+% sourceamplitudes_default = 0;
+% 
+% % We need to treat the frequency-domain cases differently from the
+% % time-domain cases. But, if .sourceamplitudes was not specified, it gets
+% % the default value 1 for all sources (and frequencies).
+% 
+% if ~isfield(Sinputdata,'sourceamplitudes')
+% %     Sinputdata.sourceamplitudes = ones(nsources,1);    
+%     Sinputdata.sourceamplitudes = 1;    
+%     sourceamplitudes_default = 1;
+% end
+% 
+% [n1,n2] = size(Sinputdata.sourceamplitudes);
+% 
+% if n1 > 1
+%     if n1 ~= nsources
+%         error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one row, or one row per source, but it had the size ',int2str(n1),' by ',int2str(n2)])
+%     else % So, we know that there is one amplitude per source. Check if there is one value per freq.
+%         if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
+%             if n2 == 1
+%                 Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(:,ones(1,nfrequencies));
+%             else
+%                 if n2 ~= nfrequencies
+%                     error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one column, or one column per frequency, but it had the size ',int2str(n1),' by ',int2str(n2)])
+%                 end
+%             end
+%         else
+%             if n2 > 1
+%                error(['ERROR: The Sinputdata.sourceamplitudes input parameter must, for TD calculations, have one column, but it had the size ',int2str(n1),' by ',int2str(n2)])
+%             end
+%         end
+%     end
+% else % Here we know that there is just one row. Check if there is one value per freq. (or a single value)
+%     if n2 > 1
+%         if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
+%             if n2 ~= nfrequencies
+%                 error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one column, or one column per frequency, but it had the size ',int2str(n1),' by ',int2str(n2)])
+%             else % Here we know that n2 == nfrequencies. Expand to number of sources
+%                 Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),:);
+%             end
+%         else
+%             error(['ERROR: The Sinputdata.sourceamplitudes input parameter must, for TD calculations, have one column, but it had the size ',int2str(n1),' by ',int2str(n2)])            
+%         end
+%     else % Here we know that n1 = 1 and n2 = 1
+%         if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
+%             Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),ones(1,nfrequencies));
+%         else
+%             Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1));            
+%         end
+%     end
+% end
 
-% We need to treat the frequency-domain cases differently from the
-% time-domain cases. But, if .sourceamplitudes was not specified, it gets
-% the default value 1 for all sources (and frequencies).
-
-if ~isfield(Sinputdata,'sourceamplitudes')
-%     Sinputdata.sourceamplitudes = ones(nsources,1);    
-    Sinputdata.sourceamplitudes = 1;    
-    sourceamplitudes_default = 1;
-end
-
-[n1,n2] = size(Sinputdata.sourceamplitudes);
-
-if n1 > 1
-    if n1 ~= nsources
-        error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one row, or one row per source, but it had the size ',int2str(n1),' by ',int2str(n2)])
-    else % So, we know that there is one amplitude per source. Check if there is one value per freq.
-        if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
-            if n2 == 1
-                Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(:,ones(1,nfrequencies));
-            else
-                if n2 ~= nfrequencies
-                    error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one column, or one column per frequency, but it had the size ',int2str(n1),' by ',int2str(n2)])
-                end
-            end
-        else
-            if n2 > 1
-               error(['ERROR: The Sinputdata.sourceamplitudes input parameter must, for TD calculations, have one column, but it had the size ',int2str(n1),' by ',int2str(n2)])
-            end
-        end
-    end
-else % Here we know that there is just one row. Check if there is one value per freq. (or a single value)
-    if n2 > 1
-        if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
-            if n2 ~= nfrequencies
-                error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one column, or one column per frequency, but it had the size ',int2str(n1),' by ',int2str(n2)])
-            else % Here we know that n2 == nfrequencies. Expand to number of sources
-                Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),:);
-            end
-        else
-            error(['ERROR: The Sinputdata.sourceamplitudes input parameter must, for TD calculations, have one column, but it had the size ',int2str(n1),' by ',int2str(n2)])            
-        end
-    else % Here we know that n1 = 1 and n2 = 1
-        if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
-            Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),ones(1,nfrequencies));
-        else
-            Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1));            
-        end
-    end
-end
-
-if controlparameters.docalcir == 1
-    if ~isfield(controlparameters,'savealldifforders')
-        controlparameters.savealldifforders = 0;
-    end
-    if ~isfield(controlparameters,'saveindividualfirstdiff')
-        controlparameters.saveindividualfirstdiff = 0;
-    end
-else
-    controlparameters.savealldifforders = 0;
-    controlparameters.saveindividualfirstdiff = 0;
- end
+% if controlparameters.docalcir == 1
+%     if ~isfield(controlparameters,'savealldifforders')
+%         controlparameters.savealldifforders = 0;
+%     end
+%     if ~isfield(controlparameters,'saveindividualfirstdiff')
+%         controlparameters.saveindividualfirstdiff = 0;
+%     end
+% else
+%     controlparameters.savealldifforders = 0;
+%     controlparameters.saveindividualfirstdiff = 0;
+%  end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct filehandlingparameters
-    
+
+if ~isstruct(filehandlingparameters)
+    error('ERROR: the struct filehandlingparameters was not specified')
+end
+
 if exist([filehandlingparameters.outputdirectory],'dir') ~=7
       mkdir([filehandlingparameters.outputdirectory])
 end
 
-if ~isfield(filehandlingparameters,'filestem')
-    if exist('CADfilestem','var') == 1
-        ifile = 1;
-        filename1 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_tf.mat'];
-        filename2 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_ir.mat'];
-        if exist(filename1,'file') == 2 || exist(filename2,'file') == 2
-            failedtofindfile = 0;
-            while (failedtofindfile == 0)
-                ifile = ifile + 1;
-                filename1 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_tf.mat'];
-                filename2 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_ir.mat'];
-                if exist(filename1,'file') ~= 2 && exist(filename2,'file') ~= 2
-                    failedtofindfile = 1;
-                end
+% columns: name, validator, default, applicability, required
+paramspec = {
+    'suppressresultrecycling',  @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) true, false; 
+    'showtext',                 @(x) isnumeric(x) && x >= 0 && round(x)==x, 1, @(cp) true, false; 
+    'saveSRdatafiles',          @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
+    'saveeddatafile',           @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
+    'saveed2datafile',          @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
+    'savesubmatrixdata',        @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
+    'saveinteqsousigs',         @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) true, false; 
+    'loadinteqsousigs',         @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) true, false; 
+    'savepathsfile',            @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
+    'savediff2result',          @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) true, false; 
+    'savelogfile',              @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
+    'saveISEStree',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) controlparameters.generalmethod(1:2) == 'ir', false; 
+    'saveHODpaths',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) controlparameters.generalmethod(1:2) == 'ir', false; 
+    };
+
+for k = 1:size(paramspec,1)
+    name       = paramspec{k,1};
+    validator  = paramspec{k,2};
+    defaultval = paramspec{k,3};
+    applicable = paramspec{k,4}(filehandlingparameters);
+    required   = paramspec{k,5};
+
+    if applicable
+        if ~isfield(filehandlingparameters,name)
+            if required
+                error('EDinputcheck:missingparam', ...
+                    'filehandlingparameters.%s is required and must be supplied by the user (no default exists)', name)
+            else
+                filehandlingparameters.(name) = defaultval;
             end
+        elseif ~validator(filehandlingparameters.(name))
+            error('EDinputcheck:badparam','Invalid value for filehandlingparameters.%s',name)
         end
-        filehandlingparameters.filestem = [CADfilestem,'_',int2str(ifile)];
-    else
-       filehandlingparameters.filestem = Filestem;        
+    elseif isfield(filehandlingparameters,name)
+        warning('EDinputcheck:irrelevantparam', ...
+            'filehandlingparameters.%s is set but has no effect for the current settings (ignored)', name)
     end
 end
+
+
+% Check the struct filehandlingparameters
+    
+% if exist([filehandlingparameters.outputdirectory],'dir') ~=7
+%       mkdir([filehandlingparameters.outputdirectory])
+% end
+
+% if ~isfield(filehandlingparameters,'filestem')
+%     if exist('CADfilestem','var') == 1
+%         ifile = 1;
+%         filename1 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_tf.mat'];
+%         filename2 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_ir.mat'];
+%         if exist(filename1,'file') == 2 || exist(filename2,'file') == 2
+%             failedtofindfile = 0;
+%             while (failedtofindfile == 0)
+%                 ifile = ifile + 1;
+%                 filename1 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_tf.mat'];
+%                 filename2 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_ir.mat'];
+%                 if exist(filename1,'file') ~= 2 && exist(filename2,'file') ~= 2
+%                     failedtofindfile = 1;
+%                 end
+%             end
+%         end
+%         filehandlingparameters.filestem = [CADfilestem,'_',int2str(ifile)];
+%     else
+%        filehandlingparameters.filestem = Filestem;        
+%     end
+% end
 % if ~isfield(filehandlingparameters,'savesetupfile')
 %     filehandlingparameters.savesetupfile = 1;
 % end
-if ~isfield(filehandlingparameters,'suppressresultrecycling')
-    filehandlingparameters.suppressresultrecycling = 0;
-end
-if ~isfield(filehandlingparameters,'showtext')
-    filehandlingparameters.showtext = 1;
-end
-if ~isfield(filehandlingparameters,'savecadgeofile')
-    filehandlingparameters.savecadgeofile = 0;
-end
-if ~isfield(filehandlingparameters,'saveSRdatafiles')
-    filehandlingparameters.saveSRdatafiles = 1;
-end
-if ~isfield(filehandlingparameters,'saveeddatafile')
-    filehandlingparameters.saveeddatafile = 1;
-end
-if ~isfield(filehandlingparameters,'saveed2datafile')
-    filehandlingparameters.saveed2datafile = 1;
-end
-if ~isfield(filehandlingparameters,'savesubmatrixdata')
-    filehandlingparameters.savesubmatrixdata = 1;
-end
-if ~isfield(filehandlingparameters,'saveinteqsousigs')
-    filehandlingparameters.saveinteqsousigs = 0;
-end
-if ~isfield(filehandlingparameters,'loadinteqsousigs')
-    filehandlingparameters.loadinteqsousigs = 0;
-end
-if ~isfield(filehandlingparameters,'savepathsfile')
-    filehandlingparameters.savepathsfile = 1;
-end
+% if ~isfield(filehandlingparameters,'suppressresultrecycling')
+%     filehandlingparameters.suppressresultrecycling = 0;
+% end
+% if ~isfield(filehandlingparameters,'showtext')
+%     filehandlingparameters.showtext = 1;
+% end
+% if ~isfield(filehandlingparameters,'savecadgeofile')
+%     filehandlingparameters.savecadgeofile = 0;
+% end
+% if ~isfield(filehandlingparameters,'saveSRdatafiles')
+%     filehandlingparameters.saveSRdatafiles = 1;
+% end
+% if ~isfield(filehandlingparameters,'saveeddatafile')
+%     filehandlingparameters.saveeddatafile = 1;
+% end
+% if ~isfield(filehandlingparameters,'saveed2datafile')
+%     filehandlingparameters.saveed2datafile = 1;
+% end
+% if ~isfield(filehandlingparameters,'savesubmatrixdata')
+%     filehandlingparameters.savesubmatrixdata = 1;
+% end
+% if ~isfield(filehandlingparameters,'saveinteqsousigs')
+%     filehandlingparameters.saveinteqsousigs = 0;
+% end
+% if ~isfield(filehandlingparameters,'loadinteqsousigs')
+%     filehandlingparameters.loadinteqsousigs = 0;
+% end
+% if ~isfield(filehandlingparameters,'savepathsfile')
+%     filehandlingparameters.savepathsfile = 1;
+% end
+% 
+% if controlparameters.docalcir == 1
+%     if ~isfield(filehandlingparameters,'saveISEStree')
+%         filehandlingparameters.saveISEStree = 0;
+%     end
+%     if ~isfield(filehandlingparameters,'savehodpaths')
+%         filehandlingparameters.savehodpaths = 0;
+%     end
+% else
+%     filehandlingparameters.savehodpaths = 0;
+%     filehandlingparameters.saveISEStree = 0;
+% end
+% if ~isfield(filehandlingparameters,'savediff2result')
+%     filehandlingparameters.savediff2result = 0;
+% end
+% if ~isfield(filehandlingparameters,'savelogfile')
+%     filehandlingparameters.savelogfile = 1;
+% end
 
-if controlparameters.docalcir == 1
-    if ~isfield(filehandlingparameters,'saveISEStree')
-        filehandlingparameters.saveISEStree = 0;
-    end
-    if ~isfield(filehandlingparameters,'savehodpaths')
-        filehandlingparameters.savehodpaths = 0;
-    end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function val = getfielddefault(s, fieldname, defaultval)
+if isfield(s, fieldname) && ~isempty(s.(fieldname))
+    val = s.(fieldname);
 else
-    filehandlingparameters.savehodpaths = 0;
-    filehandlingparameters.saveISEStree = 0;
+    val = defaultval;
 end
-if ~isfield(filehandlingparameters,'savediff2result')
-    filehandlingparameters.savediff2result = 0;
-end
-if ~isfield(filehandlingparameters,'savelogfile')
-    filehandlingparameters.savelogfile = 1;
-end
-

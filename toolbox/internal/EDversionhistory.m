@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 19 April 2024
+% Peter Svensson (peter.svensson@ntnu.no) 18 Sep. 2026
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -334,6 +334,13 @@ versiontext{icounter} = ['Replaced the numerical integration in EDwedge1st_fd.' 
     'made, where the integrand is written directly into the function. This ' ...
     'saves substantial amounts of time. One test case: 64-sided disc, 10 rec., ' ...
     '100 freq., new calc. time was 29% of old time.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.600';
+versiondate{icounter} = '18 Sep. 2026';
+versiontext{icounter} = ['Introduced GMRES, in a fast version, and a version for large problems.' ...
+    'Also intorduced a top level parameter: controlparameters.generalmethod.'
+    'Streamlined the EDcheckinputstructs'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

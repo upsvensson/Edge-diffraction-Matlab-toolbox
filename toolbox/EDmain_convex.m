@@ -547,6 +547,8 @@ if controlparameters.difforder > 1 && ( strcmp(controlparameters.generalmethod,'
     timingstruct.integralequation = timingdata;
 else
     tfinteqdiff = [];
+    extraoutputdata = struct;
+    extraoutputdata.inteqdiagnostics = [];
     timingstruct.integralequation = [0 0 0 0 0];
 end
 

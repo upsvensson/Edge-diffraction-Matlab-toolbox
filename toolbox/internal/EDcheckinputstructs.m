@@ -78,7 +78,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                         .docalcir = 1
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 17 Sep. 2026 (peter.svensson@ntnu.no)
+% Peter Svensson 25 Sep. 2026 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -170,6 +170,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 17 Sep. 2026 Tried to systematize, using suggestion by Claude. Also
 % introduced field .generalmethod = 'tf' or 'ir' or 'tf_ESIEBEM'
 % and geoinputdata.allownonconvex
+% 20 Sep. 2026 Introduced the controlparameters.ESIEpropagationimplementation
+% 24 Sep. 2026 Introduced cp.diff1method and cp.diff1GLorder 
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -228,19 +230,22 @@ end
 % columns: name, validator, default, applicability, required
 paramspec = {
     'generalmethod',       @(x) ismember(x,{'ir','tf','tf_ESIEBEM'}),                             'tf', @(cp) true, true;
-    'frequencies',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       NaN, @(cp) cp.generalmethod(1:2) == 'tf', false; 
-    'fs',                  @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, NaN, @(cp) cp.generalmethod(1:2) == 'ir', false; 
+    'frequencies',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       NaN, @(cp) strcmp(cp.generalmethod,'tf'), false; 
+    'fs',                  @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, NaN, @(cp) strcmp(cp.generalmethod,'ir'), false; 
     'Rstart',              @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 0,               0,   @(cp) true, false;
     'directsound',         @(x) isnumeric(x) && (x == 0 | x == 1),                                1,   @(cp) true, false;
     'skipfirstorder',      @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) true, false;
     'difforder',           @(x) isnumeric(x) && isscalar(x) && x>=0 && x==round(x),               10,  @(cp) true, true;
-    'inteqsolutionmethod', @(x) ismember(x,{'GMRES_fast','GMRES_large','iterative_fixeddifforder'}), 'GMRES', @(cp) cp.difforder>=2, false;
+    'diff1method',         @(x) ismember(x,{'GL','accurate'}),                                   'accurate', @(cp) cp.difforder>=1, false;
+    'diff1GLorder',        @(x) isnumeric(x) && isreal(x) && isscalar(x) && x > 0 && x==round(x), 16, @(cp) strcmp(cp.diff1method,'GL'), false;
+    'inteqsolutionmethod', @(x) ismember(x,{'GMRES_fast','GMRES_large','iterative_fixeddifforder'}), 'GMRES_fast', @(cp) cp.difforder>=2, false;
+    'ESIEpropagationimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'legacy', @(cp) cp.difforder>=2, false;
     'ngauss',              @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 16,  @(cp) true, false;
     'discretizationtype',  @(x) isnumeric(x) && (x == 0 | x == 1 | x == 2),                       2,   @(cp) true, false;
     'surfacegaussorder',   @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 5,   @(cp) cp.generalmethod(end-1:end) == 'EM', false; 
-    'HODelemsize',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       2*2.^(-[0:controlparameters.difforder-1]), @(cp) cp.generalmethod(1:2) == 'ir', false;
-    'savealldifforders',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) cp.generalmethod(1:2) == 'ir', false;
-    'saveindividualfirstdiff',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) cp.generalmethod(1:2) == 'ir', false;
+    'HODelemsize',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       @(cp) 2*2.^(-[0:cp.difforder-1]), @(cp) strcmp(cp.generalmethod,'ir'), false;
+    'savealldifforders',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) strcmp(cp.generalmethod,'ir'), false;
+    'saveindividualfirstdiff',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) strcmp(cp.generalmethod,'ir'), false;
 
     % a genuinely mandatory field -- default value is irrelevant/unused here, so [] is just a placeholder
 %    'sourcecoordinates',   @(x) isnumeric(x)&&size(x,2)==3, [], @(cp) true, true;
@@ -260,17 +265,25 @@ for k = 1:size(paramspec,1)
                 error('EDinputcheck:missingparam', ...
                     'controlparameters.%s is required and must be supplied by the user (no default exists)', name)
             else
+                if isa(defaultval,'function_handle')
+                    defaultval = defaultval(controlparameters);
+                end
                 controlparameters.(name) = defaultval;
             end
         elseif ~validator(controlparameters.(name))
             error('EDinputcheck:badparam','Invalid value for controlparameters.%s',name)
         end
-    elseif isfield(controlparameters,name)
-        warning('EDinputcheck:irrelevantparam', ...
-            'controlparameters.%s is set but has no effect for the current settings (ignored)', name)
+    else
+        if isfield(controlparameters,name)
+            val = controlparameters.(name);
+            if ~(isnumeric(val) && isscalar(val) && isnan(val))
+                warning('EDinputcheck:irrelevantparam', ...
+                    'controlparameters.%s is set but has no effect for the current settings (set to NaN)', name)
+            end
+        end
+        controlparameters.(name) = NaN;
     end
 end
-
 nfrequencies = numel(controlparameters.frequencies);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

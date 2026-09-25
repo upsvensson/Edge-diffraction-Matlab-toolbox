@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 18 Sep. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 25 Sep. 2026
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -341,6 +341,13 @@ versiondate{icounter} = '18 Sep. 2026';
 versiontext{icounter} = ['Introduced GMRES, in a fast version, and a version for large problems.' ...
     'Also intorduced a top level parameter: controlparameters.generalmethod.'
     'Streamlined the EDcheckinputstructs'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.601';
+versiondate{icounter} = '25 Sep. 2026';
+versiontext{icounter} = ['Introduced GL quadrature for first-order diffraction via the ' ...
+    'controlparameters.diff1method. Also introduced a new function EDgetGLrule for more ' ...
+    'efficient handling of quadrature rules.'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

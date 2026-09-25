@@ -1,5 +1,6 @@
 function [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
-isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegmenthavevalues,showtext,implementation)
+isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegmenthavevalues,...
+showtext,ESIEpropagationimplementation)
 % EDcalcpropagatematrix - propagates the sound pressure at the edges to a receiver
 % position.
 %
@@ -12,7 +13,7 @@ isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegment
 %   rRvec, thetaRvec, zRvec
 %   doesQsegmenthavevalues
 %   showtext (optional) 0 -> No text displayed on screen. Default: 0
-%   implementation (optional) 'legacy' (default) or 'accurate'.
+%   ESIEpropagationimplementation (optional) 'legacy' (default) or 'accurate'.
 %       'legacy'   : original, byte-identical code path. Near the
 %                    propagation singularity (where the far-edge GL node's
 %                    apex point za(z1) falls between two z2 GL nodes and
@@ -41,11 +42,11 @@ isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegment
 %
 % Uses EDcoordtrans1.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 27 Aug. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 25 Sep. 2026
 %
 % [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
 %     isthinhole,vispartedgesfromr,frequency,Rstart,...
-%     rRvec,thetaRvec,zRvec,doesQsegmenthavevalues,showtext,implementation);
+%     rRvec,thetaRvec,zRvec,doesQsegmenthavevalues,showtext,ESIEpropagationimplementation);
 
 % 20121025 Added the isthinhole parameter
 % 20130131 Cleaned up
@@ -87,9 +88,14 @@ isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegment
 %          (falls back to the legacy formula unconditionally) -- flagged,
 %          not fixed, since that singularity structure hasn't been worked
 %          out.
+% 20 Sep. 2026 Changed optional input parameter name to
+% "ESIEpropagationimplementation".
+% 25 Sep. 2026 Adapted to the change in orientation of the sparse
+% quadraturematrix data.
 
 if nargin < 13
     showtext = 0;
+    ESIEpropagationimplementation = 'legacy';    
 end
 % FOUND: this line was unconditionally overriding whatever 'implementation'
 % was passed in as the 14th argument -- BOTH your 'legacy' and 'accurate'
@@ -97,11 +103,9 @@ end
 % why they came out identical. Removing the override so the input argument
 % (and the nargin<14 default below) actually take effect.
 % implementation = 'accurate';
-if nargin < 14 || isempty(implementation)
-    implementation = 'legacy';
+if nargin < 14 || isempty(ESIEpropagationimplementation)
+    ESIEpropagationimplementation = 'legacy';
 end
-%implementation = 'accurate';
-implementation = 'legacy';
 
 % ---------------------------------------------------------------
 % TEMPORARY DIAGNOSTIC -- a persistent call counter that (as long as this
@@ -117,14 +121,14 @@ implementation = 'legacy';
 % counting up from wherever the previous run left off.
 % Set DEBUG_TARGET_RECEIVERS = [] to silence this once you're done.
 % ---------------------------------------------------------------
-persistent EDcalcpropagatematrix_callcount
-if isempty(EDcalcpropagatematrix_callcount)
-    EDcalcpropagatematrix_callcount = 0;
-end
-EDcalcpropagatematrix_callcount = EDcalcpropagatematrix_callcount + 1;
-receivernumber_fordebug = EDcalcpropagatematrix_callcount;
-DEBUG_TARGET_RECEIVERS = [211 577];
-debugtarget_fordebug = ismember(receivernumber_fordebug,DEBUG_TARGET_RECEIVERS);
+% persistent EDcalcpropagatematrix_callcount
+% if isempty(EDcalcpropagatematrix_callcount)
+%     EDcalcpropagatematrix_callcount = 0;
+% end
+% EDcalcpropagatematrix_callcount = EDcalcpropagatematrix_callcount + 1;
+% receivernumber_fordebug = EDcalcpropagatematrix_callcount;
+% DEBUG_TARGET_RECEIVERS = [211 577];
+% debugtarget_fordebug = ismember(receivernumber_fordebug,DEBUG_TARGET_RECEIVERS);
 
 % ----------------------------------------------------------------------------------------------
 % Create the F-matrix by first creating a matrix showing which
@@ -190,10 +194,12 @@ for iicounter = 1:length(ivrelevantedgepairs)
             ny = pi/(2*pi-edgedata.closwedangvec(edge2));
 
             if n2 ~= n2previous
-                n2vec = Hsubmatrixdata.quadraturematrix_pos(n2,1:n2);
-                n2vec = n2vec(:);
-                weightvec2 = Hsubmatrixdata.quadraturematrix_weights(n2,1:n2);
-                weightvec2 = weightvec2(:);
+%                n2vec = Hsubmatrixdata.quadraturematrix_pos(n2,1:n2);
+                n2vec = Hsubmatrixdata.quadraturematrix_pos(1:n2,n2);
+ %               n2vec = n2vec(:);
+%                weightvec2 = Hsubmatrixdata.quadraturematrix_weights(n2,1:n2);
+                weightvec2 = Hsubmatrixdata.quadraturematrix_weights(1:n2,n2);
+%                weightvec2 = weightvec2(:);
 
                 if edge2 ~= edge2previous
                     dzvec2 = weightvec2*edgedata.edgelengthvec(edge2);
@@ -204,10 +210,12 @@ for iicounter = 1:length(ivrelevantedgepairs)
             end
 
             if n1 ~= n1previous
-                n1vec = Hsubmatrixdata.quadraturematrix_pos(n1,1:n1);
-                n1vec = n1vec(:);
-                weightvec1 = Hsubmatrixdata.quadraturematrix_weights(n1,1:n1);
-                weightvec1 = weightvec1(:);
+%                n1vec = Hsubmatrixdata.quadraturematrix_pos(n1,1:n1);
+               n1vec = Hsubmatrixdata.quadraturematrix_pos(1:n1,n1);
+%                n1vec = n1vec(:);
+%                weightvec1 = Hsubmatrixdata.quadraturematrix_weights(n1,1:n1);
+                weightvec1 = Hsubmatrixdata.quadraturematrix_weights(1:n1,n1);
+%                weightvec1 = weightvec1(:);
                 if edge1 ~= edge1previous
                     dzvec1 = weightvec1*edgedata.edgelengthvec(edge1);
                     edge1previous = edge1;
@@ -282,7 +290,7 @@ for iicounter = 1:length(ivrelevantedgepairs)
 
             dz_expjkmloverml = exp(-1i*k*(ldist+mdist-Rstart))./ldist./mdist.*dzvec2(n2vertmat).*dzvec1(n1vertmat);
 
-            if strcmpi(implementation,'legacy')
+            if strcmpi(ESIEpropagationimplementation,'legacy')
 
                 ch = ((ze2_re2(n2vertmat) - ze1_re2(n1vertmat)).*(ze2_re2(n2vertmat) - zR) + mdist.*ldist)./re1_re2(n1vertmat)./rR;
                 ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
@@ -351,8 +359,9 @@ for iicounter = 1:length(ivrelevantedgepairs)
                         ny,thetain,thetaout,acrossface_in,[], ...
                         ze1_re2,re1_re2,ze2_re2,zR,rR,len2,n1vertmat,n2vertmat, ...
                         mdist,dz_expjkmloverml,dzvec1,dzvec2,thinplaneboost,edge1,edge2, ...
-                        receivernumber_fordebug,debugtarget_fordebug,k,Rstart);
-                elseif isthinhole == 0 % acrossface_in == 0
+                        k,Rstart);
+%                        receivernumber_fordebug,debugtarget_fordebug,k,Rstart);
+                   elseif isthinhole == 0 % acrossface_in == 0
                     % NOT validated -- falls back to legacy unconditionally.
                     % On a synthetic non-coplanar (skewed far edge) test
                     % case, the same correction sometimes reduced error
@@ -434,7 +443,8 @@ function [Fsub,ivaddition] = EDcalcpropagatematrix_accuratebeta( ...
         ny,thetain,thetaout,acrossface_in,thetae1_re2, ...
         ze1_re2,re1_re2,ze2_re2,zR,rR,len2,n1vertmat,n2vertmat, ...
         mdist,dz_expjkmloverml,dzvec1,dzvec2,thinplaneboost,edge1,edge2, ...
-        receivernumber_fordebug,debugtarget_fordebug,k,Rstart)
+        k,Rstart)
+%        receivernumber_fordebug,debugtarget_fordebug,k,Rstart)
     % Reproduces the legacy beta/Fsub computation term-by-term (still
     % using the exact closed-form beta terms everywhere), then, for
     % far-edge-node/beta-term combinations (i,k) flagged as near-singular,
@@ -588,10 +598,10 @@ function [Fsub,ivaddition] = EDcalcpropagatematrix_accuratebeta( ...
         % ~0 for a term where [SINGULARITY HIT] fired, the correction is
         % effectively a no-op for that term -- a strong hint of a logic
         % bug rather than an accuracy shortfall.
-        if debugtarget_fordebug && ~isempty(flaggedi)
-            sum_uncorrected_fordebug = 0;
-            sum_delta_fordebug = 0;
-        end
+        % % % % if debugtarget_fordebug && ~isempty(flaggedi)
+        % % % %     sum_uncorrected_fordebug = 0;
+        % % % %     sum_delta_fordebug = 0;
+        % % % % end
 
         for irow = flaggedi(:).'
             xa = 2*zavec(irow)/len2 - 1;
@@ -610,106 +620,106 @@ function [Fsub,ivaddition] = EDcalcpropagatematrix_accuratebeta( ...
             plain_lorentzian_est = termboost * lorentzian_at_nodes .* dzvec2_row;                                % [1 x n2]
             delta_row = wt_physical - plain_lorentzian_est;
 
-            if debugtarget_fordebug
-                % full() everywhere here: some of these (contrib, zavec,
-                % B1_ik, ...) can come out sparse depending on how the
-                % caller's Hsubmatrixdata matrices were stored, and
-                % fprintf errors on sparse arguments ("Function is not
-                % defined for sparse inputs"). Only affects these debug
-                % prints/accumulators, not the actual patched_betaweight
-                % math below.
-                rowuncorrected_fordebug = full(sum(contrib(irow,:)));   % legacy (pre-correction) row-sum
-                rowdelta_fordebug = full(sum(delta_row));
-                za_fordebug = full(zavec(irow));
-                sqrtB1_fordebug = full(sqrt(max(B1_ik(irow,kk),0)));
-                sum_uncorrected_fordebug = sum_uncorrected_fordebug + rowuncorrected_fordebug;
-                sum_delta_fordebug = sum_delta_fordebug + rowdelta_fordebug;
-                fprintf(['[DEBUG-DELTA] recv=%d edge1=%d edge2=%d k=%d i=%d  za=%.4f sqrt(B1)=%.3e | ' ...
-                         'row-sum uncorrected=%.4e%+.4ei  delta=%.4e%+.4ei  |delta|/|uncorrected|=%.3e\n'], ...
-                        receivernumber_fordebug,edge1,edge2,kk,irow,za_fordebug,sqrtB1_fordebug, ...
-                        real(rowuncorrected_fordebug),imag(rowuncorrected_fordebug), ...
-                        real(rowdelta_fordebug),imag(rowdelta_fordebug), ...
-                        abs(rowdelta_fordebug)/max(abs(rowuncorrected_fordebug),eps));
-
-                % --- TEMPORARY DIAGNOSTIC: fine independent 1-D reference
-                % for this exact row (same closed-form term_k(z2), same
-                % ze1_re2(irow)/re1_re2(irow)/zR/rR/ny/thetaS_i(irow) this
-                % row actually uses -- just evaluated on a fine Simpson
-                % grid over z2 instead of the fixed n2 GL nodes), so we
-                % can tell whether "uncorrected" or "corrected" is
-                % actually closer to the truth for this row, rather than
-                % just how big the delta is relative to uncorrected.
-                Nz2fine_fordebug = 4001;   % odd, for Simpson's rule
-                z2fine_fordebug = linspace(0,len2,Nz2fine_fordebug);
-                phik_fordebug = pi + full(thetaS_i(irow))*s1(kk) + thetaout*s2(kk);
-                mdistfine_fordebug = sqrt((full(ze1_re2(irow))-z2fine_fordebug).^2 + full(re1_re2(irow)).^2);
-                ldistfine_fordebug = sqrt((zR-z2fine_fordebug).^2 + rR.^2);
-                chfine_fordebug = ((z2fine_fordebug-full(ze1_re2(irow))).*(z2fine_fordebug-zR) + mdistfine_fordebug.*ldistfine_fordebug)./full(re1_re2(irow))./rR;
-                chfine_fordebug = (real(sqrt(chfine_fordebug.^2-1)) + chfine_fordebug).^ny;
-                chfine_fordebug = (chfine_fordebug + 1./chfine_fordebug)/2;
-                termkfine_fordebug = sin(ny*phik_fordebug)./(chfine_fordebug-cos(ny*phik_fordebug));
-                hfine_fordebug = len2/(Nz2fine_fordebug-1);
-                fineref_fordebug = termboost*(termkfine_fordebug(1)+termkfine_fordebug(end) ...
-                    +4*sum(termkfine_fordebug(2:2:end-1))+2*sum(termkfine_fordebug(3:2:end-2)))*hfine_fordebug/3;
-                corrected_fordebug = rowuncorrected_fordebug + rowdelta_fordebug;
-                relerr_uncorrected_fordebug = abs(rowuncorrected_fordebug-fineref_fordebug)/max(abs(fineref_fordebug),eps);
-                relerr_corrected_fordebug = abs(corrected_fordebug-fineref_fordebug)/max(abs(fineref_fordebug),eps);
-                fprintf(['[DEBUG-FINEREF] recv=%d edge1=%d edge2=%d k=%d i=%d  fine-ref=%.6e  ' ...
-                         'uncorrected=%.6e (relerr=%.3e)  corrected=%.6e (relerr=%.3e)\n'], ...
-                        receivernumber_fordebug,edge1,edge2,kk,irow,fineref_fordebug, ...
-                        rowuncorrected_fordebug,relerr_uncorrected_fordebug, ...
-                        corrected_fordebug,relerr_corrected_fordebug);
-
-                % --- TEMPORARY DIAGNOSTIC (2nd pass, prompted by PS):
-                % the check above only tests the beta term_k(z2) in
-                % isolation. The actual F-matrix element also carries the
-                % 1/(m*l) propagation-loss factor (with its exp(-jkR)
-                % phase), applied AFTER the modified-weight correction and
-                % sampled only at the fixed n2 nodes -- exactly like
-                % legacy does. The correction's validity implicitly
-                % assumes that factor is smooth enough, on the scale of
-                % the node spacing, to be captured by those samples. This
-                % re-does the same fine-grid-vs-corrected comparison but
-                % for the FULL integrand term_k(z2)*kernelfactor(z2), to
-                % check whether that assumption actually holds here (e.g.
-                % if m(z2) or l(z2) dips small near za, kernelfactor could
-                % vary sharply enough to break it even though the beta
-                % term alone is now handled essentially exactly).
-                kernelfactorfine_fordebug = exp(-1i*k*(ldistfine_fordebug+mdistfine_fordebug-Rstart)) ...
-                    ./ldistfine_fordebug./mdistfine_fordebug;
-                fullintegrandfine_fordebug = termboost*termkfine_fordebug.*kernelfactorfine_fordebug;
-                fullfineref_fordebug = (fullintegrandfine_fordebug(1)+fullintegrandfine_fordebug(end) ...
-                    +4*sum(fullintegrandfine_fordebug(2:2:end-1))+2*sum(fullintegrandfine_fordebug(3:2:end-2)))*hfine_fordebug/3;
-
-                ze2row_fordebug = full(ze2_re2(:).');
-                mdistrow_fordebug = sqrt((full(ze1_re2(irow))-ze2row_fordebug).^2 + full(re1_re2(irow)).^2);
-                ldistrow_fordebug = sqrt((zR-ze2row_fordebug).^2 + rR.^2);
-                kernelfactorrow_fordebug = exp(-1i*k*(ldistrow_fordebug+mdistrow_fordebug-Rstart)) ...
-                    ./ldistrow_fordebug./mdistrow_fordebug;
-
-                rowuncorrected_full_fordebug = full(sum(contrib(irow,:).*kernelfactorrow_fordebug));
-                rowcorrected_full_fordebug = full(sum((contrib(irow,:)+delta_row).*kernelfactorrow_fordebug));
-                relerr_uncorrected_full_fordebug = abs(rowuncorrected_full_fordebug-fullfineref_fordebug)/max(abs(fullfineref_fordebug),eps);
-                relerr_corrected_full_fordebug = abs(rowcorrected_full_fordebug-fullfineref_fordebug)/max(abs(fullfineref_fordebug),eps);
-                fprintf(['[DEBUG-FINEREF-FULL] recv=%d edge1=%d edge2=%d k=%d i=%d  fine-ref=%.6e%+.6ei  ' ...
-                         'uncorrected=%.6e%+.6ei (relerr=%.3e)  corrected=%.6e%+.6ei (relerr=%.3e)\n'], ...
-                        receivernumber_fordebug,edge1,edge2,kk,irow, ...
-                        real(fullfineref_fordebug),imag(fullfineref_fordebug), ...
-                        real(rowuncorrected_full_fordebug),imag(rowuncorrected_full_fordebug),relerr_uncorrected_full_fordebug, ...
-                        real(rowcorrected_full_fordebug),imag(rowcorrected_full_fordebug),relerr_corrected_full_fordebug);
-            end
+            % % % if debugtarget_fordebug
+            % % %     % full() everywhere here: some of these (contrib, zavec,
+            % % %     % B1_ik, ...) can come out sparse depending on how the
+            % % %     % caller's Hsubmatrixdata matrices were stored, and
+            % % %     % fprintf errors on sparse arguments ("Function is not
+            % % %     % defined for sparse inputs"). Only affects these debug
+            % % %     % prints/accumulators, not the actual patched_betaweight
+            % % %     % math below.
+            % % %     rowuncorrected_fordebug = full(sum(contrib(irow,:)));   % legacy (pre-correction) row-sum
+            % % %     rowdelta_fordebug = full(sum(delta_row));
+            % % %     za_fordebug = full(zavec(irow));
+            % % %     sqrtB1_fordebug = full(sqrt(max(B1_ik(irow,kk),0)));
+            % % %     sum_uncorrected_fordebug = sum_uncorrected_fordebug + rowuncorrected_fordebug;
+            % % %     sum_delta_fordebug = sum_delta_fordebug + rowdelta_fordebug;
+            % % %     fprintf(['[DEBUG-DELTA] recv=%d edge1=%d edge2=%d k=%d i=%d  za=%.4f sqrt(B1)=%.3e | ' ...
+            % % %              'row-sum uncorrected=%.4e%+.4ei  delta=%.4e%+.4ei  |delta|/|uncorrected|=%.3e\n'], ...
+            % % %             receivernumber_fordebug,edge1,edge2,kk,irow,za_fordebug,sqrtB1_fordebug, ...
+            % % %             real(rowuncorrected_fordebug),imag(rowuncorrected_fordebug), ...
+            % % %             real(rowdelta_fordebug),imag(rowdelta_fordebug), ...
+            % % %             abs(rowdelta_fordebug)/max(abs(rowuncorrected_fordebug),eps));
+            % % % 
+            % % %     % --- TEMPORARY DIAGNOSTIC: fine independent 1-D reference
+            % % %     % for this exact row (same closed-form term_k(z2), same
+            % % %     % ze1_re2(irow)/re1_re2(irow)/zR/rR/ny/thetaS_i(irow) this
+            % % %     % row actually uses -- just evaluated on a fine Simpson
+            % % %     % grid over z2 instead of the fixed n2 GL nodes), so we
+            % % %     % can tell whether "uncorrected" or "corrected" is
+            % % %     % actually closer to the truth for this row, rather than
+            % % %     % just how big the delta is relative to uncorrected.
+            % % %     Nz2fine_fordebug = 4001;   % odd, for Simpson's rule
+            % % %     z2fine_fordebug = linspace(0,len2,Nz2fine_fordebug);
+            % % %     phik_fordebug = pi + full(thetaS_i(irow))*s1(kk) + thetaout*s2(kk);
+            % % %     mdistfine_fordebug = sqrt((full(ze1_re2(irow))-z2fine_fordebug).^2 + full(re1_re2(irow)).^2);
+            % % %     ldistfine_fordebug = sqrt((zR-z2fine_fordebug).^2 + rR.^2);
+            % % %     chfine_fordebug = ((z2fine_fordebug-full(ze1_re2(irow))).*(z2fine_fordebug-zR) + mdistfine_fordebug.*ldistfine_fordebug)./full(re1_re2(irow))./rR;
+            % % %     chfine_fordebug = (real(sqrt(chfine_fordebug.^2-1)) + chfine_fordebug).^ny;
+            % % %     chfine_fordebug = (chfine_fordebug + 1./chfine_fordebug)/2;
+            % % %     termkfine_fordebug = sin(ny*phik_fordebug)./(chfine_fordebug-cos(ny*phik_fordebug));
+            % % %     hfine_fordebug = len2/(Nz2fine_fordebug-1);
+            % % %     fineref_fordebug = termboost*(termkfine_fordebug(1)+termkfine_fordebug(end) ...
+            % % %         +4*sum(termkfine_fordebug(2:2:end-1))+2*sum(termkfine_fordebug(3:2:end-2)))*hfine_fordebug/3;
+            % % %     corrected_fordebug = rowuncorrected_fordebug + rowdelta_fordebug;
+            % % %     relerr_uncorrected_fordebug = abs(rowuncorrected_fordebug-fineref_fordebug)/max(abs(fineref_fordebug),eps);
+            % % %     relerr_corrected_fordebug = abs(corrected_fordebug-fineref_fordebug)/max(abs(fineref_fordebug),eps);
+            % % %     fprintf(['[DEBUG-FINEREF] recv=%d edge1=%d edge2=%d k=%d i=%d  fine-ref=%.6e  ' ...
+            % % %              'uncorrected=%.6e (relerr=%.3e)  corrected=%.6e (relerr=%.3e)\n'], ...
+            % % %             receivernumber_fordebug,edge1,edge2,kk,irow,fineref_fordebug, ...
+            % % %             rowuncorrected_fordebug,relerr_uncorrected_fordebug, ...
+            % % %             corrected_fordebug,relerr_corrected_fordebug);
+            % % % 
+            % % %     % --- TEMPORARY DIAGNOSTIC (2nd pass, prompted by PS):
+            % % %     % the check above only tests the beta term_k(z2) in
+            % % %     % isolation. The actual F-matrix element also carries the
+            % % %     % 1/(m*l) propagation-loss factor (with its exp(-jkR)
+            % % %     % phase), applied AFTER the modified-weight correction and
+            % % %     % sampled only at the fixed n2 nodes -- exactly like
+            % % %     % legacy does. The correction's validity implicitly
+            % % %     % assumes that factor is smooth enough, on the scale of
+            % % %     % the node spacing, to be captured by those samples. This
+            % % %     % re-does the same fine-grid-vs-corrected comparison but
+            % % %     % for the FULL integrand term_k(z2)*kernelfactor(z2), to
+            % % %     % check whether that assumption actually holds here (e.g.
+            % % %     % if m(z2) or l(z2) dips small near za, kernelfactor could
+            % % %     % vary sharply enough to break it even though the beta
+            % % %     % term alone is now handled essentially exactly).
+            % % %     kernelfactorfine_fordebug = exp(-1i*k*(ldistfine_fordebug+mdistfine_fordebug-Rstart)) ...
+            % % %         ./ldistfine_fordebug./mdistfine_fordebug;
+            % % %     fullintegrandfine_fordebug = termboost*termkfine_fordebug.*kernelfactorfine_fordebug;
+            % % %     fullfineref_fordebug = (fullintegrandfine_fordebug(1)+fullintegrandfine_fordebug(end) ...
+            % % %         +4*sum(fullintegrandfine_fordebug(2:2:end-1))+2*sum(fullintegrandfine_fordebug(3:2:end-2)))*hfine_fordebug/3;
+            % % % 
+            % % %     ze2row_fordebug = full(ze2_re2(:).');
+            % % %     mdistrow_fordebug = sqrt((full(ze1_re2(irow))-ze2row_fordebug).^2 + full(re1_re2(irow)).^2);
+            % % %     ldistrow_fordebug = sqrt((zR-ze2row_fordebug).^2 + rR.^2);
+            % % %     kernelfactorrow_fordebug = exp(-1i*k*(ldistrow_fordebug+mdistrow_fordebug-Rstart)) ...
+            % % %         ./ldistrow_fordebug./mdistrow_fordebug;
+            % % % 
+            % % %     rowuncorrected_full_fordebug = full(sum(contrib(irow,:).*kernelfactorrow_fordebug));
+            % % %     rowcorrected_full_fordebug = full(sum((contrib(irow,:)+delta_row).*kernelfactorrow_fordebug));
+            % % %     relerr_uncorrected_full_fordebug = abs(rowuncorrected_full_fordebug-fullfineref_fordebug)/max(abs(fullfineref_fordebug),eps);
+            % % %     relerr_corrected_full_fordebug = abs(rowcorrected_full_fordebug-fullfineref_fordebug)/max(abs(fullfineref_fordebug),eps);
+            % % %     fprintf(['[DEBUG-FINEREF-FULL] recv=%d edge1=%d edge2=%d k=%d i=%d  fine-ref=%.6e%+.6ei  ' ...
+            % % %              'uncorrected=%.6e%+.6ei (relerr=%.3e)  corrected=%.6e%+.6ei (relerr=%.3e)\n'], ...
+            % % %             receivernumber_fordebug,edge1,edge2,kk,irow, ...
+            % % %             real(fullfineref_fordebug),imag(fullfineref_fordebug), ...
+            % % %             real(rowuncorrected_full_fordebug),imag(rowuncorrected_full_fordebug),relerr_uncorrected_full_fordebug, ...
+            % % %             real(rowcorrected_full_fordebug),imag(rowcorrected_full_fordebug),relerr_corrected_full_fordebug);
+            % % % end
 
             contrib(irow,:) = contrib(irow,:) + delta_row;
         end
 
-        if debugtarget_fordebug && ~isempty(flaggedi)
-            fprintf(['[DEBUG-DELTA-SUMMARY] recv=%d edge1=%d edge2=%d k=%d  %d nodes flagged (i=%d..%d)  ' ...
-                     'sum uncorrected=%.4e%+.4ei  sum delta=%.4e%+.4ei  |sum delta|/|sum uncorrected|=%.3e\n'], ...
-                    receivernumber_fordebug,edge1,edge2,kk,numel(flaggedi),min(flaggedi),max(flaggedi), ...
-                    real(sum_uncorrected_fordebug),imag(sum_uncorrected_fordebug), ...
-                    real(sum_delta_fordebug),imag(sum_delta_fordebug), ...
-                    abs(sum_delta_fordebug)/max(abs(sum_uncorrected_fordebug),eps));
-        end
+        % % % if debugtarget_fordebug && ~isempty(flaggedi)
+        % % %     fprintf(['[DEBUG-DELTA-SUMMARY] recv=%d edge1=%d edge2=%d k=%d  %d nodes flagged (i=%d..%d)  ' ...
+        % % %              'sum uncorrected=%.4e%+.4ei  sum delta=%.4e%+.4ei  |sum delta|/|sum uncorrected|=%.3e\n'], ...
+        % % %             receivernumber_fordebug,edge1,edge2,kk,numel(flaggedi),min(flaggedi),max(flaggedi), ...
+        % % %             real(sum_uncorrected_fordebug),imag(sum_uncorrected_fordebug), ...
+        % % %             real(sum_delta_fordebug),imag(sum_delta_fordebug), ...
+        % % %             abs(sum_delta_fordebug)/max(abs(sum_uncorrected_fordebug),eps));
+        % % % end
 
         patched_betaweight = patched_betaweight + contrib;
     end

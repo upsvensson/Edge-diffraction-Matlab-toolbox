@@ -32,6 +32,8 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                          max(abs(Q))/norm(Q) "peakiness" tracking
 %                          influence stopping, not just diagnose
 %   .inteqgmresmaxiter     optional, default 50. 
+%   .ESIEpropagationimplementation   optional, 'legacy' or 'accurate'.
+%                          Default: 'legacy'
 %
 % Output parameters
 %   tfinteqdiff      Matrix with the diffracted pressure
@@ -82,7 +84,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1, EDmatvecH from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  11 Sep. 2026  
+% Peter Svensson (peter.svensson@ntnu.no)  20 Sep. 2026  
 %                       
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
@@ -155,6 +157,8 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % tracking of term decay in the iterative series. Exports an
 % inteqdiagnostics struct for analysis of the calculation performance.
 % Also introduced the possibility to skip the propagation step.
+% 20 Sep. 2026 FOrwarded ESIEpropagationimplementation to
+% EDcalcpropagatematrix.
 
 t00 = clock;
 showtext = filehandlingparameters.showtext;
@@ -428,22 +432,26 @@ for ifreq = 1:nfrequencies
            % matrices
 
            if n1 ~= n1prev
-                n1vec = full(Hsubmatrixdata.quadraturematrix_pos(n1,1:n1));
-                n1vec = n1vec(:);
-                weightvec = full(Hsubmatrixdata.quadraturematrix_weights(n1,1:n1));
-                weightvec = weightvec(:);
+                % n1vec = full(Hsubmatrixdata.quadraturematrix_pos(n1,1:n1));
+                % n1vec = n1vec(:);
+                n1vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n1,n1));
+                % weightvec = full(Hsubmatrixdata.quadraturematrix_weights(n1,1:n1));
+                % weightvec = weightvec(:);
+                weightvec = full(Hsubmatrixdata.quadraturematrix_weights(1:n1,n1));
                 n1prev = n1;
            end       
            dzvec = weightvec*edgedata.edgelengthvec(edge1);
 
             if n2 ~= n2prev
-                n2vec = full(Hsubmatrixdata.quadraturematrix_pos(n2,1:n2));
-                n2vec = n2vec(:);
+                % n2vec = full(Hsubmatrixdata.quadraturematrix_pos(n2,1:n2));
+                % n2vec = n2vec(:);
+                n2vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n2,n2));
                 n2prev = n2;
             end
             if n3 ~= n3prev        
-                n3vec = full(Hsubmatrixdata.quadraturematrix_pos(n3,1:n3));
-                n3vec = n3vec(:);
+                % n3vec = full(Hsubmatrixdata.quadraturematrix_pos(n3,1:n3));
+                % n3vec = n3vec(:);
+                n3vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n3,n3));
                 n3prev = n3;
             end
 
@@ -690,12 +698,14 @@ for ifreq = 1:nfrequencies
                if showtext >= 2
                     disp('      Starting to solve the int.eq. with GMRES, fast version (for smaller problems)')
                 end
-
+                  t00_gmres = clock;
                   Hsp = EDbuildHsparse_fast(Hsubmatrixdata,Hsubdatalists,ivuselists);
                   N = size(Hsp,1);
                   A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
-                    
+                  inteqdiagnostics.gmres_time1 = etime(clock,t00_gmres);
+                  t00_gmres = clock;    
                   [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+                  inteqdiagnostics.gmres_time2 = etime(clock,t00_gmres);
                   inteqdiagnostics.gmresiter = iter;
                   inteqdiagnostics.gmresflag = flag;
                   inteqdiagnostics.gmresrelres = relres;
@@ -705,8 +715,10 @@ for ifreq = 1:nfrequencies
                if showtext >= 2
                     disp('      Starting to solve the int.eq. with GMRES, the version for larger problems')
                end
+               t00_gmres = clock;    
                afun = @(q) q - EDmatvecH(q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+               inteqdiagnostics.gmres_time1 = etime(clock,t00_gmres);
                inteqdiagnostics.gmresiter = iter;
                inteqdiagnostics.gmresflag = flag;
                inteqdiagnostics.gmresrelres = relres;
@@ -752,8 +764,10 @@ for ifreq = 1:nfrequencies
                 
                 [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,Rdata.vispartedgesfromr(:,irec),...
                         frequency,controlparameters.Rstart,...
-                        Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext);
-                    
+                        Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),...
+                        Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext,...
+                        controlparameters.ESIEpropagationimplementation);
+                inteqdiagnostics.ESIEpropagationimplementation =   controlparameters.ESIEpropagationimplementation;
                  P_receiver(ifreq,irec) = Fmatrix*Qfinal;
                  if filehandlingparameters.savediff2result == 1
                     extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec) = Fmatrix*(Qfinal-Q_firstterm);
@@ -870,12 +884,15 @@ for ifreq = 1:nfrequencies
                 elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 
                    if showtext >= 2
                         disp('      Starting to solve the int.eq. with GMRES, fast version (for smaller problems)')
-                    end
+                   end
+                     t00_gmres = clock;
                      Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
                      N = size(Hsp,1);
                      A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
-                     
+                     inteqdiagnostics.gmres_time1 = etime(clock,t00_gmres);                     
+                     t00_gmres = clock;
                      [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+                     inteqdiagnostics.gmres_time2 = etime(clock,t00_gmres);                    
                      inteqdiagnostics.gmresiter = iter;
                      inteqdiagnostics.gmresflag = flag;
                      inteqdiagnostics.gmresrelres = relres;
@@ -884,9 +901,10 @@ for ifreq = 1:nfrequencies
                    if showtext >= 2
                         disp('      Starting to solve the int.eq. with GMRES, the version for larger problems')
                     end
-                     
+                    t00_gmres = clock;
                     afun = @(q) q - EDmatvecH(q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                     [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+                    inteqdiagnostics.gmres_time1 = etime(clock,t00_gmres);                     
                     inteqdiagnostics.gmresiter = iter;
                     inteqdiagnostics.gmresflag = flag;
                     inteqdiagnostics.gmresrelres = relres;
@@ -934,8 +952,11 @@ for ifreq = 1:nfrequencies
                          [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,...
                             Rdata.vispartedgesfromr(:,irec),frequency,controlparameters.Rstart,...
                             Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),...
-                            Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext);
-    
+                            Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),...
+                            doesQsegmenthavevalues,filehandlingparameters.showtext,...
+                            controlparameters.ESIEpropagationimplementation);
+                            inteqdiagnostics.ESIEpropagationimplementation =   controlparameters.ESIEpropagationimplementation;
+   
                         if ifreq == 1 && ~isempty(ivproblematic)
                             existinglength = size(ivproblematicmatrix,2);
                             newlength = length(ivproblematic);
@@ -959,7 +980,10 @@ for ifreq = 1:nfrequencies
                      [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,...
                         Rdata.vispartedgesfromr(:,irec),frequency,controlparameters.Rstart,...
                         Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),...
-                        Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext);
+                        Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),...
+                        doesQsegmenthavevalues,filehandlingparameters.showtext,...
+                        controlparameters.ESIEpropagationimplementation);
+                        inteqdiagnostics.ESIEpropagationimplementation =   controlparameters.ESIEpropagationimplementation;
     
                     if ifreq == 1 && ~isempty(ivproblematic)
                         existinglength = size(ivproblematicmatrix,2);
@@ -1006,6 +1030,8 @@ inteqdiagnosticstruct = struct(...
     'gmresflag',         [], ...
     'gmresrelres',       NaN, ...
     'gmresiter',         NaN, ...
+    'gmres_time1',       NaN, ...
+    'gmres_time2',       NaN, ...
     'difforderused',     NaN, ...
     'hitmaxdifforder',   NaN, ...
     'finaltermratio',    NaN, ...
@@ -1016,7 +1042,8 @@ inteqdiagnosticstruct = struct(...
     'normQ',             NaN, ...
     'normQfinal',        NaN, ...
     'r_hat',             NaN, ...
-    'esttail',           NaN);
+    'esttail',           NaN,...
+    'ESIEpropagationimplementation',       []);
 end
     
 end

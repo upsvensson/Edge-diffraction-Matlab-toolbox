@@ -38,10 +38,10 @@ controlparameters,EDversionnumber,filehandlingparameters)
 %                       reused then this variable is empty. For v1 of
 %                       this function, this variable is also empty.%
 %
-% Uses the functions  EDdistelements, EDrecycleresultfiles from EDtoolbox
+% Uses the functions  EDgetGLrule, EDrecycleresultfiles from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 18 June 2026 
+% Peter Svensson (peter.svensson@ntnu.no) 25 Sep. 2026 
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 % EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
@@ -78,6 +78,10 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % .edgepairsharecorner, .edgepairangle, .edgepairsharedcornertype
 % 18 June 2026 Modified the new fields to .edgepairsharedcornertype_from
 % and .edgepairsharedcornertype_to
+% 25 Sep. 2026 Changed to using the EDgetGLrules for faster calculation of
+% the GL rules. Also changed the orientation of the storage of the sparse
+% quadraturematrix arrays: sotring each order as a column rather than a
+% row.
 
 t00 = clock;
 
@@ -410,11 +414,17 @@ uniquelistofedgepoints = unique(nedgeelems);
 quadraturematrix_pos     = sparse(zeros(max(uniquelistofedgepoints),max(uniquelistofedgepoints)));
 quadraturematrix_weights = sparse(zeros(max(uniquelistofedgepoints),max(uniquelistofedgepoints)));
 
+if inteq_discretizationtype ~= 2
+    error('ERROR: inteq_discretizationtype must = 2 for the Hsubmatrixdata.')
+end
 for ii = 1:length(uniquelistofedgepoints)
     n = uniquelistofedgepoints(ii);
-    [n1vec,weightvec] = EDdistelements(n,inteq_discretizationtype);
-    quadraturematrix_pos(n,1:n)     = n1vec(:).';
-    quadraturematrix_weights(n,1:n) = weightvec(:).';
+    [n1vec, weightvec] = EDgetGLrule(n);
+    % [n1vec,weightvec] = EDdistelements(n,inteq_discretizationtype);
+    % quadraturematrix_pos(n,1:n)     = n1vec(:).';
+    % quadraturematrix_weights(n,1:n) = weightvec(:).';
+    quadraturematrix_pos(1:n,n)     = n1vec(:);
+    quadraturematrix_weights(1:n,n) = weightvec(:);
 end
 
 Hsubmatrixdata = struct('Hsubmatrix',Hsubmatrix);

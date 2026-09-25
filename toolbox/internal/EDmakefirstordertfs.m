@@ -34,7 +34,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 % Uses functions EDcoordtrans2, EDwedge1st_fd, EDrecycleresultfiles from EDtoolbox
 % Uses function DataHash form Matlab Central
 % 
-% Peter Svensson 11 Feb. 2026 (peter.svensson@ntnu.no)
+% Peter Svensson 24 Sep. 2026 (peter.svensson@ntnu.no)
 %
 % [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename] = ...
 % EDmakefirstordertfs(firstorderpathdata,planedata,edgedata,Snewdata,...
@@ -86,6 +86,8 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 % which made the calculations stop.
 % 11 Feb. 2026 Fixed a bug with the hash check: difforder was stored in the
 % hash but it should be calcfirstorderdiff
+% 24 Sep. 2026 Adapted to the mew parameter diff1method etc for
+% EDwedge1st_fd
 
 t00 = clock;
 
@@ -95,6 +97,8 @@ difforder = controlparameters.difforder;
 frequencies = controlparameters.frequencies;
 Rstart = controlparameters.Rstart;
 directsound = controlparameters.directsound;
+diff1method = controlparameters.diff1method;
+diff1GLorder = controlparameters.diff1GLorder;
 
 % New parameter for the hash 25 Aug. 2021: calcfirstorderdiff
 calcfirstorderdiff = double(difforder > 0);
@@ -605,7 +609,7 @@ if difforder > 0
                 [tfnew,singularterm,zfirst] = EDwedge1st_fd(envdata.cair,frequencies,edgedata.closwedangvec(edgenumber),...
                     cylcoordS(Snumber(jj),1),cylcoordS(Snumber(jj),2),cylcoordS(Snumber(jj),3),...
                     cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
-                    edgedata.edgelengthvec(edgenumber)*[0 1],'n',Rstart,[1 1]);  
+                    edgedata.edgelengthvec(edgenumber)*[0 1],'n',Rstart,[1 1],diff1method,diff1GLorder);  
     
                 tfnew = tfnew.*(Sdata.sourceamplitudes( Snumber(jj),: ).');
 
@@ -642,7 +646,7 @@ if difforder > 0
 
                     [tfonepistonpoint,singularterm,zfirst] = EDwedge1st_fd(envdata.cair,frequencies,edgedata.closwedangvec(edgenumber),...
                         rs(Snumber(jj)),thetas(Snumber(jj)),zs(Snumber(jj)),cylcoordR(Rnumber(jj),1),cylcoordR(Rnumber(jj),2),cylcoordR(Rnumber(jj),3),...
-                        edgedata.edgelengthvec(edgenumber)*[0 1],'n',Rstart,[1 1]);  
+                        edgedata.edgelengthvec(edgenumber)*[0 1],'n',Rstart,[1 1],diff1method,diff1GLorder);  
                     tfsumpiston = tfsumpiston + tfonepistonpoint*Sdata.pistongaussweights{Snumber(jj)}(np);
                 end
 
@@ -669,5 +673,3 @@ timingdata(3) = etime(clock,t00sub);
 elapsedtimemaketfs = etime(clock,t00);
 
 eval(['save(''',desiredname,''',''tfdirect'',''tfgeom'',''tfdiff'',''timingdata'',''EDinputdatahash'',''elapsedtimemaketfs'');'])
-
-

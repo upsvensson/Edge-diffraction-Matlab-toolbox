@@ -12,7 +12,7 @@ function [nvec,weightvec] = EDdistelements(n,method)
 %   nvec        Vector, [n,1], of fractional positions between 0 and 1
 %   weightvec   Vector, [n,1], of weighting values for the sample points in nvec. 
 %
-% Uses function lgwt from Matlab Central
+% Uses function lgwt from Matlab Central and EDgetGLrule from EDtoolbox
 %
 % peter.svensson@ntnu.no       13 Feb 2018
 %

@@ -1,4 +1,4 @@
-function [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
+function [Fmatrix,ivproblematic,propdiagnostics] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
 isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegmenthavevalues,...
 showtext,ESIEpropagationimplementation)
 % EDcalcpropagatematrix - propagates the sound pressure at the edges to a receiver
@@ -13,7 +13,7 @@ showtext,ESIEpropagationimplementation)
 %   rRvec, thetaRvec, zRvec
 %   doesQsegmenthavevalues
 %   showtext (optional) 0 -> No text displayed on screen. Default: 0
-%   ESIEpropagationimplementation (optional) 'legacy' (default) or 'accurate'.
+%   ESIEpropagationimplementation (optional) 'accurate' (default) or 'legacy'.
 %       'legacy'   : original, byte-identical code path. Near the
 %                    propagation singularity (where the far-edge GL node's
 %                    apex point za(z1) falls between two z2 GL nodes and
@@ -39,12 +39,13 @@ showtext,ESIEpropagationimplementation)
 % Output parameters:
 %   Fmatrix
 %   ivproblematic
+%   propdiagnostics
 %
 % Uses EDcoordtrans1.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 25 Sep. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 8 Oct. 2026
 %
-% [Fmatrix,ivproblematic] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
+% [Fmatrix,ivproblematic,propdiagnostics] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
 %     isthinhole,vispartedgesfromr,frequency,Rstart,...
 %     rRvec,thetaRvec,zRvec,doesQsegmenthavevalues,showtext,ESIEpropagationimplementation);
 
@@ -92,43 +93,17 @@ showtext,ESIEpropagationimplementation)
 % "ESIEpropagationimplementation".
 % 25 Sep. 2026 Adapted to the change in orientation of the sparse
 % quadraturematrix data.
+% 8 Oct. 2026 Modified the new "accurate" implementation to be used more
+% often than the first version. Set "accurate" to the default. Some
+% speeding up by Claude.
 
 if nargin < 13
     showtext = 0;
-    ESIEpropagationimplementation = 'legacy';    
+    ESIEpropagationimplementation = 'accurate';    
 end
-% FOUND: this line was unconditionally overriding whatever 'implementation'
-% was passed in as the 14th argument -- BOTH your 'legacy' and 'accurate'
-% test runs were secretly running 'accurate' every time, which is exactly
-% why they came out identical. Removing the override so the input argument
-% (and the nargin<14 default below) actually take effect.
-% implementation = 'accurate';
 if nargin < 14 || isempty(ESIEpropagationimplementation)
-    ESIEpropagationimplementation = 'legacy';
+    ESIEpropagationimplementation = 'accurate';
 end
-
-% ---------------------------------------------------------------
-% TEMPORARY DIAGNOSTIC -- a persistent call counter that (as long as this
-% function is called exactly once per receiver per frequency, matching
-% how EDintegralequation_convex_tf drives your 629-receiver/1-frequency
-% sweep) equals the receiver number, without needing to thread a receiver
-% index through the whole call chain. Used below to gate a detailed
-% corrected-vs-uncorrected delta printout for specific receivers of
-% interest (edit DEBUG_TARGET_RECEIVERS as needed).
-% IMPORTANT: persistent variables survive across calls within the same
-% MATLAB session, so run "clear EDcalcpropagatematrix" (or "clear
-% functions"/"clear all") before each fresh sweep, or this will keep
-% counting up from wherever the previous run left off.
-% Set DEBUG_TARGET_RECEIVERS = [] to silence this once you're done.
-% ---------------------------------------------------------------
-% persistent EDcalcpropagatematrix_callcount
-% if isempty(EDcalcpropagatematrix_callcount)
-%     EDcalcpropagatematrix_callcount = 0;
-% end
-% EDcalcpropagatematrix_callcount = EDcalcpropagatematrix_callcount + 1;
-% receivernumber_fordebug = EDcalcpropagatematrix_callcount;
-% DEBUG_TARGET_RECEIVERS = [211 577];
-% debugtarget_fordebug = ismember(receivernumber_fordebug,DEBUG_TARGET_RECEIVERS);
 
 % ----------------------------------------------------------------------------------------------
 % Create the F-matrix by first creating a matrix showing which
@@ -138,7 +113,6 @@ nbig = Hsubmatrixdata.bigmatrixendnums(end);
 Fmatrix = zeros(1,nbig);
 refto = edgetoedgedata.reftoshortlistE;
 
-% k = 2*pi*frequency/CAIR;
 k = 2*pi*frequency/envdata.cair;
 
 if showtext >= 3
@@ -157,6 +131,8 @@ noedgepairsthin  = prod(1-double(Hsubmatrixdata.isthinplaneedgepair));
 ivrelevantedgepairs = find( vispartedgesfromr(Hsubmatrixdata.edgepairlist(:,1)) > 0 );
 
 ivproblematic = [];
+propdiagnostics = struct('npairs',0,'npairs_eligible',0,'npairs_corrected',0, ...
+                  'nrows',0,'nrows_corrected',0,'correctedpairs',zeros(0,4));
 
 for iicounter = 1:length(ivrelevantedgepairs)
 
@@ -306,7 +282,7 @@ for iicounter = 1:length(ivrelevantedgepairs)
                         % The lines below were added after Claude added the
                         % 'accuracy' mode.
                         if abs(thetain - thetaout - pi) < 0.01 || abs(thetain - thetaout + pi) < 0.01
-                            disp([num2str(thetain),', ',num2str(thetaout)])
+                            % disp([num2str(thetain),', ',num2str(thetaout)])
                             rhoangle = rR./re1_re2(n1vertmat);
                             R02 = (re1_re2(n1vertmat) + rR).^2 + (zR - ze1_re2(n1vertmat)).^2;
                             B1beta = 4*sin(ny*(pi + thetain + thetaout   )/2).^2*rhoangle.^2.*R02/ny^2/(1+rhoangle).^4;
@@ -355,11 +331,18 @@ for iicounter = 1:length(ivrelevantedgepairs)
                     % across two grid resolutions) and matched legacy to
                     % ~1e-18 in a case with nothing to correct -- no
                     % regression found.
-                    [Fsub,ivaddition] = EDcalcpropagatematrix_accuratebeta( ...
+                    [Fsub,ivaddition,diagsub] = EDcalcpropagatematrix_accuratebeta( ...
                         ny,thetain,thetaout,acrossface_in,[], ...
                         ze1_re2,re1_re2,ze2_re2,zR,rR,len2,n1vertmat,n2vertmat, ...
                         mdist,dz_expjkmloverml,dzvec1,dzvec2,thinplaneboost,edge1,edge2, ...
                         k,Rstart);
+                        propdiagnostics.npairs_eligible = propdiagnostics.npairs_eligible + 1;
+                        propdiagnostics.nrows           = propdiagnostics.nrows + diagsub(2);
+                        propdiagnostics.nrows_corrected = propdiagnostics.nrows_corrected + diagsub(1);
+                        if diagsub(1) > 0
+                            propdiagnostics.npairs_corrected = propdiagnostics.npairs_corrected + 1;
+                            propdiagnostics.correctedpairs(end+1,:) = [edge1 edge2 diagsub];
+                        end                    
 %                        receivernumber_fordebug,debugtarget_fordebug,k,Rstart);
                    elseif isthinhole == 0 % acrossface_in == 0
                     % NOT validated -- falls back to legacy unconditionally.
@@ -423,6 +406,7 @@ for iicounter = 1:length(ivrelevantedgepairs)
                 end
             end
 
+            propdiagnostics.npairs = propdiagnostics.npairs + 1;
             Fmatrix(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) =     Fmatrix(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) + Fsub.';
 
             if ~isempty(ivaddition)
@@ -439,7 +423,7 @@ end
 % Local functions for the 'accurate' implementation.
 % ========================================================================
 
-function [Fsub,ivaddition] = EDcalcpropagatematrix_accuratebeta( ...
+function [Fsub,ivaddition,diagsub] = EDcalcpropagatematrix_accuratebeta( ...
         ny,thetain,thetaout,acrossface_in,thetae1_re2, ...
         ze1_re2,re1_re2,ze2_re2,zR,rR,len2,n1vertmat,n2vertmat, ...
         mdist,dz_expjkmloverml,dzvec1,dzvec2,thinplaneboost,edge1,edge2, ...
@@ -530,11 +514,13 @@ function [Fsub,ivaddition] = EDcalcpropagatematrix_accuratebeta( ...
     % --- flag which (i,k) entries are under-resolved by the existing,
     % fixed z2 grid ---
     if n2 > 1
-        localspacing = min(diff(sort(ze2_re2)));
+        % Change on 7 Oct. 2026 as suggested by Claude
+        %localspacing = min(diff(sort(ze2_re2)));
+        localspacing = max(diff(sort(ze2_re2)));
     else
         localspacing = len2;
     end
-    zrelthreshold = 1.0;     % heuristic -- tune like the other resolution
+    %zrelthreshold = 1.0;     % heuristic -- tune like the other resolution
                               % thresholds used elsewhere in this codebase.
                               % Deliberately generous: sqrt(B1) is the
                               % Lorentzian's half-width, and a fixed GL
@@ -544,9 +530,13 @@ function [Fsub,ivaddition] = EDcalcpropagatematrix_accuratebeta( ...
                               % *smaller* than one node spacing is already
                               % too late -- see the worked n1=n2=16 case in
                               % the accompanying validation notes.
+     % Change on 7 Oct. 2026 as suggested by Claude
+     zrelthreshold = 5;        
+                              
     insiderange = (zavec >= -0.05*len2) & (zavec <= 1.05*len2);   % [n1x1]
     narrowenough = sqrt(max(B1_ik,0)) < zrelthreshold*localspacing;             % [n1 x nk]
     flag_ik = insiderange & narrowenough;  % [n1 x nk]
+    diagsub = [nnz(any(flag_ik,2)) size(flag_ik,1)];   % [corrected rows, all rows]
 
     % ---------------------------------------------------------------
     % TEMPORARY DIAGNOSTIC -- prints ONE line per (i,k) the moment the
@@ -563,7 +553,9 @@ function [Fsub,ivaddition] = EDcalcpropagatematrix_accuratebeta( ...
     % once per frequency -- that's expected, not a bug.
     % Set singularitydebugprint=false to silence this once you're done.
     % ---------------------------------------------------------------
-    singularitydebugprint = true;
+    singularitydebugprint = false;
+
+
     if singularitydebugprint && any(flag_ik(:))
         [flagi,flagk] = find(flag_ik);
         for hh = 1:numel(flagi)
@@ -581,145 +573,36 @@ function [Fsub,ivaddition] = EDcalcpropagatematrix_accuratebeta( ...
     patched_betaweight = zeros(n1,n2);            % holds sum_k [dzvec2(j)*term_k(i,j)], patched
 
     if any(flag_ik(:))
-        [xnodes_std,wnodes_std] = gaussLegendreNodes(n2);
-        [xnodes_std,sortidx] = sort(xnodes_std);
-        wnodes_std = wnodes_std(sortidx);
+        % 8 Oct. 2026: nodes, weights and the scaled Legendre matrix depend
+        % only on n2, so they are computed once and cached (as are the
+        % finer rule and interpolation matrix used for wide peaks).
+        [~,wnodes_std,Sstd,tfine_std,wfine_std,Pint_std] = glStandardCached(n2);
     end
+
+    ze2_row = ze2_re2(:).';                       % [1 x n2]
 
     for kk = 1:numel(betaterms)
         termk_mat = reshape(betaterms{kk},n1,n2);      % exact term_k(i,j), RAW/undoubled
         contrib = termboost * termk_mat .* dzvec2_row;  % legacy per-(i,j) contribution, [n1 x n2] -- LEFT UNCHANGED
         flaggedi = find(flag_ik(:,kk));
 
-        % --- TEMPORARY DIAGNOSTIC accumulators (see debugtarget_fordebug
-        % above): tallies how big the correction actually is, per flagged
-        % row and summed over the whole term, relative to what legacy
-        % already had there. If |sum delta|/|sum uncorrected| comes out
-        % ~0 for a term where [SINGULARITY HIT] fired, the correction is
-        % effectively a no-op for that term -- a strong hint of a logic
-        % bug rather than an accuracy shortfall.
-        % % % % if debugtarget_fordebug && ~isempty(flaggedi)
-        % % % %     sum_uncorrected_fordebug = 0;
-        % % % %     sum_delta_fordebug = 0;
-        % % % % end
-
-        for irow = flaggedi(:).'
-            xa = 2*zavec(irow)/len2 - 1;
-            Bhat = 4*max(B1_ik(irow,kk),0)/len2^2;
-            % I_1 + I_2 split: rather than replacing term_k(i,:) outright
-            % with the Lorentzian (which biases the tails, away from
-            % za(i), when B1 isn't extremely small -- confirmed by a
-            % validation case where the outright swap made things WORSE
-            % than legacy), only correct the LORENTZIAN part of term_k:
-            % subtract off the plain-GL estimate of the Lorentzian-only
-            % integral and add back the accurate modified-GL estimate of
-            % it. The exact term_k(i,j) values above stay untouched.
-            wt = modifiedWeightsLorentzian(xnodes_std,wnodes_std,xa,Bhat);   % [n2x1]
-            wt_physical = termboost * num_ik(irow,kk)*(2/len2)*wt(:).';      % [1 x n2], modified-GL estimate
-            lorentzian_at_nodes = num_ik(irow,kk) ./ ((ze2_re2(:).' - zavec(irow)).^2 + max(B1_ik(irow,kk),0));  % [1 x n2]
-            plain_lorentzian_est = termboost * lorentzian_at_nodes .* dzvec2_row;                                % [1 x n2]
-            delta_row = wt_physical - plain_lorentzian_est;
-
-            % % % if debugtarget_fordebug
-            % % %     % full() everywhere here: some of these (contrib, zavec,
-            % % %     % B1_ik, ...) can come out sparse depending on how the
-            % % %     % caller's Hsubmatrixdata matrices were stored, and
-            % % %     % fprintf errors on sparse arguments ("Function is not
-            % % %     % defined for sparse inputs"). Only affects these debug
-            % % %     % prints/accumulators, not the actual patched_betaweight
-            % % %     % math below.
-            % % %     rowuncorrected_fordebug = full(sum(contrib(irow,:)));   % legacy (pre-correction) row-sum
-            % % %     rowdelta_fordebug = full(sum(delta_row));
-            % % %     za_fordebug = full(zavec(irow));
-            % % %     sqrtB1_fordebug = full(sqrt(max(B1_ik(irow,kk),0)));
-            % % %     sum_uncorrected_fordebug = sum_uncorrected_fordebug + rowuncorrected_fordebug;
-            % % %     sum_delta_fordebug = sum_delta_fordebug + rowdelta_fordebug;
-            % % %     fprintf(['[DEBUG-DELTA] recv=%d edge1=%d edge2=%d k=%d i=%d  za=%.4f sqrt(B1)=%.3e | ' ...
-            % % %              'row-sum uncorrected=%.4e%+.4ei  delta=%.4e%+.4ei  |delta|/|uncorrected|=%.3e\n'], ...
-            % % %             receivernumber_fordebug,edge1,edge2,kk,irow,za_fordebug,sqrtB1_fordebug, ...
-            % % %             real(rowuncorrected_fordebug),imag(rowuncorrected_fordebug), ...
-            % % %             real(rowdelta_fordebug),imag(rowdelta_fordebug), ...
-            % % %             abs(rowdelta_fordebug)/max(abs(rowuncorrected_fordebug),eps));
-            % % % 
-            % % %     % --- TEMPORARY DIAGNOSTIC: fine independent 1-D reference
-            % % %     % for this exact row (same closed-form term_k(z2), same
-            % % %     % ze1_re2(irow)/re1_re2(irow)/zR/rR/ny/thetaS_i(irow) this
-            % % %     % row actually uses -- just evaluated on a fine Simpson
-            % % %     % grid over z2 instead of the fixed n2 GL nodes), so we
-            % % %     % can tell whether "uncorrected" or "corrected" is
-            % % %     % actually closer to the truth for this row, rather than
-            % % %     % just how big the delta is relative to uncorrected.
-            % % %     Nz2fine_fordebug = 4001;   % odd, for Simpson's rule
-            % % %     z2fine_fordebug = linspace(0,len2,Nz2fine_fordebug);
-            % % %     phik_fordebug = pi + full(thetaS_i(irow))*s1(kk) + thetaout*s2(kk);
-            % % %     mdistfine_fordebug = sqrt((full(ze1_re2(irow))-z2fine_fordebug).^2 + full(re1_re2(irow)).^2);
-            % % %     ldistfine_fordebug = sqrt((zR-z2fine_fordebug).^2 + rR.^2);
-            % % %     chfine_fordebug = ((z2fine_fordebug-full(ze1_re2(irow))).*(z2fine_fordebug-zR) + mdistfine_fordebug.*ldistfine_fordebug)./full(re1_re2(irow))./rR;
-            % % %     chfine_fordebug = (real(sqrt(chfine_fordebug.^2-1)) + chfine_fordebug).^ny;
-            % % %     chfine_fordebug = (chfine_fordebug + 1./chfine_fordebug)/2;
-            % % %     termkfine_fordebug = sin(ny*phik_fordebug)./(chfine_fordebug-cos(ny*phik_fordebug));
-            % % %     hfine_fordebug = len2/(Nz2fine_fordebug-1);
-            % % %     fineref_fordebug = termboost*(termkfine_fordebug(1)+termkfine_fordebug(end) ...
-            % % %         +4*sum(termkfine_fordebug(2:2:end-1))+2*sum(termkfine_fordebug(3:2:end-2)))*hfine_fordebug/3;
-            % % %     corrected_fordebug = rowuncorrected_fordebug + rowdelta_fordebug;
-            % % %     relerr_uncorrected_fordebug = abs(rowuncorrected_fordebug-fineref_fordebug)/max(abs(fineref_fordebug),eps);
-            % % %     relerr_corrected_fordebug = abs(corrected_fordebug-fineref_fordebug)/max(abs(fineref_fordebug),eps);
-            % % %     fprintf(['[DEBUG-FINEREF] recv=%d edge1=%d edge2=%d k=%d i=%d  fine-ref=%.6e  ' ...
-            % % %              'uncorrected=%.6e (relerr=%.3e)  corrected=%.6e (relerr=%.3e)\n'], ...
-            % % %             receivernumber_fordebug,edge1,edge2,kk,irow,fineref_fordebug, ...
-            % % %             rowuncorrected_fordebug,relerr_uncorrected_fordebug, ...
-            % % %             corrected_fordebug,relerr_corrected_fordebug);
-            % % % 
-            % % %     % --- TEMPORARY DIAGNOSTIC (2nd pass, prompted by PS):
-            % % %     % the check above only tests the beta term_k(z2) in
-            % % %     % isolation. The actual F-matrix element also carries the
-            % % %     % 1/(m*l) propagation-loss factor (with its exp(-jkR)
-            % % %     % phase), applied AFTER the modified-weight correction and
-            % % %     % sampled only at the fixed n2 nodes -- exactly like
-            % % %     % legacy does. The correction's validity implicitly
-            % % %     % assumes that factor is smooth enough, on the scale of
-            % % %     % the node spacing, to be captured by those samples. This
-            % % %     % re-does the same fine-grid-vs-corrected comparison but
-            % % %     % for the FULL integrand term_k(z2)*kernelfactor(z2), to
-            % % %     % check whether that assumption actually holds here (e.g.
-            % % %     % if m(z2) or l(z2) dips small near za, kernelfactor could
-            % % %     % vary sharply enough to break it even though the beta
-            % % %     % term alone is now handled essentially exactly).
-            % % %     kernelfactorfine_fordebug = exp(-1i*k*(ldistfine_fordebug+mdistfine_fordebug-Rstart)) ...
-            % % %         ./ldistfine_fordebug./mdistfine_fordebug;
-            % % %     fullintegrandfine_fordebug = termboost*termkfine_fordebug.*kernelfactorfine_fordebug;
-            % % %     fullfineref_fordebug = (fullintegrandfine_fordebug(1)+fullintegrandfine_fordebug(end) ...
-            % % %         +4*sum(fullintegrandfine_fordebug(2:2:end-1))+2*sum(fullintegrandfine_fordebug(3:2:end-2)))*hfine_fordebug/3;
-            % % % 
-            % % %     ze2row_fordebug = full(ze2_re2(:).');
-            % % %     mdistrow_fordebug = sqrt((full(ze1_re2(irow))-ze2row_fordebug).^2 + full(re1_re2(irow)).^2);
-            % % %     ldistrow_fordebug = sqrt((zR-ze2row_fordebug).^2 + rR.^2);
-            % % %     kernelfactorrow_fordebug = exp(-1i*k*(ldistrow_fordebug+mdistrow_fordebug-Rstart)) ...
-            % % %         ./ldistrow_fordebug./mdistrow_fordebug;
-            % % % 
-            % % %     rowuncorrected_full_fordebug = full(sum(contrib(irow,:).*kernelfactorrow_fordebug));
-            % % %     rowcorrected_full_fordebug = full(sum((contrib(irow,:)+delta_row).*kernelfactorrow_fordebug));
-            % % %     relerr_uncorrected_full_fordebug = abs(rowuncorrected_full_fordebug-fullfineref_fordebug)/max(abs(fullfineref_fordebug),eps);
-            % % %     relerr_corrected_full_fordebug = abs(rowcorrected_full_fordebug-fullfineref_fordebug)/max(abs(fullfineref_fordebug),eps);
-            % % %     fprintf(['[DEBUG-FINEREF-FULL] recv=%d edge1=%d edge2=%d k=%d i=%d  fine-ref=%.6e%+.6ei  ' ...
-            % % %              'uncorrected=%.6e%+.6ei (relerr=%.3e)  corrected=%.6e%+.6ei (relerr=%.3e)\n'], ...
-            % % %             receivernumber_fordebug,edge1,edge2,kk,irow, ...
-            % % %             real(fullfineref_fordebug),imag(fullfineref_fordebug), ...
-            % % %             real(rowuncorrected_full_fordebug),imag(rowuncorrected_full_fordebug),relerr_uncorrected_full_fordebug, ...
-            % % %             real(rowcorrected_full_fordebug),imag(rowcorrected_full_fordebug),relerr_corrected_full_fordebug);
-            % % % end
-
-            contrib(irow,:) = contrib(irow,:) + delta_row;
+        if ~isempty(flaggedi)
+            % 8 Oct. 2026: vectorised over all flagged rows of this term.
+            % Same I_1 + I_2 split as before: the exact term_k(i,j) values
+            % stay untouched; only the Lorentzian part is corrected, by
+            % subtracting its plain-GL estimate and adding the modified-
+            % weight (product-integration) estimate.
+            zaf  = reshape(zavec(flaggedi),[],1);              % [nf x 1]
+            B1f  = reshape(max(B1_ik(flaggedi,kk),0),[],1);    % [nf x 1]
+            numf = reshape(num_ik(flaggedi,kk),[],1);          % [nf x 1]
+            xa   = 2*zaf/len2 - 1;
+            Bhat = 4*B1f/len2^2;
+            WT = modifiedWeightsLorentzianVec(Sstd,wnodes_std,tfine_std,wfine_std,Pint_std,xa,Bhat);   % [n2 x nf]
+            wt_physical = termboost*(2/len2) * (numf .* WT.');            % [nf x n2], modified-GL estimate
+            lorentzian_at_nodes = numf ./ ((ze2_row - zaf).^2 + B1f);     % [nf x n2]
+            plain_lorentzian_est = termboost * lorentzian_at_nodes .* dzvec2_row;
+            contrib(flaggedi,:) = contrib(flaggedi,:) + (wt_physical - plain_lorentzian_est);
         end
-
-        % % % if debugtarget_fordebug && ~isempty(flaggedi)
-        % % %     fprintf(['[DEBUG-DELTA-SUMMARY] recv=%d edge1=%d edge2=%d k=%d  %d nodes flagged (i=%d..%d)  ' ...
-        % % %              'sum uncorrected=%.4e%+.4ei  sum delta=%.4e%+.4ei  |sum delta|/|sum uncorrected|=%.3e\n'], ...
-        % % %             receivernumber_fordebug,edge1,edge2,kk,numel(flaggedi),min(flaggedi),max(flaggedi), ...
-        % % %             real(sum_uncorrected_fordebug),imag(sum_uncorrected_fordebug), ...
-        % % %             real(sum_delta_fordebug),imag(sum_delta_fordebug), ...
-        % % %             abs(sum_delta_fordebug)/max(abs(sum_uncorrected_fordebug),eps));
-        % % % end
 
         patched_betaweight = patched_betaweight + contrib;
     end
@@ -763,80 +646,94 @@ function P = legendreVandermonde(x,Nmax)
         P(:,n+1) = ((2*n-1)*x.*P(:,n) - (n-1)*P(:,n-1))/n;
     end
 end
-
-function Q = neumannQ(z,Nmax)
-    % Legendre functions of the second kind Q_0..Q_{Nmax-1} at (possibly
-    % complex) z, one z-value at a time, via downward (Miller) recurrence:
-    %   Q_{n-1} = [ (2n+1) z Q_n - (n+1) Q_{n+1} ] / n
-    % seeded at an adaptively-chosen high padded order and rescaled
-    % against the closed form Q_0(z) = 0.5*log((z+1)/(z-1)). The needed
-    % padding grows quickly as z approaches [-1,1] (the relevant regime
-    % here, for narrow near-singularities), so it is increased until the
-    % result stops changing.
-    zvec = z(:).';
-    nz = length(zvec);
-    Q = zeros(nz,Nmax);
-    for iz = 1:nz
-        zval = zvec(iz);
-        Q0true = 0.5*log((zval+1)/(zval-1));
-        pad = max(200,4*Nmax);
-        prev = [];
-        cur = [];
-        for attempt = 1:12
-            Ntop = Nmax + pad;
-            Qd = zeros(Ntop+1,1);
-            Qd(Ntop+1) = 0;
-            Qd(Ntop)   = 1;
-            for n = Ntop-1:-1:1
-                Qd(n) = ( (2*n+1)*zval*Qd(n+1) - (n+1)*Qd(n+2) ) / n;
-            end
-            scale = Q0true / Qd(1);
-            cur = Qd(1:Nmax) * scale;
-            if ~isempty(prev)
-                relchange = max(abs(cur-prev)) / max(max(abs(cur)),eps);
-                if relchange < 1e-13
-                    break
-                end
-            end
-            prev = cur;
-            pad = pad*2;
-            if pad > 200000
-                warning('EDcalcpropagatematrix:neumannQNoConverge', ...
-                    'Miller recurrence padding exceeded cap without full convergence for z=%g%+gi; using best available estimate.', real(zval), imag(zval));
-                break
-            end
-        end
-        Q(iz,:) = cur.';
+function [x,w,S,tfine,wfine,Pint] = glStandardCached(n)
+    % Standard n-point Gauss-Legendre nodes x and weights w on [-1,1]
+    % (ascending), and S(j,m+1) = (2m+1)*P_m(x_j), m = 0..n-1.
+    % Also a finer 4n-point rule (tfine,wfine) and the matrix Pint
+    % [4n x n] which interpolates nodal values at x to the fine nodes
+    % (exact for polynomials of degree <= n-1).
+    % These depend only on n, so they are cached between calls.
+    persistent cachedn cachedx cachedw cachedS cachedt cachedwf cachedP
+    if isempty(cachedn)
+        cachedn = [];  cachedx = {};  cachedw = {};  cachedS = {};
+        cachedt = {};  cachedwf = {};  cachedP = {};
+    end
+    idx = find(cachedn == n,1);
+    if isempty(idx)
+        [x,w] = gaussLegendreNodes(n);
+        P = legendreVandermonde(x,n);
+        S = P .* (2*(0:n-1)+1);
+        [tfine,wfine] = gaussLegendreNodes(4*n);
+        Pfine = legendreVandermonde(tfine,n);          % [4n x n]
+        Pint = (Pfine*S.') .* (w(:).'/2);              % [4n x n]
+        cachedn(end+1) = n;
+        cachedx{end+1} = x;   cachedw{end+1} = w;   cachedS{end+1} = S;
+        cachedt{end+1} = tfine;  cachedwf{end+1} = wfine;  cachedP{end+1} = Pint;
+    else
+        x = cachedx{idx};  w = cachedw{idx};  S = cachedS{idx};
+        tfine = cachedt{idx};  wfine = cachedwf{idx};  Pint = cachedP{idx};
     end
 end
 
-function wt = modifiedWeightsSinglePole(xnodes,wnodes,z)
-    % w_j(z) = -w_j * sum_{n=0}^{N-1} (2n+1) P_n(x_j) Q_n(z)
-    % (from Neumann's formula int P_n(t)/(t-z) dt = -2 Q_n(z), applied to
-    % the degree-(N-1) Lagrange interpolant of nodal data through the
-    % fixed GL nodes). Returns wt as [N x nz], one column per pole value.
-    N = length(xnodes);
-    P = legendreVandermonde(xnodes,N);      % [N x N]
-    Q = neumannQ(z,N);                       % [nz x N]
-    nvec = (0:N-1);
-    coef = (2*nvec+1);
-    S = P .* coef;
-    wt = -(S * Q.');
-    wt = wt .* wnodes(:);
+function Q = neumannQupward(z,Nmax)
+    % Legendre functions of the second kind Q_0..Q_{Nmax-1} at the complex
+    % values z (off the interval [-1,1]), by upward recurrence from the
+    % closed forms of Q_0 and Q_1. Returns [nz x Nmax]. Vectorised over z.
+    % The upward recurrence is stable only for z close to [-1,1]; the
+    % caller uses it only where rho^(2*Nmax) < 1e4, with
+    % rho = |z + sqrt(z^2-1)|.
+    zcol = z(:);
+    Q = zeros(length(zcol),Nmax);
+    Q(:,1) = 0.5*log((zcol+1)./(zcol-1));
+    if Nmax > 1
+        Q(:,2) = zcol.*Q(:,1) - 1;
+    end
+    for n = 1:Nmax-2
+        Q(:,n+2) = ( (2*n+1)*zcol.*Q(:,n+1) - n*Q(:,n) )/(n+1);
+    end
 end
 
-function wt = modifiedWeightsLorentzian(xnodes,wnodes,za,B)
-    % Modified weights for g(t) = 1/((t-za)^2 + B), za,B real, B>=0, on
-    % the standard nodes/weights xnodes,wnodes (assumed to be the
-    % standard N-point GL rule on [-1,1]).
-    B = max(B,eps);
-    sB = sqrt(B);
-    zplus  = za + 1i*sB;
-    zminus = za - 1i*sB;
-    wtp = modifiedWeightsSinglePole(xnodes,wnodes,zplus);
-    wtm = modifiedWeightsSinglePole(xnodes,wnodes,zminus);
-    % 1/((t-za)^2+B) = 1/(p-q) * [ 1/(t-p) - 1/(t-q) ], p=za+i*sB, q=za-i*sB,
-    % p-q = 2i*sB.
-    wt = (wtp - wtm) / (2i*sB);
-    wt = real(wt);
+function WT = modifiedWeightsLorentzianVec(S,wnodes,tfine,wfine,Pint,za,B)
+    % Modified weights for g(t) = 1/((t-za)^2 + B) on the standard GL
+    % nodes, for a whole vector of (za,B) pairs at once:
+    %   WT(j,q) = integral over [-1,1] of g_q(t)*L_j(t) dt
+    % where L_j is the Lagrange polynomial of node j.
+    %   S,wnodes,tfine,wfine,Pint   from glStandardCached
+    %   za,B    [nz x 1], real, B >= 0
+    % Returns WT [N x nz], one column per (za,B) pair.
+    %
+    % Two cases, decided by rho = |p + sqrt(p^2-1)|, p = za + i*sqrt(B):
+    %
+    % 1. Narrow peak (pole close to the interval, rho^(2N) < 1e4):
+    %      1/((t-za)^2+B) = Im( 1/(t-p) ) / sqrt(B)
+    %    and the single-pole weights follow from Neumann's formula
+    %      int P_m(t)/(t-z) dt = -2 Q_m(z):
+    %      w_j(z) = -w_j * sum_m (2m+1) P_m(x_j) Q_m(z)
+    %    The conjugate pole gives the complex conjugate, so one
+    %    evaluation is enough.
+    %
+    % 2. Wide peak (rho^(2N) >= 1e4): the 4N-point rule integrates
+    %    g(t)*L_j(t) to rounding accuracy (error ~ rho^(-7N) <= 1e-14),
+    %    so the weights are obtained directly from one matrix product.
+    za = za(:);
+    sB = sqrt(max(B(:),eps));
+    N = size(S,1);
+    nz = length(za);
+    WT = zeros(N,nz);
+    p = za + 1i*sB;
+    rho = abs(p + sqrt(p.^2-1));
+    rho = max(rho,1./rho);
+    isnarrow = (2*N)*log(rho) < log(1e4);
+
+    iv = find(isnarrow);
+    if ~isempty(iv)
+        Q = neumannQupward(p(iv),N);                              % [nnarrow x N]
+        WT(:,iv) = -(S*imag(Q).') .* wnodes(:) ./ (sB(iv).');
+    end
+
+    iv = find(~isnarrow);
+    if ~isempty(iv)
+        gfine = 1./( (tfine(:) - za(iv).').^2 + (sB(iv).').^2 );    % [4N x nwide]
+        WT(:,iv) = Pint.'*(wfine(:).*gfine);
+    end
 end

@@ -239,6 +239,8 @@ paramspec = {
     'diff1method',         @(x) ismember(x,{'GL','accurate'}),                                   'accurate', @(cp) cp.difforder>=1, false;
     'diff1GLorder',        @(x) isnumeric(x) && isreal(x) && isscalar(x) && x > 0 && x==round(x), 16, @(cp) strcmp(cp.diff1method,'GL'), false;
     'inteqsolutionmethod', @(x) ismember(x,{'GMRES_fast','GMRES_large','iterative_fixeddifforder'}), 'GMRES_fast', @(cp) cp.difforder>=2, false;
+    'inteqtargettol',      @(x) isnumeric(x) && isscalar(x) && x>=0,                              1e-10, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false;
+    'inteqgmresmaxiter',   @(x) isnumeric(x) && isscalar(x) && x>=0 && round(x)==x,               100, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false;
     'ESIEpropagationimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'legacy', @(cp) cp.difforder>=2, false;
     'ngauss',              @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 16,  @(cp) true, false;
     'discretizationtype',  @(x) isnumeric(x) && (x == 0 | x == 1 | x == 2),                       2,   @(cp) true, false;

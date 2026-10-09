@@ -339,7 +339,7 @@ icounter = icounter + 1;
 versionnumbers{icounter} = '0.600';
 versiondate{icounter} = '18 Sep. 2026';
 versiontext{icounter} = ['Introduced GMRES, in a fast version, and a version for large problems.' ...
-    'Also intorduced a top level parameter: controlparameters.generalmethod.'
+    'Also intorduced a top level parameter: controlparameters.generalmethod.' ...
     'Streamlined the EDcheckinputstructs'];
 
 icounter = icounter + 1;
@@ -354,6 +354,12 @@ versionnumbers{icounter} = '0.602';
 versiondate{icounter} = '8 Oct. 2026';
 versiontext{icounter} = ['Introduced singularity subtraction in EDcalcpropagatematrix,...' ...
     ' which is a simpler way than ESIEBEM to solve the challenging radiation directions.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.603';
+versiondate{icounter} = '9 Oct. 2026';
+versiontext{icounter} = ['Introduced singularity subtraction in EDinteg_souterm.m,...' ...
+    ' which seems more accurate than a previously implemented version of LCN.'];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

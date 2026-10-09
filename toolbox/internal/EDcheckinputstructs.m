@@ -78,7 +78,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                         .docalcir = 1
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 25 Sep. 2026 (peter.svensson@ntnu.no)
+% Peter Svensson 8 Oct. 2026 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -172,6 +172,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % and geoinputdata.allownonconvex
 % 20 Sep. 2026 Introduced the controlparameters.ESIEpropagationimplementation
 % 24 Sep. 2026 Introduced cp.diff1method and cp.diff1GLorder 
+% 8 Oct 2026 Introduced cp.ESIEsourcetermimplementation
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -241,6 +242,7 @@ paramspec = {
     'inteqsolutionmethod', @(x) ismember(x,{'GMRES_fast','GMRES_large','iterative_fixeddifforder'}), 'GMRES_fast', @(cp) cp.difforder>=2, false;
     'inteqtargettol',      @(x) isnumeric(x) && isscalar(x) && x>=0,                              1e-10, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false;
     'inteqgmresmaxiter',   @(x) isnumeric(x) && isscalar(x) && x>=0 && round(x)==x,               100, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false;
+    'ESIEsourcetermimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'legacy', @(cp) cp.difforder>=2, false;
     'ESIEpropagationimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'legacy', @(cp) cp.difforder>=2, false;
     'ngauss',              @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 16,  @(cp) true, false;
     'discretizationtype',  @(x) isnumeric(x) && (x == 0 | x == 1 | x == 2),                       2,   @(cp) true, false;

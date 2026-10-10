@@ -78,7 +78,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                         .docalcir = 1
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 8 Oct. 2026 (peter.svensson@ntnu.no)
+% Peter Svensson 10 Oct. 2026 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -173,6 +173,13 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 20 Sep. 2026 Introduced the controlparameters.ESIEpropagationimplementation
 % 24 Sep. 2026 Introduced cp.diff1method and cp.diff1GLorder 
 % 8 Oct 2026 Introduced cp.ESIEsourcetermimplementation
+% 10 Oct. 2026 Step 2 fixes (by Claude, prompted by PS): validator typos
+% (xx, isnumerix, missing comma); .frequencies also applicable (and
+% required) for 'tf_ESIEBEM'; .fs default back to 44100; freefieldcase no
+% longer blocked by required .corners/.planecorners; piston sources no
+% longer blocked by required Sinputdata.coordinates; scalar/row/column
+% .sourceamplitudes are expanded again; nreceivers defined; 'saveHODpaths'
+% -> 'savehodpaths'; empty S/R coordinates rejected.
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -231,8 +238,8 @@ end
 % columns: name, validator, default, applicability, required
 paramspec = {
     'generalmethod',       @(x) ismember(x,{'ir','tf','tf_ESIEBEM'}),                             'tf', @(cp) true, true;
-    'frequencies',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       NaN, @(cp) strcmp(cp.generalmethod,'tf'), false; 
-    'fs',                  @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, NaN, @(cp) strcmp(cp.generalmethod,'ir'), false; 
+    'frequencies',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       NaN, @(cp) ismember(cp.generalmethod,{'tf','tf_ESIEBEM'}), true; 
+    'fs',                  @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 44100, @(cp) strcmp(cp.generalmethod,'ir'), false; 
     'Rstart',              @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 0,               0,   @(cp) true, false;
     'directsound',         @(x) isnumeric(x) && (x == 0 | x == 1),                                1,   @(cp) true, false;
     'skipfirstorder',      @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) true, false;
@@ -246,7 +253,7 @@ paramspec = {
     'ESIEpropagationimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'legacy', @(cp) cp.difforder>=2, false;
     'ngauss',              @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 16,  @(cp) true, false;
     'discretizationtype',  @(x) isnumeric(x) && (x == 0 | x == 1 | x == 2),                       2,   @(cp) true, false;
-    'surfacegaussorder',   @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 5,   @(cp) cp.generalmethod(end-1:end) == 'EM', false; 
+    'surfacegaussorder',   @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 5,   @(cp) strcmp(cp.generalmethod,'tf_ESIEBEM'), false; 
     'HODelemsize',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       @(cp) 2*2.^(-[0:cp.difforder-1]), @(cp) strcmp(cp.generalmethod,'ir'), false;
     'savealldifforders',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) strcmp(cp.generalmethod,'ir'), false;
     'saveindividualfirstdiff',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) strcmp(cp.generalmethod,'ir'), false;
@@ -339,14 +346,14 @@ end
 % columns: name, validator, default, applicability, required
 paramspec = {
     'freefieldcase',          @(x) isnumeric(x) && (x==0 | x==1),                                  0, @(cp) true, false;
-    'corners',                @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,         NaN, @(cp) true, true; 
-    'planecorners',           @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,1)>=2,         NaN, @(cp) true, true; 
-    'planerefltypes',         @(x) isnumeric(x) && isreal(x) && numel(x)==size(geoinputdata.planecorners,1),   ones(size(geoinputdata.planecorners,1),1), @(cp) true false;
-    'firstcornertoskip',      @(x) isnumeric(x) && isreal(x) && x>0,                                 1e6, @(cp) true, false;
+    'corners',                @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,         NaN, @(g) g.freefieldcase==0, true; 
+    'planecorners',           @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,1)>=2,         NaN, @(g) g.freefieldcase==0, true; 
+    'planerefltypes',         @(x) isnumeric(x) && isreal(x) && numel(x)==size(geoinputdata.planecorners,1),   @(g) ones(size(g.planecorners,1),1), @(g) g.freefieldcase==0, false;
+    'firstcornertoskip',      @(x) isnumeric(x) && isreal(x) && isscalar(x) && x>0,                  1e6, @(cp) true, false;
     'listofcornerstoskip',    @(x) isnumeric(x) && isreal(x) && all(x(:) >= 0),                      [], @(cp) true, false;
-    'listofedgestoskip',      @(x) isnumeric(x) && isreal(x) && x>0,                                 [], @(cp) true, false;
-    'planeseesplanestrategy', @(x) isnumeric(x) && (x==0) | (xx==1),                               0, @(cp) true, false;
-    'allownonconvex',         @(x) isnumeric(x) && (x==0) | (xx==1),                               0, @(cp) true, false;
+    'listofedgestoskip',      @(x) isnumeric(x) && isreal(x) && size(x,2)<=2 && all(x(:)>0),         [], @(cp) true, false;
+    'planeseesplanestrategy', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                    0, @(cp) true, false;
+    'allownonconvex',         @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                    0, @(cp) true, false;
     };
 
 for k = 1:size(paramspec,1)
@@ -362,6 +369,9 @@ for k = 1:size(paramspec,1)
                 error('EDinputcheck:missingparam', ...
                     'geoinputdata.%s is required and must be supplied by the user (no default exists)', name)
             else
+                if isa(defaultval,'function_handle')
+                    defaultval = defaultval(geoinputdata);
+                end
                 geoinputdata.(name) = defaultval;
             end
         elseif ~validator(geoinputdata.(name))
@@ -459,8 +469,8 @@ end
 
 % columns: name, validator, default, applicability, required
 paramspec = {
-    'coordinates',         @(x) isnumeric(x) && isreal(x) &&  size(x,2)==3,                     NaN, @(cp) true, true; 
-    'nedgesubs',           @(x) isnumeric(x) && isreal(x) &&  x >= 2 && round(x) == x,          2, @(cp) true, false; 
+    'coordinates',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,       NaN, @(cp) true, true; 
+    'nedgesubs',           @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && round(x) == x, 2, @(cp) true, false; 
     };
 
 for k = 1:size(paramspec,1)
@@ -488,6 +498,8 @@ for k = 1:size(paramspec,1)
 end
 
 
+nreceivers = size(Rinputdata.coordinates,1);
+
 % if ~isfield(Rinputdata,'coordinates')
 %     error('ERROR 2: receiver coordinates were not specified')
 % end
@@ -508,14 +520,21 @@ end
 % further down, since the values depend on whether it is a TD case or an FD
 % case.
 
+if ~isstruct(Sinputdata)
+    error('ERROR: the source was not specified')
+end
+
+% NB! 'sourcetype' must come before 'coordinates', since the applicability
+% of 'coordinates' depends on it (for piston sources, the coordinates are
+% computed further down). 'sourceamplitudes' is not in this table; it is
+% checked and expanded further down, when nsources is known.
 % columns: name, validator, default, applicability, required
 paramspec = {
-    'coordinates',         @(x) isnumeric(x) && isreal(x) &&  size(x,2)==3,                     NaN, @(cp) true, true; 
-    'doaddsources',        @(x) isnumerix(x) && (x==0 | x==1),                                  0, @(cp) true, false;
-    'doallSRcombinations', @(x) isnumeric(x) && (x==0 | x==1),                                  1, @(cp) true, false;
-    'sourcetype',          @(x) ismember(x,{'monopole','polygonpiston'}),                       'monopole', @(cp) true, false;
-    'sourceamplitudes',    @(x) isnumeric(x) && size(x,1) == size(Sinputdata.coordinates,1) && size(x,2) == nfrequencies,    ones(size(Sinputdata.coordinates,1),numel(controlparameters.frequencies)), @(cp) true, false;    
-    'nedgesubs',           @(x) isnumeric(x) && isreal(x) &&  x >= 2 && round(x) == x,          2, @(cp) true, false; 
+    'sourcetype',          @(x) ismember(x,{'monopole','polygonpiston'}),                       'monopole', @(s) true, false;
+    'coordinates',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,       NaN, @(s) strcmp(s.sourcetype,'monopole'), true; 
+    'doaddsources',        @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                  0, @(s) true, false;
+    'doallSRcombinations', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                  1, @(s) true, false;
+    'nedgesubs',           @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && round(x) == x, 2, @(s) true, false; 
     };
 
 for k = 1:size(paramspec,1)
@@ -543,9 +562,6 @@ for k = 1:size(paramspec,1)
 end
 
 
-if ~isstruct(Sinputdata)
-    error('ERROR: the source was not specified')
-end
 % sourcetype is not specified, the default is monopole
 if ~isfield(Sinputdata,'sourcetype')
     Sinputdata.sourcetype = 'monopole';
@@ -672,7 +688,7 @@ elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
                                      0.263112829634638 0.728492392955404 0.027230314174435];
                                                                
                 otherwise
-                    error(['ERROR: triangle quadrature not implemented for this number: ',int2str(surfacegaussorder)])
+                    error(['ERROR: triangle quadrature not implemented for this number: ',int2str(Sinputdata.pistongaussorder)])
             end
             n2 = size(gaussvalues,1);  
 %             corners_x = planedata.corners(planedata.planecorners(planenumber,1:3),1);
@@ -763,7 +779,7 @@ elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
                 % accurate to use the theoretical circle radius
                 circlecoordinates = GEOcirclepoints(cornerradius,Sinputdata.pistongaussorder);
                 
-                Sinputdata.pistongausscoordinates{ii} = circlecoordinates + pistonmidpointcoordinates(ii,:)
+                Sinputdata.pistongausscoordinates{ii} = circlecoordinates + pistonmidpointcoordinates(ii,:);
                 Sinputdata.pistongaussweights{ii} = 1/size(circlecoordinates,1)*ones(size(circlecoordinates,1),1);
                 disp('WARNING! Regular polygon piston has only been properly implemented in the plane with nvec = [0 0 1]')
             end
@@ -807,6 +823,38 @@ if ~isfield(Sinputdata,'nedgesubs')
     Sinputdata.nedgesubs = 2;
 end
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Check the field .sourceamplitudes of the struct Sinputdata, and expand it
+% to size [nsources,nfrequencies] (FD cases) or [nsources,1] (TD case).
+% Allowed input sizes: scalar, one row, one column, or the full size.
+
+if ismember(controlparameters.generalmethod,{'tf','tf_ESIEBEM'})
+    nampcolumns = nfrequencies;
+else
+    nampcolumns = 1;
+end
+if ~isfield(Sinputdata,'sourceamplitudes')
+    Sinputdata.sourceamplitudes = 1;
+end
+if ~isnumeric(Sinputdata.sourceamplitudes) || isempty(Sinputdata.sourceamplitudes) || ~ismatrix(Sinputdata.sourceamplitudes)
+    error('EDinputcheck:badparam','Invalid value for Sinputdata.sourceamplitudes')
+end
+[n1,n2] = size(Sinputdata.sourceamplitudes);
+if n1 ~= 1 && n1 ~= nsources
+    error('EDinputcheck:badparam',['Sinputdata.sourceamplitudes must have one row, or one row per source, ',...
+        'but it had the size ',int2str(n1),' by ',int2str(n2)])
+end
+if n2 ~= 1 && n2 ~= nampcolumns
+    error('EDinputcheck:badparam',['Sinputdata.sourceamplitudes must have one column, or (for FD calculations) one column ',...
+        'per frequency, but it had the size ',int2str(n1),' by ',int2str(n2)])
+end
+if n1 == 1
+    Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),:);
+end
+if n2 == 1
+    Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(:,ones(1,nampcolumns));
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct controlparameters
@@ -1000,8 +1048,8 @@ paramspec = {
     'savepathsfile',            @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
     'savediff2result',          @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) true, false; 
     'savelogfile',              @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
-    'saveISEStree',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) controlparameters.generalmethod(1:2) == 'ir', false; 
-    'saveHODpaths',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) controlparameters.generalmethod(1:2) == 'ir', false; 
+    'saveISEStree',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) strcmp(controlparameters.generalmethod,'ir'), false; 
+    'savehodpaths',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) strcmp(controlparameters.generalmethod,'ir'), false; 
     };
 
 for k = 1:size(paramspec,1)

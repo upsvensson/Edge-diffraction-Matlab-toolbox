@@ -180,6 +180,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % longer blocked by required Sinputdata.coordinates; scalar/row/column
 % .sourceamplitudes are expanded again; nreceivers defined; 'saveHODpaths'
 % -> 'savehodpaths'; empty S/R coordinates rejected.
+% 10 Oct. 2026 For difforder = 2, 'iterative_fixeddifforder' is enforced
+% (with a warning if the user had chosen a GMRES method).
 
 % if nargin < 7
 %     disp('ERROR: the input parameter EDmaincase was not specified')
@@ -262,6 +264,7 @@ paramspec = {
 %    'sourcecoordinates',   @(x) isnumeric(x)&&size(x,2)==3, [], @(cp) true, true;
 };
 
+inteqmethodsetbyuser = isfield(controlparameters,'inteqsolutionmethod');
 
 for k = 1:size(paramspec,1)
     name       = paramspec{k,1};
@@ -295,6 +298,21 @@ for k = 1:size(paramspec,1)
         controlparameters.(name) = NaN;
     end
 end
+
+% For difforder = 2, there is no integral equation to solve: the result is
+% the source term only. Then GMRES must not be run (the H-matrix is not
+% even built), so the iterative method is enforced.
+if controlparameters.difforder == 2 && strncmp(controlparameters.inteqsolutionmethod,'GMRES',5)
+    if inteqmethodsetbyuser
+        warning('EDinputcheck:methodoverride', ...
+            ['controlparameters.inteqsolutionmethod = ''%s'' can not be used for difforder = 2. ', ...
+            'It was changed to ''iterative_fixeddifforder''.'], controlparameters.inteqsolutionmethod)
+    end
+    controlparameters.inteqsolutionmethod = 'iterative_fixeddifforder';
+    controlparameters.inteqtargettol = NaN;
+    controlparameters.inteqgmresmaxiter = NaN;
+end
+
 nfrequencies = numel(controlparameters.frequencies);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

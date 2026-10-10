@@ -37,17 +37,23 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                       .tfinteqdiff_nodiff2
 %                       .inteqdiagnostics = a struct w fields:
 %                         .solutionmethod
-%                         .nq
+%                         .nQ
 %                         .nnzH % NaN if never explicitly assembled
 %                           (matrix-free GMRES)
-%                         % GMRES-specific (NaN/empty otherwise)
-%                         .gmresflag
-%                         .gmresrelres
-%                         .gmresiter
-%                         .gmres_time1
-%                         .gmres_time2
-%                         iterative-specific:
-%                         .normQ
+%                           (only set for 'GMRES_fast')
+%                         GMRES-specific (empty otherwise), all of size
+%                         [nfrequencies,ncols], where ncols = 1 if the
+%                         sources are added (or nsources = 1), and
+%                         ncols = nsources otherwise:
+%                         .gmresflag     0 = converged
+%                         .gmresrelres   relative residual
+%                         .gmresiter     number of (inner) iterations
+%                         .solvetime     time for the gmres call
+%                         .assemblytime  time for building the sparse
+%                                        matrix (only for 'GMRES_fast')
+%                         iterative-specific (empty otherwise):
+%                         .normQ         norm of each term in the series,
+%                                        size [difforder-2,nfrequencies,ncols]
 %                         .propdiagnostics (from EDcalcpropagatematrix)
 %   elapsedtimehodtf    This tells how long time was used inside this
 %                       function. If an existing file was reused, then
@@ -146,6 +152,12 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % filled or only served auto-stopping (normQfinal, r_hat, esttail etc),
 % the copy of ESIEpropagationimplementation in the diagnostics, and dead
 % code (old accumarray blocks, unused variables).
+% 10 Oct. 2026 Diagnostics rewrite (by Claude, prompted by PS): the GMRES
+% diagnostics are stored per frequency (and per source, if the sources are
+% handled separately) instead of being overwritten; gmres_time1/2 renamed
+% to assemblytime/solvetime; normQ is only allocated for the iterative
+% method, with size [difforder-2,nfrequencies,ncols]; solutionmethod, nQ
+% and nnzH are now set.
 
 t00 = clock;
 showtext = filehandlingparameters.showtext;
@@ -272,7 +284,26 @@ if showtext >= 1
     end
 end
 
-inteqdiagnostics.normQ = zeros(100,nfrequencies);
+inteqdiagnostics.solutionmethod = controlparameters.inteqsolutionmethod;
+inteqdiagnostics.nQ = double(nQ);
+% The diagnostics get one column per source if the sources are handled
+% separately (CASE 2 below), otherwise a single column.
+if Sdata.doaddsources == 1 || nsources == 1
+    ndiagcols = 1;
+else
+    ndiagcols = nsources;
+end
+if strncmp(controlparameters.inteqsolutionmethod,'GMRES',5)
+    inteqdiagnostics.gmresflag   = NaN(nfrequencies,ndiagcols);
+    inteqdiagnostics.gmresrelres = NaN(nfrequencies,ndiagcols);
+    inteqdiagnostics.gmresiter   = NaN(nfrequencies,ndiagcols);
+    inteqdiagnostics.solvetime   = NaN(nfrequencies,ndiagcols);
+    if strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast')
+        inteqdiagnostics.assemblytime = NaN(nfrequencies,ndiagcols);
+    end
+else
+    inteqdiagnostics.normQ = zeros(max(controlparameters.difforder-2,0),nfrequencies,ndiagcols);
+end
 
 for ifreq = 1:nfrequencies     
     frequency = controlparameters.frequencies(ifreq);
@@ -622,7 +653,6 @@ for ifreq = 1:nfrequencies
                 if showtext >= 2
                     disp('      Starting to solve the int.eq. with the iterative method')
                 end
-                normQ = zeros(max([100 controlparameters.difforder]),1);
 
                 for iiter = 1:(controlparameters.difforder-2)
                     if showtext >= 3
@@ -630,9 +660,8 @@ for ifreq = 1:nfrequencies
                     end
                     Q = EDmatvecH(Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                     Qfinal = Qfinal + Q; 
-                    normQ(iiter) = norm(Q);
+                    inteqdiagnostics.normQ(iiter,ifreq,1) = norm(Q);
                 end
-                inteqdiagnostics.normQ(1:length(normQ),ifreq) = normQ;
 
             elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 % Here we do the GMRES, fast version
                if showtext >= 2
@@ -641,13 +670,14 @@ for ifreq = 1:nfrequencies
                   t00_gmres = clock;
                   Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
                   A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
-                  inteqdiagnostics.gmres_time1 = etime(clock,t00_gmres);
+                  inteqdiagnostics.assemblytime(ifreq,1) = etime(clock,t00_gmres);
+                  inteqdiagnostics.nnzH = nnz(Hsp);
                   t00_gmres = clock;    
                   [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
-                  inteqdiagnostics.gmres_time2 = etime(clock,t00_gmres);
-                  inteqdiagnostics.gmresiter = iter;
-                  inteqdiagnostics.gmresflag = flag;
-                  inteqdiagnostics.gmresrelres = relres;
+                  inteqdiagnostics.solvetime(ifreq,1) = etime(clock,t00_gmres);
+                  inteqdiagnostics.gmresiter(ifreq,1) = iter(2);
+                  inteqdiagnostics.gmresflag(ifreq,1) = flag;
+                  inteqdiagnostics.gmresrelres(ifreq,1) = relres;
                   
             elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_large') == 1 % Here we do the GMRES for large problems
 
@@ -657,10 +687,10 @@ for ifreq = 1:nfrequencies
                t00_gmres = clock;    
                afun = @(q) q - EDmatvecH(q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
-               inteqdiagnostics.gmres_time1 = etime(clock,t00_gmres);
-               inteqdiagnostics.gmresiter = iter;
-               inteqdiagnostics.gmresflag = flag;
-               inteqdiagnostics.gmresrelres = relres;
+               inteqdiagnostics.solvetime(ifreq,1) = etime(clock,t00_gmres);
+               inteqdiagnostics.gmresiter(ifreq,1) = iter(2);
+               inteqdiagnostics.gmresflag(ifreq,1) = flag;
+               inteqdiagnostics.gmresrelres(ifreq,1) = relres;
 
             end
 
@@ -784,10 +814,9 @@ for ifreq = 1:nfrequencies
                        Q = EDmatvecH(Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                         Qfinal = Qfinal + Q; 
 
-                        normQ(iiter) = norm(Q);
+                        inteqdiagnostics.normQ(iiter,ifreq,isou) = norm(Q);
                         
                     end % for iiter = ....
-                    inteqdiagnostics.normQ(:,ifreq) = normQ;
  
                 elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 
                    if showtext >= 2
@@ -796,13 +825,14 @@ for ifreq = 1:nfrequencies
                      t00_gmres = clock;
                      Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
                      A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
-                     inteqdiagnostics.gmres_time1 = etime(clock,t00_gmres);                     
+                     inteqdiagnostics.assemblytime(ifreq,isou) = etime(clock,t00_gmres);
+                     inteqdiagnostics.nnzH = nnz(Hsp);                     
                      t00_gmres = clock;
                      [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
-                     inteqdiagnostics.gmres_time2 = etime(clock,t00_gmres);                    
-                     inteqdiagnostics.gmresiter = iter;
-                     inteqdiagnostics.gmresflag = flag;
-                     inteqdiagnostics.gmresrelres = relres;
+                     inteqdiagnostics.solvetime(ifreq,isou) = etime(clock,t00_gmres);                    
+                     inteqdiagnostics.gmresiter(ifreq,isou) = iter(2);
+                     inteqdiagnostics.gmresflag(ifreq,isou) = flag;
+                     inteqdiagnostics.gmresrelres(ifreq,isou) = relres;
                     
                 elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_large') == 1 
                    if showtext >= 2
@@ -811,10 +841,10 @@ for ifreq = 1:nfrequencies
                     t00_gmres = clock;
                     afun = @(q) q - EDmatvecH(q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                     [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
-                    inteqdiagnostics.gmres_time1 = etime(clock,t00_gmres);                     
-                    inteqdiagnostics.gmresiter = iter;
-                    inteqdiagnostics.gmresflag = flag;
-                    inteqdiagnostics.gmresrelres = relres;
+                    inteqdiagnostics.solvetime(ifreq,isou) = etime(clock,t00_gmres);                     
+                    inteqdiagnostics.gmresiter(ifreq,isou) = iter(2);
+                    inteqdiagnostics.gmresflag(ifreq,isou) = flag;
+                    inteqdiagnostics.gmresrelres(ifreq,isou) = relres;
 
                 end
 
@@ -928,14 +958,14 @@ function inteqdiagnosticstruct = edinteqdiagnosticstemplate
 
 inteqdiagnosticstruct = struct(...
     'solutionmethod',    [], ...
-    'nq',                NaN,...
+    'nQ',                NaN,...
     'nnzH',              NaN, ...
     'gmresflag',         [], ...
-    'gmresrelres',       NaN, ...
-    'gmresiter',         NaN, ...
-    'gmres_time1',       NaN, ...
-    'gmres_time2',       NaN, ...
-    'normQ',             NaN, ...
+    'gmresrelres',       [], ...
+    'gmresiter',         [], ...
+    'assemblytime',      [], ...
+    'solvetime',         [], ...
+    'normQ',             [], ...
     'propdiagnostics',   []);
 end
     

@@ -15,23 +15,13 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % New fields in the struct controlparameters on 10 Sept. 2025
 %   .skipreceiverpropagation optional, default 0. If given the value 1,
 %                           then there will be no propagation to the receivers
-%   .inteqsolutionmethod = optional, 'GMRES' | 'iterative_auto' |
-%                          'iterative_fixeddifforder' (default)
-%   ..difforder            Slightly changed meaning: fixed order under
-%                          'iterative_fixeddifforder' (same as previous
-%                          versions) but also acts as the maxdifforder
-%                          backstop under 'iterative_auto'
-%   .inteqtargettol        used by GMRES and 'iterative_auto'; ignored
-%                          (warn if set) for 'iterative_fixeddifforder'
-%   .inteqnconsecutive     optional, default 2. How many terms must have a
-%                          estimated final energy below the target tol?
-%   .inteqrestimate        optional, default empty. If given a numeric
-%                          value, then this r-estiamte will be used for 
-%                          estimating the final energy.
-%   .intequsemaxcheck      optional, default 0. If given the value 1, then
-%                          max(abs(Q))/norm(Q) "peakiness" tracking
-%                          influence stopping, not just diagnose
-%   .inteqgmresmaxiter     optional, default 50. 
+%   .inteqsolutionmethod   'GMRES_fast' | 'GMRES_large' |
+%                          'iterative_fixeddifforder'
+%   .difforder             The diffraction order, for
+%                          'iterative_fixeddifforder'. For the GMRES
+%                          methods, any value > 2 gives the full solution.
+%   .inteqtargettol        used by the GMRES methods
+%   .inteqgmresmaxiter     used by the GMRES methods
 %   .ESIEpropagationimplementation   optional, 'legacy' or 'accurate'.
 %                          Default: 'legacy'
 %
@@ -50,26 +40,15 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                         .nq
 %                         .nnzH % NaN if never explicitly assembled
 %                           (matrix-free GMRES)
-%                         .achievedaccuracy      % GMRES relres, or
-%                           iterative's est. tail error
-%                         .decayrate             % r, from the term-ratio
-%                           tracking (recent addition)
-%                         .warnings              % cell array of strings
 %                         % GMRES-specific (NaN/empty otherwise)
-%                         .assemblytime
 %                         .gmresflag
 %                         .gmresrelres
 %                         .gmresiter
-%                         iterative-specific (NaN/empty otherwise):
-%                         .difforderused
-%                         .hitmaxdifforder
-%                         .finaltermratio
-%                         .esttailerror
-%                         power-user / diagnostic-only: (populated only if
-%                           .usemaxcheck is on)
-%                         .peakinessratio
-%                         .worstelementindex
-%                         .worstedgepair
+%                         .gmres_time1
+%                         .gmres_time2
+%                         iterative-specific:
+%                         .normQ
+%                         .propdiagnostics (from EDcalcpropagatematrix)
 %   elapsedtimehodtf    This tells how long time was used inside this
 %                       function. If an existing file was reused, then
 %                       elapsedtimehodtf has a second value which tells
@@ -84,7 +63,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1, EDmatvecH from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  9 Oct. 2026  
+% Peter Svensson (peter.svensson@ntnu.no)  10 Oct. 2026  
 %                       
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
@@ -162,6 +141,11 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % 6 Oct. 2026 Implemented the propdiagnostics info from
 % EDcalcpropagatemtrix
 % Code improvement: changed nbig to nQ, changed bigmatrix... to Qvec...
+% 10 Oct. 2026 Pruning, deletions only (by Claude, prompted by PS): removed
+% the 'iterative_auto' option, the diagnostics fields that were never
+% filled or only served auto-stopping (normQfinal, r_hat, esttail etc),
+% the copy of ESIEpropagationimplementation in the diagnostics, and dead
+% code (old accumarray blocks, unused variables).
 
 t00 = clock;
 showtext = filehandlingparameters.showtext;
@@ -223,12 +207,6 @@ end
     
 nsources = size(Sdata.coordinates,1);
 nreceivers = size(Rdata.coordinates,1);
-
-% Find if there are image sources that could see any edges
-% (NB! This is not relevant for convex scattering objects)
-nplanes = size(planedata.planecorners,1);
-nedges = size(edgedata.edgecorners,1);
-vispartedgesfromIS = sparse(zeros(nplanes,nedges));
 
 % 11 Feb. 2025 by PS Make sure that one higher quadrature order than before
 % has its weights and nodes pre-calculated.
@@ -295,9 +273,6 @@ if showtext >= 1
 end
 
 inteqdiagnostics.normQ = zeros(100,nfrequencies);
-inteqdiagnostics.normQfinal = zeros(100,nfrequencies);
-inteqdiagnostics.r_hat = zeros(100,nfrequencies);
-inteqdiagnostics.esttail = zeros(100,nfrequencies);
 
 for ifreq = 1:nfrequencies     
     frequency = controlparameters.frequencies(ifreq);
@@ -643,68 +618,28 @@ for ifreq = 1:nfrequencies
         
             Q = Q_firstterm;
             Qfinal = Q;   
-               % controlparameters.inteqsolutionmethod = 'GMRES'; 
-               % controlparameters.inteqtargettol = 1e-12;
-               % controlparameters.inteqgmresmaxiter = 100;
-            if strcmp(controlparameters.inteqsolutionmethod,'iterative_auto') == 1 || strcmp(controlparameters.inteqsolutionmethod,'iterative_fixeddifforder') == 1
+            if strcmp(controlparameters.inteqsolutionmethod,'iterative_fixeddifforder') == 1
                 if showtext >= 2
                     disp('      Starting to solve the int.eq. with the iterative method')
                 end
                 normQ = zeros(max([100 controlparameters.difforder]),1);
-                normQfinal = zeros(max([100 controlparameters.difforder]),1);
-                r_hat = zeros(max([100 controlparameters.difforder]),1);
-                esttail = zeros(max([100 controlparameters.difforder]),1);
 
                 for iiter = 1:(controlparameters.difforder-2)
                     if showtext >= 3
                        disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
                     end
-                    % % Q_ackum = Q*0;              
-                    % % shortlistprev = 0;
-                    % % Hsubdata = [];
-                    % % ivuse = [];
-                    % % 
-                    % % for nn = 1:size(Hsubmatrixdata.listofsubmatrices,1)
-                    % %     ivoutvec = Hsubmatrixdata.Qvecstartnums(Hsubmatrixdata.listofsubmatrices(nn,2)):Hsubmatrixdata.Qvecendnums(Hsubmatrixdata.listofsubmatrices(nn,2));
-                    % %     ivinvec  = Hsubmatrixdata.Qvecstartnums(Hsubmatrixdata.listofsubmatrices(nn,3)):Hsubmatrixdata.Qvecendnums(Hsubmatrixdata.listofsubmatrices(nn,3));
-                    % % 
-                    % %     shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
-                    % %     if shortlistnumber ~= shortlistprev
-                    % %            Hsubdata = Hsubdatalists{nn}; 
-                    % %            ivuse = ivuselists{nn}; 
-                    % %            nHsub1 = length(ivoutvec);
-                    % %            row_Hsub = rem(ivuse-1, nHsub1) + 1;
-                    % %            col_Hsub = (ivuse-row_Hsub)/nHsub1 + 1;
-                    % %            shortlistprev = shortlistnumber;                   
-                    % %     end
-                    % % 
-                    % %     Q_ackum(1:ivoutvec(end)) = Q_ackum(1:ivoutvec(end)) + accumarray(ivoutvec(1)-1+row_Hsub,Hsubdata.*Q(ivinvec(1)-1+col_Hsub));                      
-                    % % end
-                    % % Q = Q_ackum; 
                     Q = EDmatvecH(Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                     Qfinal = Qfinal + Q; 
                     normQ(iiter) = norm(Q);
-                    normQfinal(iiter) = norm(Qfinal);
-                    if iiter >= 2
-                        r_hat(iiter) = normQ(iiter)/normQ(iiter-1);
-                        esttail(iiter) = normQ(iiter)*r_hat(iiter)/(1-r_hat(iiter));
-                        % fprintf('%2d  Qterm,Qfinal,ratio,r,esttail: %.5g %.5g %.5g %.5g %.5g\n', ...
-                        % iiter, normQ(iiter), normQfinal(iiter), normQ(iiter)/normQfinal(iiter), r_hat(iiter), esttail(iiter)/normQfinal(iiter));
-                    end
                 end
                 inteqdiagnostics.normQ(1:length(normQ),ifreq) = normQ;
-                inteqdiagnostics.normQfinal(1:length(normQfinal),ifreq) = normQfinal;
-                inteqdiagnostics.r_hat(1:length(r_hat),ifreq) = r_hat;
-                inteqdiagnostics.esttail(1:length(esttail),ifreq) = esttail;
 
             elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 % Here we do the GMRES, fast version
                if showtext >= 2
                     disp('      Starting to solve the int.eq. with GMRES, fast version (for smaller problems)')
                 end
                   t00_gmres = clock;
-%                  Hsp = EDbuildHsparse_fast(Hsubmatrixdata,Hsubdatalists,ivuselists);
                   Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
-                  N = size(Hsp,1);
                   A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
                   inteqdiagnostics.gmres_time1 = etime(clock,t00_gmres);
                   t00_gmres = clock;    
@@ -771,7 +706,6 @@ for ifreq = 1:nfrequencies
                         Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),...
                         Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext,...
                         controlparameters.ESIEpropagationimplementation);
-                inteqdiagnostics.ESIEpropagationimplementation =   controlparameters.ESIEpropagationimplementation;
                  P_receiver(ifreq,irec) = Fmatrix*Qfinal;
                  if filehandlingparameters.savediff2result == 1
                     extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec) = Fmatrix*(Qfinal-Q_firstterm);
@@ -838,7 +772,7 @@ for ifreq = 1:nfrequencies
                  Q = Q_firstterm;
                 Qfinal = Q;   
                 
-                if strcmp(controlparameters.inteqsolutionmethod,'iterative_auto') == 1 || strcmp(controlparameters.inteqsolutionmethod,'iterative_fixeddifforder') == 1
+                if strcmp(controlparameters.inteqsolutionmethod,'iterative_fixeddifforder') == 1
                    if showtext >= 2
                         disp('      Starting to solve the int.eq. with the iterative method')
                     end
@@ -847,43 +781,13 @@ for ifreq = 1:nfrequencies
                        if showtext >= 3
                            disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
                        end
-                       % % % Q_ackum = Q*0;              
-                       % % % shortlistprev = 0;
-                       % % % Hsubdata = [];
-                       % % % ivuse = [];
-                       % % % for nn = 1:size(Hsubmatrixdata.listofsubmatrices,1)
-                       % % %      ivoutvec = Hsubmatrixdata.Qvecstartnums(Hsubmatrixdata.listofsubmatrices(nn,2)):Hsubmatrixdata.Qvecendnums(Hsubmatrixdata.listofsubmatrices(nn,2));
-                       % % %      ivinvec  = Hsubmatrixdata.Qvecstartnums(Hsubmatrixdata.listofsubmatrices(nn,3)):Hsubmatrixdata.Qvecendnums(Hsubmatrixdata.listofsubmatrices(nn,3));
-                       % % % 
-                       % % %      shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
-                       % % %      if shortlistnumber ~= shortlistprev
-                       % % %         Hsubdata = Hsubdatalists{nn}; 
-                       % % %         ivuse = ivuselists{nn}; 
-                       % % %         nHsub1 = length(ivoutvec);
-                       % % %         row_Hsub = rem(ivuse-1, nHsub1) + 1;
-                       % % %         col_Hsub = (ivuse-row_Hsub)/nHsub1 + 1;
-                       % % %         shortlistprev = shortlistnumber;                   
-                       % % %      end
-                       % % %       Q_ackum(1:ivoutvec(end)) = Q_ackum(1:ivoutvec(end)) + accumarray(ivoutvec(1)-1+row_Hsub,Hsubdata.*Q(ivinvec(1)-1+col_Hsub));                      
-                       % % %  end
-                       % % %  Q = Q_ackum; 
                        Q = EDmatvecH(Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                         Qfinal = Qfinal + Q; 
 
                         normQ(iiter) = norm(Q);
-                        normQfinal(iiter) = norm(Qfinal);
-                        if iiter >= 2
-                            r_hat(iiter) = normQ(iiter)/normQ(iiter-1);
-                            esttail(iiter) = normQ(iiter)*r_hat(iiter)/(1-r_hat(iiter));
-                            % fprintf('%2d  Qterm,Qfinal,ratio,r,esttail: %.5g %.5g %.5g %.5g %.5g\n', ...
-                            % iiter, normQ(iiter), normQfinal(iiter), normQ(iiter)/normQfinal(iiter), r_hat(iiter), esttail(iiter)/normQfinal(iiter));
-                        end
                         
                     end % for iiter = ....
                     inteqdiagnostics.normQ(:,ifreq) = normQ;
-                    inteqdiagnostics.normQfinal(:,ifreq) = normQfinal;
-                    inteqdiagnostics.r_hat(:,ifreq) = r_hat;
-                    inteqdiagnostics.esttail(:,ifreq) = esttail;
  
                 elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 
                    if showtext >= 2
@@ -891,7 +795,6 @@ for ifreq = 1:nfrequencies
                    end
                      t00_gmres = clock;
                      Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
-                     N = size(Hsp,1);
                      A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
                      inteqdiagnostics.gmres_time1 = etime(clock,t00_gmres);                     
                      t00_gmres = clock;
@@ -959,7 +862,6 @@ for ifreq = 1:nfrequencies
                             Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),...
                             doesQsegmenthavevalues,filehandlingparameters.showtext,...
                             controlparameters.ESIEpropagationimplementation);
-                            inteqdiagnostics.ESIEpropagationimplementation =   controlparameters.ESIEpropagationimplementation;
    
                         if ifreq == 1 && ~isempty(ivproblematic)
                             existinglength = size(ivproblematicmatrix,2);
@@ -987,7 +889,6 @@ for ifreq = 1:nfrequencies
                         Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),...
                         doesQsegmenthavevalues,filehandlingparameters.showtext,...
                         controlparameters.ESIEpropagationimplementation);
-                        inteqdiagnostics.ESIEpropagationimplementation =   controlparameters.ESIEpropagationimplementation;
     
                     if ifreq == 1 && ~isempty(ivproblematic)
                         existinglength = size(ivproblematicmatrix,2);
@@ -1029,27 +930,13 @@ inteqdiagnosticstruct = struct(...
     'solutionmethod',    [], ...
     'nq',                NaN,...
     'nnzH',              NaN, ...
-    'achievedaccuracy',  NaN, ...
-    'decarate',         NaN, ...
-    'warnings',          [], ...
     'gmresflag',         [], ...
     'gmresrelres',       NaN, ...
     'gmresiter',         NaN, ...
     'gmres_time1',       NaN, ...
     'gmres_time2',       NaN, ...
-    'difforderused',     NaN, ...
-    'hitmaxdifforder',   NaN, ...
-    'finaltermratio',    NaN, ...
-    'esttailerror',      NaN, ...
-    'peakinessratio',    NaN, ...
-    'worstelementindex', NaN, ...
-    'worstedgepair',     [], ...
     'normQ',             NaN, ...
-    'normQfinal',        NaN, ...
-    'r_hat',             NaN, ...
-    'esttail',           NaN,...
-    'propdiagnostics',   [],...
-    'ESIEpropagationimplementation',       []);
+    'propdiagnostics',   []);
 end
     
 end

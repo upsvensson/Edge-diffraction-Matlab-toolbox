@@ -19,8 +19,8 @@ controlparameters,EDversionnumber,filehandlingparameters)
 %       submatrixcounter
 %       nuniquesubmatrices
 %       nedgeelems
-%       bigmatrixstartnums
-%       bigmatrixendnums
+%       Qvecstartnums
+%       Qvecendnums
 %       shortlist
 %       reftoshortlist
 %       isthinplanetriplet
@@ -41,7 +41,7 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % Uses the functions  EDgetGLrule, EDrecycleresultfiles from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 25 Sep. 2026 
+% Peter Svensson (peter.svensson@ntnu.no) 9 Oct 2026 
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 % EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
@@ -82,6 +82,7 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % the GL rules. Also changed the orientation of the storage of the sparse
 % quadraturematrix arrays: sotring each order as a column rather than a
 % row.
+% 9 Oct. 2026 Code cleanup, changed bigmatrix... to Qvec...
 
 t00 = clock;
 
@@ -240,16 +241,15 @@ vals(endmatch_to)   = 1;
 edgepairsharedcornertype_to(ivec) = vals;
 
 % ----------------------------------------------------------------------------------------------
-% Make two lists, bigmatrixstartnums and bigmatrixendnums, which for each
+% Make two lists, Qvecstartnums and Qvecendnums, which for each
 % edge 2 -> edge 1 combo specifies which rows in the Q-vector are used.
 
-bigmatrixelemvec = zeros(nedgepairs,1);
+Qvecelemvec = zeros(nedgepairs,1);
 for ii = 1:nedgepairs
-    bigmatrixelemvec(ii) = nedgeelems(edgepairlist(ii,1))*nedgeelems(edgepairlist(ii,2));
+    Qvecelemvec(ii) = nedgeelems(edgepairlist(ii,1))*nedgeelems(edgepairlist(ii,2));
 end
-% nbig = sum(bigmatrixelemvec);
-bigmatrixendnums = cumsum(bigmatrixelemvec);
-bigmatrixstartnums = [1;bigmatrixendnums(1:end-1)+1];
+Qvecendnums = cumsum(Qvecelemvec);
+Qvecstartnums = [1;Qvecendnums(1:end-1)+1];
 
 % ----------------------------------------------------------------------------------------------
 % Prepare for the big H-matrix by first creating a matrix, Hsubmatrix,
@@ -434,8 +434,8 @@ Hsubmatrixdata.edgetripletlist = edgetripletlist;
 Hsubmatrixdata.submatrixcounter = submatrixcounter;
 Hsubmatrixdata.nuniquesubmatrices = nuniquesubmatrices;
 Hsubmatrixdata.nedgeelems = nedgeelems;
-Hsubmatrixdata.bigmatrixstartnums = bigmatrixstartnums;
-Hsubmatrixdata.bigmatrixendnums = bigmatrixendnums;
+Hsubmatrixdata.Qvecstartnums = Qvecstartnums;
+Hsubmatrixdata.Qvecendnums = Qvecendnums;
 Hsubmatrixdata.reftoshortlist = reftoshortlist;
 Hsubmatrixdata.isthinplanetriplet = isthinplanetriplet;
 Hsubmatrixdata.isthinplaneedgepair = isthinplaneedgepair;

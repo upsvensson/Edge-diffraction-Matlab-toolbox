@@ -84,7 +84,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1, EDmatvecH from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  20 Sep. 2026  
+% Peter Svensson (peter.svensson@ntnu.no)  9 Oct. 2026  
 %                       
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
@@ -161,6 +161,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % EDcalcpropagatematrix.
 % 6 Oct. 2026 Implemented the propdiagnostics info from
 % EDcalcpropagatemtrix
+% Code improvement: changed nbig to nQ, changed bigmatrix... to Qvec...
 
 t00 = clock;
 showtext = filehandlingparameters.showtext;
@@ -248,7 +249,7 @@ Hsubcounter = 1;
 
 alltripletsthin = prod(double(Hsubmatrixdata.isthinplanetriplet));
 notripletsthin = prod(1-double(Hsubmatrixdata.isthinplanetriplet));
-nbig = Hsubmatrixdata.bigmatrixendnums(end);
+ nQ = Hsubmatrixdata.Qvecendnums(end);
 nsubmatrices = size(Hsubmatrixdata.listofsubmatrices,1);
 
 refto = edgetoedgedata.reftoshortlistE;
@@ -312,7 +313,7 @@ for ifreq = 1:nfrequencies
 
     if showtext >= 2 && controlparameters.difforder > 2
         disp(' ')
-        disp(['      Building the H matrix of size (',int2str(nbig),',',int2str(nbig),') with ',int2str(Hsubmatrixdata.submatrixcounter),' submatrices'])
+        disp(['      Building the H matrix of size (',int2str( nQ),',',int2str( nQ),') with ',int2str(Hsubmatrixdata.submatrixcounter),' submatrices'])
     end
     
     if ifreq == 1
@@ -353,7 +354,7 @@ for ifreq = 1:nfrequencies
 %             disp(['triplet no. ',int2str(nn),': n1,n2,n3 = ',int2str(n1),',',int2str(n2),',',int2str(n3)])
             shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
 
-%             ind_start = 1 + (Hsubmatrixdata.bigmatrixstartnums(ii)-1) + (Hsubmatrixdata.bigmatrixstartnums(jj)-1)*nbig;
+%             ind_start = 1 + (Hsubmatrixdata.Qvecstartnums(ii)-1) + (Hsubmatrixdata.Qvecstartnums(jj)-1)* nQ;
 
            if showtext >= 3
                disp(' ')
@@ -664,8 +665,8 @@ for ifreq = 1:nfrequencies
                     % % ivuse = [];
                     % % 
                     % % for nn = 1:size(Hsubmatrixdata.listofsubmatrices,1)
-                    % %     ivoutvec = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,2)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,2));
-                    % %     ivinvec  = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,3)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,3));
+                    % %     ivoutvec = Hsubmatrixdata.Qvecstartnums(Hsubmatrixdata.listofsubmatrices(nn,2)):Hsubmatrixdata.Qvecendnums(Hsubmatrixdata.listofsubmatrices(nn,2));
+                    % %     ivinvec  = Hsubmatrixdata.Qvecstartnums(Hsubmatrixdata.listofsubmatrices(nn,3)):Hsubmatrixdata.Qvecendnums(Hsubmatrixdata.listofsubmatrices(nn,3));
                     % % 
                     % %     shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
                     % %     if shortlistnumber ~= shortlistprev
@@ -730,8 +731,8 @@ for ifreq = 1:nfrequencies
 
             doesQsegmenthavevalues = zeros(length(Hsubmatrixdata.edgepairlist(:,1)),1);
             for iicounter = 1:length(Hsubmatrixdata.edgepairlist(:,1))
-               sectionofbigmatrix = (Hsubmatrixdata.bigmatrixstartnums(iicounter):Hsubmatrixdata.bigmatrixendnums(iicounter)); 
-               doesQsegmenthavevalues(iicounter) = any(Qfinal(sectionofbigmatrix));
+               sectionofQvec = (Hsubmatrixdata.Qvecstartnums(iicounter):Hsubmatrixdata.Qvecendnums(iicounter)); 
+               doesQsegmenthavevalues(iicounter) = any(Qfinal(sectionofQvec));
             end        
 
             if ifreq == 1
@@ -851,8 +852,8 @@ for ifreq = 1:nfrequencies
                        % % % Hsubdata = [];
                        % % % ivuse = [];
                        % % % for nn = 1:size(Hsubmatrixdata.listofsubmatrices,1)
-                       % % %      ivoutvec = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,2)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,2));
-                       % % %      ivinvec  = Hsubmatrixdata.bigmatrixstartnums(Hsubmatrixdata.listofsubmatrices(nn,3)):Hsubmatrixdata.bigmatrixendnums(Hsubmatrixdata.listofsubmatrices(nn,3));
+                       % % %      ivoutvec = Hsubmatrixdata.Qvecstartnums(Hsubmatrixdata.listofsubmatrices(nn,2)):Hsubmatrixdata.Qvecendnums(Hsubmatrixdata.listofsubmatrices(nn,2));
+                       % % %      ivinvec  = Hsubmatrixdata.Qvecstartnums(Hsubmatrixdata.listofsubmatrices(nn,3)):Hsubmatrixdata.Qvecendnums(Hsubmatrixdata.listofsubmatrices(nn,3));
                        % % % 
                        % % %      shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
                        % % %      if shortlistnumber ~= shortlistprev
@@ -920,8 +921,8 @@ for ifreq = 1:nfrequencies
 
                 doesQsegmenthavevalues = zeros(length(Hsubmatrixdata.edgepairlist(:,1)),1);
                 for iicounter = 1:length(Hsubmatrixdata.edgepairlist(:,1))
-                   sectionofbigmatrix = (Hsubmatrixdata.bigmatrixstartnums(iicounter):Hsubmatrixdata.bigmatrixendnums(iicounter)); 
-                   doesQsegmenthavevalues(iicounter) = any(Qfinal(sectionofbigmatrix));
+                   sectionofQvec = (Hsubmatrixdata.Qvecstartnums(iicounter):Hsubmatrixdata.Qvecendnums(iicounter)); 
+                   doesQsegmenthavevalues(iicounter) = any(Qfinal(sectionofQvec));
                 end
 
                 % End of CASE 2, PART 3 

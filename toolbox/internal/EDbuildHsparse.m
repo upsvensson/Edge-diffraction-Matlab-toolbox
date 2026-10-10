@@ -16,15 +16,16 @@ function Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists)
 %   ivuselists         Cell array of submatrix index maps, from EDcreateHsubmatrices
 %
 % Output parameters:
-%   Hsp                 Sparse matrix, size [N,N], N = bigmatrixendnums(end)
+%   Hsp                 Sparse matrix, size [N,N], N = Qvecendnums(end)
 %
-% Peter Svensson 2 Sep. 2026
+% Peter Svensson 9 Oct. 2026
 %
 % Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
 
 % 2 Sep. 2026 FIrst version, created by Claude, prompted by Peter Svensson
+% 9 Oct. 2026 Code cleanup, changed bigmatrix... to Qvec...
 
-N = double(Hsubmatrixdata.bigmatrixendnums(end));
+nQ = double(Hsubmatrixdata.Qvecendnums(end));
 nsub = size(Hsubmatrixdata.listofsubmatrices,1);
 
 rowcell = cell(nsub,1);
@@ -39,8 +40,8 @@ col_Hsub = [];
 for nn = 1:nsub
     ii = Hsubmatrixdata.listofsubmatrices(nn,2);
     jj = Hsubmatrixdata.listofsubmatrices(nn,3);
-    ivoutvec = Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii);
-    ivinvec  = Hsubmatrixdata.bigmatrixstartnums(jj):Hsubmatrixdata.bigmatrixendnums(jj);
+    ivoutvec = Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii);
+    ivinvec  = Hsubmatrixdata.Qvecstartnums(jj):Hsubmatrixdata.Qvecendnums(jj);
 
     shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
     if shortlistnumber ~= shortlistprev
@@ -61,4 +62,4 @@ rows = cell2mat(rowcell);
 cols = cell2mat(colcell);
 vals = cell2mat(valcell);
 
-Hsp = sparse(rows,cols,vals,N,N);
+Hsp = sparse(rows,cols,vals,nQ,nQ);

@@ -13,11 +13,11 @@ function Hq = EDmatvecH(Q,Hsubmatrixdata,Hsubdatalists,ivuselists)
 % Output parameters:
 %   Hq              Vertical vector of size [N,1]
 %
-% Peter Svensson  11 Sep. 2026
+% Peter Svensson  9 Oct. 2026
 
 % 11 Sep. 2026 First version, by Claude, after prompting by PS.
 
-N = double(Hsubmatrixdata.bigmatrixendnums(end));
+N = double(Hsubmatrixdata.Qvecendnums(end));
 nsub = size(Hsubmatrixdata.listofsubmatrices,1);
 reftoshortlist = Hsubmatrixdata.reftoshortlist(:);
 
@@ -34,13 +34,13 @@ for g = 1:ngroups
 
     ii_list = Hsubmatrixdata.listofsubmatrices(nnrange,2);
     jj_list = Hsubmatrixdata.listofsubmatrices(nnrange,3);
-    outstart = double(Hsubmatrixdata.bigmatrixstartnums(ii_list)) - 1;   % [m,1]
-    instart  = double(Hsubmatrixdata.bigmatrixstartnums(jj_list)) - 1;   % [m,1]
+    outstart = double(Hsubmatrixdata.Qvecstartnums(ii_list)) - 1;   % [m,1]
+    instart  = double(Hsubmatrixdata.Qvecstartnums(jj_list)) - 1;   % [m,1]
 
     ivuse    = double(ivuselists{nn0});   % cast: avoid uint64+double-vector broadcast error
     Hsubdata = Hsubdatalists{nn0};
-    nHsub1   = double(Hsubmatrixdata.bigmatrixendnums(ii_list(1))) - ...
-               double(Hsubmatrixdata.bigmatrixstartnums(ii_list(1))) + 1;
+    nHsub1   = double(Hsubmatrixdata.Qvecendnums(ii_list(1))) - ...
+               double(Hsubmatrixdata.Qvecstartnums(ii_list(1))) + 1;
     row_Hsub = rem(ivuse-1,nHsub1) + 1;
     col_Hsub = (ivuse-row_Hsub)/nHsub1 + 1;
 

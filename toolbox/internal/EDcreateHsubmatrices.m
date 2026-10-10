@@ -6,11 +6,12 @@ function [Hsubdatalists,ivuselists,listofactiveHsubs,Hsubmatrixdata] = EDcreateH
 %
 % Calls EDgetGLrule 
 %
-% Peter Svensson 25 Sep. 2026
+% Peter Svensson 9 Oct. 2026
 
 % 26 Mar. 2026 Cut out from EDintegralequation_convex_tf
 % 25 Sep. 2026 Changed to the new orientation of quadraturematrix, and
 % calls EDgetGLrule rather than EDdistelements.
+% Code improvement: changed nbig to nQ, bigmatrix... to Qvec...
 
 
     %
@@ -36,7 +37,7 @@ function [Hsubdatalists,ivuselists,listofactiveHsubs,Hsubmatrixdata] = EDcreateH
     
 alltripletsthin = prod(double(Hsubmatrixdata.isthinplanetriplet));
 notripletsthin = prod(1-double(Hsubmatrixdata.isthinplanetriplet));
-nbig = Hsubmatrixdata.bigmatrixendnums(end);
+ nQ = Hsubmatrixdata.Qvecendnums(end);
 nsubmatrices = size(Hsubmatrixdata.listofsubmatrices,1);
  
 listofactiveHsubs = zeros(size(Hsubmatrixdata.listofsubmatrices,1),1);
@@ -95,7 +96,7 @@ for nn = 1:nsubmatrices
 %             disp(['triplet no. ',int2str(nn),': n1,n2,n3 = ',int2str(n1),',',int2str(n2),',',int2str(n3)])
     shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
 
-%             ind_start = 1 + (Hsubmatrixdata.bigmatrixstartnums(ii)-1) + (Hsubmatrixdata.bigmatrixstartnums(jj)-1)*nbig;
+%             ind_start = 1 + (Hsubmatrixdata.Qvecstartnums(ii)-1) + (Hsubmatrixdata.Qvecstartnums(jj)-1)* nQ;
 
    if showtext >= 3
        disp(' ')

@@ -23,13 +23,14 @@ function Hsp = EDbuildHsparse_fast(Hsubmatrixdata,Hsubdatalists,ivuselists)
 % should be exactly (or to roundoff) zero, since no values are summed
 % differently -- only the construction order changes.
 %
-% Peter Svensson 3 Sep. 2026
+% Peter Svensson 9 Oct. 2026
 %
 % Hsp = EDbuildHsparse_fast(Hsubmatrixdata,Hsubdatalists,ivuselists)
 
 % 3 Sep. 2026 First version, by Claude, prompted by PS
+% 9 Oct. 2026 Code cleanup: changed bigmatrix... to Qvec...
 
-N = double(Hsubmatrixdata.bigmatrixendnums(end));
+nQ = double(Hsubmatrixdata.Qvecendnums(end));
 nsub = size(Hsubmatrixdata.listofsubmatrices,1);
 reftoshortlist = Hsubmatrixdata.reftoshortlist(:);
 
@@ -62,13 +63,13 @@ for g = 1:ngroups
 
     ii_list = Hsubmatrixdata.listofsubmatrices(nnrange,2);
     jj_list = Hsubmatrixdata.listofsubmatrices(nnrange,3);
-    outstart = double(Hsubmatrixdata.bigmatrixstartnums(ii_list)) - 1;   % [m,1]
-    instart  = double(Hsubmatrixdata.bigmatrixstartnums(jj_list)) - 1;   % [m,1]
+    outstart = double(Hsubmatrixdata.Qvecstartnums(ii_list)) - 1;   % [m,1]
+    instart  = double(Hsubmatrixdata.Qvecstartnums(jj_list)) - 1;   % [m,1]
 
     ivuse    = double(ivuselists{nn0});   % cast: uint64 can't broadcast against a double vector below
     Hsubdata = Hsubdatalists{nn0};
-    nHsub1   = double(Hsubmatrixdata.bigmatrixendnums(ii_list(1))) - ...
-               double(Hsubmatrixdata.bigmatrixstartnums(ii_list(1))) + 1;
+    nHsub1   = double(Hsubmatrixdata.Qvecendnums(ii_list(1))) - ...
+               double(Hsubmatrixdata.Qvecstartnums(ii_list(1))) + 1;
     row_Hsub = rem(ivuse-1,nHsub1) + 1;
     col_Hsub = (ivuse-row_Hsub)/nHsub1 + 1;
 
@@ -85,7 +86,7 @@ for g = 1:ngroups
     ptr = ptr + len*m;
 end
 
-%Hsp = sparse(rows,cols,vals,N,N);
-Hsp = fsparse(rows,cols,vals,[N,N]);
-Hsp = fsparse(rows,cols,real(vals),[N,N]);
-Hspi = fsparse(rows,cols,imag(vals),[N,N]);
+%Hsp = sparse(rows,cols,vals,nQ,nQ);
+Hsp = fsparse(rows,cols,vals,[nQ,nQ]);
+Hsp = fsparse(rows,cols,real(vals),[nQ,nQ]);
+Hspi = fsparse(rows,cols,imag(vals),[nQ,nQ]);

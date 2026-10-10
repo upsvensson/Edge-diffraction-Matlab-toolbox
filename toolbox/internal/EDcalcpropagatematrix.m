@@ -43,7 +43,7 @@ showtext,ESIEpropagationimplementation)
 %
 % Uses EDcoordtrans1.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 8 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 9 Oct. 2026
 %
 % [Fmatrix,ivproblematic,propdiagnostics] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
 %     isthinhole,vispartedgesfromr,frequency,Rstart,...
@@ -96,6 +96,7 @@ showtext,ESIEpropagationimplementation)
 % 8 Oct. 2026 Modified the new "accurate" implementation to be used more
 % often than the first version. Set "accurate" to the default. Some
 % speeding up by Claude.
+% Code improvement: changed nbig to nQ, changed bigmatrix... to Qvec...
 
 if nargin < 13
     showtext = 0;
@@ -109,15 +110,15 @@ end
 % Create the F-matrix by first creating a matrix showing which
 % submatrices should be included.
 
-nbig = Hsubmatrixdata.bigmatrixendnums(end);
-Fmatrix = zeros(1,nbig);
+nQ = Hsubmatrixdata.Qvecendnums(end);
+Fmatrix = zeros(1, nQ);
 refto = edgetoedgedata.reftoshortlistE;
 
 k = 2*pi*frequency/envdata.cair;
 
 if showtext >= 3
     disp(' ')
-    disp(['      Building the F matrix of size (1,',int2str(nbig),')'])
+    disp(['      Building the F matrix of size (1,',int2str( nQ),')'])
 end
 
 n1previous = 0;
@@ -163,8 +164,8 @@ for iicounter = 1:length(ivrelevantedgepairs)
     %     if vispartedgesfromr(edge2) > 0
             if showtext >= 3
                 disp(['      From edge ',int2str(edge1),' via edge ',int2str(edge2),' to R with thinplaneboost = ',int2str(thinplaneboost)])
-                disp(['         Startcol in F-matrix   = (',int2str(Hsubmatrixdata.bigmatrixstartnums(ii)),')'])
-                disp(['         Endcol in F-matrix   = (',int2str(Hsubmatrixdata.bigmatrixendnums(ii)),')'])
+                disp(['         Startcol in F-matrix   = (',int2str(Hsubmatrixdata.Qvecstartnums(ii)),')'])
+                disp(['         Endcol in F-matrix   = (',int2str(Hsubmatrixdata.Qvecendnums(ii)),')'])
             end
 
             ny = pi/(2*pi-edgedata.closwedangvec(edge2));
@@ -407,11 +408,11 @@ for iicounter = 1:length(ivrelevantedgepairs)
             end
 
             propdiagnostics.npairs = propdiagnostics.npairs + 1;
-            Fmatrix(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) =     Fmatrix(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) + Fsub.';
+            Fmatrix(Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) =     Fmatrix(Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) + Fsub.';
 
             if ~isempty(ivaddition)
-                sectionofbigmatrix = [Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)].';
-                ivproblematic = [ivproblematic;sectionofbigmatrix(ivaddition)];
+                sectionofQvec = [Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)].';
+                ivproblematic = [ivproblematic;sectionofQvec(ivaddition)];
             end
     end
 end

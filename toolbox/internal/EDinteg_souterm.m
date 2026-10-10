@@ -60,9 +60,9 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 %
 % Uses functions EDdistelements  EDcoordtrans1
 %
-% Peter Svensson 24 Nov. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson 9 Oct. 2026 (peter.svensson@ntnu.no)
 %
-% Qfirstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,inteq_ngauss,inteq_discretizationtype,...
+% [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,inteq_ngauss,inteq_discretizationtype,...
 %     vispartedgesfroms,vispartedgesfroms_start,vispartedgesfroms_end,frequency,gaussvectors,rSvec,thetaSvec,zSvec,showtext);
 
 % 20120217 Functioning version
@@ -100,6 +100,7 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 % 8 Oct. 2026 Code by Claude, prompted by PS: added the 'accurate'
 % implementation (controlparameters.ESIEsourcetermimplementation) and the
 % optional output soudiagnostics.
+% 9 Oct. 2026 Code cleanup, changed bigmatrix... to Qvec...
 
 if nargin < 14
     showtext = 0;
@@ -123,7 +124,7 @@ end
 % ----------------------------------------------------------------------------------------------
 % Create the G-matrix
 
-G = zeros(Hsubmatrixdata.bigmatrixendnums(end),1);
+G = zeros(Hsubmatrixdata.Qvecendnums(end),1);
 refto = edgetoedgedata.reftoshortlistE;
 
 k = 2*pi*frequency/envdata.cair;
@@ -131,7 +132,7 @@ k = 2*pi*frequency/envdata.cair;
 if showtext >= 3
     disp(' ')
     disp('      Calculating the ESIE source term')%: symmetrycompression = ',int2str(symmetrycompression)])    
-    disp(['      Building the G matrix of size (',int2str(Hsubmatrixdata.bigmatrixendnums(end)),',1)'])
+    disp(['      Building the G matrix of size (',int2str(Hsubmatrixdata.Qvecendnums(end)),',1)'])
 end
 
 % ----------------------------------------------------------------------------------------------
@@ -151,7 +152,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
 %         if showtext >= 1
             disp(' ')
             disp(['         From S via edge ',int2str(edge2),' to edge ',int2str(edge3)])
-            disp(['         Startrow in G-matrix   = (',int2str(Hsubmatrixdata.bigmatrixstartnums(ii)),'). Endrow in G-matrix   = (',int2str(Hsubmatrixdata.bigmatrixendnums(ii)),')'])
+            disp(['         Startrow in G-matrix   = (',int2str(Hsubmatrixdata.Qvecstartnums(ii)),'). Endrow in G-matrix   = (',int2str(Hsubmatrixdata.Qvecendnums(ii)),')'])
 %             nfrom = Hsubmatrixdata.nedgeelems(edge2);
 %             nto   = Hsubmatrixdata.nedgeelems(edge3);
         end
@@ -435,7 +436,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
 
         end    % if accuratedone == 0
          
-        G(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) =     G(Hsubmatrixdata.bigmatrixstartnums(ii):Hsubmatrixdata.bigmatrixendnums(ii)) + Gsub;
+        G(Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) =     G(Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) + Gsub;
                 
     end
     

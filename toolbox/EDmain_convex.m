@@ -75,7 +75,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % Uses the functions EDgetversion,EDcheckinputstructs, EDreadcad, EDreadgeomatrices,
 % EDedgeo, EDSorRgeo, EDfindconvexGApaths, EDmakefirstordertfs, EDed2geo,
 % EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf,
-% EDinputhash, EDassembleresults from EDtoolbox
+% EDinputhash, EDassembleresults, EDinputsummary, EDinteqsummary from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
 % Peter Svensson 12 Oct. 2026 (peter.svensson@ntnu.no)
@@ -219,8 +219,14 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % function EDassembleresults. The setting saveEDresfile was replaced by
 % savefullEDresfile: the _EDres file is always saved, with or without the
 % result matrices.
+% 12 Oct. 2026 The log file now contains all the input data, with the
+% origin of each value (via EDinputsummary), a summary of the solver
+% diagnostics (via EDinteqsummary), and closing lines with the total time
+% and the name of the results file.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
+
+t00main = clock;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check input data, assign default values if needed
@@ -301,6 +307,20 @@ else
     end
 end
 fid = EDmessage(filehandlingparameters,'sf',fid,1,'',textline1,textline2,[]);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Write all the input data to the log file (not on the screen): one line
+% per field, with its value and where the value came from (user, default,
+% derived or not applicable).
+
+if filehandlingparameters.savelogfile == 1
+    EDmessage(filehandlingparameters,'f',fid,1,'',' ',['Hash of the input data: ',EDruninputhash],'');
+    for ii = 1:length(inputstructnames)
+        inputtextlines = EDinputsummary(settingsdata.(inputstructnames{ii}),inputstructnames{ii});
+        EDmessage(filehandlingparameters,'f',fid,1,'',['Input data: ',inputstructnames{ii}],inputtextlines{:},'');
+    end
+end
+clear settingsdata
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Read the input CAD-file, or input matrices, and create the planedata struct
@@ -593,6 +613,17 @@ if controlparameters.difforder > 1 && ( strcmp(controlparameters.generalmethod,'
         [int2str(nfrequencies),' frequencies. Diffraction order: ',DIF,'.'],...
         ['H-matrix: ',num2str(timingdata(1)),' s. Q_firstterm: ',num2str(timingdata(2)),' s (per freq.)'],...
         ['Qfinal: ',num2str(timingdata(3)),' s. P at receiver: ',num2str(timingdata(4)),' s.'])    
+
+    % A summary of the solver diagnostics goes to the log file. A warning
+    % (if GMRES did not converge for some frequency) is also shown on the
+    % screen.
+    [inteqtextlines,inteqwarninglines] = EDinteqsummary(extraoutputdata.inteqdiagnostics);
+    if ~isempty(inteqtextlines)
+        EDmessage(filehandlingparameters,'f',fid,1,'','   Diagnostics:',inteqtextlines{:});
+    end
+    if ~isempty(inteqwarninglines)
+        EDmessage(filehandlingparameters,'sf',fid,0,'',['   ',inteqwarninglines{1}]);
+    end
 %    timingstruct.integralequation = elapsedtimehodtf;
     timingstruct.integralequation = timingdata;
 else
@@ -751,6 +782,17 @@ clear resfiledata
 if nargout > 0
     EDres = EDresult;
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The closing lines in the log file
+
+if filehandlingparameters.savefullEDresfile == 1
+    textline2 = ['Results file: ',filehandlingparameters.filestem,'_EDres.mat (complete)'];
+else
+    textline2 = ['Results file: ',filehandlingparameters.filestem,'_EDres.mat (without the result matrices)'];
+end
+EDmessage(filehandlingparameters,'sf',fid,1,'',...
+    ['EDmain_convex finished. Total time: ',num2str(etime(clock,t00main)),' s'],textline2);
 
 if filehandlingparameters.savelogfile == 1
     fclose(fid);

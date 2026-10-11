@@ -80,6 +80,13 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   .saveISEStree         (default: 0) Not used by
 %                                         EDmain_convexESIE
 %                   .savelogfile          (default: 1)
+%                   .savefullEDresfile    (default: 1) The file
+%                                         <filestem>_EDres.mat is always
+%                                         saved. If 1, it contains the
+%                                         complete results struct, EDres.
+%                                         If 0, the result matrices are
+%                                         left out (they are in the _tf,
+%                                         _tfinteq etc files).
 %                   .savediff2result      (default: 0)
 %                   .savehodpaths         (default: 0) Used only if
 %                                         .docalcir = 1
@@ -112,7 +119,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % field .inputorigin should not be set by the user. The six output structs
 % never contain the field .inputorigin; it is returned separately.
 %
-% Peter Svensson 11 Oct. 2026 (peter.svensson@ntnu.no)
+% Peter Svensson 12 Oct. 2026 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -236,6 +243,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 11 Oct. 2026 An input struct can carry the field .inputorigin from an
 % earlier run. Then 'default' and 'derived' are kept for values that have
 % not been changed.
+% 12 Oct. 2026 Introduced filehandlingparameters.savefullEDresfile
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check if the needed non-EDtoolbox functions are available.
@@ -832,11 +840,12 @@ paramspec = {
     'savepathsfile',            @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
     'savediff2result',          @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) true, false; 
     'savelogfile',              @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
+    'savefullEDresfile',        @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
     'saveISEStree',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) strcmp(controlparameters.generalmethod,'ir'), false; 
     'savehodpaths',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) strcmp(controlparameters.generalmethod,'ir'), false; 
     };
 
-removedfields = {'savecadgeofile','savesetupfile','lineending'};
+removedfields = {'savecadgeofile','savesetupfile','lineending','saveEDresfile'};
 [filehandlingparameters,inputorigin.filehandlingparameters] = ...
     edapplyparamspec(filehandlingparameters,paramspec,'filehandlingparameters',{},removedfields,prevorigin.filehandlingparameters);
 if outputdirectoryderived

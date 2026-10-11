@@ -42,13 +42,22 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 %                       .textshift           (default: 0)
 %
 % Output parameters:
-%   EDres               (optional) If no output parameter is specified when
-%   EDmain_convex is called, then the results are saved in files. If this
-%   output parameter is specified, EDres will be a struct which contains
-%   these fields (the irrelevant ones will have zeros):
+%   EDres               (optional) A struct with all results and all input
+%   data. The file <filestem>_EDres.mat is always saved, together with a
+%   hash of the input data, EDruninputhash, so the results can be found
+%   later with EDgetresults. If filehandlingparameters.savefullEDresfile =
+%   1 (default), the file contains the complete struct EDres. If it is 0,
+%   the result matrices are left out of that file (they are in the _tf,
+%   _tfinteq, _ir and _irhod files, and EDgetresults loads them from
+%   there). EDres contains these fields (the irrelevant ones are empty):
 %                       irdirect, irgeom, irdiff, irhod, irtot
 %                       tfdirect, tfgeom, tfdiff, tfinteqdiff, tftot
 %                       tftot_ESIEBEM
+%                       inteqdiagnostics, timingstruct
+%                       geoinputdata, Sinputdata, Rinputdata, envdata,
+%                       controlparameters, filehandlingparameters (each
+%                       with the field .inputorigin), EDversionnumber,
+%                       inputhash
 %                       
 %                       xxdirect contains the direct sound
 %                       xxgeom contains the specular reflection
@@ -65,10 +74,11 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % 
 % Uses the functions EDgetversion,EDcheckinputstructs, EDreadcad, EDreadgeomatrices,
 % EDedgeo, EDSorRgeo, EDfindconvexGApaths, EDmakefirstordertfs, EDed2geo,
-% EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
+% EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf,
+% EDinputhash, EDassembleresults from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 11 Oct. 2026 (peter.svensson@ntnu.no)
+% Peter Svensson 12 Oct. 2026 (peter.svensson@ntnu.no)
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -200,6 +210,15 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % tells if each input value was given by the user, a default, derived or
 % not applicable) is attached to each input struct, as the field
 % .inputorigin, in the _settings file and in EDres.
+% 11 Oct. 2026 The results struct is now always saved, in the file
+% <filestem>_EDres.mat (filehandlingparameters.saveEDresfile, default 1; see
+% 12 Oct. 2026),
+% together with a hash of the complete input data (from EDinputhash).
+% The hash is also saved in the _settings file.
+% 12 Oct. 2026 The putting together of the results was moved to the new
+% function EDassembleresults. The setting saveEDresfile was replaced by
+% savefullEDresfile: the _EDres file is always saved, with or without the
+% result matrices.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -246,6 +265,13 @@ for ii = 1:length(inputstructnames)
     settingsdata.(inputstructnames{ii}).inputorigin = inputorigin.(inputstructnames{ii});
 end
 settingsdata.EDversionnumber = EDversionnumber;
+
+% One hash value for the complete input (the five structs that define the
+% problem). It is saved in the settings file and in the results file, so
+% that the results for a given set of input data can be found later.
+EDruninputhash = EDinputhash(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters);
+settingsdata.EDruninputhash = EDruninputhash;
+
 save(desiredname,'-struct','settingsdata');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -637,95 +663,93 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if nargout > 0
-    EDres = struct;
-    EDres.timingstruct = timingstruct;
-%    if controlparameters.docalcir == 1
+% Collect the results.
+%
+% EDmeta contains everything except the (possibly large) result matrices:
+% timing data, diagnostics, the six input structs (each with its origin
+% record), the version number and the hash of the input data.
+% The result matrices are put together by EDassembleresults.
+%
+% The file <filestem>_EDres.mat is always saved:
+%   savefullEDresfile = 1: the file contains the complete results struct.
+%   savefullEDresfile = 0: the file contains EDmeta only; the result
+%   matrices are then only in the _tf, _tfinteq, _ir and _irhod files, from
+%   where EDgetresults can load them.
+
+EDmeta = struct;
+EDmeta.timingstruct = timingstruct;
+if strcmp(controlparameters.generalmethod,'tf') == 1
+    EDmeta.inteqdiagnostics = extraoutputdata.inteqdiagnostics;
+end
+EDmeta.geoinputdata = geoinputdata;
+EDmeta.Sinputdata = Sinputdata;
+EDmeta.Rinputdata = Rinputdata;
+EDmeta.envdata = envdata;
+EDmeta.controlparameters = controlparameters;
+EDmeta.filehandlingparameters = filehandlingparameters;
+EDmeta.EDversionnumber = EDversionnumber;
+for ii = 1:length(inputstructnames)
+    EDmeta.(inputstructnames{ii}).inputorigin = inputorigin.(inputstructnames{ii});
+end
+EDmeta.inputhash = EDruninputhash;
+
+buildfullresults = (nargout > 0) || (filehandlingparameters.savefullEDresfile == 1);
+if buildfullresults
+    resultparts = struct;
     if strcmp(controlparameters.generalmethod,'ir') == 1
-        if geoinputdata.freefieldcase == 0
-            irtot = irdirect + irgeom + irdiff;
-            [nold,nrec,nsou] = size(irtot);  
-            if iscell(irhod)
-                ncells = length(irhod);
-                if controlparameters.savealldifforders == 0  % This should correspond to ncells == 1
-                    irhodsum = irhod{1};
-                else
-                    irhodsum = irhod{2};
-                    for ii = 3:ncells
-                        irhodsum = irhodsum + irhod{ii};
-                    end
-                end                
-            else
-                irhodsum = irhod;
+        resultparts.irdirect = irdirect;
+        resultparts.irgeom = irgeom;
+        resultparts.irdiff = irdiff;
+        resultparts.irhod = irhod;
+    elseif strcmp(controlparameters.generalmethod,'tf') == 1
+        resultparts.tfdirect = tfdirect;
+        resultparts.tfgeom = tfgeom;
+        resultparts.tfdiff = tfdiff;
+        resultparts.tfinteqdiff = tfinteqdiff;
+    end
+    resultparts.tftot_ESIEBEM = tftot_ESIEBEM;
+
+    EDresult = EDassembleresults(resultparts,controlparameters,geoinputdata);
+    clear resultparts
+    metanames = fieldnames(EDmeta);
+    for ii = 1:length(metanames)
+        EDresult.(metanames{ii}) = EDmeta.(metanames{ii});
+    end
+end
+
+desiredname = [filehandlingparameters.outputdirectory,filesep,...
+    filehandlingparameters.filestem,'_EDres.mat'];
+resfiledata = struct;
+resfiledata.EDruninputhash = EDruninputhash;
+if filehandlingparameters.savefullEDresfile == 1
+    resfiledata.EDres = EDresult;
+    resfiledata.EDresisfull = 1;
+else
+    resfiledata.EDres = EDmeta;
+    resfiledata.EDresisfull = 0;
+    % Note the hashes of the files that hold the result matrices, so that
+    % EDgetresults can detect if one of them has been overwritten by
+    % another calculation.
+    stagefilesuffixes = {'_tf','_tfinteq','_ir','_irhod','_tfESIEBEM'};
+    EDstagefilehashes = struct;
+    for ii = 1:length(stagefilesuffixes)
+        stagefilename = [filehandlingparameters.outputdirectory,filesep,...
+            filehandlingparameters.filestem,stagefilesuffixes{ii},'.mat'];
+        if exist(stagefilename,'file') == 2
+            variablesinfile = whos('-file',stagefilename);
+            if any(strcmp({variablesinfile.name},'EDinputdatahash'))
+                hashinfile = load(stagefilename,'EDinputdatahash');
+                EDstagefilehashes.(stagefilesuffixes{ii}(2:end)) = hashinfile.EDinputdatahash;
             end
-            nnew = size(irhodsum,1);
-            if nnew > nold
-               irdirect = [irdirect;zeros(nnew-nold,nrec,nsou)];
-               irgeom   = [irgeom;zeros(nnew-nold,nrec,nsou)];
-               irdiff   = [irdiff;zeros(nnew-nold,nrec,nsou)];
-               irtot    = [irtot;zeros(nnew-nold,nrec,nsou)];
-            elseif nnew < nold
-               irhodsum = [irhodsum;zeros(nold-nnew,nrec,nsou)];
-            end
-            irtot = irtot + irhodsum;
-            EDres.irdirect = irdirect;
-            EDres.irgeom   = irgeom;
-            EDres.irdiff   = irdiff;
-            if controlparameters.savealldifforders == 1
-                EDres.irhod = irhod;
-            else
-                EDres.irhod    = irhodsum;
-            end
-            EDres.irtot    = irtot;
-        else
-            EDres.irdirect = irdirect;
-            EDres.irgeom = [];
-            EDres.irdiff = [];
-            EDres.irhod = [];
-            EDres.irtot = irdirect;
         end
-    else
-        EDres.irdirect = [];
-        EDres.irgeom = [];
-        EDres.irdiff = [];
-        EDres.irhod = [];
-        EDres.irtot = [];
     end
-%    if controlparameters.docalctf == 1
-    if strcmp(controlparameters.generalmethod,'tf') == 1
-        if isempty(tfinteqdiff)
-            tfinteqdiff = zeros(size(tfdirect));
-        end
-        tftot = tfdirect + tfgeom + tfdiff + tfinteqdiff;
-        EDres.tfdirect = tfdirect;
-        EDres.tfgeom = tfgeom;
-        EDres.tfdiff = tfdiff;
-        EDres.tfinteqdiff = tfinteqdiff;
-        EDres.tftot = tftot;
-        EDres.inteqdiagnostics = extraoutputdata.inteqdiagnostics;
-    else
-        EDres.tfdirect = [];
-        EDres.tfgeom = [];
-        EDres.tfdiff = [];
-        EDres.tfinteqdiff = [];
-        EDres.tftot = [];
-    end
-%    if controlparameters.docalctf_ESIEBEM == 1
-     if strcmp(controlparameters.generalmethod,'tf_ESIEBEM') == 1
-       EDres.tftot_ESIEBEM = tftot_ESIEBEM;
-    else
-        EDres.tftot_ESIEBEM = [];
-    end
-    EDres.geoinputdata = geoinputdata;
-    EDres.Sinputdata = Sinputdata;
-    EDres.Rinputdata = Rinputdata;
-    EDres.envdata = envdata;
-    EDres.controlparameters = controlparameters;
-    EDres.filehandlingparameters = filehandlingparameters;
-    EDres.EDversionnumber = EDversionnumber;
-    for ii = 1:length(inputstructnames)
-        EDres.(inputstructnames{ii}).inputorigin = inputorigin.(inputstructnames{ii});
-    end
+    resfiledata.EDstagefilehashes = EDstagefilehashes;
+end
+save(desiredname,'-struct','resfiledata');
+clear resfiledata
+
+if nargout > 0
+    EDres = EDresult;
 end
 
 if filehandlingparameters.savelogfile == 1

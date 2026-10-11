@@ -103,6 +103,15 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % names). A field which has been removed from the toolbox gives a warning
 % and is ignored.
 %
+% Reusing structs from an earlier run: EDmain_convex attaches the origin
+% record to each struct, as the field .inputorigin, in EDres and in the
+% _settings file. If such a struct is sent in here, its .inputorigin is
+% taken out of the struct and used: a field that was 'default' or 'derived'
+% in the earlier run, and still has the default/derived value, keeps that
+% origin. If the value has been changed, the origin becomes 'user'. The
+% field .inputorigin should not be set by the user. The six output structs
+% never contain the field .inputorigin; it is returned separately.
+%
 % Peter Svensson 11 Oct. 2026 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
@@ -224,6 +233,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % here, so .corners and .planecorners are always filled in (as 'derived').
 % .skipreceiverpropagation is now in the table. The old .docalctf etc
 % fields are removed from the struct after they have been translated.
+% 11 Oct. 2026 An input struct can carry the field .inputorigin from an
+% earlier run. Then 'default' and 'derived' are kept for values that have
+% not been changed.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check if the needed non-EDtoolbox functions are available.
@@ -240,6 +252,18 @@ end
 if file2ok == 0
    error('ERROR: Matlab can not find the function lgwt.m. Please download it from Mathworks') 
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% If a struct carries an origin record from an earlier run (the field
+% .inputorigin), take it out of the struct. It is used further down.
+
+prevorigin = struct;
+[geoinputdata,prevorigin.geoinputdata]                     = edtakeoutorigin(geoinputdata);
+[Sinputdata,prevorigin.Sinputdata]                         = edtakeoutorigin(Sinputdata);
+[Rinputdata,prevorigin.Rinputdata]                         = edtakeoutorigin(Rinputdata);
+[envdata,prevorigin.envdata]                               = edtakeoutorigin(envdata);
+[controlparameters,prevorigin.controlparameters]           = edtakeoutorigin(controlparameters);
+[filehandlingparameters,prevorigin.filehandlingparameters] = edtakeoutorigin(filehandlingparameters);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Replace controlparameters.docalctf = 1 etc with 
@@ -313,7 +337,7 @@ inputorigin = struct;
 
 removedfields = {'inteqnconsecutive','inteqrestimate','intequsemaxcheck','nedgepoints_visibility','specorder'};
 [controlparameters,inputorigin.controlparameters] = ...
-    edapplyparamspec(controlparameters,paramspec,'controlparameters',{},removedfields);
+    edapplyparamspec(controlparameters,paramspec,'controlparameters',{},removedfields,prevorigin.controlparameters);
 
 % For difforder = 2, there is no integral equation to solve: the result is
 % the source term only. Then GMRES must not be run (the H-matrix is not
@@ -330,6 +354,9 @@ if controlparameters.difforder == 2 && strncmp(controlparameters.inteqsolutionme
     inputorigin.controlparameters.inteqsolutionmethod = 'derived';
     inputorigin.controlparameters.inteqtargettol = 'notapplicable';
     inputorigin.controlparameters.inteqgmresmaxiter = 'notapplicable';
+elseif controlparameters.difforder == 2 && strcmp(edprevorigin(prevorigin.controlparameters,'inteqsolutionmethod'),'derived')
+    % A struct from an earlier run, where the method was enforced
+    inputorigin.controlparameters.inteqsolutionmethod = 'derived';
 end
 
 nfrequencies = numel(controlparameters.frequencies);
@@ -346,7 +373,7 @@ paramspec = {
     'rhoair',       @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 1.21, @(s) true, false; 
 };
 
-[envdata,inputorigin.envdata] = edapplyparamspec(envdata,paramspec,'envdata',{},{});
+[envdata,inputorigin.envdata] = edapplyparamspec(envdata,paramspec,'envdata',{},{},prevorigin.envdata);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct geoinputdata
@@ -407,7 +434,7 @@ paramspec = {
     'allownonconvex',         @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                    0, @(g) true, false;
     };
 
-[geoinputdata,inputorigin.geoinputdata] = edapplyparamspec(geoinputdata,paramspec,'geoinputdata',{},{});
+[geoinputdata,inputorigin.geoinputdata] = edapplyparamspec(geoinputdata,paramspec,'geoinputdata',{},{},prevorigin.geoinputdata);
 
 if usesgeofile
     geoinputdata.geoinputfile = char(geoinputdata.geoinputfile);
@@ -428,7 +455,7 @@ paramspec = {
     'nedgesubs',           @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && round(x) == x, 2, @(s) true, false; 
     };
 
-[Rinputdata,inputorigin.Rinputdata] = edapplyparamspec(Rinputdata,paramspec,'Rinputdata',{},{});
+[Rinputdata,inputorigin.Rinputdata] = edapplyparamspec(Rinputdata,paramspec,'Rinputdata',{},{},prevorigin.Rinputdata);
 
 nreceivers = size(Rinputdata.coordinates,1);
 
@@ -470,7 +497,7 @@ pistongaussordergiven = edisgiven(Sinputdata,'pistongaussorder');
 doaddsourcesgiven     = edisgiven(Sinputdata,'doaddsources');
 
 [Sinputdata,inputorigin.Sinputdata] = edapplyparamspec(Sinputdata,paramspec,'Sinputdata',...
-    [pistoninputfields,pistonderivedfields,{'sourceamplitudes'}],{});
+    [pistoninputfields,pistonderivedfields,{'sourceamplitudes'}],{},prevorigin.Sinputdata);
 
 if strcmp(Sinputdata.sourcetype,'monopole')
     nsources = size(Sinputdata.coordinates,1);
@@ -691,7 +718,7 @@ else   % Sinputdata.sourcetype is 'polygonpiston'
     inputorigin.Sinputdata.pistoncornercoordinates = 'user';
     inputorigin.Sinputdata.pistoncornernumbers = 'user';
     inputorigin.Sinputdata.pistonplanes = 'user';
-    if pistongaussordergiven
+    if pistongaussordergiven && ~(strcmp(edprevorigin(prevorigin.Sinputdata,'pistongaussorder'),'default') && isequal(Sinputdata.pistongaussorder,3))
         inputorigin.Sinputdata.pistongaussorder = 'user';
     else
         inputorigin.Sinputdata.pistongaussorder = 'default';
@@ -711,7 +738,7 @@ else   % Sinputdata.sourcetype is 'polygonpiston'
 end
 
 if nsources == 1
-    if ~(doaddsourcesgiven && Sinputdata.doaddsources == 1)
+    if ~(doaddsourcesgiven && Sinputdata.doaddsources == 1) || strcmp(edprevorigin(prevorigin.Sinputdata,'doaddsources'),'derived')
         inputorigin.Sinputdata.doaddsources = 'derived';
     end
     Sinputdata.doaddsources = 1;
@@ -756,6 +783,9 @@ end
 if n2 == 1
     Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(:,ones(1,nampcolumns));
 end
+if strcmp(edprevorigin(prevorigin.Sinputdata,'sourceamplitudes'),'default') && all(Sinputdata.sourceamplitudes(:) == 1)
+    inputorigin.Sinputdata.sourceamplitudes = 'default';
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct filehandlingparameters
@@ -777,10 +807,14 @@ if usesgeofile
     if ~edisgiven(filehandlingparameters,'outputdirectory')
         filehandlingparameters.outputdirectory = [geofilepath,filesep,'results'];
         outputdirectoryderived = true;
+    elseif strcmp(edprevorigin(prevorigin.filehandlingparameters,'outputdirectory'),'derived')
+        outputdirectoryderived = isequal(filehandlingparameters.outputdirectory,[geofilepath,filesep,'results']);
     end
     if ~edisgiven(filehandlingparameters,'filestem')
         filehandlingparameters.filestem = geofilestem;
         filestemderived = true;
+    elseif strcmp(edprevorigin(prevorigin.filehandlingparameters,'filestem'),'derived')
+        filestemderived = isequal(filehandlingparameters.filestem,geofilestem);
     end
 end
 
@@ -804,7 +838,7 @@ paramspec = {
 
 removedfields = {'savecadgeofile','savesetupfile','lineending'};
 [filehandlingparameters,inputorigin.filehandlingparameters] = ...
-    edapplyparamspec(filehandlingparameters,paramspec,'filehandlingparameters',{},removedfields);
+    edapplyparamspec(filehandlingparameters,paramspec,'filehandlingparameters',{},removedfields,prevorigin.filehandlingparameters);
 if outputdirectoryderived
     inputorigin.filehandlingparameters.outputdirectory = 'derived';
 end
@@ -820,7 +854,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [s,origin] = edapplyparamspec(s,paramspec,structname,extrafields,removedfields)
+function [s,origin] = edapplyparamspec(s,paramspec,structname,extrafields,removedfields,prevorigin)
 % Checks the fields of one input struct against a table, and sets default
 % values.
 %
@@ -847,6 +881,11 @@ function [s,origin] = edapplyparamspec(s,paramspec,structname,extrafields,remove
 %   removedfields  Cell array with names of fields that existed in earlier
 %                versions of the toolbox. They give a warning, and are
 %                removed from the struct.
+%   prevorigin   The origin record from an earlier run, if the struct
+%                carried one (see edtakeoutorigin); otherwise an empty
+%                struct. A field which was 'default' in the earlier run,
+%                and still has the default value, keeps the origin
+%                'default'.
 %
 % Output parameters:
 %   s            The struct, where all fields in the table exist. Fields
@@ -901,6 +940,20 @@ for k = 1:size(paramspec,1)
             end
         else
             origin.(name) = 'user';
+            if strcmp(edprevorigin(prevorigin,name),'default') && ~required
+                % Given, but it was a default value in an earlier run. If
+                % the value still is the default value, it stays 'default'.
+                try
+                    currentdefault = defaultval;
+                    if isa(currentdefault,'function_handle')
+                        currentdefault = currentdefault(s);
+                    end
+                    if isequaln(s.(name),currentdefault)
+                        origin.(name) = 'default';
+                    end
+                catch
+                end
+            end
             % A validator that fails, or that does not return a single
             % true/false, counts as an invalid value.
             try
@@ -960,3 +1013,31 @@ end
 
 corners = planedata.corners;
 planecorners = double(planedata.planecorners);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [s,prevorigin] = edtakeoutorigin(s)
+% If the struct s has the field .inputorigin (attached by EDmain_convex in
+% an earlier run), that field is removed from s and returned. Otherwise an
+% empty struct is returned.
+
+prevorigin = struct;
+if isstruct(s) && isfield(s,'inputorigin')
+    if isstruct(s.inputorigin) && isscalar(s.inputorigin)
+        prevorigin = s.inputorigin;
+    end
+    s = rmfield(s,'inputorigin');
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function originvalue = edprevorigin(prevorigin,name)
+% Returns the origin of the field "name" in an earlier run, or '' if there
+% is no such record.
+
+originvalue = '';
+if isfield(prevorigin,name) && ischar(prevorigin.(name))
+    originvalue = prevorigin.(name);
+end

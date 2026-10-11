@@ -198,7 +198,8 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % Corrected the order of the input parameters in the call to EDreadcad.
 % 11 Oct. 2026 The new output inputorigin from EDcheckinputstructs (which
 % tells if each input value was given by the user, a default, derived or
-% not applicable) is saved in the _settings file and in EDres.inputorigin.
+% not applicable) is attached to each input struct, as the field
+% .inputorigin, in the _settings file and in EDres.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -229,7 +230,23 @@ Rinputdata = Rnewdata;
 desiredname = [filehandlingparameters.outputdirectory,filesep,...
 	filehandlingparameters.filestem,'_settings.mat'];
 
-eval(['save(''',desiredname,''',''geoinputdata'',''Sinputdata'',''Rinputdata'',''envdata'',''controlparameters'',''filehandlingparameters'',''EDversionnumber'',''inputorigin'');'])
+% The origin record (user/default/derived/notapplicable for each field) is
+% attached to each struct, as the field .inputorigin, in the saved file
+% (and in EDres, at the end of this function). The structs that are used in
+% the calculations do not contain that field.
+inputstructnames = {'geoinputdata','Sinputdata','Rinputdata','envdata','controlparameters','filehandlingparameters'};
+settingsdata = struct;
+settingsdata.geoinputdata = geoinputdata;
+settingsdata.Sinputdata = Sinputdata;
+settingsdata.Rinputdata = Rinputdata;
+settingsdata.envdata = envdata;
+settingsdata.controlparameters = controlparameters;
+settingsdata.filehandlingparameters = filehandlingparameters;
+for ii = 1:length(inputstructnames)
+    settingsdata.(inputstructnames{ii}).inputorigin = inputorigin.(inputstructnames{ii});
+end
+settingsdata.EDversionnumber = EDversionnumber;
+save(desiredname,'-struct','settingsdata');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -706,7 +723,9 @@ if nargout > 0
     EDres.controlparameters = controlparameters;
     EDres.filehandlingparameters = filehandlingparameters;
     EDres.EDversionnumber = EDversionnumber;
-    EDres.inputorigin = inputorigin;
+    for ii = 1:length(inputstructnames)
+        EDres.(inputstructnames{ii}).inputorigin = inputorigin.(inputstructnames{ii});
+    end
 end
 
 if filehandlingparameters.savelogfile == 1

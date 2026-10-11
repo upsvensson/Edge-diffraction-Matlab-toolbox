@@ -32,7 +32,12 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                   If nsources > 1, and all sources should be computed
 %                       separately, then the size is
 %                       [nfrequencies,nreceivers,nsources]
-%   timingdata
+%   timingdata          Vector of size [1,4], with the times, for the
+%                       first frequency, for: building the H-matrix, the
+%                       source term, solving the integral equation, and
+%                       the propagation to the receivers. If the sources
+%                       are handled separately, the last three values
+%                       are for the first source only.
 %   extraoutputdata     A struct with fields
 %                       .tfinteqdiff_nodiff2
 %                       .inteqdiagnostics = a struct w fields:
@@ -50,7 +55,8 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                         .gmresiter     number of (inner) iterations
 %                         .solvetime     time for the gmres call
 %                         .assemblytime  time for building the sparse
-%                                        matrix (only for 'GMRES_fast')
+%                                        matrix (only for 'GMRES_fast'),
+%                                        size [nfrequencies,1]
 %                         iterative-specific (empty otherwise):
 %                         .normQ         norm of each term in the series,
 %                                        size [difforder-2,nfrequencies,ncols]
@@ -69,7 +75,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1, EDmatvecH from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  10 Oct. 2026  
+% Peter Svensson (peter.svensson@ntnu.no)  11 Oct. 2026  
 %                       
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
@@ -158,7 +164,14 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % to assemblytime/solvetime; normQ is only allocated for the iterative
 % method, with size [difforder-2,nfrequencies,ncols]; solutionmethod, nQ
 % and nnzH are now set.
+% 11 Oct. 2026 Bug fixes (by Claude, prompted by PS): elapsedtimehodtf is
+% now the total time (t00 was reused for the section timers); propdiagnostics
+% is defined also when skipreceiverpropagation = 1; for several separate
+% sources (CASE 2): timingdata(2:4) are set, the sparse matrix for
+% GMRES_fast is built once per frequency instead of once per source, and
+% ISOU is defined also when loadinteqsousigs = 1.
 
+t00_total = clock;
 t00 = clock;
 showtext = filehandlingparameters.showtext;
 
@@ -192,7 +205,7 @@ if foundmatch == 1
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
-    elapsedtimehodtf_new = etime(clock,t00);
+    elapsedtimehodtf_new = etime(clock,t00_total);
     elapsedtimehodtf = [elapsedtimehodtf_new elapsedtimehodtf];
     P_receiver = tfinteqdiff;
     return
@@ -203,6 +216,8 @@ extraoutputdata = struct('tfinteqdiff_nodiff2',[]);
 nfrequencies = length(controlparameters.frequencies);
 
 timingdata = zeros(1,4);
+
+propdiagnostics = [];
 
 inteqdiagnostics = edinteqdiagnosticstemplate;
 
@@ -299,7 +314,7 @@ if strncmp(controlparameters.inteqsolutionmethod,'GMRES',5)
     inteqdiagnostics.gmresiter   = NaN(nfrequencies,ndiagcols);
     inteqdiagnostics.solvetime   = NaN(nfrequencies,ndiagcols);
     if strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast')
-        inteqdiagnostics.assemblytime = NaN(nfrequencies,ndiagcols);
+        inteqdiagnostics.assemblytime = NaN(nfrequencies,1);
     end
 else
     inteqdiagnostics.normQ = zeros(max(controlparameters.difforder-2,0),nfrequencies,ndiagcols);
@@ -761,7 +776,24 @@ for ifreq = 1:nfrequencies
         if ifreq==1
             P_receiver = zeros(nfrequencies,nreceivers,nsources);
         end
+
+        % For GMRES_fast: the sparse H-matrix depends on frequency but not
+        % on the source, so it is built once here, before the source loop.
+        if strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 && filehandlingparameters.loadinteqsousigs == 0
+            t00_gmres = clock;
+            Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
+            A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
+            inteqdiagnostics.assemblytime(ifreq,1) = etime(clock,t00_gmres);
+            inteqdiagnostics.nnzH = nnz(Hsp);
+            if ifreq == 1
+                % The matrix building is counted as part of the solving
+                timingdata(3) = inteqdiagnostics.assemblytime(ifreq,1);
+                t00 = clock;
+            end
+        end
+
         for isou = 1:nsources
+            ISOU = int2str(isou);
             
             if filehandlingparameters.loadinteqsousigs == 0
                 
@@ -790,6 +822,11 @@ for ifreq = 1:nfrequencies
                 end
 
                 Q_firstterm = Q_firstterm*Sdata.sourceamplitudes(isou,ifreq);
+
+                if ifreq == 1 && isou == 1
+                    timingdata(2) = etime(clock,t00);
+                    t00 = clock;
+                end
                               
                 % End of CASE 2, PART 2 
                 % Q_firstterm has been computed
@@ -823,11 +860,6 @@ for ifreq = 1:nfrequencies
                         disp('      Starting to solve the int.eq. with GMRES, fast version (for smaller problems)')
                    end
                      t00_gmres = clock;
-                     Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
-                     A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
-                     inteqdiagnostics.assemblytime(ifreq,isou) = etime(clock,t00_gmres);
-                     inteqdiagnostics.nnzH = nnz(Hsp);                     
-                     t00_gmres = clock;
                      [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
                      inteqdiagnostics.solvetime(ifreq,isou) = etime(clock,t00_gmres);                    
                      inteqdiagnostics.gmresiter(ifreq,isou) = iter(2);
@@ -856,6 +888,11 @@ for ifreq = 1:nfrequencies
                 for iicounter = 1:length(Hsubmatrixdata.edgepairlist(:,1))
                    sectionofQvec = (Hsubmatrixdata.Qvecstartnums(iicounter):Hsubmatrixdata.Qvecendnums(iicounter)); 
                    doesQsegmenthavevalues(iicounter) = any(Qfinal(sectionofQvec));
+                end
+
+                if ifreq == 1 && isou == 1
+                    timingdata(3) = timingdata(3) + etime(clock,t00);
+                    t00 = clock;
                 end
 
                 % End of CASE 2, PART 3 
@@ -935,13 +972,16 @@ for ifreq = 1:nfrequencies
                      end
                    
                 end
+                if ifreq == 1 && isou == 1
+                    timingdata(4) = etime(clock,t00);
+                end
             end
         end   % for isou = 1:nsources
 
     end  % if Sdata.doaddsources == 1 || nsources == 1
 end  % for ifreq = 1:nfrequencies     
 
-elapsedtimehodtf = etime(clock,t00);
+elapsedtimehodtf = etime(clock,t00_total);
 tfinteqdiff = P_receiver;
 
 EDinputdatahash = EDinputdatahash_tfinteq;

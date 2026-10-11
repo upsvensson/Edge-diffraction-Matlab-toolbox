@@ -170,10 +170,19 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % sources (CASE 2): timingdata(2:4) are set, the sparse matrix for
 % GMRES_fast is built once per frequency instead of once per source, and
 % ISOU is defined also when loadinteqsousigs = 1.
+% 11 Oct. 2026 Hash fix (by Claude, prompted by PS): the solution method,
+% GMRES tolerance and maxiter, the two ESIE...implementation settings,
+% skipreceiverpropagation, the source type/amplitudes/doaddsources/
+% doallSRcombinations (and piston geometry), cair and savediff2result are
+% now part of the EDinputdatahash.
 
 t00_total = clock;
 t00 = clock;
 showtext = filehandlingparameters.showtext;
+
+if ~isfield(controlparameters,'skipreceiverpropagation')
+    controlparameters.skipreceiverpropagation = 0;
+end
 
 EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
     planedata.planecorners,'offedges',edgedata.offedges,...
@@ -183,6 +192,27 @@ EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
     controlparameters.frequencies,'ngauss',controlparameters.ngauss, ...
     'discretizationtype',controlparameters.discretizationtype,...
     'Rstart',controlparameters.Rstart,'EDversionnumber',EDversionnumber);
+
+% More settings that influence the result, and therefore must be part of
+% the hash. Otherwise, e.g., a change from 'legacy' to 'accurate', or of
+% the solution method, would lead to an old result file being reused.
+hashfields_cp = {'inteqsolutionmethod','inteqtargettol','inteqgmresmaxiter',...
+    'ESIEsourcetermimplementation','ESIEpropagationimplementation',...
+    'skipreceiverpropagation'};
+for ii = 1:length(hashfields_cp)
+    EDinputdatastruct.(hashfields_cp{ii}) = controlparameters.(hashfields_cp{ii});
+end
+% The piston fields are only present for piston sources
+hashfields_S = {'sourcetype','sourceamplitudes','doaddsources','doallSRcombinations',...
+    'pistoncornercoordinates','pistoncornernumbers','pistonplanes','pistongaussorder'};
+for ii = 1:length(hashfields_S)
+    if isfield(Sdata,hashfields_S{ii})
+        EDinputdatastruct.(hashfields_S{ii}) = Sdata.(hashfields_S{ii});
+    end
+end
+EDinputdatastruct.cair = envdata.cair;
+EDinputdatastruct.savediff2result = filehandlingparameters.savediff2result;
+
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -220,12 +250,6 @@ timingdata = zeros(1,4);
 propdiagnostics = [];
 
 inteqdiagnostics = edinteqdiagnosticstemplate;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if ~isfield(controlparameters,'skipreceiverpropagation')
-    controlparameters.skipreceiverpropagation = 0;
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

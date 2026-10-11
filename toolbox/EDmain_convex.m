@@ -33,7 +33,6 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 %                       .filestem        (default: name of the cad-file, with an underscore + running integer)
 %                       .showtext            (default: 1)
 %                       .suppressresultrecycling   (default: 0)
-%                       .savecadgeofile      (default: 0)
 %                       .saveSRdatafiles     (default: 1)
 %                       .saveeddatafile      (default: 1)
 %                       .saveed2datafile     (default: 1)
@@ -69,7 +68,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf from EDtoolbox
 % Uses the functions DataHash from Matlab Central
 % 
-% Peter Svensson 17 Sep. 2026 (peter.svensson@ntnu.no)
+% Peter Svensson 11 Oct. 2026 (peter.svensson@ntnu.no)
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -194,6 +193,12 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % the inteqdiagnostics struct in EDres.
 % 17 Sep. 2026 Introduced controlparameters.generalmethod instead of
 % '.docalcir' etc.
+% 11 Oct. 2026 Adapted to the new EDcheckinputstructs: the choice between
+% geometry file and geometry matrices is made with ischar(.geoinputfile).
+% Corrected the order of the input parameters in the call to EDreadcad.
+% 11 Oct. 2026 The new output inputorigin from EDcheckinputstructs (which
+% tells if each input value was given by the user, a default, derived or
+% not applicable) is saved in the _settings file and in EDres.inputorigin.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -212,7 +217,7 @@ if ispc == 1
 else
     lineending = 10;
 end
-[geoinputdata,Snewdata,Rnewdata,envdata,controlparameters,filehandlingparameters] ...
+[geoinputdata,Snewdata,Rnewdata,envdata,controlparameters,filehandlingparameters,inputorigin] ...
     = EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -224,7 +229,7 @@ Rinputdata = Rnewdata;
 desiredname = [filehandlingparameters.outputdirectory,filesep,...
 	filehandlingparameters.filestem,'_settings.mat'];
 
-eval(['save(''',desiredname,''',''geoinputdata'',''Sinputdata'',''Rinputdata'',''envdata'',''controlparameters'',''filehandlingparameters'',''EDversionnumber'');'])
+eval(['save(''',desiredname,''',''geoinputdata'',''Sinputdata'',''Rinputdata'',''envdata'',''controlparameters'',''filehandlingparameters'',''EDversionnumber'',''inputorigin'');'])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -258,9 +263,11 @@ fid = EDmessage(filehandlingparameters,'sf',fid,1,'',textline1,textline2,[]);
 % Read the input CAD-file, or input matrices, and create the planedata struct
 
 if geoinputdata.freefieldcase == 0
-   if isfield(geoinputdata,'geoinputfile')
+   % After EDcheckinputstructs, geoinputdata.geoinputfile is either a file
+   % name or NaN (when the geometry was given as matrices).
+   if ischar(geoinputdata.geoinputfile)
         EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the planedata struct from the CAD file']);
-     [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(filehandlingparameters,geoinputdata.geoinputfile,0);
+     [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(geoinputdata.geoinputfile,0,filehandlingparameters);
         textline1start = ['EDreadcad: '];
         t01 = elapsedtimecadgeo;
     else
@@ -699,6 +706,7 @@ if nargout > 0
     EDres.controlparameters = controlparameters;
     EDres.filehandlingparameters = filehandlingparameters;
     EDres.EDversionnumber = EDversionnumber;
+    EDres.inputorigin = inputorigin;
 end
 
 if filehandlingparameters.savelogfile == 1

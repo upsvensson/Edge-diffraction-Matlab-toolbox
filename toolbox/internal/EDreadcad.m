@@ -12,7 +12,8 @@ function [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(CADfile,checkge
 %  checkgeom		If this parameter is given the value 'check', then a few checks
 %                   of the geometry consistency will be done: a check for duplicate corners
 %                   for redundant corners and for corners that are connected to only one plane.
-%  filehandlingparameters 
+%  filehandlingparameters  (not used any more, but its presence selects
+%                   "version 2" of this function)
 %
 % Output parameters:
 %	planedata       Structwith fields:
@@ -68,7 +69,7 @@ function [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(CADfile,checkge
 %
 % Uses the functions EDextrnums EDinfrontofplane
 % 
-% Peter Svensson (peter.svensson@ntnu.no) 28 Sep. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 11 Oct. 2026
 %
 % [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(CADfile,checkgeom,filehandlingparameters)
 
@@ -92,6 +93,8 @@ function [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(CADfile,checkge
 % compatibility with the old "version 1". v2 moves the check if an existing
 % file can be reused inside this function. Also updated load and save to
 % the function call form, which avoids problems with spaces in file names.
+% 11 Oct. 2026 Removed the saving of the _cadgeo file (the setting
+% filehandlingparameters.savecadgeofile does not exist any more).
 
 
 t00 = clock;
@@ -112,10 +115,6 @@ end
 % corner coordinates. Was 1e-10 earlier.
 
 geomacc = 1e-4;
-
-if functionversion == 2
-    desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_cadgeo.mat'];
-end
 
 %---------------------------------------------------------------
 % If no CAD-file was specified, present a file opening window
@@ -817,8 +816,4 @@ planedata = struct('corners',corners,'planecorners',planecorners,...
 
 if functionversion == 2
     elapsedtimecadgeo = etime(clock,t00);
-
-    if filehandlingparameters.savecadgeofile == 1
-    	eval(['save(''',desiredname,''',''planedata'',''extraCATTdata'',''elapsedtimecadgeo'');'])
-    end
 end

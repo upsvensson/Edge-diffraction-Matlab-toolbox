@@ -1,16 +1,19 @@
-function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
+function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,inputorigin] = ...
     EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters)
 % EDcheckinputstructs checks the input data structs to EDmain_convex
 % and sets default values.
 % 
 % Input parameters:
-%   geoinputdata     .geoinputfile        (specified, or a file open
-%                                             window is given - unless the fields .corners and .planecorners are given)
-%                   .corners             (optional; alternative to
-%                                             .geoinputfile. But, the use of this option
-%                                             requires that filehandlingparameters.outputdirectory and .filestem are specified)
-%                   .planecorners        (optional; alternative to
-%                                             .geoinputfile)
+%   geoinputdata    Exactly one geometry source must be given (unless
+%                   .freefieldcase = 1): either .geoinputfile, or
+%                   .corners and .planecorners.
+%                   .geoinputfile        Name of a geometry file (must
+%                                        exist; there is no file open window)
+%                   .corners             (alternative to .geoinputfile. The
+%                                        use of this option requires that
+%                                        filehandlingparameters.outputdirectory
+%                                        and .filestem are specified)
+%                   .planecorners        (alternative to .geoinputfile)
 %                   .planerefltypes      (optional; gives the reflection
 %                                         factors of the planes: 1,0,-1.
 %                                         default: ones(nplanes,1) )
@@ -60,9 +63,13 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                         .docalctf_ESIEBEM = 0)
 %                   .HODirelemsize       (default:
 %                                       2*2.^(-[0:controlparameters.difforder-1]))
-%   filehandlingparameters    .outputdirectory  (default: the folder of the geoinputfile)  
-%                   .filestem        (default: name of the cad-file, with an underscore + running integer)
-%                   .savecadgeofile      (default: 0)
+%   filehandlingparameters    .outputdirectory  (default: the folder
+%                                        "results" in the folder of the
+%                                        geoinputfile; obligatory if no
+%                                        geoinputfile is given)  
+%                   .filestem            (default: name of the geoinputfile,
+%                                        without extension; obligatory if
+%                                        no geoinputfile is given)
 %                   .saveSRdatafiles     (default: 1)
 %                   .saveeddatafile      (default: 1)
 %                   .saveed2datafile      (default: 1)
@@ -78,7 +85,25 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                                         .docalcir = 1
 %                   .showtext             (default: 1)
 % 
-% Peter Svensson 10 Oct. 2026 (peter.svensson@ntnu.no)
+% Output parameters:
+%   The six input structs, where all fields have got values, and
+%   inputorigin     A struct which tells where each value came from. It has
+%                   one field per input struct, e.g.,
+%                   inputorigin.controlparameters.ngauss, with one of the
+%                   values
+%                     'user'          given by the user
+%                     'default'       not given; the default value was used
+%                     'derived'       not given; computed from other input
+%                                     (e.g., .corners read from a geometry
+%                                     file)
+%                     'notapplicable' has no meaning for the current
+%                                     settings; the value is NaN
+%
+% A field name which is not known gives an error (to catch misspelt
+% names). A field which has been removed from the toolbox gives a warning
+% and is ignored.
+%
+% Peter Svensson 11 Oct. 2026 (peter.svensson@ntnu.no)
 % 
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
 % EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -182,11 +207,23 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % -> 'savehodpaths'; empty S/R coordinates rejected.
 % 10 Oct. 2026 For difforder = 2, 'iterative_fixeddifforder' is enforced
 % (with a warning if the user had chosen a GMRES method).
-
-% if nargin < 7
-%     disp('ERROR: the input parameter EDmaincase was not specified')
-%     return
-% end
+% 11 Oct. 2026 Restructuring (by Claude, prompted by PS): the five copies
+% of the table-processing loop were replaced by one local function,
+% edapplyparamspec, so all six structs are handled in the same way
+% (non-applicable fields get the value NaN in all structs). Geometry input:
+% exactly one of .geoinputfile and .corners/.planecorners must be given;
+% the file open window was removed; .outputdirectory and .filestem get
+% defaults from the geometry file name. Removed .savecadgeofile and the
+% old code that was commented out.
+% 11 Oct. 2026 A field with the value NaN is now treated as not given
+% (local function edisgiven), so that a struct which has already been
+% through this check can be sent in again.
+% 11 Oct. 2026 Step 8 (by Claude, prompted by PS): new output inputorigin
+% (user/default/derived/notapplicable for each field). Unknown field names
+% give an error; removed fields give a warning. A geometry file is now read
+% here, so .corners and .planecorners are always filled in (as 'derived').
+% .skipreceiverpropagation is now in the table. The old .docalctf etc
+% fields are removed from the struct after they have been translated.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check if the needed non-EDtoolbox functions are available.
@@ -229,6 +266,9 @@ if ~isfield(controlparameters,'generalmethod') && any(isfield(controlparameters,
         'This run will keep working via automatic translation, but please update your script to set ', ...
         'controlparameters.generalmethod = ''%s'' directly.'], controlparameters.generalmethod)
 end
+% The old fields are not needed after this point
+oldmethodfields = {'docalctf','docalcir','docalctf_ESIEBEM'};
+controlparameters = rmfield(controlparameters,oldmethodfields(isfield(controlparameters,oldmethodfields)));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Specify allowed values and default values for the controlparameters struct 
@@ -237,7 +277,13 @@ if ~isstruct(controlparameters)
      error('ERROR: the struct controlparameters was not specified')           
 end
 
-% columns: name, validator, default, applicability, required
+% The tables below have these columns:
+%    name, validator, default, applicability, required
+% and they are processed by the local function edapplyparamspec (at the end
+% of this file). The default can be a function handle, which then takes the
+% struct as input. The applicability is a function handle which takes the
+% struct as input. A field which is not applicable gets the value NaN.
+
 paramspec = {
     'generalmethod',       @(x) ismember(x,{'ir','tf','tf_ESIEBEM'}),                             'tf', @(cp) true, true;
     'frequencies',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       NaN, @(cp) ismember(cp.generalmethod,{'tf','tf_ESIEBEM'}), true; 
@@ -253,57 +299,27 @@ paramspec = {
     'inteqgmresmaxiter',   @(x) isnumeric(x) && isscalar(x) && x>=0 && round(x)==x,               100, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false;
     'ESIEsourcetermimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'legacy', @(cp) cp.difforder>=2, false;
     'ESIEpropagationimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'legacy', @(cp) cp.difforder>=2, false;
+    'skipreceiverpropagation',  @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),              0, @(cp) cp.difforder>=2, false;
     'ngauss',              @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 16,  @(cp) true, false;
     'discretizationtype',  @(x) isnumeric(x) && (x == 0 | x == 1 | x == 2),                       2,   @(cp) true, false;
     'surfacegaussorder',   @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 5,   @(cp) strcmp(cp.generalmethod,'tf_ESIEBEM'), false; 
     'HODelemsize',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       @(cp) 2*2.^(-[0:cp.difforder-1]), @(cp) strcmp(cp.generalmethod,'ir'), false;
     'savealldifforders',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) strcmp(cp.generalmethod,'ir'), false;
     'saveindividualfirstdiff',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) strcmp(cp.generalmethod,'ir'), false;
-
-    % a genuinely mandatory field -- default value is irrelevant/unused here, so [] is just a placeholder
-%    'sourcecoordinates',   @(x) isnumeric(x)&&size(x,2)==3, [], @(cp) true, true;
 };
 
-inteqmethodsetbyuser = isfield(controlparameters,'inteqsolutionmethod');
 
-for k = 1:size(paramspec,1)
-    name       = paramspec{k,1};
-    validator  = paramspec{k,2};
-    defaultval = paramspec{k,3};
-    applicable = paramspec{k,4}(controlparameters);
-    required   = paramspec{k,5};
+inputorigin = struct;
 
-    if applicable
-        if ~isfield(controlparameters,name)
-            if required
-                error('EDinputcheck:missingparam', ...
-                    'controlparameters.%s is required and must be supplied by the user (no default exists)', name)
-            else
-                if isa(defaultval,'function_handle')
-                    defaultval = defaultval(controlparameters);
-                end
-                controlparameters.(name) = defaultval;
-            end
-        elseif ~validator(controlparameters.(name))
-            error('EDinputcheck:badparam','Invalid value for controlparameters.%s',name)
-        end
-    else
-        if isfield(controlparameters,name)
-            val = controlparameters.(name);
-            if ~(isnumeric(val) && isscalar(val) && isnan(val))
-                warning('EDinputcheck:irrelevantparam', ...
-                    'controlparameters.%s is set but has no effect for the current settings (set to NaN)', name)
-            end
-        end
-        controlparameters.(name) = NaN;
-    end
-end
+removedfields = {'inteqnconsecutive','inteqrestimate','intequsemaxcheck','nedgepoints_visibility','specorder'};
+[controlparameters,inputorigin.controlparameters] = ...
+    edapplyparamspec(controlparameters,paramspec,'controlparameters',{},removedfields);
 
 % For difforder = 2, there is no integral equation to solve: the result is
 % the source term only. Then GMRES must not be run (the H-matrix is not
 % even built), so the iterative method is enforced.
 if controlparameters.difforder == 2 && strncmp(controlparameters.inteqsolutionmethod,'GMRES',5)
-    if inteqmethodsetbyuser
+    if strcmp(inputorigin.controlparameters.inteqsolutionmethod,'user')
         warning('EDinputcheck:methodoverride', ...
             ['controlparameters.inteqsolutionmethod = ''%s'' can not be used for difforder = 2. ', ...
             'It was changed to ''iterative_fixeddifforder''.'], controlparameters.inteqsolutionmethod)
@@ -311,242 +327,123 @@ if controlparameters.difforder == 2 && strncmp(controlparameters.inteqsolutionme
     controlparameters.inteqsolutionmethod = 'iterative_fixeddifforder';
     controlparameters.inteqtargettol = NaN;
     controlparameters.inteqgmresmaxiter = NaN;
+    inputorigin.controlparameters.inteqsolutionmethod = 'derived';
+    inputorigin.controlparameters.inteqtargettol = 'notapplicable';
+    inputorigin.controlparameters.inteqgmresmaxiter = 'notapplicable';
 end
 
 nfrequencies = numel(controlparameters.frequencies);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Specify allowed values and default values for the envdata struct 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Check the struct envdata
 
 if ~isstruct(envdata)
     error('ERROR: the struct envdata was not specified')
 end
-% if ~isfield(envdata,'cair')
-%     envdata.cair = 344;
-% end
-% if ~isfield(envdata,'rhoair')
-%     envdata.rhoair = 1.21;
-% end
-% columns: name, validator, default, applicability, required
+
 paramspec = {
-    'cair',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 344,  @(cp) true, false; 
-    'rhoair',       @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 1.21, @(cp) true, false; 
+    'cair',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 344,  @(s) true, false; 
+    'rhoair',       @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 1.21, @(s) true, false; 
 };
 
-for k = 1:size(paramspec,1)
-    name       = paramspec{k,1};
-    validator  = paramspec{k,2};
-    defaultval = paramspec{k,3};
-    applicable = paramspec{k,4}(envdata);
-    required   = paramspec{k,5};
-
-    if applicable
-        if ~isfield(envdata,name)
-            if required
-                error('EDinputcheck:missingparam', ...
-                    'envdata.%s is required and must be supplied by the user (no default exists)', name)
-            else
-                envdata.(name) = defaultval;
-            end
-        elseif ~validator(envdata.(name))
-            error('EDinputcheck:badparam','Invalid value for envdata.%s',name)
-        end
-    elseif isfield(envdata,name)
-        warning('EDinputcheck:irrelevantparam', ...
-            'envdata.%s is set but has no effect for the current settings (ignored)', name)
-    end
-end
-
+[envdata,inputorigin.envdata] = edapplyparamspec(envdata,paramspec,'envdata',{},{});
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Specify allowed values and default values for the geoinputdata struct 
+% Check the struct geoinputdata
+%
+% Exactly one geometry source must be given, unless freefieldcase = 1:
+% either a geometry file (.geoinputfile) or the two matrices .corners and
+% .planecorners.
+%
+% If a geometry file is given, it is read here, and .corners and
+% .planecorners are filled in (marked as 'derived' in inputorigin). So,
+% after this check, .corners and .planecorners always describe the
+% geometry. A struct which has been through this check before has both the
+% file name and the matrices. That is accepted if the matrices are
+% identical to those in the file.
 
-% columns: name, validator, default, applicability, required
-paramspec = {
-    'freefieldcase',          @(x) isnumeric(x) && (x==0 | x==1),                                  0, @(cp) true, false;
-    'corners',                @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,         NaN, @(g) g.freefieldcase==0, true; 
-    'planecorners',           @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,1)>=2,         NaN, @(g) g.freefieldcase==0, true; 
-    'planerefltypes',         @(x) isnumeric(x) && isreal(x) && numel(x)==size(geoinputdata.planecorners,1),   @(g) ones(size(g.planecorners,1),1), @(g) g.freefieldcase==0, false;
-    'firstcornertoskip',      @(x) isnumeric(x) && isreal(x) && isscalar(x) && x>0,                  1e6, @(cp) true, false;
-    'listofcornerstoskip',    @(x) isnumeric(x) && isreal(x) && all(x(:) >= 0),                      [], @(cp) true, false;
-    'listofedgestoskip',      @(x) isnumeric(x) && isreal(x) && size(x,2)<=2 && all(x(:)>0),         [], @(cp) true, false;
-    'planeseesplanestrategy', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                    0, @(cp) true, false;
-    'allownonconvex',         @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                    0, @(cp) true, false;
-    };
+if ~isstruct(geoinputdata)
+    error('ERROR: the struct geoinputdata was not specified')
+end
 
-for k = 1:size(paramspec,1)
-    name       = paramspec{k,1};
-    validator  = paramspec{k,2};
-    defaultval = paramspec{k,3};
-    applicable = paramspec{k,4}(geoinputdata);
-    required   = paramspec{k,5};
+isfreefieldcase = isfield(geoinputdata,'freefieldcase') && isequal(geoinputdata.freefieldcase,1);
+usesgeofile     = ~isfreefieldcase && edisgiven(geoinputdata,'geoinputfile');
+usesgeomatrices = ~isfreefieldcase && (edisgiven(geoinputdata,'corners') || edisgiven(geoinputdata,'planecorners'));
 
-    if applicable
-        if ~isfield(geoinputdata,name)
-            if required
-                error('EDinputcheck:missingparam', ...
-                    'geoinputdata.%s is required and must be supplied by the user (no default exists)', name)
-            else
-                if isa(defaultval,'function_handle')
-                    defaultval = defaultval(geoinputdata);
-                end
-                geoinputdata.(name) = defaultval;
+if ~isfreefieldcase
+    if usesgeofile && usesgeomatrices
+        % Could be a struct that has been through this check before. Then
+        % the matrices must be the same as those in the file.
+        [corners_fromfile,planecorners_fromfile] = edreadgeometryfile(geoinputdata.geoinputfile);
+        if edisgiven(geoinputdata,'corners') && edisgiven(geoinputdata,'planecorners') && ...
+                isequal(geoinputdata.corners,corners_fromfile) && isequal(geoinputdata.planecorners,planecorners_fromfile)
+            geoinputdata = rmfield(geoinputdata,{'corners','planecorners'});
+            if isfield(geoinputdata,'planerefltypes')
+                geoinputdata = rmfield(geoinputdata,'planerefltypes');
             end
-        elseif ~validator(geoinputdata.(name))
-            error('EDinputcheck:badparam','Invalid value for geoinputdata.%s',name)
+            usesgeomatrices = false;
+        else
+            error('EDinputcheck:geometrysource', ...
+                ['Both geoinputdata.geoinputfile and geoinputdata.corners/.planecorners were given, and they do not ',...
+                'describe the same geometry. Please give only one geometry source.'])
         end
-    elseif isfield(geoinputdata,name)
-        warning('EDinputcheck:irrelevantparam', ...
-            'geoinputdata.%s is set but has no effect for the current settings (ignored)', name)
+    end
+    if ~usesgeofile && ~usesgeomatrices
+        error('EDinputcheck:geometrysource', ...
+            'No geometry was given. Please specify either geoinputdata.geoinputfile, or geoinputdata.corners and .planecorners.')
     end
 end
 
+paramspec = {
+    'freefieldcase',          @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                  0, @(g) true, false;
+    'geoinputfile',           @(x) (ischar(x) || (isstring(x) && isscalar(x))) && exist(char(x),'file')==2,  NaN, @(g) usesgeofile, true; 
+    'corners',                @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,         NaN, @(g) usesgeomatrices, true; 
+    'planecorners',           @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,1)>=2,         NaN, @(g) usesgeomatrices, true; 
+    'planerefltypes',         @(x) isnumeric(x) && isreal(x) && numel(x)==size(geoinputdata.planecorners,1),   @(g) ones(size(g.planecorners,1),1), @(g) usesgeomatrices, false;
+    'firstcornertoskip',      @(x) isnumeric(x) && isreal(x) && isscalar(x) && x>0,                  1e6, @(g) true, false;
+    'listofcornerstoskip',    @(x) isnumeric(x) && isreal(x) && all(x(:) >= 0),                      [], @(g) true, false;
+    'listofedgestoskip',      @(x) isnumeric(x) && isreal(x) && size(x,2)<=2 && all(x(:)>0),         [], @(g) true, false;
+    'planeseesplanestrategy', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                    0, @(g) true, false;
+    'allownonconvex',         @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                    0, @(g) true, false;
+    };
 
-% if ~isstruct(geoinputdata)
-% 
-% 	[CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
-%     [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
-% 
-%     CADfile = [CADfilepath,CADfile];
-%     geoinputdata = struct ('geoinputfile',CADfile);
-% 
-%     [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
-%     if ~isfield(filehandlingparameters,'outputdirectory')
-%         filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
-%     end   
-%     if ~isfield(filehandlingparameters,'filestem')
-%         filehandlingparameters.filestem = CADfilestem;
-%     end
-% end
-% if ~isfield(geoinputdata,'freefieldcase')
-%     geoinputdata.freefieldcase = 0;
-% end
-% % if geoinputdata.freefieldcase == 1
-% %     geoinputdata.corners = [];
-% %     geoinputdata.planecorners = [];
-% % else
-% %     if isfield(geoinputdata,'geoinputfile')
-% %         [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);
-% %         if ~isfield(filehandlingparameters,'outputdirectory')
-% %             filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
-% %         end    
-% %         if ~isfield(filehandlingparameters,'filestem')
-% %             filehandlingparameters.filestem = CADfilestem;
-% %         end
-% %     else
-% % 
-% %         if ~isfield(geoinputdata,'corners') || ~isfield(geoinputdata,'planecorners')
-% %     	    [CADfile,CADfilepath] = uigetfile('*.*','Please select the cadfile');
-% %             [~,CADfile,~] = fileparts([CADfilepath,CADfile]);
-% % 
-% %             CADfile = [CADfilepath,CADfile];
-% %             geoinputdata.geoinputfile = CADfile;
-% %             [infilepath,CADfilestem] = fileparts(geoinputdata.geoinputfile);        
-% %             if ~isfield(filehandlingparameters,'outputdirectory')
-% %                 filehandlingparameters.outputdirectory = [infilepath,filesep,'results'];
-% %             end    
-% %         else
-% %             if isfield(filehandlingparameters,'outputdirectory') == 0 || isfield(filehandlingparameters,'filestem') == 0
-% %                 error('ERROR: When you give the geometry input in the form of data matrices, you must specify filehandlingparameters.outputdirectory and .filestem')            
-% %             end
-% %             if ~isfield(geoinputdata,'planerefltypes')
-% %                nplanes = size(geoinputdata.planecorners,1);
-% %                geoinputdata.planerefltypes = ones(nplanes,1);
-% %             end
-% %         end
-% %     end
-% %     if ~isfield(geoinputdata,'firstcornertoskip')
-% %         geoinputdata.firstcornertoskip = 1e6;
-% %     end
-% %     if ~isfield(geoinputdata,'listofcornerstoskip')
-% %         geoinputdata.listofcornerstoskip = [];
-% %     end
-% %     if ~isfield(geoinputdata,'listofedgestoskip')
-% %         geoinputdata.listofedgestoskip = [];
-% %     else
-% %         ncols = size(geoinputdata.listofedgestoskip,2);
-% %         if ncols > 2
-% %             error('ERROR: geoinputdata.listofedgestoskip has more than two columns')
-% %         else
-% %             if any(any(geoinputdata.listofedgestoskip==0))
-% %                 error('ERROR: geoinputdata.listofedgestoskip contains some zeros')
-% %             end
-% %         end
-% %     end
-% %     if ~isfield(geoinputdata,'planeseesplanestrategy')
-% %         geoinputdata.planeseesplanestrategy = 0;
-% %     end
-% % end
+[geoinputdata,inputorigin.geoinputdata] = edapplyparamspec(geoinputdata,paramspec,'geoinputdata',{},{});
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if usesgeofile
+    geoinputdata.geoinputfile = char(geoinputdata.geoinputfile);
+    [geoinputdata.corners,geoinputdata.planecorners] = edreadgeometryfile(geoinputdata.geoinputfile);
+    inputorigin.geoinputdata.corners = 'derived';
+    inputorigin.geoinputdata.planecorners = 'derived';
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct Rinputdata
 
 if ~isstruct(Rinputdata)
-    error('ERROR 1: receiver coordinates were not specified')
+    error('ERROR: the struct Rinputdata was not specified')
 end
 
-% columns: name, validator, default, applicability, required
 paramspec = {
-    'coordinates',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,       NaN, @(cp) true, true; 
-    'nedgesubs',           @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && round(x) == x, 2, @(cp) true, false; 
+    'coordinates',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,       NaN, @(s) true, true; 
+    'nedgesubs',           @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && round(x) == x, 2, @(s) true, false; 
     };
 
-for k = 1:size(paramspec,1)
-    name       = paramspec{k,1};
-    validator  = paramspec{k,2};
-    defaultval = paramspec{k,3};
-    applicable = paramspec{k,4}(Rinputdata);
-    required   = paramspec{k,5};
-
-    if applicable
-        if ~isfield(Rinputdata,name)
-            if required
-                error('EDinputcheck:missingparam', ...
-                    'Rinputdata.%s is required and must be supplied by the user (no default exists)', name)
-            else
-                Rinputdata.(name) = defaultval;
-            end
-        elseif ~validator(Rinputdata.(name))
-            error('EDinputcheck:badparam','Invalid value for Rinputdata.%s',name)
-        end
-    elseif isfield(Rinputdata,name)
-        warning('EDinputcheck:irrelevantparam', ...
-            'Rinputdata.%s is set but has no effect for the current settings (ignored)', name)
-    end
-end
-
+[Rinputdata,inputorigin.Rinputdata] = edapplyparamspec(Rinputdata,paramspec,'Rinputdata',{},{});
 
 nreceivers = size(Rinputdata.coordinates,1);
 
-% if ~isfield(Rinputdata,'coordinates')
-%     error('ERROR 2: receiver coordinates were not specified')
-% end
-% nreceivers = size(Rinputdata.coordinates,1);
-% if nreceivers == 0
-%      error('ERROR 3: receiver coordinates were not specified')            
-% end
-% ncolumns = size(Rinputdata.coordinates,2);
-% if ncolumns ~= 3
-%    error(['ERROR: check your receiver coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
-% end
-% if ~isfield(Rinputdata,'nedgesubs')
-%     Rinputdata.nedgesubs = 2;
-% end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct Sinputdata, but the field .sourceamplitudes is handled
-% further down, since the values depend on whether it is a TD case or an FD
-% case.
+% further down, since its size depends on the number of sources, and on
+% whether it is a TD case or an FD case.
 
 if ~isstruct(Sinputdata)
-    error('ERROR: the source was not specified')
+    error('ERROR: the struct Sinputdata was not specified')
 end
 
 % NB! 'sourcetype' must come before 'coordinates', since the applicability
 % of 'coordinates' depends on it (for piston sources, the coordinates are
-% computed further down). 'sourceamplitudes' is not in this table; it is
-% checked and expanded further down, when nsources is known.
-% columns: name, validator, default, applicability, required
+% computed further down).
 paramspec = {
     'sourcetype',          @(x) ismember(x,{'monopole','polygonpiston'}),                       'monopole', @(s) true, false;
     'coordinates',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,       NaN, @(s) strcmp(s.sourcetype,'monopole'), true; 
@@ -555,55 +452,37 @@ paramspec = {
     'nedgesubs',           @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && round(x) == x, 2, @(s) true, false; 
     };
 
-for k = 1:size(paramspec,1)
-    name       = paramspec{k,1};
-    validator  = paramspec{k,2};
-    defaultval = paramspec{k,3};
-    applicable = paramspec{k,4}(Sinputdata);
-    required   = paramspec{k,5};
+% These fields are not in the table, but are handled further down: the
+% piston input fields, the fields that are computed for a piston, and
+% .sourceamplitudes.
+pistoninputfields   = {'pistoncornercoordinates','pistoncornernumbers','pistonplanes','pistongaussorder'};
+pistonderivedfields = {'pistongausscoordinates','pistongaussweights','ncornersperpiston','pistonareas'};
 
-    if applicable
-        if ~isfield(Sinputdata,name)
-            if required
-                error('EDinputcheck:missingparam', ...
-                    'Sinputdata.%s is required and must be supplied by the user (no default exists)', name)
-            else
-                Sinputdata.(name) = defaultval;
-            end
-        elseif ~validator(Sinputdata.(name))
-            error('EDinputcheck:badparam','Invalid value for Sinputdata.%s',name)
-        end
-    elseif isfield(Sinputdata,name)
-        warning('EDinputcheck:irrelevantparam', ...
-            'Sinputdata.%s is set but has no effect for the current settings (ignored)', name)
-    end
+% For a piston, the coordinates are computed further down. If they are
+% present (as in a struct which has been through this check before), they
+% are removed here.
+if isfield(Sinputdata,'sourcetype') && isequal(Sinputdata.sourcetype,'polygonpiston') && isfield(Sinputdata,'coordinates')
+    Sinputdata = rmfield(Sinputdata,'coordinates');
 end
 
+sourceamplitudesgiven = edisgiven(Sinputdata,'sourceamplitudes');
+pistongaussordergiven = edisgiven(Sinputdata,'pistongaussorder');
+doaddsourcesgiven     = edisgiven(Sinputdata,'doaddsources');
 
-% sourcetype is not specified, the default is monopole
-if ~isfield(Sinputdata,'sourcetype')
-    Sinputdata.sourcetype = 'monopole';
-    Sinputdata.pistoncornercoordinates = [];
-    Sinputdata.pistoncornernumbers = [];
-    Sinputdata.pistonplanes = [];    
-end
+[Sinputdata,inputorigin.Sinputdata] = edapplyparamspec(Sinputdata,paramspec,'Sinputdata',...
+    [pistoninputfields,pistonderivedfields,{'sourceamplitudes'}],{});
+
 if strcmp(Sinputdata.sourcetype,'monopole')
-    if ~isfield(Sinputdata,'coordinates') 
-        error('ERROR: you must specify monopole source coordinates')
-    end
-    [nsources,ncolumns] = size(Sinputdata.coordinates);
-    if nsources == 0
-         error('ERROR: source coordinates were not specified')            
-    end
-    if ncolumns ~= 3
-       error(['ERROR: check your sources coordinates; there were ',int2str(ncolumns),' columns rather than 3']) 
-    end
+    nsources = size(Sinputdata.coordinates,1);
     Sinputdata.pistoncornercoordinates = [];
     Sinputdata.pistoncornernumbers = [];
     Sinputdata.pistonplanes = []; 
     Sinputdata.pistongaussorder = 0;
+    for ii = 1:length(pistoninputfields)
+        inputorigin.Sinputdata.(pistoninputfields{ii}) = 'notapplicable';
+    end
     
-elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
+else   % Sinputdata.sourcetype is 'polygonpiston'
    if ~isfield(Sinputdata,'pistoncornercoordinates') || ~isfield(Sinputdata,'pistoncornernumbers') || ~isfield(Sinputdata,'pistonplanes')
         error('ERROR: when you specify a polygonpiston sources, you must specify corner coordinates and numbers, and piston plane(s).')
     end
@@ -808,6 +687,19 @@ elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
     Sinputdata.ncornersperpiston = ncornersperpiston;
     Sinputdata.pistonareas = pistonareavec;
 
+    inputorigin.Sinputdata.coordinates = 'derived';
+    inputorigin.Sinputdata.pistoncornercoordinates = 'user';
+    inputorigin.Sinputdata.pistoncornernumbers = 'user';
+    inputorigin.Sinputdata.pistonplanes = 'user';
+    if pistongaussordergiven
+        inputorigin.Sinputdata.pistongaussorder = 'user';
+    else
+        inputorigin.Sinputdata.pistongaussorder = 'default';
+    end
+    for ii = 1:length(pistonderivedfields)
+        inputorigin.Sinputdata.(pistonderivedfields{ii}) = 'derived';
+    end
+
     if ~isfield(Sinputdata,'pistonplanes')
         error('ERROR: When Sinputdata.sourcetype is polygonpiston, then the field .pistonplanes must be specified.')
     else
@@ -816,31 +708,19 @@ elseif strcmp(Sinputdata.sourcetype,'polygonpiston')
         end
     end
 
-else
-    error('ERROR: Only monopole and polygonpistonsources have been defined')
 end
 
-if ~isfield(Sinputdata,'doaddsources')
-    Sinputdata.doaddsources = 0;
-end
 if nsources == 1
+    if ~(doaddsourcesgiven && Sinputdata.doaddsources == 1)
+        inputorigin.Sinputdata.doaddsources = 'derived';
+    end
     Sinputdata.doaddsources = 1;
 end    
-if ~isfield(Sinputdata,'doallSRcombinations')
-    Sinputdata.doallSRcombinations = 1;
-else
-    if Sinputdata.doallSRcombinations == 0 && nsources~=nreceivers
-        disp(['   nsources = ',int2str(nsources)])
-        disp(['   nreceivers = ',int2str(nreceivers)])
-        
-       error('ERROR: doallSRcombinations was set to 0, but the number of sources was not the same as the number of receivers'); 
-    end
+if Sinputdata.doallSRcombinations == 0 && nsources ~= nreceivers
+    disp(['   nsources = ',int2str(nsources)])
+    disp(['   nreceivers = ',int2str(nreceivers)])
+    error('ERROR: doallSRcombinations was set to 0, but the number of sources was not the same as the number of receivers'); 
 end
-
-if ~isfield(Sinputdata,'nedgesubs')
-    Sinputdata.nedgesubs = 2;
-end
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the field .sourceamplitudes of the struct Sinputdata, and expand it
@@ -852,8 +732,11 @@ if ismember(controlparameters.generalmethod,{'tf','tf_ESIEBEM'})
 else
     nampcolumns = 1;
 end
-if ~isfield(Sinputdata,'sourceamplitudes')
+if sourceamplitudesgiven
+    inputorigin.Sinputdata.sourceamplitudes = 'user';
+else
     Sinputdata.sourceamplitudes = 1;
+    inputorigin.Sinputdata.sourceamplitudes = 'default';
 end
 if ~isnumeric(Sinputdata.sourceamplitudes) || isempty(Sinputdata.sourceamplitudes) || ~ismatrix(Sinputdata.sourceamplitudes)
     error('EDinputcheck:badparam','Invalid value for Sinputdata.sourceamplitudes')
@@ -874,312 +757,206 @@ if n2 == 1
     Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(:,ones(1,nampcolumns));
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check the struct controlparameters
-
-% if ~isstruct(controlparameters)
-%      error('ERROR: the struct controlparameters was not specified')           
-% end
-
-% First some general parameters 
-
-% if ~isfield(controlparameters,'directsound')
-%     controlparameters.directsound = 1;
-% end
-% if ~isfield(controlparameters,'skipfirstorder')
-%     controlparameters.skipfirstorder = 0;
-% end
-% if ~isfield(controlparameters,'Rstart')
-%     controlparameters.Rstart = 0;
-% end
-% if ~isfield(controlparameters,'difforder') 
-%     if geoinputdata.freefieldcase == 1
-%         controlparameters.difforder = 0;
-%     else
-%         disp('   INFO: controlparameters.difforder was not specified. It is given the value 10.')
-%         controlparameters.difforder = 10;
-%     end
-% end
-
-% Then other parameters 
-
-% if ~isfield(controlparameters,'docalctf')
-%     controlparameters.docalctf = 0;
-% %    disp('WARNING: controlparameters.docalctf was not specified. It is given the value 0.')
-% end
-% if ~isfield(controlparameters,'docalcir')
-%     controlparameters.docalcir = 0;
-% %    disp('WARNING: controlparameters.docalcir was not specified. It is given the value 0.')
-% end
-% if (controlparameters.docalctf == 1) && (controlparameters.docalcir == 1)
-%     error('EROR: docalcir and docalctf can not both be set to 1')
-% end        
-% if ~isfield(controlparameters,'docalctf_ESIEBEM')
-%     controlparameters.docalctf_ESIEBEM = 0;
-% %    disp('WARNING: controlparameters.docalctf_ESIEBEM was not specified. It is given the value 0.')
-% else
-%     if controlparameters.docalctf_ESIEBEM == 1 
-%         if geoinputdata.freefieldcase == 1
-%             error('ERROR: controlparameters.docalctf_ESIEBEM and geoinputdata.freefieldcase can not both be set to 1')
-%         end
-%         if controlparameters.docalctf == 1
-%             error('ERROR: controlparameters.docalctf and controlparameters.docalctf_ESIEBEM can not both be set to 1')
-%         end
-%         if controlparameters.docalcir == 1
-%             error('ERROR: controlparameters.docalcir and controlparameters.docalctf_ESIEBEM can not both be set to 1')
-%         end
-%     end
-% end
-% if (controlparameters.docalctf == 0) && (controlparameters.docalcir == 0) && (controlparameters.docalctf_ESIEBEM == 0)
-%     error('ERROR: You must choose a calulcation method: one of (docalcir, docalctf, docalctf_ESIEBEM) must be 1')
-% end
-
-% if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1
-%     if ~isfield(controlparameters,'frequencies')
-%         error('ERROR: controlparameters.frequencies were not specified')
-%     end
-%     if ~isfield(controlparameters,'ngauss')
-%         disp('   INFO: controlparameters.ngauss wasnt set; it is given the default value 16.')
-%         controlparameters.ngauss = 16;
-%     end
-%     if ~isfield(controlparameters,'discretizationtype')
-% %        disp('   INFO: controlparameters.discretizationtype wasnt set; it is given the default value 2.')
-%         controlparameters.discretizationtype = 2;
-%     end
-% else
-%     controlparameters.frequencies = [];
-%     controlparameters.ngauss = 0;
-%     controlparameters.discretizationtype = 0;
-% end
-% nfrequencies = length(controlparameters.frequencies);
-
-% if controlparameters.docalctf_ESIEBEM == 1
-%     if ~isfield(controlparameters,'surfacegaussorder')
-%         disp('   INFO: controlparameters.surfacegaussorder wasnt set; it is given the default value 5.')
-%         controlparameters.surfacegaussorder = 5;
-%     end
-% else
-%     controlparameters.surfacegaussorder = 0;
-% end
-
-% if controlparameters.docalcir == 1
-%     if ~isfield(controlparameters,'fs')
-%         disp('   INFO: controlparameters.fs wasn''t set; it is given the default value 44100.')
-%         controlparameters.fs = 44100;
-%     end   
-%     if ~isfield(controlparameters,'HODelemsize')
-%         controlparameters.HODelemsize = 2*2.^(-[0:controlparameters.difforder-1]);
-%     end   
-% else
-%    controlparameters.fs = 44100;
-% end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check the field .sourceamplitudes of the struct Sinputdata
-
-% sourceamplitudes_default = 0;
-% 
-% % We need to treat the frequency-domain cases differently from the
-% % time-domain cases. But, if .sourceamplitudes was not specified, it gets
-% % the default value 1 for all sources (and frequencies).
-% 
-% if ~isfield(Sinputdata,'sourceamplitudes')
-% %     Sinputdata.sourceamplitudes = ones(nsources,1);    
-%     Sinputdata.sourceamplitudes = 1;    
-%     sourceamplitudes_default = 1;
-% end
-% 
-% [n1,n2] = size(Sinputdata.sourceamplitudes);
-% 
-% if n1 > 1
-%     if n1 ~= nsources
-%         error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one row, or one row per source, but it had the size ',int2str(n1),' by ',int2str(n2)])
-%     else % So, we know that there is one amplitude per source. Check if there is one value per freq.
-%         if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
-%             if n2 == 1
-%                 Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(:,ones(1,nfrequencies));
-%             else
-%                 if n2 ~= nfrequencies
-%                     error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one column, or one column per frequency, but it had the size ',int2str(n1),' by ',int2str(n2)])
-%                 end
-%             end
-%         else
-%             if n2 > 1
-%                error(['ERROR: The Sinputdata.sourceamplitudes input parameter must, for TD calculations, have one column, but it had the size ',int2str(n1),' by ',int2str(n2)])
-%             end
-%         end
-%     end
-% else % Here we know that there is just one row. Check if there is one value per freq. (or a single value)
-%     if n2 > 1
-%         if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
-%             if n2 ~= nfrequencies
-%                 error(['ERROR: The Sinputdata.sourceamplitudes input parameter must have one column, or one column per frequency, but it had the size ',int2str(n1),' by ',int2str(n2)])
-%             else % Here we know that n2 == nfrequencies. Expand to number of sources
-%                 Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),:);
-%             end
-%         else
-%             error(['ERROR: The Sinputdata.sourceamplitudes input parameter must, for TD calculations, have one column, but it had the size ',int2str(n1),' by ',int2str(n2)])            
-%         end
-%     else % Here we know that n1 = 1 and n2 = 1
-%         if controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1      
-%             Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1),ones(1,nfrequencies));
-%         else
-%             Sinputdata.sourceamplitudes = Sinputdata.sourceamplitudes(ones(nsources,1));            
-%         end
-%     end
-% end
-
-% if controlparameters.docalcir == 1
-%     if ~isfield(controlparameters,'savealldifforders')
-%         controlparameters.savealldifforders = 0;
-%     end
-%     if ~isfield(controlparameters,'saveindividualfirstdiff')
-%         controlparameters.saveindividualfirstdiff = 0;
-%     end
-% else
-%     controlparameters.savealldifforders = 0;
-%     controlparameters.saveindividualfirstdiff = 0;
-%  end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check the struct filehandlingparameters
+%
+% If a geometry file was given, then .outputdirectory and .filestem get
+% default values from the file name. Otherwise they must be given.
 
 if ~isstruct(filehandlingparameters)
     error('ERROR: the struct filehandlingparameters was not specified')
 end
 
-if exist([filehandlingparameters.outputdirectory],'dir') ~=7
-      mkdir([filehandlingparameters.outputdirectory])
+outputdirectoryderived = false;
+filestemderived = false;
+if usesgeofile
+    [geofilepath,geofilestem] = fileparts(geoinputdata.geoinputfile);
+    if isempty(geofilepath)
+        geofilepath = pwd;
+    end
+    if ~edisgiven(filehandlingparameters,'outputdirectory')
+        filehandlingparameters.outputdirectory = [geofilepath,filesep,'results'];
+        outputdirectoryderived = true;
+    end
+    if ~edisgiven(filehandlingparameters,'filestem')
+        filehandlingparameters.filestem = geofilestem;
+        filestemderived = true;
+    end
 end
 
-% columns: name, validator, default, applicability, required
 paramspec = {
-    'suppressresultrecycling',  @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) true, false; 
-    'showtext',                 @(x) isnumeric(x) && x >= 0 && round(x)==x, 1, @(cp) true, false; 
-    'saveSRdatafiles',          @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
-    'saveeddatafile',           @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
-    'saveed2datafile',          @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
-    'savesubmatrixdata',        @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
-    'saveinteqsousigs',         @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) true, false; 
-    'loadinteqsousigs',         @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) true, false; 
-    'savepathsfile',            @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
-    'savediff2result',          @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) true, false; 
-    'savelogfile',              @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(cp) true, false; 
-    'saveISEStree',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) strcmp(controlparameters.generalmethod,'ir'), false; 
-    'savehodpaths',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(cp) strcmp(controlparameters.generalmethod,'ir'), false; 
+    'outputdirectory',          @(x) ischar(x) && ~isempty(x),              NaN, @(s) true, true; 
+    'filestem',                 @(x) ischar(x) && ~isempty(x),              NaN, @(s) true, true; 
+    'suppressresultrecycling',  @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) true, false; 
+    'showtext',                 @(x) isnumeric(x) && x >= 0 && round(x)==x, 1, @(s) true, false; 
+    'saveSRdatafiles',          @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
+    'saveeddatafile',           @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
+    'saveed2datafile',          @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
+    'savesubmatrixdata',        @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
+    'saveinteqsousigs',         @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) true, false; 
+    'loadinteqsousigs',         @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) true, false; 
+    'savepathsfile',            @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
+    'savediff2result',          @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) true, false; 
+    'savelogfile',              @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
+    'saveISEStree',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) strcmp(controlparameters.generalmethod,'ir'), false; 
+    'savehodpaths',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) strcmp(controlparameters.generalmethod,'ir'), false; 
     };
+
+removedfields = {'savecadgeofile','savesetupfile','lineending'};
+[filehandlingparameters,inputorigin.filehandlingparameters] = ...
+    edapplyparamspec(filehandlingparameters,paramspec,'filehandlingparameters',{},removedfields);
+if outputdirectoryderived
+    inputorigin.filehandlingparameters.outputdirectory = 'derived';
+end
+if filestemderived
+    inputorigin.filehandlingparameters.filestem = 'derived';
+end
+
+if exist(filehandlingparameters.outputdirectory,'dir') ~= 7
+    mkdir(filehandlingparameters.outputdirectory)
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [s,origin] = edapplyparamspec(s,paramspec,structname,extrafields,removedfields)
+% Checks the fields of one input struct against a table, and sets default
+% values.
+%
+% Input parameters:
+%   s            The struct to check
+%   paramspec    Cell array of size [nparameters,5], with the columns
+%                   1. name          The field name
+%                   2. validator     Function handle; takes the field value
+%                                    and returns true if it is valid.
+%                   3. default       The default value, or a function handle
+%                                    which takes the struct and returns
+%                                    the default value.
+%                   4. applicability Function handle; takes the struct and
+%                                    returns true if the field is relevant
+%                                    for the current settings.
+%                   5. required      true if the user must give the field
+%                                    (when it is applicable).
+%                The rows are processed in order, so a row can depend on
+%                fields that were handled by earlier rows.
+%   structname   The name of the struct, for the error messages
+%   extrafields  Cell array with names of fields that are allowed in the
+%                struct, but are not in the table (they are handled
+%                elsewhere).
+%   removedfields  Cell array with names of fields that existed in earlier
+%                versions of the toolbox. They give a warning, and are
+%                removed from the struct.
+%
+% Output parameters:
+%   s            The struct, where all fields in the table exist. Fields
+%                that are not applicable have the value NaN.
+%   origin       A struct with one field for each row in the table, with
+%                the value 'user', 'default' or 'notapplicable'.
+%
+% A field in the struct which is neither in the table, nor in extrafields
+% or removedfields, gives an error. This catches misspelt field names.
+%
+% A field which has the value NaN is treated as not given. This makes it
+% possible to send in a struct which has already been through this check
+% (e.g., EDres.controlparameters from an earlier run).
+
+isremoved = isfield(s,removedfields);
+if any(isremoved)
+    removednames = removedfields(isremoved);
+    for k = 1:length(removednames)
+        warning('EDinputcheck:removedparam', ...
+            '%s.%s is no longer used by the EDtoolbox. It is ignored.',structname,removednames{k})
+    end
+    s = rmfield(s,removednames);
+end
+
+unknownnames = setdiff(fieldnames(s),[paramspec(:,1);extrafields(:)]);
+if ~isempty(unknownnames)
+    error('EDinputcheck:unknownparam', ...
+        '%s.%s is not a known field. Please check the spelling. The known fields are: %s', ...
+        structname,unknownnames{1},strjoin(sort([paramspec(:,1);extrafields(:)]).',', '))
+end
+
+origin = struct;
 
 for k = 1:size(paramspec,1)
     name       = paramspec{k,1};
     validator  = paramspec{k,2};
     defaultval = paramspec{k,3};
-    applicable = paramspec{k,4}(filehandlingparameters);
+    applicable = paramspec{k,4}(s);
     required   = paramspec{k,5};
 
     if applicable
-        if ~isfield(filehandlingparameters,name)
+        if ~edisgiven(s,name)
             if required
                 error('EDinputcheck:missingparam', ...
-                    'filehandlingparameters.%s is required and must be supplied by the user (no default exists)', name)
+                    '%s.%s is required and must be supplied by the user (no default exists)',structname,name)
             else
-                filehandlingparameters.(name) = defaultval;
+                if isa(defaultval,'function_handle')
+                    defaultval = defaultval(s);
+                end
+                s.(name) = defaultval;
+                origin.(name) = 'default';
             end
-        elseif ~validator(filehandlingparameters.(name))
-            error('EDinputcheck:badparam','Invalid value for filehandlingparameters.%s',name)
+        else
+            origin.(name) = 'user';
+            % A validator that fails, or that does not return a single
+            % true/false, counts as an invalid value.
+            try
+                isvalid = validator(s.(name));
+                isvalid = islogical(isvalid) && isscalar(isvalid) && isvalid;
+            catch
+                isvalid = false;
+            end
+            if ~isvalid
+                error('EDinputcheck:badparam','Invalid value for %s.%s',structname,name)
+            end
         end
-    elseif isfield(filehandlingparameters,name)
-        warning('EDinputcheck:irrelevantparam', ...
-            'filehandlingparameters.%s is set but has no effect for the current settings (ignored)', name)
+    else
+        if isfield(s,name)
+            val = s.(name);
+            if ~(isnumeric(val) && isscalar(val) && isnan(val))
+                warning('EDinputcheck:irrelevantparam', ...
+                    '%s.%s is set but has no effect for the current settings (set to NaN)',structname,name)
+            end
+        end
+        s.(name) = NaN;
+        origin.(name) = 'notapplicable';
     end
 end
 
-
-% Check the struct filehandlingparameters
-    
-% if exist([filehandlingparameters.outputdirectory],'dir') ~=7
-%       mkdir([filehandlingparameters.outputdirectory])
-% end
-
-% if ~isfield(filehandlingparameters,'filestem')
-%     if exist('CADfilestem','var') == 1
-%         ifile = 1;
-%         filename1 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_tf.mat'];
-%         filename2 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_ir.mat'];
-%         if exist(filename1,'file') == 2 || exist(filename2,'file') == 2
-%             failedtofindfile = 0;
-%             while (failedtofindfile == 0)
-%                 ifile = ifile + 1;
-%                 filename1 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_tf.mat'];
-%                 filename2 = [filehandlingparameters.outputdirectory,filesep,'results',filesep,CADfilestem,'_',int2str(ifile),'_ir.mat'];
-%                 if exist(filename1,'file') ~= 2 && exist(filename2,'file') ~= 2
-%                     failedtofindfile = 1;
-%                 end
-%             end
-%         end
-%         filehandlingparameters.filestem = [CADfilestem,'_',int2str(ifile)];
-%     else
-%        filehandlingparameters.filestem = Filestem;        
-%     end
-% end
-% if ~isfield(filehandlingparameters,'savesetupfile')
-%     filehandlingparameters.savesetupfile = 1;
-% end
-% if ~isfield(filehandlingparameters,'suppressresultrecycling')
-%     filehandlingparameters.suppressresultrecycling = 0;
-% end
-% if ~isfield(filehandlingparameters,'showtext')
-%     filehandlingparameters.showtext = 1;
-% end
-% if ~isfield(filehandlingparameters,'savecadgeofile')
-%     filehandlingparameters.savecadgeofile = 0;
-% end
-% if ~isfield(filehandlingparameters,'saveSRdatafiles')
-%     filehandlingparameters.saveSRdatafiles = 1;
-% end
-% if ~isfield(filehandlingparameters,'saveeddatafile')
-%     filehandlingparameters.saveeddatafile = 1;
-% end
-% if ~isfield(filehandlingparameters,'saveed2datafile')
-%     filehandlingparameters.saveed2datafile = 1;
-% end
-% if ~isfield(filehandlingparameters,'savesubmatrixdata')
-%     filehandlingparameters.savesubmatrixdata = 1;
-% end
-% if ~isfield(filehandlingparameters,'saveinteqsousigs')
-%     filehandlingparameters.saveinteqsousigs = 0;
-% end
-% if ~isfield(filehandlingparameters,'loadinteqsousigs')
-%     filehandlingparameters.loadinteqsousigs = 0;
-% end
-% if ~isfield(filehandlingparameters,'savepathsfile')
-%     filehandlingparameters.savepathsfile = 1;
-% end
-% 
-% if controlparameters.docalcir == 1
-%     if ~isfield(filehandlingparameters,'saveISEStree')
-%         filehandlingparameters.saveISEStree = 0;
-%     end
-%     if ~isfield(filehandlingparameters,'savehodpaths')
-%         filehandlingparameters.savehodpaths = 0;
-%     end
-% else
-%     filehandlingparameters.savehodpaths = 0;
-%     filehandlingparameters.saveISEStree = 0;
-% end
-% if ~isfield(filehandlingparameters,'savediff2result')
-%     filehandlingparameters.savediff2result = 0;
-% end
-% if ~isfield(filehandlingparameters,'savelogfile')
-%     filehandlingparameters.savelogfile = 1;
-% end
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function val = getfielddefault(s, fieldname, defaultval)
-if isfield(s, fieldname) && ~isempty(s.(fieldname))
-    val = s.(fieldname);
-else
-    val = defaultval;
+function given = edisgiven(s,name)
+% Returns true if the field exists in the struct s and has a value other
+% than a single NaN. NaN is the marker for "not applicable", so a field
+% with that value counts as not given by the user.
+
+given = isfield(s,name);
+if given
+    val = s.(name);
+    given = ~(isnumeric(val) && isscalar(val) && isnan(val));
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [corners,planecorners] = edreadgeometryfile(geoinputfile)
+% Reads a geometry file and returns the two geometry matrices. The file
+% format is chosen from the file extension. To add a format: add a case
+% here, which calls the reader function for that format.
+
+[~,~,fileext] = fileparts(char(geoinputfile));
+
+switch lower(fileext)
+    case '.cad'
+        planedata = EDreadcad(char(geoinputfile),0);
+    otherwise
+        error('EDinputcheck:geometryformat', ...
+            'The geometry file format ''%s'' is not supported. Supported formats: .cad',fileext)
+end
+
+corners = planedata.corners;
+planecorners = double(planedata.planecorners);

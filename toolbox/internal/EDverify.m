@@ -93,6 +93,9 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % the line ending of the computer. The outputdirectory input parameter is
 % now used (it was overwritten by a directory window before). Fixed: the
 % log of tests 2 and 3 used the pass value of test 4. Added tests 9-15.
+% 12 Oct. 2026 After the first run: test 9 has a more robust kink measure
+% (near the boundary vs. the rest of the window); the limits of tests 1
+% and 10 were set from the results with the accurate implementations.
 
 ntests = 15;
 
@@ -231,7 +234,8 @@ end
 function r = edtest1(outputdirectory,filestem,~)
 title = 'DC response at a cuboid surface, plane wave incidence';
 description = {'Expected rel. errors for receiver positions 1 (in front, at surface) and 2 (behind, at surface),',...
-    'with 96 Gauss-Legendre points for the longest edge and diffraction order 20, are 1.3e-5 and 1.5e-5.'};
+    'with 96 Gauss-Legendre points for the longest edge and diffraction order 20, are 3.4e-6 and 9.1e-6',...
+    '(with the accurate source term and propagation, Oct. 2026; it was 1.3e-5 and 1.5e-5 before).'};
 
 corners = [-0.2 -0.44 -0.32; 0.2 -0.44 -0.32; 0.2 0.2 -0.32; -0.2 0.2 -0.32;...
            -0.2 -0.44 0; 0.2 -0.44 0; 0.2 0.2 0; -0.2 0.2 0];
@@ -246,7 +250,7 @@ EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameter
     edfilehandling(outputdirectory,filestem));
 
 relerr = abs(EDres.tftot*norm(Sinputdata.coordinates) - 1);
-r = edresult(title,description,relerr(1) < 0.14e-4 && relerr(2) < 0.16e-4,...
+r = edresult(title,description,relerr(1) < 5e-6 && relerr(2) < 1.4e-5,...
     {['Computed rel. errors: ',num2str(relerr(1)),' and ',num2str(relerr(2))]});
 end
 
@@ -473,12 +477,16 @@ end
 
 function r = edtest9(outputdirectory,filestem,plotdiagrams)
 title = 'No kinks at higher-order zone boundaries, cube, 100 Hz';
-maxratio = 20;
+maxrelstep = 1e-3;
 description = {'1 m cube, source 0.1 mm from the center of the top face, receivers on an arc of radius 2 m,',...
-    'in two windows around 14.5 deg. and 104.5 deg., where the receivers cross the extension of a',...
-    'side face and the bottom face. No lower-order term changes there, so the total field must be',...
-    'smooth. Measure: max/median of the second difference of abs(tftot) in each window. With the',...
-    ['legacy propagation (Oct. 2026) it was > 100. It should be below ',int2str(maxratio),'.']};
+    'in two windows around 14.48 deg. and 104.48 deg., where the receivers cross the extension of a',...
+    'side face and the bottom face. The true total field is smooth there (it is smooth everywhere',...
+    'outside the object), so a step at the boundary is a numerical error. Measure of the step: the',...
+    'largest second difference of abs(tftot) within 1 deg. of the boundary, minus the largest one in',...
+    'the rest of the window, relative to max abs(tftot) in the window. With the legacy propagation',...
+    'it was estimated to about 1.6e-2; with the accurate one it was 2.9e-4 and 3.5e-4 (Oct. 2026).',...
+    ['It should be below ',num2str(maxrelstep),'.'],...
+    'Also shown: the ratio of the two second differences (about 1 for a perfectly smooth curve).'};
 
 [corners,planecorners] = edcube(0.5);
 geoinputdata = struct('corners',corners,'planecorners',planecorners);
@@ -494,10 +502,16 @@ EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameter
 
 n1 = length(thetavec1);
 ratios = zeros(1,2);
+relsteps = zeros(1,2);
 windows = {1:n1, n1+1:length(thetavec)};
+boundaryangles = [asind(0.25) acosd(-0.25)];     % 14.48 and 104.48 deg.
 for ii = 1:2
+    thetawindow = thetavec(windows{ii});
     d2 = abs(diff(abs(EDres.tftot(windows{ii})),2));
-    ratios(ii) = max(d2)/median(d2);
+    thetad2 = thetawindow(2:end-1);              % the angle of each second difference
+    nearboundary = abs(thetad2 - boundaryangles(ii)) < 1;
+    ratios(ii) = max(d2(nearboundary))/max(d2(~nearboundary));
+    relsteps(ii) = max(0,max(d2(nearboundary)) - max(d2(~nearboundary)))/max(abs(EDres.tftot(windows{ii})));
 end
 
 if plotdiagrams == 1
@@ -506,8 +520,9 @@ if plotdiagrams == 1
     xlabel('Receiver angle (window 2 shifted by -90 deg.)   [deg.]'); ylabel('abs(tftot)   [-]');
 end
 
-r = edresult(title,description,all(ratios < maxratio),...
-    {['Kink measure around 14.5 deg.: ',num2str(ratios(1),3),', around 104.5 deg.: ',num2str(ratios(2),3)]});
+r = edresult(title,description,all(relsteps < maxrelstep),...
+    {['Relative step around 14.48 deg.: ',num2str(relsteps(1),3),', around 104.48 deg.: ',num2str(relsteps(2),3)],...
+     ['Ratio of second differences around 14.48 deg.: ',num2str(ratios(1),3),', around 104.48 deg.: ',num2str(ratios(2),3)]});
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -525,11 +540,11 @@ end
 
 function r = edtest10(outputdirectory,filestem,~)
 title = 'The three integral equation solution methods agree';
-tolgmres = 1e-7;
-toliterative = 1e-3;
+tolgmres = 1e-9;
+toliterative = 1e-8;
 description = {'1 m cube, 2 frequencies, 3 receivers. GMRES_fast and GMRES_large should agree to',...
     [num2str(tolgmres),' (relative to max abs(tftot)); iterative_fixeddifforder with difforder 30 should agree'],...
-    ['with GMRES to ',num2str(toliterative),' (provisional limit).']};
+    ['with GMRES to ',num2str(toliterative),'. (Oct. 2026: 6e-17 and 1e-11.)']};
 
 [geoinputdata,Sinputdata,Rinputdata,controlparameters] = edsmallcube;
 methods = {'GMRES_fast','GMRES_large','iterative_fixeddifforder'};

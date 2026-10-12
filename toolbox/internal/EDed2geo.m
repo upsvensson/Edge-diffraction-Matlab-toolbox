@@ -108,6 +108,13 @@ function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedat
 % will be zero for aligned edge pairs.
 % 26 Mar. 26 Introduced a new output field .edgeconnectionangle, a sparse
 % matrix for all edge pairs with non-zero values in .edgeconnectedwithedge.
+% 12 Oct. 2026 New EDinputdatahash: chained to the edgedata hash, and with a
+% local stageversion instead of the overall EDversionnumber. The source
+% and receiver coordinates were removed from the hash (they are not used
+% here; only nedgesubs is), as was ndiff2batches (it only splits the
+% computations into batches). difforder is hashed only as
+% (difforder >= 2). The hash is stored as a field .EDinputdatahash in
+% edgetoedgedata. load/save without eval.
 
 t00 = clock;
 
@@ -123,11 +130,15 @@ nedgesubs = Sdata.nedgesubs;
 % EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata,...
 %     'Sdata',Sdata,'Rdata',Rdata,'specorder',specorder,'difforder',difforder,...
 %     'nedgesubs',nedgesubs,'ndiff2batches',ndiff2batches,'EDversionnumber',EDversionnumber);
-EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
-    planedata.planecorners,'offedges',edgedata.offedges,...
-    'sources',Sdata.coordinates,'Snedgesubs',Sdata.nedgesubs,...
-    'receivers',Rdata.coordinates,'Rnedgesubs',Rdata.nedgesubs,...
-    'specorder',specorder,'difforder',difforder,'ndiff2batches',ndiff2batches,'EDversionnumber',EDversionnumber);
+% stageversion identifies the version of the computations in this function.
+% Increase it by one whenever a change in this function changes its output
+% data, so that previously saved stage files are not reused. The overall
+% EDversionnumber is not part of the hash.
+stageversion = 1;
+
+EDinputdatastruct = struct('stage','EDed2geo','stageversion',stageversion,...
+    'edgedatahash',EDparenthash(edgedata),'nedgesubs',nedgesubs,...
+    'specorder',specorder,'calcdiff2',double(difforder >= 2));
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 % geomacc = 1e-10;
@@ -146,7 +157,9 @@ end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_ed2data.mat'];
 
 if foundmatch == 1
-    eval(['load(''',existingfilename,''')'])
+    filedata = load(existingfilename,'edgetoedgedata','elapsedtimeed2geo');
+    edgetoedgedata = filedata.edgetoedgedata;
+    elapsedtimeed2geo = filedata.elapsedtimeed2geo;
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
@@ -1596,11 +1609,10 @@ edgetoedgedata = struct('reftoshortlistE',reftoshortlistE,'re1sho',re1sho,...
     'edgeperptoplane',edgeperptoplane,'edgeplaneperptoplane1',edgeplaneperptoplane1,...
     'edgeplaneperptoplane2',edgeplaneperptoplane2);
 
+edgetoedgedata.EDinputdatahash = EDinputdatahash;
+
 elapsedtimeed2geo = etime(clock,t00);
 
 if filehandlingparameters.saveed2datafile == 1
-	eval(['save(''',desiredname,''',''planedata'',''edgedata'',''edgetoedgedata'',''EDinputdatahash'',''elapsedtimeed2geo'');'])
+	save(desiredname,'planedata','edgedata','edgetoedgedata','EDinputdatahash','elapsedtimeed2geo','stageversion','EDversionnumber');
 end
-
-
-

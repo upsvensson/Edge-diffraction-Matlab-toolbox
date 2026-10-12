@@ -97,6 +97,11 @@ function [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
 % 28 Apr. 2025 Fixed a bug: when the sources were the same as the
 % receivers, a matrix 'possibleSPR' erroneously got a lot of zero rows,
 % which had to be removed.
+% 12 Oct. 2026 New EDinputdatahash: chained to the edgedata, Sdata and
+% Rdata hashes, and with a local stageversion instead of the overall
+% EDversionnumber. difforder is hashed only as (difforder > 0), since that
+% is the only way it is used here. The hash is stored as a field
+% .EDinputdatahash in firstorderpathdata. load/save without eval.
 
 t00 = clock;
 
@@ -104,14 +109,16 @@ showtext = filehandlingparameters.showtext;
 difforder = controlparameters.difforder;
 directsound = controlparameters.directsound;
 
-EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
-    planedata.planecorners,'offedges',edgedata.offedges,...
-    'sources',Sdata.coordinates,'Snedgesubs',Sdata.nedgesubs,...
-    'pistoncoordinates',Sdata.pistoncornercoordinates,...
-    'pistongaussorder',Sdata.pistongaussorder,...
-    'receivers',Rdata.coordinates,'Rnedgesubs',Rdata.nedgesubs,...
-    'difforder',difforder,'directsound',directsound,'doallSRcombinations',...
-    Sdata.doallSRcombinations,'EDversionnumber',EDversionnumber);
+% stageversion identifies the version of the computations in this function.
+% Increase it by one whenever a change in this function changes its output
+% data, so that previously saved stage files are not reused. The overall
+% EDversionnumber is not part of the hash.
+stageversion = 1;
+
+EDinputdatastruct = struct('stage','EDfindconvexGApaths','stageversion',stageversion,...
+    'edgedatahash',EDparenthash(edgedata),'Sdatahash',EDparenthash(Sdata),...
+    'Rdatahash',EDparenthash(Rdata),'calcdiffpaths',double(difforder > 0),...
+    'directsound',directsound,'doallSRcombinations',Sdata.doallSRcombinations);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -128,8 +135,9 @@ end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_paths.mat'];
 
 if foundmatch == 1
-%        eval(['load ''',existingfilename,''''])
-    eval(['load(''',existingfilename,''')'])
+    filedata = load(existingfilename,'firstorderpathdata','elapsedtimefindpaths');
+    firstorderpathdata = filedata.firstorderpathdata;
+    elapsedtimefindpaths = filedata.elapsedtimefindpaths;
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
@@ -459,9 +467,11 @@ firstorderpathdata.edgeisactive     = edgeisactive;
 firstorderpathdata.directsoundlist  = [Snumber_directsoundOK(:) Rnumber_directsoundOK(:) dirsoundamp(:)];
 firstorderpathdata.ncomponents      = numberofcomponents;
 
+firstorderpathdata.EDinputdatahash = EDinputdatahash;
+
 elapsedtimefindpaths = etime(clock,t00);
 outpar = elapsedtimefindpaths;
 
 if filehandlingparameters.savepathsfile == 1
-	eval(['save(''',desiredname,''',''firstorderpathdata'',''EDinputdatahash'',''elapsedtimefindpaths'');'])
+	save(desiredname,'firstorderpathdata','EDinputdatahash','elapsedtimefindpaths','stageversion','EDversionnumber');
 end

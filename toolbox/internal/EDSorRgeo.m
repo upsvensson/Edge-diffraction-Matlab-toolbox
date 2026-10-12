@@ -118,6 +118,14 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
 % 20 Nov. 2023 Another reduction of the size of rrsho etc.
 % 29 Nov. 2023 Adapted to the name change of the field pistongausspoints to
 % pistongaussorder
+% 12 Oct. 2026 New EDinputdatahash: chained to the edgedata hash, and with a
+% local stageversion instead of the overall EDversionnumber. Only the
+% fields which the computations use are hashed (the source amplitudes were
+% removed from the hash). When an existing file is reused, all fields that
+% are passed through unchanged from the inputstruct (e.g.,
+% sourceamplitudes, doallSRcombinations) are taken from the current
+% inputstruct, not from the file. The hash is stored as a field
+% .EDinputdatahash in the output struct. load/save without eval.
 
 t00 = clock;
 geomacc = 1e-9;
@@ -132,20 +140,25 @@ if typeofcoords~='r' && typeofcoords~='s'
     error('ERROR: The input parameter typeofcoords must have the value S or R')    
 end
 
+% stageversion identifies the version of the computations in this function.
+% Increase it by one whenever a change in this function changes its output
+% data, so that previously saved stage files are not reused. The overall
+% EDversionnumber is not part of the hash.
+stageversion = 1;
+
 if typeofcoords == 's'
-    EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
-        planedata.planecorners,'offedges',edgedata.offedges,...
-        'coordinates',inputstruct.coordinates,...
-        'amplitudes',inputstruct.sourceamplitudes,...
-        'pistoncoordinates',inputstruct.pistoncornercoordinates,...
-        'pistongaussorder',inputstruct.pistongaussorder,...
-        'nedgesubs',inputstruct.nedgesubs,'EDversionnumber',EDversionnumber);
+    hashfields = {'coordinates','nedgesubs','sourcetype','pistoncornercoordinates',...
+        'pistoncornernumbers','pistonplanes','pistongaussorder','pistongausscoordinates'};
 else
-    EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
-        planedata.planecorners,'offedges',edgedata.offedges,...
-        'coordinates',inputstruct.coordinates,...
-        'nedgesubs',inputstruct.nedgesubs,'EDversionnumber',EDversionnumber);
-end    
+    hashfields = {'coordinates','nedgesubs'};
+end
+EDinputdatastruct = struct('stage',['EDSorRgeo_',typeofcoords],...
+    'stageversion',stageversion,'edgedatahash',EDparenthash(edgedata));
+for ii = 1:numel(hashfields)
+    if isfield(inputstruct,hashfields{ii})
+        EDinputdatastruct.(hashfields{ii}) = inputstruct.(hashfields{ii});
+    end
+end
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -170,18 +183,26 @@ else
 end
 
 if foundmatch == 1
-    eval(['load(''',existingfilename,''')'])
+    if typeofcoords == 's'
+        filedata = load(existingfilename,'Sdata','elapsedtimeSgeo');
+        outputstruct = filedata.Sdata;
+        elapsedtimeSgeo_new = etime(clock,t00);
+        elapsedtimeSRgeo = [elapsedtimeSgeo_new filedata.elapsedtimeSgeo];
+    else
+        filedata = load(existingfilename,'Rdata','elapsedtimeRgeo');
+        outputstruct = filedata.Rdata;
+        elapsedtimeRgeo_new = etime(clock,t00);
+        elapsedtimeSRgeo = [elapsedtimeRgeo_new filedata.elapsedtimeRgeo];
+    end
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
-    if typeofcoords == 's'
-        outputstruct = Sdata;
-        elapsedtimeSgeo_new = etime(clock,t00);
-        elapsedtimeSRgeo = [elapsedtimeSgeo_new elapsedtimeSgeo];
-    else
-        outputstruct = Rdata;
-        elapsedtimeRgeo_new = etime(clock,t00);
-        elapsedtimeSRgeo = [elapsedtimeRgeo_new elapsedtimeRgeo];
+    % Fields that are passed through from the inputstruct are taken from
+    % the current inputstruct (the coordinates are hashed, and might
+    % have been modified slightly by the computations, so they are kept).
+    passthroughfields = setdiff(fieldnames(inputstruct),{'coordinates','EDinputdatahash'});
+    for ii = 1:numel(passthroughfields)
+        outputstruct.(passthroughfields{ii}) = inputstruct.(passthroughfields{ii});
     end
     return
 end
@@ -1143,12 +1164,14 @@ if typeofcoords=='r'
     outputstruct.thetaRsho = thetaRsho;
     outputstruct.zRsho = zRsho;
 
+    outputstruct.EDinputdatahash = EDinputdatahash;
+
     elapsedtimeRgeo = etime(clock,t00);
     elapsedtimeSRgeo = elapsedtimeRgeo;
 
     if filehandlingparameters.saveSRdatafiles == 1
         Rdata = outputstruct;
-    	eval(['save(''',desiredname,''',''Rdata'',''EDinputdatahash'',''elapsedtimeRgeo'');'])
+    	save(desiredname,'Rdata','EDinputdatahash','elapsedtimeRgeo','stageversion','EDversionnumber');
     end   
     
 else
@@ -1208,13 +1231,14 @@ else
     outputstruct.thetaSsho = thetaRsho;
     outputstruct.zSsho = zRsho;
 
+    outputstruct.EDinputdatahash = EDinputdatahash;
+
     elapsedtimeSgeo = etime(clock,t00);
     elapsedtimeSRgeo = elapsedtimeSgeo;
     
     if filehandlingparameters.saveSRdatafiles == 1
         Sdata = outputstruct;
-    	eval(['save(''',desiredname,''',''Sdata'',''EDinputdatahash'',''elapsedtimeSgeo'');'])
+    	save(desiredname,'Sdata','EDinputdatahash','elapsedtimeSgeo','stageversion','EDversionnumber');
     end   
     
 end
-

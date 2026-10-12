@@ -162,6 +162,11 @@ function [edgedata,planedata,elapsedtimeedgeo,existingfilename] = EDedgeo(planed
 % 30 Oct. 2023 Moved the EDversionnumber position among input parameters.
 % Fine-tuned the EDinputdatahash
 % 25 March 2024 Implemented the new input parameter listofedgestoskip
+% 12 Oct. 2026 New EDinputdatahash: it contains the complete input planedata
+% struct, the skip-lists, and a local stageversion (instead of the overall
+% EDversionnumber). The hash is also stored as a field in the output
+% edgedata, so that later stages can include it in their own hashes
+% (chained hashes). load/save without eval.
 
 t00 = clock;
 geomacc = 1e-10;
@@ -188,11 +193,17 @@ else
     planeseesplanestrategy = geoinputdata.planeseesplanestrategy;
 end
 
-EDinputdatastruct = struct('corners',planedata.corners,'planecorners',planedata.planecorners,...
-    'planeabstypes',planedata.planeabstypes,...
-'firstcornertoskip',firstcornertoskip,'listofcornerstoskip',listofcornerstoskip,...
-'listofedgestoskip',listofedgestoskip,...
-'planeseesplanestrategy',planeseesplanestrategy,'EDversionnumber',EDversionnumber);
+% stageversion identifies the version of the computations in this function.
+% Increase it by one whenever a change in this function changes its output
+% data, so that previously saved stage files are not reused. The overall
+% EDversionnumber is not part of the hash.
+stageversion = 1;
+
+EDinputdatastruct = struct('stage','EDedgeo','stageversion',stageversion,...
+    'planedata',planedata,'firstcornertoskip',firstcornertoskip,...
+    'listofcornerstoskip',listofcornerstoskip,...
+    'listofedgestoskip',listofedgestoskip,...
+    'planeseesplanestrategy',planeseesplanestrategy);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -212,8 +223,10 @@ desiredname = [filehandlingparameters.outputdirectory,filesep,...
 	filehandlingparameters.filestem,'_eddata.mat'];
 
 if foundmatch == 1
-%		eval(['load ''',existingfilename,''''])
-	eval(['load(''',existingfilename,''')'])
+	filedata = load(existingfilename,'planedata','edgedata','elapsedtimeedgeo');
+	planedata = filedata.planedata;
+	edgedata = filedata.edgedata;
+	elapsedtimeedgeo = filedata.elapsedtimeedgeo;
 	if ~strcmp(existingfilename,desiredname)
 		copyfile(existingfilename,desiredname);
 	end
@@ -1555,8 +1568,10 @@ planedata.rearsideplane = rearsideplane;
 planedata.canplaneobstruct = canplaneobstruct;
 planedata.reflfactors = reflfactors;
 
+edgedata.EDinputdatahash = EDinputdatahash;
+
 elapsedtimeedgeo = etime(clock,t00);
 
 if filehandlingparameters.saveeddatafile == 1
-	eval(['save(''',desiredname,''',''planedata'',''edgedata'',''EDinputdatahash'',''elapsedtimeedgeo'');'])
+	save(desiredname,'planedata','edgedata','EDinputdatahash','elapsedtimeedgeo','stageversion','EDversionnumber');
 end

@@ -244,6 +244,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % earlier run. Then 'default' and 'derived' are kept for values that have
 % not been changed.
 % 12 Oct. 2026 Introduced filehandlingparameters.savefullEDresfile
+% 12 Oct. 2026 The defaults for controlparameters.ESIEsourcetermimplementation
+% and .ESIEpropagationimplementation were changed from 'legacy' to
+% 'accurate'.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check if the needed non-EDtoolbox functions are available.
@@ -329,8 +332,8 @@ paramspec = {
     'inteqsolutionmethod', @(x) ismember(x,{'GMRES_fast','GMRES_large','iterative_fixeddifforder'}), 'GMRES_fast', @(cp) cp.difforder>=2, false;
     'inteqtargettol',      @(x) isnumeric(x) && isscalar(x) && x>=0,                              1e-10, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false;
     'inteqgmresmaxiter',   @(x) isnumeric(x) && isscalar(x) && x>=0 && round(x)==x,               100, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false;
-    'ESIEsourcetermimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'legacy', @(cp) cp.difforder>=2, false;
-    'ESIEpropagationimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'legacy', @(cp) cp.difforder>=2, false;
+    'ESIEsourcetermimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'accurate', @(cp) cp.difforder>=2, false;
+    'ESIEpropagationimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'accurate', @(cp) cp.difforder>=2, false;
     'skipreceiverpropagation',  @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),              0, @(cp) cp.difforder>=2, false;
     'ngauss',              @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 16,  @(cp) true, false;
     'discretizationtype',  @(x) isnumeric(x) && (x == 0 | x == 1 | x == 2),                       2,   @(cp) true, false;

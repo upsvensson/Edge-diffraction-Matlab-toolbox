@@ -43,7 +43,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %   controlparameters   .fs              (default: 44100) Only relevant if
 %                                        controlparameters.docalcir = 1.
 %                   .directsound         (default: 1 = yes)
-%                   .difforder           (default: 10)
+%                   .difforder           (obligatory)
 %                   .savealldifforders   (default: 0) Only relevant if
 %                                        controlparameters.docalcir = 1.
 %                   .saveindividualfirstdiff (default: 0) Only relevant if
@@ -247,6 +247,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 12 Oct. 2026 The defaults for controlparameters.ESIEsourcetermimplementation
 % and .ESIEpropagationimplementation were changed from 'legacy' to
 % 'accurate'.
+% 12 Oct. 2026 controlparameters.difforder is obligatory: the unused
+% default value 10 in the table was replaced by NaN, and the header text
+% corrected.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check if the needed non-EDtoolbox functions are available.
@@ -326,7 +329,7 @@ paramspec = {
     'Rstart',              @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 0,               0,   @(cp) true, false;
     'directsound',         @(x) isnumeric(x) && (x == 0 | x == 1),                                1,   @(cp) true, false;
     'skipfirstorder',      @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) true, false;
-    'difforder',           @(x) isnumeric(x) && isscalar(x) && x>=0 && x==round(x),               10,  @(cp) true, true;
+    'difforder',           @(x) isnumeric(x) && isscalar(x) && x>=0 && x==round(x),               NaN, @(cp) true, true;
     'diff1method',         @(x) ismember(x,{'GL','accurate'}),                                   'accurate', @(cp) cp.difforder>=1, false;
     'diff1GLorder',        @(x) isnumeric(x) && isreal(x) && isscalar(x) && x > 0 && x==round(x), 16, @(cp) strcmp(cp.diff1method,'GL'), false;
     'inteqsolutionmethod', @(x) ismember(x,{'GMRES_fast','GMRES_large','iterative_fixeddifforder'}), 'GMRES_fast', @(cp) cp.difforder>=2, false;

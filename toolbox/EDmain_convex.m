@@ -223,6 +223,9 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % origin of each value (via EDinputsummary), a summary of the solver
 % diagnostics (via EDinteqsummary), and closing lines with the total time
 % and the name of the results file.
+% 12 Oct. 2026 The edge discretization is checked against the highest
+% frequency (points per wavelength): a log line; a note in the log file below
+% 6 points per wavelength; a warning on screen and in the log below 4.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -593,6 +596,40 @@ if controlparameters.difforder > 1 && ( strcmp(controlparameters.generalmethod,'
         int2str(max(Hsubmatrixdata.nedgeelems)),' gauss points. ',int2str(Hsubmatrixdata.Qvecendnums(end)),' edge source signals to compute.'],...
         ['The IE matrix has ',int2str(nonzeroelements),' non-zero elements. Some may be identical due to symmetries'])    
     timingstruct.submatrixdata = elapsedtimesubmatrix;
+
+    % Check the edge discretization against the highest frequency: the
+    % number of edge points per wavelength. The number of points on an
+    % edge is ngauss*(edge length)/(longest edge length), so the points per
+    % wavelength are (nearly) the same for all edges; the smallest value is
+    % reported. Two levels, based on convergence tests (ngauss = 8 vs 16)
+    % for a cube, Oct. 2026:
+    %   >= 6 points per wavelength: the error is at a frequency-independent
+    %        floor (about 0.4% relative to the largest amplitude).
+    %   4-6: the overall accuracy is still at that floor, but the relative
+    %        error at low-level receivers (deep minima, shadow regions)
+    %        grows, to about 1-2%. A note is written to the log file.
+    %   < 4: also the overall accuracy degrades. A warning is written to
+    %        the log file and shown on the screen.
+    pointsperwavelength_note = 6;
+    pointsperwavelength_warning = 4;
+    pointspermeter = min(double(Hsubmatrixdata.nedgeelems(:))./edgedata.edgelengthvec(:));
+    maxfrequency = max(controlparameters.frequencies);
+    pointsperwavelength = pointspermeter*envdata.cair/maxfrequency;
+    frequencylimit_note = pointspermeter*envdata.cair/pointsperwavelength_note;
+    frequencylimit_warning = pointspermeter*envdata.cair/pointsperwavelength_warning;
+    EDmessage(filehandlingparameters,'f',fid,1,'',['   Edge discretization: ',num2str(pointsperwavelength,3),...
+        ' points per wavelength at the highest frequency (',num2str(maxfrequency),' Hz). ',...
+        num2str(pointsperwavelength_note),' points per wavelength up to ',num2str(round(frequencylimit_note)),' Hz, ',...
+        num2str(pointsperwavelength_warning),' up to ',num2str(round(frequencylimit_warning)),' Hz.']);
+    if pointsperwavelength < pointsperwavelength_warning
+        EDmessage(filehandlingparameters,'sf',fid,0,'',['   WARNING: the edges have fewer than ',num2str(pointsperwavelength_warning),...
+            ' points per wavelength above ',num2str(round(frequencylimit_warning)),' Hz (',num2str(pointsperwavelength,3),...
+            ' at ',num2str(maxfrequency),' Hz), so the accuracy degrades there. Consider a higher controlparameters.ngauss.']);
+    elseif pointsperwavelength < pointsperwavelength_note
+        EDmessage(filehandlingparameters,'f',fid,1,'',['   NOTE: the edges have fewer than ',num2str(pointsperwavelength_note),...
+            ' points per wavelength above ',num2str(round(frequencylimit_note)),' Hz. The overall accuracy is not affected, ',...
+            'but relative errors at low-level receivers (deep minima, shadow regions) can reach 1-2% there.']);
+    end
 else
     timingstruct.submatrixdata = 0;
 end

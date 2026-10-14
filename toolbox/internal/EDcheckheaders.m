@@ -47,11 +47,13 @@ function report = EDcheckheaders(toolboxfolder,outputfile)
 % Dates are recognized in the form "14 Oct. 2026" (day, month name, year).
 % Other date formats in the history are ignored by the date check.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % report = EDcheckheaders(toolboxfolder,outputfile);
 
 % 14 Oct. 2026 First version (by Claude, prompted by PS)
+% 15 Oct. 2026 The number of input parameters in the call syntax is not
+% checked for functions with varargin.
 
 if nargin < 1 || isempty(toolboxfolder)
     toolboxfolder = fileparts(fileparts(mfilename('fullpath')));
@@ -168,7 +170,7 @@ else
         end
     else
         [~,callins,callouts] = edparsecall(callline,name);
-        if numel(callins) ~= numel(ins)
+        if numel(callins) ~= numel(ins) && ~any(strcmp(ins,'varargin'))
             remarks{end+1} = sprintf('the call syntax has %d input parameters, the function has %d',numel(callins),numel(ins));
         end
         if ~isempty(outs) && numel(callouts) ~= numel(outs)

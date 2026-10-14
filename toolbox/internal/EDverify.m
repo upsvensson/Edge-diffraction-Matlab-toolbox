@@ -1,5 +1,5 @@
 function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
-% EDverify runs the EDtoolbox for a number of defined tests, and compares
+% EDverify - Runs the EDtoolbox for a number of defined tests, and compares
 % the results to expected results. A logfile is written.
 %
 % There are two kinds of tests:
@@ -62,8 +62,15 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 %     gives a warning.
 % 15. Result recycling: an unchanged rerun reuses the _tfinteq file; a
 %     changed ESIEpropagationimplementation gives a new one.
+% 16. The dependency lists in EDstageversions agree with the code.
+% 17. A change of one input parameter gives new stage files for exactly
+%     the stages that depend on it.
+% 18. The integral equation solution (_qfinal) is reused for new
+%     receivers, and gives the same result as a run without recycling.
 %
-% Peter Svensson 12 Oct. 2026 (peter.svensson@ntnu.no)
+% See also EDmain_convex, EDstageversions
+%
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams);
 
@@ -107,6 +114,7 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % of the integral equation solution for new receivers).
 % 14 Oct. 2026 Tests 17 and 18: the first run is done without recycling.
 % Test 18: a receiver was in the plane of a cube face.
+% 15 Oct. 2026 The header was updated (tests 16-18 listed).
 
 ntests = 18;
 

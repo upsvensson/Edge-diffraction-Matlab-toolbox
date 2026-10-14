@@ -1,131 +1,44 @@
 function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,inputorigin] = ...
     EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters)
-% EDcheckinputstructs checks the input data structs to EDmain_convex
-% and sets default values.
-% 
+% EDcheckinputstructs - Checks the input structs of EDmain_convex and sets the default values.
+% Each of the six input structs is checked against a table (in the local
+% function edparamspec), which for each field gives a validator, the
+% default value, when the field is relevant, whether it is required, and
+% a description. The descriptions can be read with EDinputdoc.
+%
+% A misspelt field name gives an error. A field which has been removed from
+% the toolbox gives a warning and is ignored. A field which is not relevant
+% for the settings gets the value NaN. If a geometry file is given, it is
+% read here, and .corners and .planecorners are filled in.
+%
+% Each value gets an origin: 'user' (given by the user), 'default',
+% 'derived' (computed from other input) or 'notapplicable'. A struct from
+% an earlier run (e.g., EDres.controlparameters) can be sent in again: its
+% field .inputorigin is taken out and used, so that a value that was a
+% default, and has not been changed, stays 'default'.
+%
 % Input parameters:
-%   geoinputdata    Exactly one geometry source must be given (unless
-%                   .freefieldcase = 1): either .geoinputfile, or
-%                   .corners and .planecorners.
-%                   .geoinputfile        Name of a geometry file (must
-%                                        exist; there is no file open window)
-%                   .corners             (alternative to .geoinputfile. The
-%                                        use of this option requires that
-%                                        filehandlingparameters.outputdirectory
-%                                        and .filestem are specified)
-%                   .planecorners        (alternative to .geoinputfile)
-%                   .planerefltypes      (optional; gives the reflection
-%                                         factors of the planes: 1,0,-1.
-%                                         default: ones(nplanes,1) )
-%                   .firstcornertoskip   (optional, default: 1e6)
-%                   .listofcornerstoskip (optional, default [])
-%                   .freefieldcase       (optional, default: 0)
-%                   .planeseesplanestrategy  (optional, defaul: 0)
-%   Sinputdata         .coordinates         (obligatory)
-%                   .doaddsources        (default: 0 = no)
-%                   .sourceamplitudes    Only used if doaddsources = 1
-%                                        (default:
-%                                         ones(nsources,nfrequencies))
-%                   .doallSRcombinations  (default: 1 = yes)
-%                   .sourcetype           'monopole' (default) or
-%                                         'polygonpiston'
-%                   .pistoncornercoordinates (obligatory if .sourcetype =
-%                   'polygonpiston'). Matrix size[npistoncorners,3].
-%                   .pistoncornernumbers   (obligatory if .sourcetype =
-%                   'polygonpiston'). Matrix size [npistons,maxncornersperpiston].
-%                   .pistonplanes          (obligatory if .sourcetype =
-%                   'polygonpiston'). List of size [npistons,1].
-%                   .nedgesubs           (optional, default 2)
-%   Rinputdata         .coordinates         (obligatory)
-%                   .nedgesubs           (optional, default 2)
-%   envdata         .cair                (default: 344)
-%                   .rhoair              (default: 1.21)
-%   controlparameters   .fs              (default: 44100) Only relevant if
-%                                        controlparameters.docalcir = 1.
-%                   .directsound         (default: 1 = yes)
-%                   .difforder           (obligatory)
-%                   .savealldifforders   (default: 0) Only relevant if
-%                                        controlparameters.docalcir = 1.
-%                   .saveindividualfirstdiff (default: 0) Only relevant if
-%                                        controlparameters.docalcir = 1.
-%                   .skipfirstorder      (default: 0)
-%             Maximum one of .docalctf,.docalcir,docalctf_ESIEBEM can be 1.
-%                   .docalctf            (default: 0) Only on 
-%                   .docalcir            (default: 0)
-%                   .docalctf_ESIEBEM    (default: 0)
-%                   .Rstart              (default: 0)
-%                   .frequencies         (obligatory if .docalctf = 1 or
-%                                        docalctf_ESIEBEM = 1)
-%                   .discretizationtype  (default: 2 = G-L)
-%                   .ngauss              (default: 16, but ignored if
-%                                        .docalcir = 1)
-%                   .surfacegaussorder   (default: 5, but ignored if 
-%                                         .docalctf_ESIEBEM = 0)
-%                   .HODirelemsize       (default:
-%                                       2*2.^(-[0:controlparameters.difforder-1]))
-%   filehandlingparameters    .outputdirectory  (default: the folder
-%                                        "results" in the folder of the
-%                                        geoinputfile; obligatory if no
-%                                        geoinputfile is given)  
-%                   .filestem            (default: name of the geoinputfile,
-%                                        without extension; obligatory if
-%                                        no geoinputfile is given)
-%                   .saveSRdatafiles     (default: 1)
-%                   .saveeddatafile      (default: 1)
-%                   .saveed2datafile      (default: 1)
-%                   .savesubmatrixdata    (default: 1)
-%                   .saveinteqsolution    (default: 1) The solution of
-%                                         the integral equation is saved
-%                                         in the file _qfinal.mat (if it
-%                                         is smaller than 4 GB), so it can
-%                                         be reused for other receivers.
-%                   .savepathsfile        (default: 1)
-%                   .saveISEStree         (default: 0) Not used by
-%                                         EDmain_convexESIE
-%                   .savelogfile          (default: 1)
-%                   .savefullEDresfile    (default: 1) The file
-%                                         <filestem>_EDres.mat is always
-%                                         saved. If 1, it contains the
-%                                         complete results struct, EDres.
-%                                         If 0, the result matrices are
-%                                         left out (they are in the _tf,
-%                                         _tfinteq etc files).
-%                   .savediff2result      (default: 0)
-%                   .savehodpaths         (default: 0) Used only if
-%                                         .docalcir = 1
-%                   .showtext             (default: 1)
-% 
+%   geoinputdata, Sinputdata, Rinputdata, envdata, controlparameters,
+%   filehandlingparameters
+%                   The six input structs of EDmain_convex. For their
+%                   fields, see EDinputdoc.
+%   A special call, EDcheckinputstructs('paramspecs'), returns a struct
+%   with the tables, without checking anything (used by EDinputdoc).
+%
 % Output parameters:
-%   The six input structs, where all fields have got values, and
-%   inputorigin     A struct which tells where each value came from. It has
-%                   one field per input struct, e.g.,
-%                   inputorigin.controlparameters.ngauss, with one of the
-%                   values
-%                     'user'          given by the user
-%                     'default'       not given; the default value was used
-%                     'derived'       not given; computed from other input
-%                                     (e.g., .corners read from a geometry
-%                                     file)
-%                     'notapplicable' has no meaning for the current
-%                                     settings; the value is NaN
+%   geoinputdata, Sinputdata, Rinputdata, envdata, controlparameters,
+%   filehandlingparameters
+%                   The six structs, where all fields have values. They do
+%                   not contain the field .inputorigin.
+%   inputorigin     A struct with one field per input struct, e.g.
+%                   inputorigin.controlparameters.ngauss = 'default'.
 %
-% A field name which is not known gives an error (to catch misspelt
-% names). A field which has been removed from the toolbox gives a warning
-% and is ignored.
+% See also EDinputdoc, EDmain_convex, EDdatastructs
 %
-% Reusing structs from an earlier run: EDmain_convex attaches the origin
-% record to each struct, as the field .inputorigin, in EDres and in the
-% _settings file. If such a struct is sent in here, its .inputorigin is
-% taken out of the struct and used: a field that was 'default' or 'derived'
-% in the earlier run, and still has the default/derived value, keeps that
-% origin. If the value has been changed, the origin becomes 'user'. The
-% field .inputorigin should not be set by the user. The six output structs
-% never contain the field .inputorigin; it is returned separately.
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% Peter Svensson 12 Oct. 2026 (peter.svensson@ntnu.no)
-% 
-% [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
-% EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
+% [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,inputorigin] = ...
+%    EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
 % 24 Nov. 2017 First version
 % 28 Nov. 2017 Cleaned code a bit
@@ -256,6 +169,28 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 14 Oct. 2026 filehandlingparameters.saveinteqsousigs and
 % .loadinteqsousigs were removed (replaced by the hashed _qfinal file).
 % New field .saveinteqsolution (default 1).
+% 15 Oct. 2026 The tables were moved to the local function edparamspec, and
+% got a sixth column with a description of each field (used by the new
+% function EDinputdoc). New call EDcheckinputstructs('paramspecs'). The
+% header was updated; the list of fields is now given by EDinputdoc. (By
+% Claude, prompted by PS.)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Documentation mode: EDcheckinputstructs('paramspecs') returns the tables
+% (used by EDinputdoc), without checking anything.
+
+if nargin == 1 && ischar(geoinputdata) && strcmp(geoinputdata,'paramspecs')
+    docmode = struct('usesgeofile',true,'usesgeomatrices',true,...
+        'geoinputdata',struct('planecorners',[]),'controlparameters',struct('generalmethod','tf'));
+    specs = struct;
+    structnames = {'geoinputdata','Sinputdata','Rinputdata','envdata','controlparameters','filehandlingparameters'};
+    for ii = 1:numel(structnames)
+        specs.(structnames{ii}) = edparamspec(structnames{ii},docmode);
+    end
+    specs.notes = ednotes;
+    geoinputdata = specs;
+    return
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check if the needed non-EDtoolbox functions are available.
@@ -321,36 +256,17 @@ if ~isstruct(controlparameters)
      error('ERROR: the struct controlparameters was not specified')           
 end
 
-% The tables below have these columns:
-%    name, validator, default, applicability, required
-% and they are processed by the local function edapplyparamspec (at the end
-% of this file). The default can be a function handle, which then takes the
-% struct as input. The applicability is a function handle which takes the
-% struct as input. A field which is not applicable gets the value NaN.
+% The tables for the six structs are defined in the local function
+% edparamspec (at the end of this file), with the columns
+%    name, validator, default, applicability, required, description
+% and they are processed by the local function edapplyparamspec. The
+% default can be a function handle, which then takes the struct as input.
+% The applicability is a function handle which takes the struct as input.
+% A field which is not applicable gets the value NaN. The description is
+% used by EDinputdoc.
 
-paramspec = {
-    'generalmethod',       @(x) ismember(x,{'ir','tf','tf_ESIEBEM'}),                             'tf', @(cp) true, true;
-    'frequencies',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       NaN, @(cp) ismember(cp.generalmethod,{'tf','tf_ESIEBEM'}), true; 
-    'fs',                  @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 44100, @(cp) strcmp(cp.generalmethod,'ir'), false; 
-    'Rstart',              @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 0,               0,   @(cp) true, false;
-    'directsound',         @(x) isnumeric(x) && (x == 0 | x == 1),                                1,   @(cp) true, false;
-    'skipfirstorder',      @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) true, false;
-    'difforder',           @(x) isnumeric(x) && isscalar(x) && x>=0 && x==round(x),               NaN, @(cp) true, true;
-    'diff1method',         @(x) ismember(x,{'GL','accurate'}),                                   'accurate', @(cp) cp.difforder>=1, false;
-    'diff1GLorder',        @(x) isnumeric(x) && isreal(x) && isscalar(x) && x > 0 && x==round(x), 16, @(cp) strcmp(cp.diff1method,'GL'), false;
-    'inteqsolutionmethod', @(x) ismember(x,{'GMRES_fast','GMRES_large','iterative_fixeddifforder'}), 'GMRES_fast', @(cp) cp.difforder>=2, false;
-    'inteqtargettol',      @(x) isnumeric(x) && isscalar(x) && x>=0,                              1e-10, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false;
-    'inteqgmresmaxiter',   @(x) isnumeric(x) && isscalar(x) && x>=0 && round(x)==x,               100, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false;
-    'ESIEsourcetermimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'accurate', @(cp) cp.difforder>=2, false;
-    'ESIEpropagationimplementation',  @(x) ismember(x,{'legacy','accurate'}),                     'accurate', @(cp) cp.difforder>=2, false;
-    'skipreceiverpropagation',  @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),              0, @(cp) cp.difforder>=2, false;
-    'ngauss',              @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 16,  @(cp) true, false;
-    'discretizationtype',  @(x) isnumeric(x) && (x == 0 | x == 1 | x == 2),                       2,   @(cp) true, false;
-    'surfacegaussorder',   @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 5,   @(cp) strcmp(cp.generalmethod,'tf_ESIEBEM'), false; 
-    'HODelemsize',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0),       @(cp) 2*2.^(-[0:cp.difforder-1]), @(cp) strcmp(cp.generalmethod,'ir'), false;
-    'savealldifforders',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) strcmp(cp.generalmethod,'ir'), false;
-    'saveindividualfirstdiff',   @(x) isnumeric(x) && (x == 0 | x == 1),                                0,   @(cp) strcmp(cp.generalmethod,'ir'), false;
-};
+paramspec = edparamspec('controlparameters',struct);
+
 
 
 inputorigin = struct;
@@ -388,10 +304,8 @@ if ~isstruct(envdata)
     error('ERROR: the struct envdata was not specified')
 end
 
-paramspec = {
-    'cair',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 344,  @(s) true, false; 
-    'rhoair',       @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 1.21, @(s) true, false; 
-};
+paramspec = edparamspec('envdata',struct);
+
 
 [envdata,inputorigin.envdata] = edapplyparamspec(envdata,paramspec,'envdata',{},{},prevorigin.envdata);
 
@@ -441,18 +355,9 @@ if ~isfreefieldcase
     end
 end
 
-paramspec = {
-    'freefieldcase',          @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                  0, @(g) true, false;
-    'geoinputfile',           @(x) (ischar(x) || (isstring(x) && isscalar(x))) && exist(char(x),'file')==2,  NaN, @(g) usesgeofile, true; 
-    'corners',                @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,         NaN, @(g) usesgeomatrices, true; 
-    'planecorners',           @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,1)>=2,         NaN, @(g) usesgeomatrices, true; 
-    'planerefltypes',         @(x) isnumeric(x) && isreal(x) && numel(x)==size(geoinputdata.planecorners,1),   @(g) ones(size(g.planecorners,1),1), @(g) usesgeomatrices, false;
-    'firstcornertoskip',      @(x) isnumeric(x) && isreal(x) && isscalar(x) && x>0,                  1e6, @(g) true, false;
-    'listofcornerstoskip',    @(x) isnumeric(x) && isreal(x) && all(x(:) >= 0),                      [], @(g) true, false;
-    'listofedgestoskip',      @(x) isnumeric(x) && isreal(x) && size(x,2)<=2 && all(x(:)>0),         [], @(g) true, false;
-    'planeseesplanestrategy', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                    0, @(g) true, false;
-    'allownonconvex',         @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                    0, @(g) true, false;
-    };
+paramspec = edparamspec('geoinputdata',struct('usesgeofile',usesgeofile,...
+    'usesgeomatrices',usesgeomatrices,'geoinputdata',geoinputdata));
+
 
 [geoinputdata,inputorigin.geoinputdata] = edapplyparamspec(geoinputdata,paramspec,'geoinputdata',{},{},prevorigin.geoinputdata);
 
@@ -470,10 +375,8 @@ if ~isstruct(Rinputdata)
     error('ERROR: the struct Rinputdata was not specified')
 end
 
-paramspec = {
-    'coordinates',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,       NaN, @(s) true, true; 
-    'nedgesubs',           @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && round(x) == x, 2, @(s) true, false; 
-    };
+paramspec = edparamspec('Rinputdata',struct);
+
 
 [Rinputdata,inputorigin.Rinputdata] = edapplyparamspec(Rinputdata,paramspec,'Rinputdata',{},{},prevorigin.Rinputdata);
 
@@ -491,13 +394,8 @@ end
 % NB! 'sourcetype' must come before 'coordinates', since the applicability
 % of 'coordinates' depends on it (for piston sources, the coordinates are
 % computed further down).
-paramspec = {
-    'sourcetype',          @(x) ismember(x,{'monopole','polygonpiston'}),                       'monopole', @(s) true, false;
-    'coordinates',         @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3,       NaN, @(s) strcmp(s.sourcetype,'monopole'), true; 
-    'doaddsources',        @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                  0, @(s) true, false;
-    'doallSRcombinations', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1),                  1, @(s) true, false;
-    'nedgesubs',           @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && round(x) == x, 2, @(s) true, false; 
-    };
+paramspec = edparamspec('Sinputdata',struct);
+
 
 % These fields are not in the table, but are handled further down: the
 % piston input fields, the fields that are computed for a piston, and
@@ -838,23 +736,8 @@ if usesgeofile
     end
 end
 
-paramspec = {
-    'outputdirectory',          @(x) ischar(x) && ~isempty(x),              NaN, @(s) true, true; 
-    'filestem',                 @(x) ischar(x) && ~isempty(x),              NaN, @(s) true, true; 
-    'suppressresultrecycling',  @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) true, false; 
-    'showtext',                 @(x) isnumeric(x) && x >= 0 && round(x)==x, 1, @(s) true, false; 
-    'saveSRdatafiles',          @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
-    'saveeddatafile',           @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
-    'saveed2datafile',          @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
-    'savesubmatrixdata',        @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
-    'saveinteqsolution',        @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
-    'savepathsfile',            @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
-    'savediff2result',          @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) true, false; 
-    'savelogfile',              @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
-    'savefullEDresfile',        @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
-    'saveISEStree',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) strcmp(controlparameters.generalmethod,'ir'), false; 
-    'savehodpaths',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) strcmp(controlparameters.generalmethod,'ir'), false; 
-    };
+paramspec = edparamspec('filehandlingparameters',struct('controlparameters',controlparameters));
+
 
 removedfields = {'savecadgeofile','savesetupfile','lineending','saveEDresfile','saveinteqsousigs','loadinteqsousigs'};
 [filehandlingparameters,inputorigin.filehandlingparameters] = ...
@@ -1061,3 +944,169 @@ originvalue = '';
 if isfield(prevorigin,name) && ischar(prevorigin.(name))
     originvalue = prevorigin.(name);
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function paramspec = edparamspec(structname,context)
+% Returns the table for one input struct, with the columns
+%    name, validator, default, applicability, required, description
+% context is a struct with values that some of the handles need:
+%    .usesgeofile, .usesgeomatrices, .geoinputdata (for geoinputdata)
+%    .controlparameters (for filehandlingparameters)
+% The rows are processed in order, so a row can depend on fields that were
+% handled by earlier rows.
+
+switch structname
+    case 'controlparameters'
+    paramspec = {
+        'generalmethod', @(x) ismember(x,{'ir','tf','tf_ESIEBEM'}), 'tf', @(cp) true, true, ...
+            'The calculation method: ''tf'' = transfer functions (ESIE), ''ir'' = impulse responses, ''tf_ESIEBEM'' = transfer functions via surface receivers (ESIEBEM).';
+        'frequencies', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0), NaN, @(cp) ismember(cp.generalmethod,{'tf','tf_ESIEBEM'}), true, ...
+            'The frequencies, in Hz. Required for ''tf'' and ''tf_ESIEBEM''.';
+        'fs', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 44100, @(cp) strcmp(cp.generalmethod,'ir'), false, ...
+            'The sampling frequency, in Hz. Only for ''ir''.';
+        'Rstart', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 0, 0, @(cp) true, false, ...
+            'A distance, in m, that gives the time zero (IRs) or the phase reference (TFs): a path of this length has no delay.';
+        'directsound', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(cp) true, false, ...
+            '1: the direct sound is included. 0: it is not.';
+        'skipfirstorder', @(x) isnumeric(x) && (x == 0 | x == 1), 0, @(cp) true, false, ...
+            '1: the direct sound, the specular reflections and the first-order diffraction are not computed.';
+        'difforder', @(x) isnumeric(x) && isscalar(x) && x>=0 && x==round(x), NaN, @(cp) true, true, ...
+            'The highest diffraction order. Required. For the GMRES methods, any value larger than 2 gives the full solution of the integral equation.';
+        'diff1method', @(x) ismember(x,{'GL','accurate'}), 'accurate', @(cp) cp.difforder>=1, false, ...
+            'The method for first-order diffraction: ''accurate'' (adaptive integration, with an analytic treatment near the apex point) or ''GL'' (Gauss-Legendre quadrature, faster).';
+        'diff1GLorder', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x > 0 && x==round(x), 16, @(cp) strcmp(cp.diff1method,'GL'), false, ...
+            'The number of Gauss-Legendre points per edge, for diff1method = ''GL''.';
+        'inteqsolutionmethod', @(x) ismember(x,{'GMRES_fast','GMRES_large','iterative_fixeddifforder'}), 'GMRES_fast', @(cp) cp.difforder>=2, false, ...
+            'How the integral equation is solved: ''GMRES_fast'' (with an explicit sparse matrix), ''GMRES_large'' (matrix-free, for large problems) or ''iterative_fixeddifforder'' (difforder-2 terms of the Neumann series). For difforder = 2, the iterative method is always used.';
+        'inteqtargettol', @(x) isnumeric(x) && isscalar(x) && x>=0, 1e-10, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false, ...
+            'The relative tolerance for GMRES.';
+        'inteqgmresmaxiter', @(x) isnumeric(x) && isscalar(x) && x>=0 && round(x)==x, 100, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false, ...
+            'The maximum number of GMRES iterations.';
+        'ESIEsourcetermimplementation', @(x) ismember(x,{'legacy','accurate'}), 'accurate', @(cp) cp.difforder>=2, false, ...
+            'The source term of the integral equation: ''accurate'' uses singularity subtraction when a source is close to the plane of a face; ''legacy'' is the earlier method.';
+        'ESIEpropagationimplementation', @(x) ismember(x,{'legacy','accurate'}), 'accurate', @(cp) cp.difforder>=2, false, ...
+            'The propagation from the edge sources to the receivers: ''accurate'' uses singularity subtraction near the zone boundaries; ''legacy'' uses plain Gauss-Legendre quadrature.';
+        'skipreceiverpropagation', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1), 0, @(cp) cp.difforder>=2, false, ...
+            '1: the integral equation is solved, but the propagation to the receivers is skipped (the result is zero).';
+        'ngauss', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 16, @(cp) true, false, ...
+            'The number of Gauss-Legendre points on the longest edge; shorter edges get proportionally fewer (at least 2). A negative value gives an odd number on every edge. The log file reports the points per wavelength.';
+        'discretizationtype', @(x) isnumeric(x) && (x == 0 | x == 1 | x == 2), 2, @(cp) true, false, ...
+            'The edge discretization: 2 = Gauss-Legendre (the only one that is supported).';
+        'surfacegaussorder', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 5, @(cp) strcmp(cp.generalmethod,'tf_ESIEBEM'), false, ...
+            'The quadrature order on the largest surface, for the surface receivers. Only for ''tf_ESIEBEM''.';
+        'HODelemsize', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && all(x(:) >= 0), @(cp) 2*2.^(-[0:cp.difforder-1]), @(cp) strcmp(cp.generalmethod,'ir'), false, ...
+            'For each diffraction order N, the edge element length is (cair/fs)/HODelemsize(N). Only for ''ir''. Default: 2*2.^(-[0:difforder-1]).';
+        'savealldifforders', @(x) isnumeric(x) && (x == 0 | x == 1), 0, @(cp) strcmp(cp.generalmethod,'ir'), false, ...
+            '1: the higher-order diffraction IRs are kept separate for each order. Only for ''ir''.';
+        'saveindividualfirstdiff', @(x) isnumeric(x) && (x == 0 | x == 1), 0, @(cp) strcmp(cp.generalmethod,'ir'), false, ...
+            '1: the first-order diffraction IR of each edge is kept separate. Only for ''ir''.';
+        };
+    case 'envdata'
+    paramspec = {
+        'cair', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 344, @(s) true, false, ...
+            'The speed of sound, in m/s.';
+        'rhoair', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 1.21, @(s) true, false, ...
+            'The density of air, in kg/m3.';
+        };
+    case 'geoinputdata'
+    paramspec = {
+        'freefieldcase', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1), 0, @(g) true, false, ...
+            '1: no scattering object; only the direct sound is computed.';
+        'geoinputfile', @(x) (ischar(x) || (isstring(x) && isscalar(x))) && exist(char(x),'file')==2, NaN, @(g) context.usesgeofile, true, ...
+            'The name of a geometry file (.cad). Either this, or .corners and .planecorners, must be given.';
+        'corners', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3, NaN, @(g) context.usesgeomatrices, true, ...
+            '[ncorners,3] the corner coordinates. If a geometry file is given, corners is filled in from the file.';
+        'planecorners', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,1)>=2, NaN, @(g) context.usesgeomatrices, true, ...
+            '[nplanes,nmaxcorners] the corner numbers of each plane; the order of the corners defines the front side of the plane according to the RH rule (thumb in normal vector direction). If a geometry file is given, planecorners is filled in from the file.';
+        'planerefltypes', @(x) isnumeric(x) && isreal(x) && numel(x)==size(context.geoinputdata.planecorners,1), @(g) ones(size(g.planecorners,1),1), @(g) context.usesgeomatrices, false, ...
+            '[nplanes,1] for each plane: +1 rigid, 0 totally absorbing, -1 pressure release. Only with .corners/.planecorners. Default: all rigid.';
+        'firstcornertoskip', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x>0, 1e6, @(g) true, false, ...
+            'Edges with at least one corner with this number, or higher, are switched off.';
+        'listofcornerstoskip', @(x) isnumeric(x) && isreal(x) && all(x(:) >= 0), [], @(g) true, false, ...
+            'Edges with at least one corner in this list are switched off.';
+        'listofedgestoskip', @(x) isnumeric(x) && isreal(x) && size(x,2)<=2 && all(x(:)>0), [], @(g) true, false, ...
+            'Edge numbers (one column), or corner pairs (two columns), of edges that are switched off.';
+        'planeseesplanestrategy', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1), 0, @(g) true, false, ...
+            '1: the plane-to-plane visibility is checked only between the plane midpoints (enough for some geometries). 0: a full check.';
+        'allownonconvex', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1), 0, @(g) true, false, ...
+            '1: a non-convex model is accepted (EDmain_convex computes correct results only for convex models).';
+        };
+    case 'Rinputdata'
+    paramspec = {
+        'coordinates', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3, NaN, @(s) true, true, ...
+            '[nreceivers,3] the receiver coordinates. Required.';
+        'nedgesubs', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && round(x) == x, 2, @(s) true, false, ...
+            'The number of points per edge that are used in the visibility tests (2 = the two end points).';
+        };
+    case 'Sinputdata'
+        % NB! 'sourcetype' must come before 'coordinates', since the
+        % applicability of 'coordinates' depends on it.
+    paramspec = {
+        'sourcetype', @(x) ismember(x,{'monopole','polygonpiston'}), 'monopole', @(s) true, false, ...
+            '''monopole'' or ''polygonpiston'' (see the piston fields below).';
+        'coordinates', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3, NaN, @(s) strcmp(s.sourcetype,'monopole'), true, ...
+            '[nsources,3] the source coordinates. Required for monopoles; for pistons, the center points are computed.';
+        'doaddsources', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1), 0, @(s) true, false, ...
+            '1: the contributions of all the sources are added. 0: each source gives a separate result. For a single source, it is always 1.';
+        'doallSRcombinations', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1), 1, @(s) true, false, ...
+            '1: all source-receiver combinations are computed. 0: only source N to receiver N (then there must be as many sources as receivers).';
+        'nedgesubs', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && round(x) == x, 2, @(s) true, false, ...
+            'The number of points per edge that are used in the visibility tests (2 = the two end points).';
+        };
+    case 'filehandlingparameters'
+    paramspec = {
+        'outputdirectory', @(x) ischar(x) && ~isempty(x), NaN, @(s) true, true, ...
+            'The directory for all the result files. Required, unless a geometry file is given: then the default is the folder ''results'' next to it.';
+        'filestem', @(x) ischar(x) && ~isempty(x), NaN, @(s) true, true, ...
+            'The first part of the names of all the result files. Required, unless a geometry file is given: then the default is its name.';
+        'suppressresultrecycling', @(x) isnumeric(x) && (x == 0 | x == 1), 0, @(s) true, false, ...
+            '1: saved stage files are never reused, so everything is computed.';
+        'showtext', @(x) isnumeric(x) && x >= 0 && round(x)==x, 1, @(s) true, false, ...
+            '0: no text on the screen. 1: one line per stage. 2 or more: more details.';
+        'saveSRdatafiles', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...
+            '1: the stage files _Sdata and _Rdata are saved.';
+        'saveeddatafile', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...
+            '1: the stage file _eddata is saved.';
+        'saveed2datafile', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...
+            '1: the stage file _ed2data is saved.';
+        'savesubmatrixdata', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...
+            '1: the stage file _submatrixdata is saved.';
+        'saveinteqsolution', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...
+            '1: the solution of the integral equation is saved in the stage file _qfinal (if it is smaller than 4 GB), so that it can be reused for other receivers.';
+        'savepathsfile', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...
+            '1: the stage file _paths is saved.';
+        'savediff2result', @(x) isnumeric(x) && (x == 0 | x == 1), 0, @(s) true, false, ...
+            '1: the integral equation result is also computed without the second-order diffraction (extraoutputdata.tfinteqdiff_nodiff2 in the _tfinteq file).';
+        'savelogfile', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...
+            '1: a log file is written.';
+        'savefullEDresfile', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...
+            '1: the file _EDres contains the result matrices. 0: they are left out (EDgetresults loads them from the stage files).';
+        'saveISEStree', @(x) isnumeric(x) && (x == 0 | x == 1), 0, @(s) strcmp(context.controlparameters.generalmethod,'ir'), false, ...
+            'Not used by EDmain_convex.';
+        'savehodpaths', @(x) isnumeric(x) && (x == 0 | x == 1), 0, @(s) strcmp(context.controlparameters.generalmethod,'ir'), false, ...
+            '1: the stage file _hodpaths is saved. Only for ''ir''.';
+        };
+    otherwise
+        error('EDcheckinputstructs:unknownstruct','Unknown struct name: %s',structname)
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function notes = ednotes
+% Descriptions of the input fields that are not in the tables, because they
+% are checked separately (used by EDinputdoc).
+
+notes = struct;
+notes.Sinputdata = {
+    'sourceamplitudes', 'Default: 1. A scalar, a row ([1,nfrequencies]), a column ([nsources,1]) or the full matrix [nsources,nfrequencies]; it is expanded to the full size. For ''ir'', one value per source.';
+    'pistoncornercoordinates', '[npistoncorners,3] the corner coordinates of all the pistons. Required for polygon pistons.';
+    'pistoncornernumbers', '[npistons,nmaxcorners] the corner numbers of each piston (0 for unused positions). Required for polygon pistons.';
+    'pistonplanes', '[npistons,1] the number of the plane that each piston is on. Required for polygon pistons.';
+    'pistongaussorder', 'Default: 3. The quadrature order on each piston.';
+    };
+notes.Sinputdata_text = {'For polygon pistons, the fields .coordinates, .pistongausscoordinates, .pistongaussweights, .ncornersperpiston and .pistonareas are computed (see help EDdatastructs).'};
+notes.geoinputdata_text = {'Exactly one geometry source must be given (unless .freefieldcase = 1): .geoinputfile, or .corners and .planecorners.'};
+notes.filehandlingparameters_text = {'filehandlingparameters can be left out if a geometry file is given.'};

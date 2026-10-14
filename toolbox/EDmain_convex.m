@@ -17,9 +17,9 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % Input parameters:
 %   geoinputdata, Sinputdata, Rinputdata, envdata, controlparameters,
 %   filehandlingparameters
-%                   Six structs. All fields, their default values and when
-%                   they are used are given by the tables in
-%                   EDcheckinputstructs. The most important fields:
+%                   Six structs. All fields, with their default values and
+%                   descriptions, are listed by EDinputdoc. The most
+%                   important fields:
 %                   geoinputdata       .geoinputfile, or .corners and
 %                                      .planecorners
 %                   Sinputdata         .coordinates (or the piston fields),
@@ -43,7 +43,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 %
 % Requires the functions DataHash and lgwt from the Matlab File Exchange.
 %
-% See also EDcheckinputstructs, EDgetresults, EDdatastructs, EDshowcalltree
+% See also EDinputdoc, EDdatastructs, EDgetresults, EDcheckinputstructs, EDshowcalltree
 %
 % Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
@@ -203,6 +203,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % 14 Oct. 2026 The header was updated to the standard structure (by Claude,
 % prompted by PS).
 % 15 Oct. 2026 The list of called functions was replaced by a See also line.
+% 15 Oct. 2026 The header refers to EDinputdoc for the input fields.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 

@@ -60,9 +60,9 @@ function plothandles = EDplotmodel(eddatafile,varargin)
 % Sources and Rdata.receivers are taken from an sdatafile and an rdatafile, the file name of
 % which is assumed to be similar to the eddatafile.
 %
-% Uses functions EDstrpend, EDstrpblnk
+% See also EDmain_convex, EDdatastructs
 %
-% Peter Svensson (peter.svensson@ntnu.no) 22 March 2024
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 % 
 % plothandles = EDplotmodel(eddatafile,varargin);
 
@@ -88,6 +88,7 @@ function plothandles = EDplotmodel(eddatafile,varargin)
 % a plotoption
  
 p = inputParser;
+% 15 Oct. 2026 The header was updated (a See also line).
 
 p.addOptional('plotoptions',0,@isscalar);
 p.addParamValue('sounumbers',[],@isnumeric);

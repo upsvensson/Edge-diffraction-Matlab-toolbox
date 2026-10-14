@@ -1,5 +1,5 @@
 function [EDres,resultfile] = EDgetresults(varargin)
-% EDgetresults loads the results struct, EDres, from a results file
+% EDgetresults - Loads the results struct, EDres, from a results file
 % (<filestem>_EDres.mat) that was saved by EDmain_convex.
 %
 % The results file can be specified in two ways:
@@ -51,10 +51,9 @@ function [EDres,resultfile] = EDgetresults(varargin)
 % _EDres.mat file was introduced (Oct. 2026) can not be loaded with this
 % function.
 %
-% Uses the functions EDcheckinputstructs, EDinputhash, EDassembleresults,
-% EDgetversion from EDtoolbox
+% See also EDmain_convex, EDdatastructs
 %
-% Peter Svensson (peter.svensson@ntnu.no) 12 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [EDres,resultfile] = EDgetresults(outputdirectory,filestem);
 % [EDres,resultfile] = EDgetresults(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -74,6 +73,8 @@ function [EDres,resultfile] = EDgetresults(varargin)
 % (savefullEDresfile = 0), by loading them from the stage files.
 % 14 Oct. 2026 filehandlingparameters is given to EDinputhash, since its
 % field .savediff2result is now part of the run hash.
+% 15 Oct. 2026 The header was updated (by Claude,
+% prompted by PS).
 
 EDres = [];
 resultfile = '';

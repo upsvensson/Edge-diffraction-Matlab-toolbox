@@ -34,11 +34,9 @@ function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,.
 %   existingfilename  The name of the stage file that was reused, or empty
 %                   if the data were computed.
 %
-% Uses the functions EDwedge2nd, EDwedgeN, EDcreindexmatrix, EDparenthash,
-% EDrecycleresultfiles, EDstageversions from the EDtoolbox
-% Uses the function DataHash from Matlab Central
+% See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,...
 %    hodpathsalongplane,edgedata,edgetoedgedata,Sdata,Rdata,envdata,...
@@ -84,6 +82,7 @@ function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,.
 % in EDstageversions.
 % 14 Oct. 2026 The header was updated to the standard structure (by Claude,
 % prompted by PS).
+% 15 Oct. 2026 The list of called functions was replaced by a See also line.
 
 t00 = clock;
 

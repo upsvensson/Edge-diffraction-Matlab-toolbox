@@ -44,11 +44,9 @@ function [irdirect,irgeom,irdiff,timingdata,elapsedtimemakeirs,existingfilename]
 %   existingfilename  The name of the stage file that was reused, or empty
 %                   if the data were computed.
 %
-% Uses the functions EDcoordtrans2, EDwedge1st_ir, EDparenthash,
-% EDrecycleresultfiles, EDstageversions from the EDtoolbox
-% Uses the function DataHash from Matlab Central
+% See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [irdirect,irgeom,irdiff,timingdata,elapsedtimemakeirs,existingfilename] = ...
 %    EDmakefirstorderirs(firstorderpathdata,planedata,edgedata,Sdata,...
@@ -93,6 +91,7 @@ function [irdirect,irgeom,irdiff,timingdata,elapsedtimemakeirs,existingfilename]
 % also contains the versions of the subroutines that this function uses.
 % 14 Oct. 2026 The header was updated to the standard structure (by Claude,
 % prompted by PS).
+% 15 Oct. 2026 The list of called functions was replaced by a See also line.
 
 t00 = clock;
 t00_total = t00;

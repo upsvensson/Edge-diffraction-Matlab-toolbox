@@ -40,11 +40,9 @@ function [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
 %   existingfilename  The name of the stage file that was reused, or empty
 %                   if the data were computed.
 %
-% Uses the functions EDcalccosfi, EDcalcdist, EDrecycleresultfiles,
-% EDstageversions from the EDtoolbox
-% Uses the function DataHash from Matlab Central
+% See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
 %    EDpropagateESIEBEM(tftot_surface,Rinputdata,fieldpoints,Sinputdata,...
@@ -67,6 +65,7 @@ function [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
 % load/save without eval.
 % 14 Oct. 2026 The header was updated to the standard structure (by Claude,
 % prompted by PS).
+% 15 Oct. 2026 The list of called functions was replaced by a See also line.
 
 t00 = clock;
 

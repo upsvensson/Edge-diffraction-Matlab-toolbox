@@ -56,13 +56,9 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %   existingfilename  The name of the stage file that was reused, or empty
 %                   if the data were computed.
 %
-% Uses the functions EDinteg_souterm, EDbuildHsparse, EDmatvecH,
-% EDcalcpropagatematrix, EDcalcedgeinteqmatrixsub2_mex, EDcoordtrans1,
-% EDdistelements, EDparenthash, EDrecycleresultfiles, EDstageversions from
-% the EDtoolbox
-% Uses the function DataHash from Matlab Central
+% See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %    EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
@@ -102,6 +98,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % 19 Jan 2018 Renamed the ESIE2...mex to ED...mex
 % 14 Oct. 2026 The header was updated to the standard structure (by Claude,
 % prompted by PS).
+% 15 Oct. 2026 The list of called functions was replaced by a See also line.
 
 % 10 Dec. 2017 TODO: finish the timingdata for the CASE2 : addsources
 % 19 Jan 2018 The TODO above is probably done

@@ -38,11 +38,9 @@ function [hodpaths,hodpathsalongplane,elapsedtimehodpaths,existingfilename] = ..
 %   existingfilename  The name of the stage file that was reused, or empty
 %                   if the data were computed.
 %
-% Uses the functions EDrecycleresultfiles, EDstageversions from the
-% EDtoolbox
-% Uses the function DataHash from Matlab Central
+% See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [hodpaths,hodpathsalongplane,elapsedtimehodpaths,existingfilename] = ...
 %    EDfindHODpaths(edgeseesedge,visedgesfroms,visedgesfromr,...
@@ -64,6 +62,7 @@ function [hodpaths,hodpathsalongplane,elapsedtimehodpaths,existingfilename] = ..
 % without eval.
 % 14 Oct. 2026 The header was updated to the standard structure (by Claude,
 % prompted by PS).
+% 15 Oct. 2026 The list of called functions was replaced by a See also line.
 
 t00 = clock;
 

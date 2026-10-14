@@ -41,14 +41,11 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 %                   matrices if filehandlingparameters.savefullEDresfile =
 %                   0), and can be loaded later with EDgetresults.
 %
-% Uses the functions EDcheckinputstructs, EDinputhash, EDinputsummary,
-% EDreadcad, EDreadgeomatrices, EDgensurfreceivers, EDedgeo, EDSorRgeo,
-% EDfindconvexGApaths, EDmakefirstordertfs, EDmakefirstorderirs, EDed2geo,
-% EDinteg_submatrixstructure, EDintegralequation_convex_tf, EDinteqsummary,
-% EDpropagateESIEBEM, EDfindHODpaths, EDmakeHODirs, EDassembleresults,
-% EDmessage, EDpostfunctext, EDgetversion from the EDtoolbox
+% Requires the functions DataHash and lgwt from the Matlab File Exchange.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+% See also EDcheckinputstructs, EDgetresults, EDdatastructs, EDshowcalltree
+%
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -205,6 +202,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % stored in EDres.logfilename and shown in the closing lines.
 % 14 Oct. 2026 The header was updated to the standard structure (by Claude,
 % prompted by PS).
+% 15 Oct. 2026 The list of called functions was replaced by a See also line.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 

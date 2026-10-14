@@ -57,7 +57,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 %                       geoinputdata, Sinputdata, Rinputdata, envdata,
 %                       controlparameters, filehandlingparameters (each
 %                       with the field .inputorigin), EDversionnumber,
-%                       inputhash
+%                       inputhash, logfilename (the name of the log file)
 %                       
 %                       xxdirect contains the direct sound
 %                       xxgeom contains the specular reflection
@@ -230,6 +230,9 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % geoinputdata (the input parameter is called planedata).
 % 14 Oct. 2026 filehandlingparameters is given to EDinputhash (its field
 % .savediff2result is part of the run hash).
+% 14 Oct. 2026 The log file name ends with the date and time of the run
+% (see EDmessage), so reruns do not overwrite earlier logs. The name is
+% stored in EDres.logfilename and shown in the closing lines.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -293,6 +296,13 @@ textline1 = ['EDmain_convex, v.',num2str(EDversionnumber),' (',lastsavedate,')']
 textline2 = ['filestem for results: ',filehandlingparameters.filestem];
 textline3 = ['directory for results: ',filehandlingparameters.outputdirectory];
 fid = EDmessage(filehandlingparameters,'sf',0,1,'',textline1,textline2,textline3);
+% The log file name contains the date and time (set by EDmessage)
+if fid > 0
+    [~,logfilestem,logfileext] = fileparts(fopen(fid));
+    logfilename = [logfilestem,logfileext];
+else
+    logfilename = '';
+end
 
 %if controlparameters.docalctf_ESIEBEM == 1
 if strcmp(controlparameters.generalmethod,'tf_ESIEBEM') == 1
@@ -764,6 +774,7 @@ for ii = 1:length(inputstructnames)
     EDmeta.(inputstructnames{ii}).inputorigin = inputorigin.(inputstructnames{ii});
 end
 EDmeta.inputhash = EDruninputhash;
+EDmeta.logfilename = logfilename;
 
 buildfullresults = (nargout > 0) || (filehandlingparameters.savefullEDresfile == 1);
 if buildfullresults
@@ -832,8 +843,13 @@ if filehandlingparameters.savefullEDresfile == 1
 else
     textline2 = ['Results file: ',filehandlingparameters.filestem,'_EDres.mat (without the result matrices)'];
 end
+if isempty(logfilename)
+    textline3 = 'No log file (savelogfile = 0)';
+else
+    textline3 = ['Log file: ',logfilename];
+end
 EDmessage(filehandlingparameters,'sf',fid,1,'',...
-    ['EDmain_convex finished. Total time: ',num2str(etime(clock,t00main)),' s'],textline2);
+    ['EDmain_convex finished. Total time: ',num2str(etime(clock,t00main)),' s'],textline2,textline3);
 
 if filehandlingparameters.savelogfile == 1
     fclose(fid);

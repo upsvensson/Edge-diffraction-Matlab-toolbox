@@ -48,6 +48,11 @@ function fid = EDmessage(filehandlingparameters,showprint,fid,showtextlevelneede
 % shown.
 % 6 Oct. 2023 Fixed error: when a file is recycled, the detailed timing
 % data wasnt written to the log file.
+% 14 Oct. 2026 The log file name ends with the date and time when the log
+% file is opened: <filestem>_log_YYYYMMDD_HHhMMmSS.txt, so a rerun does
+% not overwrite the log of an earlier run. If such a file already exists
+% (two runs within the same second), a counter is added: ..._2.txt etc.
+% The calling function can get the name with fopen(fid).
 
 ntextstrings = nargin - 5;
 
@@ -106,8 +111,17 @@ end
 
 if writetofile == 1
     if filehandlingparameters.savelogfile == 1
-        logfilename = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_log.txt'];
         if fid == 0
+            clockvec = clock;
+            timestamp = sprintf('%04d%02d%02d_%02dh%02dm%02d',clockvec(1),clockvec(2),clockvec(3),...
+                clockvec(4),clockvec(5),floor(clockvec(6)));
+            logfilebase = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_log_',timestamp];
+            logfilename = [logfilebase,'.txt'];
+            counter = 1;
+            while exist(logfilename,'file') == 2
+                counter = counter + 1;
+                logfilename = [logfilebase,'_',int2str(counter),'.txt'];
+            end
             fid = fopen(logfilename,'w');
             if fid == -1
                 error('ERROR: The planned logfile is not possible to open - check that it isn''t opened by any other program!')

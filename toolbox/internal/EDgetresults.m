@@ -72,6 +72,8 @@ function [EDres,resultfile] = EDgetresults(varargin)
 % removed.
 % 12 Oct. 2026 Handles an _EDres file without the result matrices
 % (savefullEDresfile = 0), by loading them from the stage files.
+% 14 Oct. 2026 filehandlingparameters is given to EDinputhash, since its
+% field .savediff2result is now part of the run hash.
 
 EDres = [];
 resultfile = '';
@@ -123,7 +125,7 @@ elseif nargin == 6 && isstruct(varargin{1})
     [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters] = ...
         EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
-    hashtolookfor = EDinputhash(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters);
+    hashtolookfor = EDinputhash(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
     % Go through all the results files in the directory, and read only the
     % hash from each file.

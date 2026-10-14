@@ -40,6 +40,8 @@ function stageinfo = EDstageversions(stagename)
 
 % 14 Oct. 2026 First version (by Claude, prompted by PS). The lists were
 % made from the output of EDshowcalltree('EDmain_convex').
+% 14 Oct. 2026 EDmakeHODirs, EDwedge1st_fd and EDpropagateESIEBEM to
+% version 2 (bug fixes).
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -56,8 +58,8 @@ versions.EDed2geo                     = 1;
 versions.EDinteg_submatrixstructure   = 1;
 versions.EDintegralequation_convex_tf = 1;
 versions.EDfindHODpaths               = 1;
-versions.EDmakeHODirs                 = 1;
-versions.EDpropagateESIEBEM           = 1;
+versions.EDmakeHODirs                 = 2;  % 2: source amplitudes applied also for doaddsources = 0
+versions.EDpropagateESIEBEM           = 2;  % 2: complete hash; several sources give an error
 
 % Subroutines
 versions.EDbetaoverm_fd               = 1;
@@ -94,7 +96,7 @@ versions.EDpoinpla                    = 1;
 versions.EDpoinplax                   = 1;
 versions.EDquadgk                     = 1;
 versions.EDquadstep                   = 1;
-versions.EDwedge1st_fd                = 1;
+versions.EDwedge1st_fd                = 2;  % 2: 'GL' falls back to 'accurate' for singular cases
 versions.EDwedge1st_ir                = 1;
 versions.EDwedge2nd                   = 1;
 versions.EDwedgeN                     = 1;

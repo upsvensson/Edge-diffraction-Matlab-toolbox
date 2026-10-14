@@ -28,7 +28,7 @@ function [hodpaths,hodpathsalongplane,elapsedtimehodpaths,existingfilename] = ..
 %                       the reused file name is given here. If no existing
 %                       file could be reused then this variable is empty. 
 % 
-% Uses the function EDrecycleresultfiles from EDtoolbox
+% Uses the functions EDrecycleresultfiles, EDstageversions from EDtoolbox
 % Uses the function Datahash from Matlab Central
 % 
 % Peter Svensson (peter.svensson@ntnu.no) 29 Oct. 2023
@@ -48,13 +48,21 @@ function [hodpaths,hodpathsalongplane,elapsedtimehodpaths,existingfilename] = ..
 % file can be reused inside this function. Also updated load and save to
 % the function call form, which avoids problems with spaces in file names.
 % 29 Oct. 2023 CHanged the input parameters; only version 2.
+% 14 Oct. 2026 The EDinputdatahash contains a stageversion from
+% EDstageversions instead of the overall EDversionnumber. load/save
+% without eval.
 
 t00 = clock;
 
-EDinputdatastruct = struct('difforder',difforder,...
+% The version of this function, and of the subroutines it uses, are
+% defined in EDstageversions. They are part of the hash, so that saved
+% stage files are not reused after a change in the computations.
+stageversion = EDstageversions('EDfindHODpaths');
+
+EDinputdatastruct = struct('stage','EDfindHODpaths','stageversion',stageversion,...
+        'difforder',difforder,...
         'edgeseespartialedge',edgeseesedge,...
-        'vispartedgesfroms',visedgesfroms,'vispartedgesfromr',visedgesfromr,...
-        'EDversionnumber',EDversionnumber);
+        'vispartedgesfroms',visedgesfroms,'vispartedgesfromr',visedgesfromr);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -74,7 +82,10 @@ desiredname = [filehandlingparameters.outputdirectory,filesep,...
 	filehandlingparameters.filestem,'_hodpaths.mat'];
 
 if foundmatch == 1
-	eval(['load(''',existingfilename,''')'])
+	filedata = load(existingfilename,'hodpaths','hodpathsalongplane','elapsedtimehodpaths');
+	hodpaths = filedata.hodpaths;
+	hodpathsalongplane = filedata.hodpathsalongplane;
+	elapsedtimehodpaths = filedata.elapsedtimehodpaths;
 	if ~strcmp(existingfilename,desiredname)
 		copyfile(existingfilename,desiredname);
 	end
@@ -155,5 +166,5 @@ end
 elapsedtimehodpaths = etime(clock,t00);
 
 if filehandlingparameters.savehodpaths == 1
-	eval(['save(''',desiredname,''',''hodpaths'',''hodpathsalongplane'',''EDinputdatahash'',''elapsedtimehodpaths'');'])
+	save(desiredname,'hodpaths','hodpathsalongplane','EDinputdatahash','elapsedtimehodpaths','stageversion','EDversionnumber');
 end

@@ -38,7 +38,7 @@ function [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
 %                           name is given here. If no existing file could be 
 %                           reused then this variable is empty. 
 %
-% Uses functions EDcalcdist, EDcalccosfi, EDrecycleresultfiles from EDtoolbox
+% Uses functions EDcalcdist, EDcalccosfi, EDrecycleresultfiles, EDstageversions from EDtoolbox
 % Uses function DataHash form Matlab Central
 % 
 % Peter Svensson 30 Oct. 2023 (peter.svensson@ntnu.no)
@@ -51,11 +51,34 @@ function [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
 % 29 Sep. 2023 Moved code from EDmain_convexESIEBEM into this function
 % 3 Oct. 2023 Added the EDsettingnshash as input parameter
 % 27 Oct. 2023 Added the fieldpoints to the datahash.
+% 14 Oct. 2026 The EDinputdatahash was incomplete: it contained only the
+% surface pressure and the field points. Now it also contains the surface
+% points, normal vectors and weights, the source data, the direct sound
+% setting, the frequencies, Rstart and cair, and a stageversion from
+% EDstageversions (instead of the overall EDversionnumber). Before, a
+% change of only controlparameters.directsound led to the reuse of an old
+% _tfESIEBEM file. The branch for several, not added, sources was wrong
+% (it used the output matrix instead of tftot_surface, had a different
+% sign, and ignored the source amplitudes). It is not reachable from
+% EDmain_convex, and has been replaced by an error message.
+% load/save without eval.
 
 t00 = clock;
 
-EDinputdatastruct = struct('tftot_surface',tftot_surface,...
-    'fieldpoints',fieldpoints,'EDversionnumber',EDversionnumber);
+% The version of this function, and of the subroutines it uses, are
+% defined in EDstageversions. They are part of the hash, so that saved
+% stage files are not reused after a change in the computations.
+stageversion = EDstageversions('EDpropagateESIEBEM');
+
+EDinputdatastruct = struct('stage','EDpropagateESIEBEM','stageversion',stageversion,...
+    'tftot_surface',tftot_surface,'fieldpoints',fieldpoints,...
+    'surfacepoints',Rinputdata.coordinates,'surfacenvecs',Rinputdata.nvecs,...
+    'surfaceweights',Rinputdata.weights,...
+    'sources',Sinputdata.coordinates,'sourceamplitudes',Sinputdata.sourceamplitudes,...
+    'doaddsources',Sinputdata.doaddsources,'doallSRcombinations',Sinputdata.doallSRcombinations,...
+    'directsound_fieldpoints',directsound_fieldpoints,...
+    'frequencies',controlparameters.frequencies,'Rstart',controlparameters.Rstart,...
+    'cair',envdata.cair);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -75,7 +98,9 @@ desiredname = [filehandlingparameters.outputdirectory,filesep,...
 	filehandlingparameters.filestem,'_tfESIEBEM.mat'];
 
 if foundmatch == 1
-	eval(['load(''',existingfilename,''')'])
+	filedata = load(existingfilename,'tftot_ESIEBEM','elapsedtimeESIEBEMpropagate');
+	tftot_ESIEBEM = filedata.tftot_ESIEBEM;
+	elapsedtimeESIEBEMpropagate = filedata.elapsedtimeESIEBEMpropagate;
 	if ~strcmp(existingfilename,desiredname)
 		copyfile(existingfilename,desiredname);
 	end
@@ -100,6 +125,10 @@ nsurfacepoints = size(surfacepoints,1);
 nsources = size(Sinputdata.coordinates,1);
 nfrequencies = length(controlparameters.frequencies);
 
+if ~(Sinputdata.doaddsources == 1 || nsources == 1)
+    error('ERROR: EDpropagateESIEBEM has not been implemented for several sources that are not added (doaddsources = 0)')
+end
+
 [distances,cosfi] = EDcalccosfi(fieldpoints,surfacepoints,surfacenvecs);
 
 if directsound_fieldpoints == 1
@@ -109,11 +138,7 @@ if directsound_fieldpoints == 1
 %    end
 end
 
-if Sinputdata.doaddsources == 1 || nsources == 1
-    tftot_ESIEBEM = zeros(nfrequencies,nfieldpoints);
-else
-    tftot_ESIEBEM = zeros(nfrequencies,nfieldpoints,nsources);    
-end
+tftot_ESIEBEM = zeros(nfrequencies,nfieldpoints);
 kvec = 2*pi*controlparameters.frequencies(:)./envdata.cair;
 kvec = kvec(:,ones(1,nsurfacepoints));
 onesvec = ones(1,nfrequencies);
@@ -139,38 +164,12 @@ if Sinputdata.doaddsources == 1 || nsources == 1
             tftot_ESIEBEM = tftot_ESIEBEM + exp(-1i*kvec.*(ffdist(:,onesvec*jj).'-controlparameters.Rstart))./ffdist(:,onesvec*jj).'.*sourceamp(:,jj);
         end
     end
-else
-    % tftot has size [nfreq,nsurfacerec,nsources]
-    % tffieldpoints has size [nfreq,nfieldpoints,nsources]    
-    %   becomes tftot
-    for ii = 1:nfieldpoints    
-        transfermatrix = -exp(-1i*kvec.*distances(:,ii*onesvec).')./distances(:,ii*onesvec).'.*(1i*kvec + 1./distances(:,ii*onesvec).').*cosfi(:,ii*onesvec).'.*Rinputdata.weights(:,onesvec).'/4/pi;
-        for jj = 1:nsources
-            if Sinputdata.doallSRcombinations == 1 || jj == ii
-                tfonefp = squeeze(tftot_ESIEBEM(:,:,jj)).*transfermatrix;
-                tftot_ESIEBEM(:,ii,jj) = sum(tfonefp.').';
-            end
-        end
-    end
-
-    checkvalue = (size(tftot_ESIEBEM,2)==1) || (size(tftot_ESIEBEM,3)==1);
-    if directsound_fieldpoints == 1
-        for kk = 1:nfrequencies
-            kvec = 2*pi*controlparameters.frequencies(kk*ones(nfieldpoints,nsources))./envdata.cair;
-            if checkvalue == 1 
-                tftot_ESIEBEM(kk,:,:) = squeeze(tftot_ESIEBEM(kk,:,:)).' + exp(-1i*kvec.*(ffdist-controlparameters.Rstart))./ffdist;            
-            else
-                tftot_ESIEBEM(kk,:,:) = squeeze(tftot_ESIEBEM(kk,:,:)) + exp(-1i*kvec.*(ffdist-controlparameters.Rstart))./ffdist;                            
-            end
-        end
-    end
-    
 end
 
 elapsedtimeESIEBEMpropagate = etime(clock,t00);
 
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfESIEBEM.mat'];
 
-eval(['save(''',desiredname,''',''tftot_ESIEBEM'',''EDinputdatahash'',''elapsedtimeESIEBEMpropagate'');'])
+save(desiredname,'tftot_ESIEBEM','EDinputdatahash','elapsedtimeESIEBEMpropagate','stageversion','EDversionnumber');
 
 

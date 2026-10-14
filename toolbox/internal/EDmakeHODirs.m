@@ -81,6 +81,9 @@ function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,.
 % explicitly; of envdata, only cair is used. load/save without eval.
 % 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
 % also contains the versions of the subroutines that this function uses.
+% 14 Oct. 2026 Fixed a bug: when the sources were not added (doaddsources
+% = 0), the source amplitudes were not applied. Version 2 of this function
+% in EDstageversions.
 
 t00 = clock;
 
@@ -399,7 +402,7 @@ for isou = 1:nsources
                     if firstcomponentdone == 0 || size(irhod,2) < cellcounter
                        if Sdata.doaddsources == 0
                            irhod{cellcounter} = zeros(nnew,nreceivers,nsources);
-                           irhod{cellcounter}(:,irec,isou) = irnew;
+                           irhod{cellcounter}(:,irec,isou) = irnew*Sdata.sourceamplitudes(isou);
                        else
                            irhod{cellcounter} = zeros(nnew,nreceivers,1);
                            irhod{cellcounter}(:,irec,1) = irnew*Sdata.sourceamplitudes(isou);                   
@@ -415,7 +418,7 @@ for isou = 1:nsources
                             end
                         end
                         if Sdata.doaddsources == 0
-                            irhod{cellcounter}(1:nnew,irec,isou) = irhod{cellcounter}(1:nnew,irec,isou) + irnew;                
+                            irhod{cellcounter}(1:nnew,irec,isou) = irhod{cellcounter}(1:nnew,irec,isou) + irnew*Sdata.sourceamplitudes(isou);                
                         else
                             irhod{cellcounter}(1:nnew,irec,1) = irhod{cellcounter}(1:nnew,irec,1) + irnew*Sdata.sourceamplitudes(isou);                                    
                         end

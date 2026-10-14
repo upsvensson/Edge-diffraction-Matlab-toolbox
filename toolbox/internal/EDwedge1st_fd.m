@@ -72,6 +72,12 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 % built-in quadgk to a stripped-down version, EDquadgk.
 % 24 Sep. 2026 Introduced GL quadrature as an option, controlled by the
 % optional input parameters diff1method and diff1GLorder.
+% 14 Oct. 2026 (by Claude, prompted by PS) The defaults of the optional
+% input parameters work also when fewer than 13 parameters are given.
+% For diff1method = 'GL', a case which is singular (a receiver exactly on
+% a zone boundary) is computed with the 'accurate' method instead; before,
+% the check for this was in the 'accurate' branch, so it was never used.
+% An unknown diff1method gives an error.
 
 localshowtext = 0;
 
@@ -84,24 +90,27 @@ localselectanalytical = 1;
 %     disp('Reference solution for wedge 1st')
 % end
 
-if nargin < 12
+if nargin < 12 || isempty(Rstart)
 	Rstart = 0;
 end
-if nargin < 13
+if nargin < 13 || isempty(bc)
 	bc = [1 1];
-else
-	if bc(1)*bc(2)~=1
-		error('ERROR: Only all-rigid, or all-soft, wedges are implemented');
+end
+if bc(1)*bc(2)~=1
+	error('ERROR: Only all-rigid, or all-soft, wedges are implemented');
+end
+if nargin < 14 || isempty(diff1method)
+    diff1method = 'accurate';
+end
+if nargin < 15 || isempty(diff1GLorder)
+    if strcmp(diff1method,'GL')
+        diff1GLorder = 16;
+    else
+        diff1GLorder = NaN;
     end
-    if nargin < 14
-        diff1method = 'accurate';
-    elseif nargin < 15
-        if diff1method == 'GL'
-            diff1GLorder = 16;
-        else
-            diff1GLorder = NaN;
-        end
-    end
+end
+if ~strcmp(diff1method,'accurate') && ~strcmp(diff1method,'GL')
+    error(['ERROR: diff1method must be ''accurate'' or ''GL'', not ''',diff1method,''''])
 end
 
 %------------------------------------------------------------------
@@ -252,9 +261,6 @@ if strcmp(diff1method,'accurate')
     useterm = 1 - singularterm;
     if any(singularterm) && localshowtext
          disp(['            Singularity for term ',int2str(find(singularterm))])   
-    end
-    if any(singularterm) && strcmp(diff1method,'GL') == 1
-        error('ERROR: For cases that are close to singular, the GL method can not be used.')
     end
     
     tf = zeros(nfrequencies,1);
@@ -444,6 +450,12 @@ if strcmp(diff1method,'accurate')
         end
     end
 elseif strcmp(diff1method,'GL')
+    % A singular case (a receiver exactly on a zone boundary) can not be
+    % computed with GL quadrature; the 'accurate' method is used instead.
+    if any(absnyfivec < 1e4*eps | abs(absnyfivec - 2*pi) < 1e4*eps)
+        [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs+za,rr,thetar,zr+za,zw+za,Method,Rstart,bc,'accurate',NaN);
+        return
+    end
     zfirst = NaN;
     singularterm = [0 0 0 0];
 

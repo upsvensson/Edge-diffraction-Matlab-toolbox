@@ -228,6 +228,8 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % 6 points per wavelength; a warning on screen and in the log below 4.
 % 12 Oct. 2026 EDmakefirstorderirs is given planedata instead of
 % geoinputdata (the input parameter is called planedata).
+% 14 Oct. 2026 filehandlingparameters is given to EDinputhash (its field
+% .savediff2result is part of the run hash).
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -280,7 +282,7 @@ settingsdata.EDversionnumber = EDversionnumber;
 % One hash value for the complete input (the five structs that define the
 % problem). It is saved in the settings file and in the results file, so
 % that the results for a given set of input data can be found later.
-EDruninputhash = EDinputhash(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters);
+EDruninputhash = EDinputhash(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 settingsdata.EDruninputhash = EDruninputhash;
 
 save(desiredname,'-struct','settingsdata');

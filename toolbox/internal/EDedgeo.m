@@ -167,6 +167,8 @@ function [edgedata,planedata,elapsedtimeedgeo,existingfilename] = EDedgeo(planed
 % EDversionnumber). The hash is also stored as a field in the output
 % edgedata, so that later stages can include it in their own hashes
 % (chained hashes). load/save without eval.
+% 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
+% also contains the versions of the subroutines that this function uses.
 
 t00 = clock;
 geomacc = 1e-10;
@@ -193,11 +195,10 @@ else
     planeseesplanestrategy = geoinputdata.planeseesplanestrategy;
 end
 
-% stageversion identifies the version of the computations in this function.
-% Increase it by one whenever a change in this function changes its output
-% data, so that previously saved stage files are not reused. The overall
-% EDversionnumber is not part of the hash.
-stageversion = 1;
+% The version of this function, and of the subroutines it uses, are
+% defined in EDstageversions. They are part of the hash, so that saved
+% stage files are not reused after a change in the computations.
+stageversion = EDstageversions('EDedgeo');
 
 EDinputdatastruct = struct('stage','EDedgeo','stageversion',stageversion,...
     'planedata',planedata,'firstcornertoskip',firstcornertoskip,...

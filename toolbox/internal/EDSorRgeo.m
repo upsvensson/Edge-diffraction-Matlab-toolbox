@@ -126,6 +126,8 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
 % sourceamplitudes, doallSRcombinations) are taken from the current
 % inputstruct, not from the file. The hash is stored as a field
 % .EDinputdatahash in the output struct. load/save without eval.
+% 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
+% also contains the versions of the subroutines that this function uses.
 
 t00 = clock;
 geomacc = 1e-9;
@@ -140,11 +142,10 @@ if typeofcoords~='r' && typeofcoords~='s'
     error('ERROR: The input parameter typeofcoords must have the value S or R')    
 end
 
-% stageversion identifies the version of the computations in this function.
-% Increase it by one whenever a change in this function changes its output
-% data, so that previously saved stage files are not reused. The overall
-% EDversionnumber is not part of the hash.
-stageversion = 1;
+% The version of this function, and of the subroutines it uses, are
+% defined in EDstageversions. They are part of the hash, so that saved
+% stage files are not reused after a change in the computations.
+stageversion = EDstageversions('EDSorRgeo');
 
 if typeofcoords == 's'
     hashfields = {'coordinates','nedgesubs','sourcetype','pistoncornercoordinates',...

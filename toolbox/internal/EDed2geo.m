@@ -115,6 +115,8 @@ function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedat
 % computations into batches). difforder is hashed only as
 % (difforder >= 2). The hash is stored as a field .EDinputdatahash in
 % edgetoedgedata. load/save without eval.
+% 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
+% also contains the versions of the subroutines that this function uses.
 
 t00 = clock;
 
@@ -130,11 +132,10 @@ nedgesubs = Sdata.nedgesubs;
 % EDinputdatastruct = struct('planedata',planedata,'edgedata',edgedata,...
 %     'Sdata',Sdata,'Rdata',Rdata,'specorder',specorder,'difforder',difforder,...
 %     'nedgesubs',nedgesubs,'ndiff2batches',ndiff2batches,'EDversionnumber',EDversionnumber);
-% stageversion identifies the version of the computations in this function.
-% Increase it by one whenever a change in this function changes its output
-% data, so that previously saved stage files are not reused. The overall
-% EDversionnumber is not part of the hash.
-stageversion = 1;
+% The version of this function, and of the subroutines it uses, are
+% defined in EDstageversions. They are part of the hash, so that saved
+% stage files are not reused after a change in the computations.
+stageversion = EDstageversions('EDed2geo');
 
 EDinputdatastruct = struct('stage','EDed2geo','stageversion',stageversion,...
     'edgedatahash',EDparenthash(edgedata),'nedgesubs',nedgesubs,...

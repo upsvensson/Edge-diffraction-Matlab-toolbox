@@ -181,6 +181,8 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % stageversion replaces the overall EDversionnumber. For the GMRES
 % methods, difforder is not hashed (any value > 2 gives the full
 % solution). load/save of the _tfinteq file without eval.
+% 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
+% also contains the versions of the subroutines that this function uses.
 
 t00_total = clock;
 t00 = clock;
@@ -190,11 +192,10 @@ if ~isfield(controlparameters,'skipreceiverpropagation')
     controlparameters.skipreceiverpropagation = 0;
 end
 
-% stageversion identifies the version of the computations in this function.
-% Increase it by one whenever a change in this function changes its output
-% data, so that previously saved stage files are not reused. The overall
-% EDversionnumber is not part of the hash.
-stageversion = 1;
+% The version of this function, and of the subroutines it uses, are
+% defined in EDstageversions. They are part of the hash, so that saved
+% stage files are not reused after a change in the computations.
+stageversion = EDstageversions('EDintegralequation_convex_tf');
 
 % For the GMRES methods, the full solution is computed for any
 % difforder > 2, so the value of difforder does not affect the result.

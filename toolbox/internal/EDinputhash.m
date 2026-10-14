@@ -1,0 +1,52 @@
+function inputhash = EDinputhash(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters)
+% EDinputhash computes one hash value for the complete input to a
+% calculation: the five input structs that define the problem, after they
+% have been through EDcheckinputstructs (so that all default values are
+% filled in).
+%
+% Two runs get the same hash if, and only if, all the values in the five
+% structs are the same. The hash does not depend on
+%   - filehandlingparameters (where and what to save)
+%   - the field .inputorigin (if a value was given by the user or was a
+%     default value)
+%   - geoinputdata.geoinputfile (the geometry is represented by .corners
+%     and .planecorners, so a renamed geometry file gives the same hash)
+%   - the order of the fields in the structs
+%   - the version of the EDtoolbox
+%
+% This hash is saved in the results file (_EDres.mat) by EDmain_convex, and
+% is used by EDgetresults to find the results file for a given set of
+% input data.
+%
+% Input parameters:
+%   geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters
+%                   The five structs, as returned by EDcheckinputstructs.
+%
+% Output parameters:
+%   inputhash       A text string.
+%
+% Uses the function DataHash from Matlab Central
+%
+% Peter Svensson (peter.svensson@ntnu.no) 11 Oct. 2026
+%
+% inputhash = EDinputhash(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters);
+
+% 11 Oct. 2026 First version, by Claude, prompted by PS
+
+structlist = {geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters};
+fieldstoskip = {'inputorigin','geoinputfile'};
+
+for ii = 1:length(structlist)
+    onestruct = structlist{ii};
+    onestruct = rmfield(onestruct,fieldstoskip(isfield(onestruct,fieldstoskip)));
+    structlist{ii} = orderfields(onestruct);
+end
+
+hashdata = struct;
+hashdata.geoinputdata      = structlist{1};
+hashdata.Sinputdata        = structlist{2};
+hashdata.Rinputdata        = structlist{3};
+hashdata.envdata           = structlist{4};
+hashdata.controlparameters = structlist{5};
+
+inputhash = DataHash(hashdata);

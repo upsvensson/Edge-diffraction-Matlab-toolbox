@@ -1,41 +1,52 @@
 function [hodpaths,hodpathsalongplane,elapsedtimehodpaths,existingfilename] = ...
     EDfindHODpaths(edgeseesedge,visedgesfroms,visedgesfromr,...
     difforder,EDversionnumber,filehandlingparameters)
-% EDfindHODpaths finds the higher order diffraction paths for a convex
-% object, or a non-convex object where specular reflections are ignored.
-% 
+% EDfindHODpaths - Finds the higher-order diffraction paths, for the IR calculation.
+% Finds all the edge sequences, for diffraction orders 2 to difforder, from
+% each source to each receiver, for a convex object (or a non-convex
+% object where specular reflections are ignored). The results are saved
+% in the stage file <filestem>_hodpaths.mat (if
+% filehandlingparameters.savehodpaths = 1), which is reused when the input
+% data are the same.
+%
 % Input parameters:
-%   edgeseesedge        Matrix, [nedges,nedges], of -1, 0 and 1
-%   visedgesfroms       Matrix, [nedges,nsources], of 0 and 1
-%   visedgesfromr       Matrix, [nedges,nreceivers], of 0 and 1
-%   difforder
-%   EDversionnumber
-%   filehandlingparameters  (obligatory)
+%   edgeseesedge    [nedges,nedges] with the values -1, 0 or 1: the sign of
+%                   edgetoedgedata.edgeseespartialedge (1: the path runs
+%                   along a plane, -1: it does not)
+%   visedgesfroms   [nedges,nsources] 0 or 1, the sign of
+%                   Sdata.vispartedgesfroms
+%   visedgesfromr   [nedges,nreceivers] 0 or 1, the sign of
+%                   Rdata.vispartedgesfromr
+%   difforder       The highest diffraction order
+%   EDversionnumber  The version number of the EDtoolbox (stored in the
+%                   stage file).
+%   filehandlingparameters
+%                   struct; the fields .outputdirectory, .filestem,
+%                   .suppressresultrecycling and .savehodpaths are used.
 %
 % Output parameters:
-%   hodpaths            Cell variable, hodpaths{2} has size [npaths,2] etc
-%                       Each row in each matrix has a sequence of edge
-%                       numbers.
-%   hodpathsalongplane  Cell variable, hodpaths{2} has size [npaths,1] etc
-%                       Each row in each matrix has values 0 or 1, which tells
-%                       for each hod sequence "leg" whether it passes along
-%                       a plane or not.
-%   elapsedtimehodpaths This tells how long time was used inside this
-%                       function. If an existing file was reused, then
-%                       elapsedtimefindHODpaths has a second value which tells
-%                       how much time was used for the existing file.
-%   existingfilename    If an existing file was found that was reused, then
-%                       the reused file name is given here. If no existing
-%                       file could be reused then this variable is empty. 
-% 
-% Uses the functions EDrecycleresultfiles, EDstageversions from EDtoolbox
-% Uses the function Datahash from Matlab Central
-% 
-% Peter Svensson (peter.svensson@ntnu.no) 29 Oct. 2023
-% 
-% [hodpaths,hodpathsalongplane,elapsedtimehodpaths,existingfilename] = EDfindHODpaths...
-% (edgeseesedge,visedgesfroms,visedgesfromr,...
-% difforder,EDversionnumber,filehandlingparameters);
+%   hodpaths        Cell array {difforder,nreceivers,nsources}. The cell
+%                   hodpaths{N,ireceiver,isource} has one row per path of
+%                   diffraction order N, with the N edge numbers.
+%   hodpathsalongplane  Cell array of the same size. Each row has, for each
+%                   of the N-1 legs of the path, 1 if the leg runs along a
+%                   plane, otherwise 0.
+%   elapsedtimehodpaths
+%                   The time used by this function, in seconds. If an
+%                   existing stage file was reused, a second value gives
+%                   the time it took to compute that file.
+%   existingfilename  The name of the stage file that was reused, or empty
+%                   if the data were computed.
+%
+% Uses the functions EDrecycleresultfiles, EDstageversions from the
+% EDtoolbox
+% Uses the function DataHash from Matlab Central
+%
+% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+%
+% [hodpaths,hodpathsalongplane,elapsedtimehodpaths,existingfilename] = ...
+%    EDfindHODpaths(edgeseesedge,visedgesfroms,visedgesfromr,...
+%    difforder,EDversionnumber,filehandlingparameters);
 
 % 15 Mar 2018 First version
 % 16 Mar 2018 Expanded to several sources and receivers
@@ -51,6 +62,8 @@ function [hodpaths,hodpathsalongplane,elapsedtimehodpaths,existingfilename] = ..
 % 14 Oct. 2026 The EDinputdatahash contains a stageversion from
 % EDstageversions instead of the overall EDversionnumber. load/save
 % without eval.
+% 14 Oct. 2026 The header was updated to the standard structure (by Claude,
+% prompted by PS).
 
 t00 = clock;
 

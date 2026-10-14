@@ -1,123 +1,52 @@
 function [edgedata,planedata,elapsedtimeedgeo,existingfilename] = EDedgeo(planedata,...
     geoinputdata,EDversionnumber,filehandlingparameters)
-% EDedgeo - Calculates some plane- and edge-related geometrical
-% parameters, based on corners and planes in the planedata struct.
+% EDedgeo - Computes the edge-related geometry data from the planedata struct.
+% Finds all the edges of the model, with their wedge angles, reference
+% planes and edge-related coordinate systems, and the plane-to-plane and
+% edge-to-plane visibility. Edges can be switched off with the skip-lists
+% in geoinputdata. The results are saved in the stage file
+% <filestem>_eddata.mat, which is reused when the input data are the same.
 %
 % Input parameters:
-%	planedata               A struct with the corners and plane data.
-%   geoinputdata            A struct where these fields are optionally used
-%	.firstcornertoskip 	    All edges including at least one corner with this number or
-%                   		higher will be excluded from the calculations. Default: 1e6
-%   .listofcornerstoskip    All edges including at least one corner
-%                           in this list will be excluded from the
-%                           calculations. Default: [].
-%   .listofedgestoskip      This is a vertical matrix with one or two
-%                           columns. If it has one column, then edges with
-%                           these numbers will be turned off. If the matrix
-%                           has two columns, then edges with the corner
-%                           pairs will be turned off. .listofedgestoskip
-%                           takes precedence over .firstcornertoskip and
-%                           .listofcornerstoskip. Default: [].
-%   .planeseesplanestrategy If this parameter is given the value 1, a plane-to-plane
-%                           visibility check is done by checking the plane-midpoint to plane-midpoint
-%                           for obstructions, which might be enough for
-%                           some geometries. Default: 0.
-%  EDversionnumber 
-%  filehandlingparameters   a struct which contains the field showtext.
-% 
+%   planedata       struct, see help EDdatastructs
+%   geoinputdata    struct; these fields are used:
+%     .firstcornertoskip    Edges with at least one corner with this number,
+%                           or higher, are switched off.
+%     .listofcornerstoskip  Edges with at least one corner in this list are
+%                           switched off.
+%     .listofedgestoskip    Edge numbers (one column), or corner pairs (two
+%                           columns), of edges that are switched off. Takes
+%                           precedence over the two fields above.
+%     .planeseesplanestrategy  1: the plane-to-plane visibility is checked
+%                           only from plane midpoint to plane midpoint,
+%                           which is enough for some geometries. 0: a full
+%                           check.
+%   EDversionnumber  The version number of the EDtoolbox (stored in the
+%                   stage file).
+%   filehandlingparameters
+%                   struct; the fields .outputdirectory, .filestem, .showtext,
+%                   .suppressresultrecycling and .saveeddatafile are used.
+%
 % Output parameters:
-%	edgedata				Struct with fields as below
+%   edgedata        struct, see help EDdatastructs
+%   planedata       The input struct, with the fields .planeisthin,
+%                   .rearsideplane, .canplaneobstruct, .planeseesplane and
+%                   .reflfactors added.
+%   elapsedtimeedgeo
+%                   The time used by this function, in seconds. If an
+%                   existing stage file was reused, a second value gives
+%                   the time it took to compute that file.
+%   existingfilename  The name of the stage file that was reused, or empty
+%                   if the data were computed.
 %
-%       edgecorners             Matrix [nedges,2] with the corner numbers that
-%	                        define each edge, in the reference order.
-%       edgestartcoords         Matrix [nedges,3] with the coordinates of the
-%                           start corner for each edge.
-%       edgeendcoords           Matrix [nedges,3] with the coordinates of the
-%                           end corner for each edge.
-%       edgelengthvec           List [nedges,1] with the lengths of each edge.
-%       planesatedge            Matrix [nedges,2] with the plane numbers of the
-%                           two planes that connect to each edge. The first
-%                           plane is considered as the reference plane for
-%                           each edge. Rule: if the RH thumb is placed
-%                           along the edge, from start to end, and the hand
-%                           is rotated, the fingers should "come up
-%                           through" the reference plane.
-%       closwedangvec           List [nedges,1] with the angles in radians of
-%                           each edge - for the closed part of each edge.
-%       edgenvecs               Matrix [nedges,3] with the normal vectors of
-%                           the reference plane for each edge.
-%       offedges                List [nlength,1] where nlength = 0-nedges,
-%                           containing the edge numbers that should not
-%                           used.
-%       reflfactors             List [nplanes,1] with the reflection factors
-%                           of each plane. The only supported values are
-%                           +1 for rigid planes, 0 for perfectlt absorbing
-%                           planes and -1 for pressure-release planes. The
-%                           pressure-release cases might not be implemented
-%                           fully.
-%       planeisthin             List [nplanes,1] with the value 1 or 0 stating
-%                           whether the plane is thin or not. 
-%       rearsideplane           List [nplanes,1] with the plane number that is at
-%                           the rear side. If a plane is non-thin, the
-%                           value in this list is zero.
-%       planehasindents         List [nplanes,1] with the value 1 or 0 stating
-%                           whether a plane has indents or not.
-%       indentingedgepairs      Matrix [nindentingedgepairs,2] where each row
-%                           gives two connected edges that form an indent
-%                           in the shared plane. Consequently, those two
-%                           edges can never see each other.
-%       canplaneobstruct        List [nplanes,1] with the value 1 or 0 stating
-%                           whether a plane has the potential to obstruct
-%                           or not.
-%       planeseesplane          A matrix, [nplanes,nplanes], with the value 1,
-%                           0,-1,-2 stating:
-%                           1 A plane is front of another plane and could
-%                             then potentially see it.
-%                           0 A plane is completely behind another plane
-%                             but they are not aligned
-%                           -1 A plane is aligned with another plane
-%                           -2 A plane is back-to-back with another plane.
-%       edgesatplane            A matrix, [nplanes,nmaxedgesperplane] which for
-%                           row N contains the edge numbers that connect to
-%                           to plane N.
-%       edgeseesplane           A matrix, [nplanes,nedges], which contains the
-%                           values 0,1,-2 or -2, meaning:
-%                           0   The edge is completely behind a plane
-%                           -1  The edge can never see the plane and the
-%                               edge is aligned with the plane
-%                           -2  The edge can never see the plane and the
-%                               edge belongs to the plane
-%                           1   The edge has at least one point in front of the plane.
-%       edgerelatedcoordsysmatrices    A matrix, [nedges,9], containing, for each edge, the 3*3
-%                           matrices needed for finding the edge-related
-%                           coordinate system. Each row has to be reshaped
-%                           by
-%                           Bmatrix =
-%                           reshape(edgerelatedcoordsysmatrices(edgenumber,:),3,3);    
-%   planedata               Struct with some added fields.
-%       planeisthin 
-%       planeseesplane
-%       rearsideplane
-%       canplaneobstruct
-%       reflfactors
-%   elapsedtimeedgeo        This tells how long time was used inside this
-%                           function. If an existing file was reused, then
-%                           elapsedtimeedgeo has a second value which tells
-%                           how much time was used for the existing file.
-%   existingfilename        For v2 of this function, if an existing file was
-%                           found that was reused, then the reused file
-%                           name is given here. If no existing file could be 
-%                           reused then this variable is empty. For v1 of
-%                           this function, this variable is also empty.
-% 
-% Uses the functions EDcoordtrans1, EDinfrontofplane , EDrecycleresultfiles
-% from EDtoolbox
-% Uses the function Datahash from Matlab Central
-% 
-% Peter Svensson (peter.svensson@ntnu.no) 25 March 2024
+% Uses the functions EDcheckobstrpaths, EDcoordtrans1, EDinfrontofplane,
+% EDrecycleresultfiles, EDstageversions from the EDtoolbox
+% Uses the function DataHash from Matlab Central
 %
-% [edgedata,planedata,elapsedtimeedgeo,existingfilename] = EDedgeo...
-% (planedata,geoinputdata,EDversionnumber,filehandlingparameters);
+% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+%
+% [edgedata,planedata,elapsedtimeedgeo,existingfilename] = ...
+%    EDedgeo(planedata,geoinputdata,EDversionnumber,filehandlingparameters);
 
 % 9 July 2009   Stable version
 % 28 Sep. 2014  Added the optional input parameter listofcornerstoskip
@@ -169,6 +98,8 @@ function [edgedata,planedata,elapsedtimeedgeo,existingfilename] = EDedgeo(planed
 % (chained hashes). load/save without eval.
 % 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
 % also contains the versions of the subroutines that this function uses.
+% 14 Oct. 2026 The header was updated to the standard structure (by Claude,
+% prompted by PS).
 
 t00 = clock;
 geomacc = 1e-10;

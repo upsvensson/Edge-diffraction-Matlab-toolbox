@@ -2,51 +2,54 @@ function [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
     EDpropagateESIEBEM(tftot_surface,Rinputdata,fieldpoints,...
     Sinputdata,directsound_fieldpoints,controlparameters,envdata,...
     EDversionnumber,filehandlingparameters)
-% EDpropagateESIEBEM calculates the pressure at fieldpoints from the
-% surface pressure.
-%
-% From v0.4 of the EDtoolbox, the input parameter list changed.
+% EDpropagateESIEBEM - Computes the sound pressure at field points from the surface pressure (ESIEBEM).
+% The sound pressure at the surface points (computed by the ESIE) is
+% propagated to the field points with the Kirchhoff-Helmholtz integral.
+% If directsound_fieldpoints = 1, the free-field sound from the source is
+% added. Only a single source, or added sources, can be handled. The
+% results are saved in the stage file <filestem>_tfESIEBEM.mat, which is
+% reused when the input data are the same.
 %
 % Input parameters:
-%   tftot_surface           [nsurfacepoints,nfreqs] The sound pressure at the surface points
-%   Rinputdata              struct with fields
-%                           .coordinates [nsurfacepoints,3]
-%                           .nvecs       [nsurfacepoints,3]
-%                           .weights     [nsurfacepoints,1]
-%   fieldpoints             [nfieldpoints,3] The coordinates of the
-%                           fieldpoints
-%   Sinputdata
-%   directsound_fieldpoints 0 or 1
-%   controlparameters       struct, for which these fields are used:
-%                           .frequencies
-%                           .Rstart
-%   envdata                 Input struct; field .cair is used here
-%   EDversionnumber 
+%   tftot_surface   [nfrequencies,nsurfacepoints] the sound pressure at the
+%                   surface points
+%   Rinputdata      struct with the surface points: .coordinates
+%                   [nsurfacepoints,3], .nvecs [nsurfacepoints,3] and
+%                   .weights [nsurfacepoints,1] (from EDgensurfreceivers)
+%   fieldpoints     [nfieldpoints,3] the coordinates of the field points
+%                   (the receivers given by the user)
+%   Sinputdata      struct; the fields .coordinates, .sourceamplitudes,
+%                   .doaddsources and .doallSRcombinations are used.
+%   directsound_fieldpoints  0 or 1
+%   controlparameters  struct; the fields .frequencies and .Rstart are
+%                   used.
+%   envdata         struct; the field .cair is used.
+%   EDversionnumber  The version number of the EDtoolbox (stored in the
+%                   stage file).
 %   filehandlingparameters
-% 
-% Output parameters:
-%   tftot_ESIEBEM           [nfrequencies,nreceivers,nsources]
-%                           (if doaddsources = 0) or [nfrequencies,nreceivers]
-%                           (if doaddsources = 1)
-%   elapsedtimeESIEBEMpropagate
-%                           This tells how long time was used inside this
-%                           function. If an existing file was reused, then
-%                           elapsedtimeESIEBEMpropagate has a second value which tells
-%                           how much time was used for the existing file.
-%   existingfilename        If an existing file was
-%                           found that was reused, then the reused file
-%                           name is given here. If no existing file could be 
-%                           reused then this variable is empty. 
+%                   struct; the fields .outputdirectory, .filestem and
+%                   .suppressresultrecycling are used.
 %
-% Uses functions EDcalcdist, EDcalccosfi, EDrecycleresultfiles, EDstageversions from EDtoolbox
-% Uses function DataHash form Matlab Central
-% 
-% Peter Svensson 30 Oct. 2023 (peter.svensson@ntnu.no)
+% Output parameters:
+%   tftot_ESIEBEM   [nfrequencies,nfieldpoints] the sound pressure at the
+%                   field points
+%   elapsedtimeESIEBEMpropagate
+%                   The time used by this function, in seconds. If an
+%                   existing stage file was reused, a second value gives
+%                   the time it took to compute that file.
+%   existingfilename  The name of the stage file that was reused, or empty
+%                   if the data were computed.
+%
+% Uses the functions EDcalccosfi, EDcalcdist, EDrecycleresultfiles,
+% EDstageversions from the EDtoolbox
+% Uses the function DataHash from Matlab Central
+%
+% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
 %
 % [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
-%    EDpropagateESIEBEM(tftot_surface,surfacepoints,surfacenvecs,fieldpoints,...
-%    originalsourcecoordinates,directsound_fieldpoints,frequencies,envdata,...
-%    EDversionnumber,filehandlingparameters)
+%    EDpropagateESIEBEM(tftot_surface,Rinputdata,fieldpoints,Sinputdata,...
+%    directsound_fieldpoints,controlparameters,envdata,EDversionnumber,...
+%    filehandlingparameters);
 
 % 29 Sep. 2023 Moved code from EDmain_convexESIEBEM into this function
 % 3 Oct. 2023 Added the EDsettingnshash as input parameter
@@ -62,6 +65,8 @@ function [tftot_ESIEBEM,elapsedtimeESIEBEMpropagate,existingfilename] = ...
 % sign, and ignored the source amplitudes). It is not reachable from
 % EDmain_convex, and has been replaced by an error message.
 % load/save without eval.
+% 14 Oct. 2026 The header was updated to the standard structure (by Claude,
+% prompted by PS).
 
 t00 = clock;
 

@@ -1,76 +1,44 @@
 function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedata,edgedata,Sdata,...
     Rdata,controlparameters,EDversionnumber,ndiff2batches,filehandlingparameters)
-% EDed2geo - Calculates 2nd- and higher-order edge-related geom. parameters.
-% EDed2geo calculates some plane- and edge-related geometrical parameters,
-% based on corners and planes from a EDreadcad, but only data that is 
-% independent of the source and receiver.
+% EDed2geo - Computes the edge-to-edge geometry data, for second- and higher-order diffraction.
+% Finds which edges (and which parts of them) can see each other, and the
+% edge-related cylindrical coordinates of each edge relative to every
+% other edge. These data do not depend on the sources and receivers. The
+% results are saved in the stage file <filestem>_ed2data.mat, which is
+% reused when the input data are the same.
 %
 % Input parameters:
-%   planedata,edgedata
-%   Sdata                   Struct: needed if some edges could be redundant
-%                           to compute data for.
-%   Rdata
-%   controlparameters       
-%   EDversionnumber
-%   ndiff2batches (optional)        Default: 1
-%   filehandlingparameters  filehandlingparameters is a struct which
-%                           contains the field showtext.
-% 
-% Output parameters:
-%   edgetoedgedata          struct with fields:
-%       edgeseespartialedge     A sparse matrix, [nedges,nedges], with the
-%                           values 0, pos. integer or neg. integer:
-%                           0           Two edges can not see each other (or one
-%                                       of the edges is inactive)
-%                           pos.int.    A value from 1 to 2^nedgesubs-1,
-%                                       indicating how much of the edges
-%                                       see each other. A pos. value
-%                                       indicates that the edge-to-edge
-%                                       path runs along a plane.
-%                                       NB! A complete visibility test is
-%                                       not made; subsegment 1 on edge 1 is only
-%                                       checked against subsegment 1 on
-%                                       edge 2, not against all other
-%                                       subsegments of edge 2.
-%                           neg.int.    Same as for the pos.int. except
-%                                       that the edge-to-edge path does not
-%                                       run along a plane.
-%       edgealignedwithedge     A sparse matrix, [nedges,nedges], with the value 1
-%                           or 0 stating whether an (active) edge is aligned
-%                           with another (active) edge or not.
-%       edgeperptoplane         A sparse matrix, [nplanes,nedges], with the value 1
-%                           or 0 stating whether an (active) edge is perpendicular
-%                           to an active plane or not.
-%       edgeplaneperptoplane1   A sparse matrix, [nplanes,nedges], with the value 1
-%                           or 0 stating whether an (active) edge has one
-%                           of its two defining planes perpendicular to
-%                           another plane with which it shares an edge.
-%       edgeplaneperptoplane2   A sparse matrix, [nplanes,nedges], with the value 1
-%                           or 0 stating whether an (active) edge has one
-%                           of its two defining planes perpendicular to
-%                           another plane which has a flat edge (i.e., a 180 degree edge).
-%       reftoshortlistE         
-%       re1sho, re2sho
-%       thetae1sho, thetae2sho
-%       ze1sho, ze2sho
-%       examplecombE	
-%   elapsedtimeed2geo       This tells how long time was used inside this
-%                           function. If an existing file was reused, then
-%                           elapsedtimeedgeo has a second value which tells
-%                           how much time was used for the existing file.
-%   existingfilename        If an existing file was found that was reused, 
-%                           then the reused file name is given here. 
-%                           If no existing file could be reused then  
-%                           this variable is empty. 
+%   planedata, edgedata  structs, see help EDdatastructs
+%   Sdata           struct; only the field .nedgesubs is used.
+%   Rdata           struct (not used)
+%   controlparameters  struct; the fields .specorder (set to 1 by
+%                   EDmain_convex) and .difforder are used.
+%   EDversionnumber  The version number of the EDtoolbox (stored in the
+%                   stage file).
+%   ndiff2batches   (optional) The number of batches the computation is
+%                   split into, to save memory. Default: 1.
+%   filehandlingparameters
+%                   struct; the fields .outputdirectory, .filestem, .showtext,
+%                   .suppressresultrecycling and .saveed2datafile are used.
 %
-% Uses the functions EDcoordtrans2, EDinfrontofplane, EDcompress7,EDrecycleresultfiles
-%                    EDcheckobstr_edgetoedge EDgetedgepoints in EDtoolbox
+% Output parameters:
+%   edgetoedgedata  struct, see help EDdatastructs
+%   elapsedtimeed2geo
+%                   The time used by this function, in seconds. If an
+%                   existing stage file was reused, a second value gives
+%                   the time it took to compute that file.
+%   existingfilename  The name of the stage file that was reused, or empty
+%                   if the data were computed.
+%
+% Uses the functions EDcheckobstr_edgetoedge, EDcompress7, EDcoordtrans2,
+% EDgetedgepoints, EDinfrontofplane, EDparenthash, EDrecycleresultfiles,
+% EDstageversions from the EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 23 March 2026
+% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
 %
 % [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedata,edgedata,Sdata,...
-%    Rdata,controlparameters,EDversionnumber,ndiff2batches,filehandlingparameters)
+%    Rdata,controlparameters,EDversionnumber,ndiff2batches,filehandlingparameters);
 
 % 27.5.2011  Stable version
 % 13.3.2013  Fixed a problem with thin folded planes. Two edges with the
@@ -117,6 +85,8 @@ function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedat
 % edgetoedgedata. load/save without eval.
 % 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
 % also contains the versions of the subroutines that this function uses.
+% 14 Oct. 2026 The header was updated to the standard structure (by Claude,
+% prompted by PS).
 
 t00 = clock;
 

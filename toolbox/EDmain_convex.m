@@ -1,84 +1,54 @@
 function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters)
-% EDmain_convex - Calculates the specular and edge diffraction IRs and/or TFs
-% for convex, rigid scattering objects, using the image source method for
-% the specular reflection and the explicit integral formulation for first-order
-% diffraction. For TFs, the edge source integral equation is used for the
-% second- and higher-order diffraction whereas for IRs, the "restarted-
-% order" approach is used.
+% EDmain_convex - Computes the sound field around a convex, rigid scattering object.
+% The direct sound and the first-order specular reflections are computed
+% with the image source method, and first-order diffraction with the
+% explicit integral formulation. Second- and higher-order diffraction is
+% computed with the edge source integral equation (ESIE) for transfer
+% functions, or with the "repeated-order" approach for impulse responses.
+% The method is chosen with controlparameters.generalmethod: 'tf', 'ir' or
+% 'tf_ESIEBEM'.
 %
-% Input parameters are six structs with fields as specified below:
-%   geoinputdata        .geoinputfile        (obligatory)
-%                       As an alternative to specifying geoinputfile, it is
-%                       possible to specify .corners, .planecorners.
-%                       .firstcornertoskip   (default: 1e6)
-%   Sinputdata          .coordinates         (obligatory)
-%                       .doaddsources        (default: 0 = no)
-%                       .sourceamplitudes    (default:
-%                        ones(nsources,nfrequencies)
-%   Rinputdata          .coordinates         (obligatory)
-%   envdata             .cair                (default: 344)
-%                       .rhoair              (default: 1.21)
-%   controlparameters   .fs                  (default: 44100)
-%                       .directsound         (default: 1 = yes)
-%                       .difforder           (default: 15)
-%                       .docalctf            (default: 1)
-%                       .docalcir            (default: 0)
-%                       .skipfirstorder      (default: 0)
-%                       .Rstart              (default: 0)
-%                       .frequencies         (obligatory, if docalcftf = 1)
-%                       .discretizationtype  (default: 2 = G-L)
-%                       .ngauss              (default: 16)
-%   filehandlingparameters (optional)    
-%                       .outputdirectory  (default: /result, in the folder of the geoinputfile)  
-%                       .filestem        (default: name of the cad-file, with an underscore + running integer)
-%                       .showtext            (default: 1)
-%                       .suppressresultrecycling   (default: 0)
-%                       .saveSRdatafiles     (default: 1)
-%                       .saveeddatafile      (default: 1)
-%                       .saveed2datafile     (default: 1)
-%                       .savepathsfile       (default: 1)
-%                       .savelogfile         (default: 1)
-%                       .savediff2result      (default: 0)
-%                       .textshift           (default: 0)
+% The input structs are checked by EDcheckinputstructs, which also sets the
+% default values, and they are saved in <filestem>_settings.mat. The
+% intermediate results are saved in stage files, which are reused by later
+% runs when the data they depend on are the same (see help EDdatastructs).
+% Each run writes a log file, <filestem>_log_<date and time>.txt.
+%
+% Input parameters:
+%   geoinputdata, Sinputdata, Rinputdata, envdata, controlparameters,
+%   filehandlingparameters
+%                   Six structs. All fields, their default values and when
+%                   they are used are given by the tables in
+%                   EDcheckinputstructs. The most important fields:
+%                   geoinputdata       .geoinputfile, or .corners and
+%                                      .planecorners
+%                   Sinputdata         .coordinates (or the piston fields),
+%                                      .sourceamplitudes, .doaddsources
+%                   Rinputdata         .coordinates
+%                   envdata            .cair
+%                   controlparameters  .generalmethod, .difforder
+%                                      (required), .frequencies (for 'tf'),
+%                                      .fs (for 'ir'), .ngauss
+%                   filehandlingparameters  .outputdirectory, .filestem
+%                   filehandlingparameters can be left out if a geometry
+%                   file is given.
 %
 % Output parameters:
-%   EDres               (optional) A struct with all results and all input
-%   data. The file <filestem>_EDres.mat is always saved, together with a
-%   hash of the input data, EDruninputhash, so the results can be found
-%   later with EDgetresults. If filehandlingparameters.savefullEDresfile =
-%   1 (default), the file contains the complete struct EDres. If it is 0,
-%   the result matrices are left out of that file (they are in the _tf,
-%   _tfinteq, _ir and _irhod files, and EDgetresults loads them from
-%   there). EDres contains these fields (the irrelevant ones are empty):
-%                       irdirect, irgeom, irdiff, irhod, irtot
-%                       tfdirect, tfgeom, tfdiff, tfinteqdiff, tftot
-%                       tftot_ESIEBEM
-%                       inteqdiagnostics, timingstruct
-%                       geoinputdata, Sinputdata, Rinputdata, envdata,
-%                       controlparameters, filehandlingparameters (each
-%                       with the field .inputorigin), EDversionnumber,
-%                       inputhash, logfilename (the name of the log file)
-%                       
-%                       xxdirect contains the direct sound
-%                       xxgeom contains the specular reflection
-%                       xxdiff contains the first-order diffraction
-%                       irhod contains the second- and higher-order
-%                           diffraction; either as a sum of all orders or with
-%                           one cell for each order
-%                       tfinteqdiff contains the sum of second- and
-%                           higher-order diffraction
-%                       xxtot is the sum of the individual sound field
-%                           terms listed above
-%                       tftot_ESIEBEM is the total sound field, when
-%                           computed with the ESIEBEM method
-% 
-% Uses the functions EDgetversion,EDcheckinputstructs, EDreadcad, EDreadgeomatrices,
-% EDedgeo, EDSorRgeo, EDfindconvexGApaths, EDmakefirstordertfs, EDed2geo,
-% EDmessage, EDpostfunctext, EDinteg_submatrixstructure, EDintegralequation_convex_tf,
-% EDinputhash, EDassembleresults, EDinputsummary, EDinteqsummary from EDtoolbox
-% Uses the functions DataHash from Matlab Central
-% 
-% Peter Svensson 12 Oct. 2026 (peter.svensson@ntnu.no)
+%   EDres           (optional) A struct with the results, the six input
+%                   structs (each with the field .inputorigin), the timing
+%                   and the diagnostics; see help EDdatastructs. The struct
+%                   is also saved in <filestem>_EDres.mat (without the result
+%                   matrices if filehandlingparameters.savefullEDresfile =
+%                   0), and can be loaded later with EDgetresults.
+%
+% Uses the functions EDcheckinputstructs, EDinputhash, EDinputsummary,
+% EDreadcad, EDreadgeomatrices, EDgensurfreceivers, EDedgeo, EDSorRgeo,
+% EDfindconvexGApaths, EDmakefirstordertfs, EDmakefirstorderirs, EDed2geo,
+% EDinteg_submatrixstructure, EDintegralequation_convex_tf, EDinteqsummary,
+% EDpropagateESIEBEM, EDfindHODpaths, EDmakeHODirs, EDassembleresults,
+% EDmessage, EDpostfunctext, EDgetversion from the EDtoolbox
+%
+% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -233,6 +203,8 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % 14 Oct. 2026 The log file name ends with the date and time of the run
 % (see EDmessage), so reruns do not overwrite earlier logs. The name is
 % stored in EDres.logfilename and shown in the closing lines.
+% 14 Oct. 2026 The header was updated to the standard structure (by Claude,
+% prompted by PS).
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 

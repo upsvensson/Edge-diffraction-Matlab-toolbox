@@ -1,49 +1,36 @@
 function [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
     EDfindconvexGApaths(planedata,edgedata,Sdata,Rdata,controlparameters,...
     EDversionnumber,filehandlingparameters)
-% EDfindconvexGApaths - Finds all the first-order specular and (possibly)
-% first-order diffraction paths for a convex object.
-% 
-% From v0.4 of the EDtoolbox, the input parameter list changed.
+% EDfindconvexGApaths - Finds the first-order paths for a convex object.
+% Finds the direct sound paths (with obstruction tests), the first-order
+% specular reflections and the first-order diffraction paths, for all
+% source-receiver combinations. The results are saved in the stage file
+% <filestem>_paths.mat, which is reused when the input data are the same.
 %
 % Input parameters:
-%   planedata, edgedata, Sdata, Rdata       structs
-% 	controlparameters                       struct (only fields .difforder
-%                                           and .directsound are used)
-%   EDversionnumber
-%   filehandlingparameters  filehandlingparameters is a struct which
-%                           contains the field showtext.
+%   planedata, edgedata, Sdata, Rdata  structs, see help EDdatastructs
+%   controlparameters  struct; the fields .difforder (only whether it is
+%                   larger than 0) and .directsound are used.
+%   EDversionnumber  The version number of the EDtoolbox (stored in the
+%                   stage file).
+%   filehandlingparameters
+%                   struct; the fields .outputdirectory, .filestem, .showtext,
+%                   .suppressresultrecycling and .savepathsfile are used.
 %
 % Output parameters:
-%   firstorderpathdata      struct with the fields:
-%   .specrefllist           matrix, [nIS,2] with all the valid specular
-%                           reflections. First column has the source
-%                           numbers and the second column has the receiver
-%                           numbers.
-%   .specreflIScoords       matrix, [nIS,3] with IS coordinates
-%   .diffpaths              matrix, [nreceivers,nsources,nedges] with
-%                           logical 0 or 1
-%   .edgeisactive           vector, [nedges,1] with logical 0 or 1
-%   .directsoundlist        matrix, [ncomponents,2] with all the direct
-%                           sound components that are visible. First column
-%                           has the source number and the second column has
-%                           the receiver number.
-%   .ncomponents            vector, [1,3], with the number of components
-%                           for the direct sound, specular reflections, diffraction.
+%   firstorderpathdata  struct, see help EDdatastructs
 %   elapsedtimefindpaths
-%                           This tells how long time was used inside this
-%                           function. If an existing file was reused, then
-%                           elapsedtimefindpaths has a second value which tells
-%                           how much time was used for the existing file.
-%   existingfilename        If an existing file was found that was reused,
-%                           then the reused file name is given here. 
-%                           If no existing file could be reused then this 
-%                           variable is empty. 
+%                   The time used by this function, in seconds. If an
+%                   existing stage file was reused, a second value gives
+%                   the time it took to compute that file.
+%   existingfilename  The name of the stage file that was reused, or empty
+%                   if the data were computed.
 %
-% Uses functions  EDfindis EDchkISvisible EDrecycleresultfiles from EDtoolbox
-% Uses function DataHash from Matlab Central
+% Uses the functions EDchkISvisible, EDfindis, EDparenthash,
+% EDrecycleresultfiles, EDstageversions from the EDtoolbox
+% Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 Apr. 2025
+% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
 %
 % [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
 %    EDfindconvexGApaths(planedata,edgedata,Sdata,Rdata,controlparameters,...
@@ -104,6 +91,8 @@ function [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
 % .EDinputdatahash in firstorderpathdata. load/save without eval.
 % 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
 % also contains the versions of the subroutines that this function uses.
+% 14 Oct. 2026 The header was updated to the standard structure (by Claude,
+% prompted by PS).
 
 t00 = clock;
 

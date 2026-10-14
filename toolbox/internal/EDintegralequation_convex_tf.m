@@ -1,85 +1,72 @@
 function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
 	Sdata,Rdata,envdata,controlparameters,EDversionnumber,filehandlingparameters)
-% EDintegralequation_convex_tf calculates the sound pressure representing second-
-% and higher-order diffraction, for a convex scattering object
+% EDintegralequation_convex_tf - Computes second- and higher-order diffraction TFs with the edge source integral equation.
+% For each frequency, the integral equation q = q0 + H*q for the edge
+% source amplitudes is set up (q0 = the source term, from EDinteg_souterm)
+% and solved, either with GMRES (explicit sparse matrix, or matrix-free)
+% or with a fixed number of terms of the Neumann series. The solution is
+% then propagated to the receivers (EDcalcpropagatematrix).
 %
-% From v0.4 of the EDtoolbox, the input parameter list changed.
-% 
+% Two stage files are saved, each with its own hash:
+%   <filestem>_qfinal.mat   the solution, Qfinal (and Q_firstterm), for all
+%                           frequencies. It does not depend on the
+%                           receivers, so it is reused when only the
+%                           receivers or the propagation settings change.
+%                           Saved if filehandlingparameters.saveinteqsolution
+%                           = 1 and it is smaller than 4 GB.
+%   <filestem>_tfinteq.mat  the result at the receivers.
+%
 % Input parameters:
-%   Hsubmatrixdata          Structs
-%   planedata,edgedata,edgetoedgedata       Structs
-%   Sdata,Rdata,envdata,controlparameters   Structs
-%   EDversionnumber
-%   filehandlingparameters, envdata, 
-% New fields in the struct controlparameters on 10 Sept. 2025
-%   .skipreceiverpropagation optional, default 0. If given the value 1,
-%                           then there will be no propagation to the receivers
-%   .inteqsolutionmethod   'GMRES_fast' | 'GMRES_large' |
-%                          'iterative_fixeddifforder'
-%   .difforder             The diffraction order, for
-%                          'iterative_fixeddifforder'. For the GMRES
-%                          methods, any value > 2 gives the full solution.
-%   .inteqtargettol        used by the GMRES methods
-%   .inteqgmresmaxiter     used by the GMRES methods
-%   .ESIEpropagationimplementation   optional, 'legacy' or 'accurate'.
-%                          Default: 'legacy'
+%   Hsubmatrixdata, planedata, edgedata, edgetoedgedata, Sdata, Rdata
+%                   structs, see help EDdatastructs (planedata is not
+%                   used)
+%   envdata         struct; the field .cair is used.
+%   controlparameters  struct; the fields .frequencies, .difforder,
+%                   .inteqsolutionmethod ('GMRES_fast', 'GMRES_large' or
+%                   'iterative_fixeddifforder'), .inteqtargettol,
+%                   .inteqgmresmaxiter, .ESIEsourcetermimplementation,
+%                   .ESIEpropagationimplementation, .skipreceiverpropagation,
+%                   .ngauss, .discretizationtype and .Rstart are used. For
+%                   the GMRES methods, any difforder > 2 gives the full
+%                   solution.
+%   EDversionnumber  The version number of the EDtoolbox (stored in the
+%                   stage file).
+%   filehandlingparameters
+%                   struct; the fields .outputdirectory, .filestem, .showtext,
+%                   .suppressresultrecycling, .saveinteqsolution and
+%                   .savediff2result are used.
 %
-% Output parameters
-%   tfinteqdiff      Matrix with the diffracted pressure
-%                   If nsources = 1, or all sources should be added, then
-%                       the size is [nfrequencies,nreceivers]
-%                   If nsources > 1, and all sources should be computed
-%                       separately, then the size is
-%                       [nfrequencies,nreceivers,nsources]
-%   timingdata          Vector of size [1,4], with the times, for the
-%                       first frequency, for: building the H-matrix, the
-%                       source term, solving the integral equation, and
-%                       the propagation to the receivers. If the sources
-%                       are handled separately, the last three values
-%                       are for the first source only.
-%   extraoutputdata     A struct with fields
-%                       .tfinteqdiff_nodiff2
-%                       .inteqdiagnostics = a struct w fields:
-%                         .solutionmethod
-%                         .nQ
-%                         .nnzH % NaN if never explicitly assembled
-%                           (matrix-free GMRES)
-%                           (only set for 'GMRES_fast')
-%                         GMRES-specific (empty otherwise), all of size
-%                         [nfrequencies,ncols], where ncols = 1 if the
-%                         sources are added (or nsources = 1), and
-%                         ncols = nsources otherwise:
-%                         .gmresflag     0 = converged
-%                         .gmresrelres   relative residual
-%                         .gmresiter     number of (inner) iterations
-%                         .solvetime     time for the gmres call
-%                         .assemblytime  time for building the sparse
-%                                        matrix (only for 'GMRES_fast'),
-%                                        size [nfrequencies,1]
-%                         iterative-specific (empty otherwise):
-%                         .normQ         norm of each term in the series,
-%                                        size [difforder-2,nfrequencies,ncols]
-%                         .propdiagnostics (from EDcalcpropagatematrix)
-%   elapsedtimehodtf    This tells how long time was used inside this
-%                       function. If an existing file was reused, then
-%                       elapsedtimehodtf has a second value which tells
-%                       how much time was used for the existing file.
-%   existingfilename    For v2 of this function, if an existing file was
-%                       found that was reused, then the reused file
-%                       name is given here. If no existing file could be 
-%                       reused then this variable is empty. For v1 of
-%                       this function, this variable is also empty.
+% Output parameters:
+%   tfinteqdiff     The second- and higher-order diffraction, of size
+%                   [nfrequencies,nreceivers] if the sources are added
+%                   (Sdata.doaddsources = 1), otherwise
+%                   [nfrequencies,nreceivers,nsources].
+%   timingdata      [1,4] the times, for the first frequency, for building
+%                   the H-matrix, the source term, solving the integral
+%                   equation, and the propagation to the receivers.
+%   extraoutputdata  struct with the fields
+%     .tfinteqdiff_nodiff2  the same as tfinteqdiff but without the second-
+%                   order diffraction (only if savediff2result = 1)
+%     .inteqdiagnostics  see help EDdatastructs
+%   elapsedtimehodtf
+%                   The time used by this function, in seconds. If an
+%                   existing stage file was reused, a second value gives
+%                   the time it took to compute that file.
+%   existingfilename  The name of the stage file that was reused, or empty
+%                   if the data were computed.
 %
-% Uses functions EDdistelements, EDcalcedgeinteqmatrixsub2_mex, EDinteg_souterm, 
-% EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1, EDmatvecH, EDparenthash from EDtoolbox
-% Uses function DataHash from Matlab Central
-%           
-% Peter Svensson (peter.svensson@ntnu.no)  12 Oct. 2026  
-%                       
+% Uses the functions EDinteg_souterm, EDbuildHsparse, EDmatvecH,
+% EDcalcpropagatematrix, EDcalcedgeinteqmatrixsub2_mex, EDcoordtrans1,
+% EDdistelements, EDparenthash, EDrecycleresultfiles, EDstageversions from
+% the EDtoolbox
+% Uses the function DataHash from Matlab Central
+%
+% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+%
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
-%     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
-%	Snewdata,Rnewdata,envdata,controlparameters,EDversionnumber,filehandlingparameters);
+%    EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
+%    Sdata,Rdata,envdata,controlparameters,EDversionnumber,filehandlingparameters);
 
 % 31 March 2015 Introduced detailed timing, also as output parameter.
 % 8 April 2015 Substantial speeding up by saving Hsubdata instead of Hsub
@@ -113,6 +100,8 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %              no. of displayed frequencies.
 % 13 Dec. 2017 Added the sourceamplitudes to the Sinputdata struct
 % 19 Jan 2018 Renamed the ESIE2...mex to ED...mex
+% 14 Oct. 2026 The header was updated to the standard structure (by Claude,
+% prompted by PS).
 
 % 10 Dec. 2017 TODO: finish the timingdata for the CASE2 : addsources
 % 19 Jan 2018 The TODO above is probably done

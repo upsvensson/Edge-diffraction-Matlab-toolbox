@@ -1,51 +1,44 @@
 function [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
 controlparameters,EDversionnumber,filehandlingparameters)
-% EDinteg_submatrixstructure - Develop the edge-to-edge matrix structure for the ED int.eq.
+% EDinteg_submatrixstructure - Sets up the structure of the edge source integral equation.
+% Decides the number of Gauss-Legendre points on each edge, the edge pairs
+% (blocks of unknowns) and the edge triplets (submatrices of the H-matrix),
+% and finds identical submatrices (symmetries). The results are saved in
+% the stage file <filestem>_submatrixdata.mat, which is reused when the
+% input data are the same.
 %
-% From v0.4 of the EDtoolbox, the input parameter list changed.
-% 
 % Input parameters:
-%   edgedata, edgetoedgedata,controlparameters      Structs
-%   EDversionnumber
-%   filehandlingparameters      a struct which contains the field showtext.
+%   edgedata, edgetoedgedata  structs, see help EDdatastructs
+%   controlparameters  struct; these fields are used:
+%     .ngauss       The number of Gauss-Legendre points on the longest edge;
+%                   shorter edges get proportionally fewer (at least 2).
+%                   A negative value enforces an odd number on every edge.
+%     .discretizationtype  Must be 2 (Gauss-Legendre).
+%   EDversionnumber  The version number of the EDtoolbox (stored in the
+%                   stage file).
+%   filehandlingparameters
+%                   struct; the fields .outputdirectory, .filestem, .showtext,
+%                   .suppressresultrecycling and .savesubmatrixdata are used.
 %
 % Output parameters:
-%   Hsubmatrixdata      Struct with the fields
-%       Hsubmatrix
-%       listofsubmatrices
-%       edgepairlist
-%       edgetripletlist
-%       submatrixcounter
-%       nuniquesubmatrices
-%       nedgeelems
-%       Qvecstartnums
-%       Qvecendnums
-%       shortlist
-%       reftoshortlist
-%       isthinplanetriplet
-%       edgepairsharecorner
-%       edgepairsharedcornertype
-%       edgepairangle
+%   Hsubmatrixdata  struct, see help EDdatastructs
 %   elapsedtimesubmatrix
-%                       This tells how long time was used inside this
-%                       function. If an existing file was reused, then
-%                       elapsedtimesubmatrix has a second value which tells
-%                       how much time was used for the existing file.
-%   existingfilename    For v2 of this function, if an existing file was
-%                       found that was reused, then the reused file
-%                       name is given here. If no existing file could be 
-%                       reused then this variable is empty. For v1 of
-%                       this function, this variable is also empty.%
+%                   The time used by this function, in seconds. If an
+%                   existing stage file was reused, a second value gives
+%                   the time it took to compute that file.
+%   existingfilename  The name of the stage file that was reused, or empty
+%                   if the data were computed.
 %
-% Uses the functions  EDgetGLrule, EDrecycleresultfiles, EDparenthash from EDtoolbox
+% Uses the functions EDgetGLrule, EDparenthash, EDrecycleresultfiles,
+% EDstageversions from the EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 9 Oct 2026 
+% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
-% EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
-% controlparameters,EDversionnumber,filehandlingparameters);
+%    EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
+%    controlparameters,EDversionnumber,filehandlingparameters);
 
 % 29-1-2013 Cleaned up quite much and avoided looping through all the
 %           empty combinations. Exported much more data. Introduced
@@ -91,6 +84,8 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % the field .EDinputdatahash in Hsubmatrixdata. load/save without eval.
 % 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
 % also contains the versions of the subroutines that this function uses.
+% 14 Oct. 2026 The header was updated to the standard structure (by Claude,
+% prompted by PS).
 
 t00 = clock;
 

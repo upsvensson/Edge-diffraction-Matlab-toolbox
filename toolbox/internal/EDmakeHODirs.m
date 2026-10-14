@@ -1,50 +1,48 @@
 function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,...
     hodpathsalongplane,edgedata,edgetoedgedata,Sdata,Rdata,envdata,...
     controlparameters,EDversionnumber,filehandlingparameters)
-% EDmakeHODirs - Constructs higher-order (two and higher) diffraction impulse
-% responses from a list of paths in the input struct hodpaths.
+% EDmakeHODirs - Computes the second- and higher-order diffraction IRs.
+% Computes the impulse responses for the paths in hodpaths, with the
+% discretized formulation of EDwedge2nd (second order) and EDwedgeN (third
+% order and higher), and sums them, or keeps the diffraction orders
+% separate. The results are saved in the stage file <filestem>_irhod.mat,
+% which is reused when the input data are the same.
 %
-% From v0.4 of the EDtoolbox, the input parameter list changed.
-% 
 % Input parameters:
-%   hodpaths        Cell variable with a list of all the valid
-%                   edge-sequences for each diffraction order
-%   hodpathsalongplane  Cell variable with a list of 0/1 for each edge-sequence.
-%   edgedata,edgetoedgedata,Snewdata,Rnewdata,envdata,controlparameters,...
-%                   filehandlingparameters    Structs
-%   EDversionnumber
+%   hodpaths, hodpathsalongplane  from EDfindHODpaths
+%   edgedata, edgetoedgedata, Sdata, Rdata  structs, see help EDdatastructs
+%   envdata         struct; the field .cair is used.
+%   controlparameters  struct; the fields .difforder, .fs, .Rstart,
+%                   .HODelemsize (the edge element size for each
+%                   diffraction order) and .savealldifforders are used.
+%   EDversionnumber  The version number of the EDtoolbox (stored in the
+%                   stage file).
+%   filehandlingparameters
+%                   struct; the fields .outputdirectory, .filestem, .showtext and
+%                   .suppressresultrecycling are used.
 %
 % Output parameters:
-%   irhod           The ir with all the higher-order diffraction orders summed up
-%                   Size depends on the value of savealldifforders.
-%                   If savealldifforders = 0:
-%                       [nsampels,nreceivers,nsources] (if doaddsources = 0)
-%                       [nsampels,nreceivers,1] (if doaddsources = 1)
-%                   If savealldifforders = 1: irhod is a cell variable,
-%                   where each irhod{ndifforder} has this size:
-%                       [nsampels,nreceivers,nsources] (if doaddsources = 0)
-%                       [nsampels,nreceivers,1] (if doaddsources = 1)
+%   irhod           Cell array. If controlparameters.savealldifforders = 0,
+%                   irhod{1} has the sum of all orders; if it is 1,
+%                   irhod{N} has diffraction order N. Each cell has the size
+%                   [nsamples,nreceivers,nsources], or [nsamples,nreceivers]
+%                   if the sources are added (Sdata.doaddsources = 1).
 %   elapsedtimemakeirhod
-%                           This tells how long time was used inside this
-%                           function. If an existing file was reused, then
-%                           elapsedtimemakehodirs has a second value which tells
-%                           how much time was used for the existing file.
-%   existingfilename        For v2 of this function, if an existing file was
-%                           found that was reused, then the reused file
-%                           name is given here. If no existing file could be 
-%                           reused then this variable is empty. For v1 of
-%                           this function, this variable is also empty.
+%                   The time used by this function, in seconds. If an
+%                   existing stage file was reused, a second value gives
+%                   the time it took to compute that file.
+%   existingfilename  The name of the stage file that was reused, or empty
+%                   if the data were computed.
 %
-% Uses functions EDcreindexmatrix,EDwedge2nd,EDwedgeN,EDrecycleresultfiles,EDparenthash
-% from the EDtoolbox
-% Uses function DataHash from Matlab Central
+% Uses the functions EDwedge2nd, EDwedgeN, EDcreindexmatrix, EDparenthash,
+% EDrecycleresultfiles, EDstageversions from the EDtoolbox
+% Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
 %
-% [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,hodpathsalongplane,...
-%     edgedata,edgetoedgedata,Snewdata,Rnewdata,envdata,...
-%    controlparameters,EDversionnumber,...
-%    filehandlingparameters)
+% [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,...
+%    hodpathsalongplane,edgedata,edgetoedgedata,Sdata,Rdata,envdata,...
+%    controlparameters,EDversionnumber,filehandlingparameters);
     
 % 8 Dec. 2006 First version
 % 1 May 2017 Fixed a bug which gave an erroneous boosting of some
@@ -84,6 +82,8 @@ function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,.
 % 14 Oct. 2026 Fixed a bug: when the sources were not added (doaddsources
 % = 0), the source amplitudes were not applied. Version 2 of this function
 % in EDstageversions.
+% 14 Oct. 2026 The header was updated to the standard structure (by Claude,
+% prompted by PS).
 
 t00 = clock;
 

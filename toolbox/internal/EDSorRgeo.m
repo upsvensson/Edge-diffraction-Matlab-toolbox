@@ -1,78 +1,48 @@
 function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
     (planedata,edgedata,inputstruct,typeofcoords,EDversionnumber,filehandlingparameters)
-% EDSorRgeo - Calculates some source- or receiver-related geometrical parameters.
-% Calculates some source- or receiver-related geometrical parameters,
-% based on corners,edges and planes in an eddata-file, and on a list of
-% source/receiver coordinates. The output is returned as an expanded version
-% of the input struct. For piston sources only one point of the piston is
-% checked (the center point). The position is nudged a little bit in the
-% direction of the plane normal vector.
-%
-% From v0.4 of the EDtoolbox, the input parameter list changed.
+% EDSorRgeo - Computes the source- or receiver-related geometry data.
+% For each source (or receiver), finds which planes and which parts of
+% each edge it can see, and its edge-related cylindrical coordinates
+% relative to each edge. The output is the input struct with these data
+% added. For a piston source, only the center point is checked, nudged a
+% little bit in the direction of the plane normal. A point that is too
+% close to a plane, an edge, a corner, or the extension of a plane, gives
+% an error. The results are saved in the stage file <filestem>_Sdata.mat
+% or <filestem>_Rdata.mat, which is reused when the input data are the
+% same.
 %
 % Input parameters:
-%   planedata               struct
-%   edgedata                struct
-%	inputstruct             struct (Sdata or Rdata) where the fields
-%                           .coordinates, .nedgesubs, .sourcetype and 
-%                           .pistonplanes (if Sdata) are the only ones used by this
-%                           function. The function adds new fields to this existing struct.
-%                           .nedgesubs: the number of subdivisions that each edge will be
-%							subdivided into for visibility/obstruction tests. Default: 2
-%							NB! When nedgesubs = 2, the two end points will be checked.
-%   typeofcoords            'S' or 'R' - specifying if the point coordinates are sources
-%                           or receivers. This determines what the output data in the output
-%                           file will be called.
-%   EDversionnumber
-%   filehandlingparameters  a struct which contains the field showtext.
+%   planedata, edgedata  structs, see help EDdatastructs
+%   inputstruct     Sinputdata or Rinputdata (after EDcheckinputstructs).
+%                   The fields .coordinates and .nedgesubs (the number of
+%                   points per edge used in the visibility tests; 2 = the
+%                   two end points) are used, and for sources also
+%                   .sourcetype and the piston fields.
+%   typeofcoords    'S' or 'R'
+%   EDversionnumber  The version number of the EDtoolbox (stored in the
+%                   stage file).
+%   filehandlingparameters
+%                   struct; the fields .outputdirectory, .filestem, .showtext,
+%                   .suppressresultrecycling and .saveSRdatafiles are used.
 %
 % Output parameters:
-%   outputstruct            struct with fields
-%       coordinates         (renamed) copy of the input parameter 'pointcoords'
-%       visplanesfroms/visplanesfromr           Matrix, [nplanes,nsources]/[nplanes/nreceivers]
-%                                           with integer values 0-5:
-%                           0 means S/R behind a plane which is reflective or totabs
-%                           1 means S/R is aligned with a plane, but outside it
-%                           2 means S/R is in front of a plane which is reflective
-%                           3 means S/R is in front of a plane which is totabs
-%                           4 means S/R is inside a plane which is reflective
-%                           5 means S/R is inside a plane which is totabs
-%       vispartedgesfroms/vispartedgesfromr     Matrix, [nedges,nsources]/[nedges/nreceivers]
-%                                           with integer values 0-2^nedgesubs-1 indicating
-%                                           part-visibility of the edge.
-%       soutsidemodel/routsidemodel             List, [nsources,1]/[nreceivers,1], with values
-%                                           1 or 0 indicating whether the S/R is outside (1)
-%                                           the model or not (0).
-%                                           NB! Only simple tests are done, so an S/R could still
-%                                           be outside the model even if the value here is 0.
-%       reftoshortlistS/reftoshortlistR         Matrix, [nedges,nreceivers] or
-%                                           [nedges,nsources] with pointers
-%                                           to the three shortlists below.
-%       rSsho/rRsho                             A shortlist with the unique
-%                                           values of radius for sources/receivers relative to the the edges.
-%       thetaSsho/thetaRsho
-%       zSsho/zRsho
-%   elapsedtimeSRgeo        This tells how long time was used inside this
-%                           function. If an existing file was reused, then
-%                           elapsedtimeSgeo has a second value which tells
-%                           how much time was used for the existing file.
-%   existingfilename        If an existing file was found that was reused,
-%                           then the reused file name is given here. If no 
-%                           existing file could be reused then this variable
-%                           is empty. 
+%   outputstruct    Sdata or Rdata, see help EDdatastructs
+%   elapsedtimeSRgeo
+%                   The time used by this function, in seconds. If an
+%                   existing stage file was reused, a second value gives
+%                   the time it took to compute that file.
+%   existingfilename  The name of the stage file that was reused, or empty
+%                   if the data were computed.
 %
-% NB! The text on the screeen, and in the code refers to 'R' or 'receivers'
-% but it should be S or R.
-%
-% Uses the functions EDinfrontofplane, EDpoinpla, EDcompress3, EDcoordtrans1
-% EDgetedgepoints, EDcheckobstr_pointtoedge, EDrecycleresultfiles
-% from EDtoolbox.
+% Uses the functions EDcheckobstr_pointtoedge, EDcompress3, EDcoordtrans1,
+% EDgetedgepoints, EDinfrontofplane, EDpoinpla, EDparenthash,
+% EDrecycleresultfiles, EDstageversions from the EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
-% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
 %
 % [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo(planedata,...
-% edgedata,inputstruct,typeofcoords,EDversionnumber,filehandlingparameters);
+%    edgedata,inputstruct,typeofcoords,EDversionnumber,filehandlingparameters);
 
 %  1 June 2006 Functioning version
 %  2 Dec 2014  Introduced new output parameters in the file: reftoshortlistR,rRsho,thetaRsho,zRsho
@@ -128,6 +98,8 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
 % .EDinputdatahash in the output struct. load/save without eval.
 % 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
 % also contains the versions of the subroutines that this function uses.
+% 14 Oct. 2026 The header was updated to the standard structure (by Claude,
+% prompted by PS).
 
 t00 = clock;
 geomacc = 1e-9;

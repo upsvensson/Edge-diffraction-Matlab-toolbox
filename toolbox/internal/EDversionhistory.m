@@ -2,7 +2,7 @@ function EDversionhistory
 % This function, EDversionhistory, prints out the EDtoolbox version
 % history on the screen.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 8 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
 
 % 28 Jan 2018 First version, just after version 0.101
 
@@ -360,6 +360,14 @@ versionnumbers{icounter} = '0.603';
 versiondate{icounter} = '9 Oct. 2026';
 versiontext{icounter} = ['Introduced singularity subtraction in EDinteg_souterm.m,...' ...
     ' which seems more accurate than a previously implemented version of LCN.'];
+
+icounter = icounter + 1;
+versionnumbers{icounter} = '0.61';
+versiondate{icounter} = '14 Oct. 2026';
+versiontext{icounter} = ['A large number of structural changes: version tracking ' ...
+    'of subroutines, giving more finegrained hashing. More cases in EDverify, ' ...
+    'testing also file versions. ESIE_source and ESIE_propagation have ' ...
+    'got accurate as default. '];
 
 nversions = size(versiontext,2);
 txtwidth = 80;

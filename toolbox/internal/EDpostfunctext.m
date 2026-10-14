@@ -24,9 +24,7 @@ function EDpostfunctext(functype,timingvalue,existingfilename,...
 %                   put on the same line as the function name and the time.
 %                   The following ones are the detail lines.
 %
-% Uses the function EDmessage
-%
-% Peter Svensson 12 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % EDpostfunctext(functype,timingvalue,existingfilename,...
 %    filehandlingparameters,fid,TTT,varargin)
@@ -36,6 +34,7 @@ function EDpostfunctext(functype,timingvalue,existingfilename,...
 % 12 Oct. 2026 The detail lines, and the name of a reused file, are written
 % to the log file only, unless showtext >= 2 (by Claude, prompted by PS).
 % Removed the use of eval.
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 ntextstrings = nargin - 6;
 if ntextstrings > 0

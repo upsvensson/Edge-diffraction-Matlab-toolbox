@@ -34,9 +34,7 @@ function [planedata,elapsedtimegeomatrices] = EDreadgeomatrices(corners,planecor
 %       modeltype
 %  elapsedtimegeomatrices
 %
-% Uses the functions EDinfrontofplane
-% 
-% Peter Svensson (peter.svensson@ntnu.no) 10 Oct 2022
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [planedata,elapsedtimegeomatrices] = EDreadgeomatrices(corners,planecorners,planerefltypes);
 
@@ -53,6 +51,7 @@ function [planedata,elapsedtimegeomatrices] = EDreadgeomatrices(corners,planecor
 % corrected to "planecorners" in three locations.
 % 10 Oct 2022 Added the timing inside this function and returned as a
 % second output parameter.
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 t00 = clock;
 

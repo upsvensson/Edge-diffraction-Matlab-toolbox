@@ -4,8 +4,19 @@ function outval = EDbetaoverml(zvec,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec)
 % into the numerical integration function EDquadstep for faster operation
 % but EDbetaoverml is also called directly by EDwedge1st_ir.
 %
-% Uses no special functions.
-% 
+% Input parameters:
+%   zvec            Vector of positions along the edge, in m
+%   rs, rr, zs, zr  The cylindrical coordinates r and z of the source and of
+%                   the receiver, relative to the edge
+%   ny              The wedge index, pi/(2*pi - closed wedge angle)
+%   sinnyfivec, cosnyfivec  [1,4] sin and cos of ny*phi for the four beta
+%                   terms
+%
+% Output parameters:
+%   outval          The integrand at each point in zvec: the sum of the four
+%                   beta terms, divided by m*l (the distances from the edge
+%                   point to the source and to the receiver)
+%
 % ----------------------------------------------------------------------------------------------
 %   This file is part of the Edge Diffraction Toolbox by Peter Svensson.                       
 %                                                                                              
@@ -20,13 +31,14 @@ function outval = EDbetaoverml(zvec,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec)
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson 28 Jan 2018 (peter.svensson@ntnu.no)
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % outval = EDbetaoverml(zvec,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec);
 
 % 23 March 2004 Functioning version in EDB toolbox
 % 29 Dec. 2016 Renamed to ESIE2 without changes
 % 28 Jan 2018 Renamed to ED without changes
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 ml = sqrt( (zvec-zs).^2 + rs.^2 ).*sqrt( (zvec-zr).^2 + rr.^2 );
 	

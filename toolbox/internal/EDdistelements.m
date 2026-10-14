@@ -1,5 +1,5 @@
 function [nvec,weightvec] = EDdistelements(n,method)
-% EDdistelements returns two vectors: fractional positions of n elements
+% EDdistelements - Returns two vectors: fractional positions of n elements
 % ditributed from 0 to 1, and the corresponding weightvec.
 %
 % Input parameters:
@@ -12,9 +12,7 @@ function [nvec,weightvec] = EDdistelements(n,method)
 %   nvec        Vector, [n,1], of fractional positions between 0 and 1
 %   weightvec   Vector, [n,1], of weighting values for the sample points in nvec. 
 %
-% Uses function lgwt from Matlab Central and EDgetGLrule from EDtoolbox
-%
-% peter.svensson@ntnu.no       13 Feb 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [nvec,weightvec] = EDdistelements(n,method);
 
@@ -23,6 +21,7 @@ function [nvec,weightvec] = EDdistelements(n,method)
 % 27 Nov. 2017 Copied from ESIE2toolbox
 % 13 Feb 2018 Switched to using lgwt from Matlab Central, instead of
 % quad_gauss
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 if method == 0
     nvec = ([0:n-1].'+0.5)/n;

@@ -33,15 +33,14 @@ function [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints]
 %    cornerhitpoints  List, [ncornerhits,3] of the hitpoint coordinates for the
 %                   planes that were hit at a corner.
 %
-% Uses the function EDpoinplax.
-%
-% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2016
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 % 
 % [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = EDchkISvisiblex(bigplanelist,planeeqs_lastvalue,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec)
 
 % 16 Jan. 2005 Functioning version
 % 27 Nov. 2017 Copied from ESIE2toolbox
 % 29 Nov. 2017 Called ESIE2poinplax - changed to ED
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 global BIGFROMCOORDSSHORTLIST REFTOFROMSHORTLIST BIGTOCOORDSSHORTLIST REFTOTOSHORTLIST
 

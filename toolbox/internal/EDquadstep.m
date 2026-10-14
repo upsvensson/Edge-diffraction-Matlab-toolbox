@@ -3,7 +3,15 @@ function Q = EDquadstep(a,b,fa,fc,fb,tol,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec)
 % Modified from Matlabs QUADSTEP function. The EDquadstep version
 % solves all time steps at the same time.
 %
-% Uses no special function 
+% Input parameters:
+%   a, b            [nslots,1] the start and end points of the integration
+%                   intervals along the edge
+%   fa, fc, fb      [nslots,1] the integrand at a, at the midpoint, and at b
+%   tol             The relative tolerance
+%   rs, rr, zs, zr, ny, sinnyfivec, cosnyfivec  As for EDbetaoverml
+%
+% Output parameters:
+%   Q               [nslots,1] the integral over each interval
 %
 % ----------------------------------------------------------------------------------------------
 %   This file is part of the Edge Diffraction Toolbox by Peter Svensson.                       
@@ -19,13 +27,14 @@ function Q = EDquadstep(a,b,fa,fc,fb,tol,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec)
 %   You should have received a copy of the GNU General Public License along with the           
 %   Edge Diffraction Toolbox. If not, see <http://www.gnu.org/licenses/>.                 
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@iet.ntnu.no) 28 Jan 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% EDquadstep(a,b,fa,fc,fb,tol,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec)
+% Q = EDquadstep(a,b,fa,fc,fb,tol,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec);
 
 % 21 March 2004 Functioning version in EDB toolbox
 % 29 Dec. 2016 Renamed to ESIE2 without any changes
 % 28 Jan 2018 Renamed from ESIE2 without any changes
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 % Evaluate integrand twice in interior of subinterval [a,b].
 c = (a + b)/2;

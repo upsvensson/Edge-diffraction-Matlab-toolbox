@@ -11,15 +11,14 @@ function distances = EDcalcdist(x1,x2)
 %   distances   Matrix, [n1,n2], with the distances from all
 %               points in x1 to all points in x2.
 %
-% Uses no special subroutines
-%
-% Peter Svensson (peter.svensson@ntnu.no) 3 July 2019
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % distances = EDcalcdist(x1,x2);
 
 % 10 Oct. 2000 First version
 % 28 Nov. 2017 Copied to EDtoolbox
 % 3 July 2019 Implemented a speed-up if x2 has many more points than x1.
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 [n11,n12] = size(x1);
 [n21,n22] = size(x2);

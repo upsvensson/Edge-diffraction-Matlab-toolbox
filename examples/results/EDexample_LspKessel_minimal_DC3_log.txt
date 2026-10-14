@@ -1,0 +1,25 @@
+EDmain_convex, v.0.504 (19April2024)
+   filestem for results: EDexample_LspKessel_minimal_DC3
+   directory for results: /Users/svensson/Documents/Projekt/Dokum_Matlab6files/EDtoolbox/examples/results
+Calculating transfer functions with the ESIE method
+   
+EDreadgeomatrices: 8 corners and 6 planes. Time: 0.001169 s
+EDedgeo: 12 edges. Time: 0.004668 s (Orig.: 0.14726s)
+   (Recycled and duplicated EDexample_LspKessel_minimal_DC1_eddata)
+EDSorRgeo: 1 sources. Time: 0.002955 s (Orig.: 0.003394s)
+   (Recycled and duplicated EDexample_LspKessel_minimal_DC1_Sdata)
+EDSorRgeo: 1 receivers. Time: 0.002961 s (Orig.: 0.001886s)
+   (Recycled and duplicated EDexample_LspKessel_minimal_DC1_Rdata)
+EDfindconvexGApaths: 1 spec. paths and 12 diff. paths. Time: 0.003032 s (Orig.: 0.007987s)
+   (Recycled and duplicated EDexample_LspKessel_minimal_DC1_paths)
+EDmakefirstordertfs: 1 frequencies. Time: 0.003413 s (Orig.: 0.011246s)
+   (Recycled and duplicated EDexample_LspKessel_minimal_DC1_tf)
+   (Direct sound: 0.001628s, spec.refl.: 0.002141s, first-order diff.: 0.005346s)
+EDed2geo:  Time: 0.003672 s (Orig.: 0.061012s)
+   (Recycled and duplicated EDexample_LspKessel_minimal_DC1_ed2data)
+EDinteg_submatrixstructure: 252 submatrices, out of 432, to compute. Time: 0.011042 s
+   Edges discretized with: 24-48 gauss points. 83232 edge source signals to compute.
+   The IE matrix has 16979328 non-zero elements. Some may be identical due to symmetries
+EDintegralequation_convex_tf: 1 frequencies. Diffraction order: 15. Time: 0.004858 s
+   H-matrix: 0.6803 s. Q_firstterm: 0.020716 s (per freq.)
+   Qfinal: 2.2234 s. P at receiver: 0.004726 s.

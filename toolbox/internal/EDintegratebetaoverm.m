@@ -20,15 +20,14 @@ function [tf,singularterm] = EDintegratebetaoverm(cair,frequencies,closwedang,rs
 %   rr, thetar, zr	cyl. coordinates of the receiver pos
 %   zw		        the edge ends given as [z1 z2]
 %
-% Uses the built-in function QUADGK and the function EDbetaoverm_fd for numerical integration.
-%
-% Peter Svensson (peter.svensson@ntnu.no) 28 May 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [tf,singularterm] = EDintegratebetaoverm(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw);
 
 % 26 May 2018 Modified the EDwedge1st_fd by removing some parts. Method,
 % Rstart and bc are not used here.
 % 28 May 2018 Did some corrections, switching R0 to m0
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 localshowtext = 0;
 

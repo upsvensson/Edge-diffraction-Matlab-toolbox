@@ -26,9 +26,7 @@ function [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_p
 %   cornerhits          A list, [N_cornerhits,1] of the indicies of paths that hit a
 %                       plane right at a corner.   
 %
-% Uses function EDpoinpla
-%
-% Peter Svensson (peter.svensson@ntnu.no) 27 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [nonobstructedpaths,nobstructions,edgehits,cornerhits] =
 % EDcheckobstr_pointtoedge(fromcoordsshortlist,reftoshortlist,tocoords,...
@@ -36,6 +34,7 @@ function [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_p
 
 % 22 Sep. 2005 Functioning version
 % 27 Nov. 2017 Copied from ESIE2toolbox
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 npaths = size(tocoords,1);
 nplanes = size(canplaneobstruct,2);

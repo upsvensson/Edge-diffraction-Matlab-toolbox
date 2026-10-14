@@ -39,9 +39,7 @@ function [ir,initdelay,singularterm,zfirst] = EDwedge1st_ir(fs,cair,closwedang,r
 %                   [1 -1] => rigid-soft. First plane should be the ref. plane.
 %   CAIR (global)   The speed of sound
 %
-% Uses the functions EDquadstep and EDbetaoverml for numerical integration.
-%
-% Peter Svensson (peter.svensson@ntnu.no) 7 Apr 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [ir,initdelay,singularterm,zfirst] =
 % EDwedge1st_ir(fs,cair,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,R_irstart,bc);
@@ -50,6 +48,7 @@ function [ir,initdelay,singularterm,zfirst] = EDwedge1st_ir(fs,cair,closwedang,r
 % 29 Dec. 2016 Renamed to ESIE2, without making any changes.
 % 28 Jan 2018 Copied from ESIE2wedge1st_int
 % 7 Apr 2018 Introduced the zfirst output parameter
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 localshowtext = 0;
 

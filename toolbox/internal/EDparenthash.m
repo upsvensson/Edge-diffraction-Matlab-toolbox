@@ -15,13 +15,12 @@ function parenthash = EDparenthash(datastruct)
 % Output parameters:
 %   parenthash      A hash string
 %
-% Uses the function DataHash from Matlab Central
-%
-% Peter Svensson (peter.svensson@ntnu.no) 12 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % parenthash = EDparenthash(datastruct);
 
 % 12 Oct. 2026 First version
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 if isfield(datastruct,'EDinputdatahash')
     parenthash = datastruct.EDinputdatahash;

@@ -41,9 +41,7 @@ showtext,ESIEpropagationimplementation)
 %   ivproblematic
 %   propdiagnostics
 %
-% Uses EDcoordtrans1.
-%
-% Peter Svensson (peter.svensson@ntnu.no) 9 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [Fmatrix,ivproblematic,propdiagnostics] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
 %     isthinhole,vispartedgesfromr,frequency,Rstart,...
@@ -97,6 +95,7 @@ showtext,ESIEpropagationimplementation)
 % often than the first version. Set "accurate" to the default. Some
 % speeding up by Claude.
 % Code improvement: changed nbig to nQ, changed bigmatrix... to Qvec...
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 if nargin < 13
     showtext = 0;

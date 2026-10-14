@@ -58,12 +58,12 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 %                   .npairs_skew, .npairs_partlyvisible, .npairs_nodesnotGL
 %                                       pairs left to the legacy code, by reason
 %
-% Uses functions EDdistelements  EDcoordtrans1
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% Peter Svensson 9 Oct. 2026 (peter.svensson@ntnu.no)
-%
-% [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,inteq_ngauss,inteq_discretizationtype,...
-%     vispartedgesfroms,vispartedgesfroms_start,vispartedgesfroms_end,frequency,gaussvectors,rSvec,thetaSvec,zSvec,showtext);
+% [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,...
+%    edgetoedgedata,Hsubmatrixdata,controlparameters,vispartedgesfroms,...
+%    vispartedgesfroms_start,vispartedgesfroms_end,frequency,gaussvectors,...
+%    rSvec,thetaSvec,zSvec,showtext);
 
 % 20120217 Functioning version
 % 20121025 Added the isthinhole output parameter
@@ -101,6 +101,7 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 % implementation (controlparameters.ESIEsourcetermimplementation) and the
 % optional output soudiagnostics.
 % 9 Oct. 2026 Code cleanup, changed bigmatrix... to Qvec...
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 if nargin < 14
     showtext = 0;

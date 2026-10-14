@@ -29,15 +29,14 @@ function inputhash = EDinputhash(geoinputdata,Sinputdata,Rinputdata,envdata,cont
 % Output parameters:
 %   inputhash       A text string.
 %
-% Uses the function DataHash from Matlab Central
-%
-% Peter Svensson (peter.svensson@ntnu.no) 11 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % inputhash = EDinputhash(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
 % 11 Oct. 2026 First version, by Claude, prompted by PS
 % 14 Oct. 2026 Optional input parameter filehandlingparameters; its field
 % .savediff2result is part of the hash.
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 structlist = {geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters};
 fieldstoskip = {'inputorigin','geoinputfile'};

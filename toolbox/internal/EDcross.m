@@ -9,6 +9,10 @@ function c = EDcross(a,b)
 %   c       One vector, of size (3,1)
 %
 %  c = EDcross(a,b)
+%
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+%
+% c = EDcross(a,b);
 
 %CROSS  Vector cross product.
 %   C = CROSS(A,B) returns the cross product of the vectors
@@ -18,6 +22,7 @@ function c = EDcross(a,b)
 %   C = CROSS(A,B) returns the cross product of A and B along the
 %   first dimension of length 3.
 %
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 %   Clay M. Thompson
 %   updated 12-21-94, Denise Chen

@@ -42,12 +42,11 @@ function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = ...
 %                    simply 1,2,3,... for each plane, gien by the order of 
 %                    the corners for that plane.
 %
-% Uses no special subroutines
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% Peter Svensson (peter.svensson@ntnu.no) 31 Oct. 2023
-% 
-% [hitvec,edgehit,edgehitnumbers,cornerhit] = EDpoinpla(xpoints,planelist,...
-% minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs,geomacc,showtext);
+% [hitvec,edgehit,edgehitnumbers,cornerhit,...
+%    cornerhitnumbers] = EDpoinpla(xpoints,planelist,minvals,maxvals,...
+%    planecorners,corners,ncornersperplanevec,planenvecs,geomacc,showtext);
 
 % 100204 Functioning version
 % 111201 Fixed a bug: when the ray (from the hitpoint in the positive x-direction) passed exactly
@@ -70,6 +69,7 @@ function [hitvec,edgehit,edgehitnumbers,cornerhit,cornerhitnumbers] = ...
 % 3-corner planes and some 4-corner planes etc.
 % 31 Oct. 2023 Found a bug which would happen rarely: if the ray goes
 % exactly through a corner, then the hit was micounted.
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 if nargin < 10
     showtext = 0;

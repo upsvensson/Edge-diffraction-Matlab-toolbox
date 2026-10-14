@@ -40,11 +40,10 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 %   diff1GLorder    (optional) GL order; only relevant if diff1method =
 %   'GL';
 %
-% Uses the built-in function QUADGK and the function EDbetaoverml_fd for numerical integration.
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% Peter Svensson (peter.svensson@ntnu.no) 24 Sep. 2026
-%
-% [tf,singularterm] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc,diff1method,diff1GLorder);
+% [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs,...
+%    thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc,diff1method,diff1GLorder);
 
 % 18 Jul. 2010   Stable version
 % 19 Feb. 2013   Fixed the Dirichlet case
@@ -78,6 +77,7 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 % a zone boundary) is computed with the 'accurate' method instead; before,
 % the check for this was in the 'accurate' branch, so it was never used.
 % An unknown diff1method gives an error.
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 localshowtext = 0;
 

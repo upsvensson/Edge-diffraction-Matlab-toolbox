@@ -22,12 +22,14 @@ function pointinfront = EDinfrontofplane(pointcoords,planenvecs,planecoco,backup
 %	pointinfront			A list of values, +1 (in front) 0 (in plane) or
 %                           -1 (behind). Type: int8.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 18 June 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% pointinfront = EDinfrontofplane(pointcoords,planenvecs,planecoco,backupplanecoco,cornernumb,planenumb);
+% pointinfront = EDinfrontofplane(pointcoords,planenvecs,planecoco,...
+%    backupplanecoco,cornernumb,planenumb,geomacc);
 
 % 24 Nov. 2017 Copied, with minor changes, from ESIE2infrontofplane
 % 18 June 2018 Introduced geomacc as an input parameter w default value 1e-9 m
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 planenumbdefined = 0;
 cornernumbdefined = 0;

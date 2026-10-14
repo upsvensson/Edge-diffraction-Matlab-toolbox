@@ -18,13 +18,14 @@ nyveclist,edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs)
 % "validity" check. But, the subsequent "obstruction" check is not done
 % yet.
 %
+% Output parameters:
 %   ir     The 2nd order diffraction impulse response for two
 %          edges that share one plane.
 %   ninit  The initial delay that has been cut away before the
 %          beginning of ir. Note that the time zero of the ir (including ninit)
 %		   corresponds to R_irstart.
 %
-% with input parameters
+% Input parameters:
 %	cylS	vector containing [rS,thetaS,zS] = cyl. coordinates of the source rel. to the first edge
 %	cylR	vector containing [rR,thetaR,zR] = cyl. coordinates of the receiver rel. to the second edge
 %	cylE2_r1	matrix containing [rstart_r1,thetastart_r1,zstart_r1;rend_r1,thetaend_r1,zend_r1]
@@ -39,13 +40,7 @@ nyveclist,edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs)
 %           Row 2 has the start and end values of edge 2
 %           For a fully visible/active edge, the start value = 0 and the
 %           end value equals the length (in meters) of the edge.
-%	elemsize_2nd
-%		   	the number of elements per wavelength at the sampling frequency.
-%		   	Recommended value 0.5, and this value is chosen if no other value
-%		   	has been set. One can experiment with lower values (0.25, 0.1, ...)
-%		   	for comparisons - the error increases with frequency but if first
-%		   	order diffraction and specular response is masking the second order
-%		   	diffraction, low values of elemsize_2nd might be perfectly acceptable.
+%   dzvec   [1,2] the edge element lengths, in m, of the two edges
 %	method	'n' for the New method or 'v' for Vanderkooys method
 %   pathalongplane      1 or 0 depending on if the path runs along a plane
 %           or not
@@ -60,10 +55,8 @@ nyveclist,edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs)
 %			refl21 is edge 2, plane 1 (refplane)
 %			refl22 is edge 2, plane 2
 %			default is all-rigid
-%   CAIR (global)
-%          	the speed of sound
-%	FSAMP (global)
-%			the sampling frequency
+%   cair    the speed of sound
+%   fs      the sampling frequency
 %   BIGEDGESTEPMATRIX (global)
 %           a matrix, size [N,2], where N = nedge1*nedge2. nedge1 is the number of edge
 %           elements that edge1 is sub-divided into and nedge2 is the
@@ -84,12 +77,10 @@ nyveclist,edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs)
 %           These values are multiplied with the lengths of the respective
 %           edges to give the actual position, in meters along each edge.
 %
-% Uses the subroutine EDcoordtrans1
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% Peter Svensson (peter.svensson@ntnu.no) 17 Apr 2024
-%
-% [ir,ninit] = EDwedge2nd(cylS,cylR,cylE2_r1,cylE1_r2,...
-% nyveclist,edgelengthlist,dzvec,method,pathalongplane,BigB,R_irstart,bc,cair,fs);
+% [ir,ninit] = EDwedge2nd(cylS,cylR,cylE2_r1,cylE1_r2,nyveclist,...
+%    edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs);
 
 % 8 May 2008: Functioning version
 % 1 Sep. 2014: Fixed probable bug for edgesareinplane
@@ -103,6 +94,7 @@ nyveclist,edgelengthlist,dzvec,method,pathalongplane,R_irstart,bc,cair,fs)
 % 17 Apr 2024 Removed (commented out) 3 lines that cleared variables, which
 % cut the calculation time drastically for one text case (time 44% after
 % the change for on-axis receivers and a polygonal disc).
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 global BIGEDGESTEPMATRIX
 

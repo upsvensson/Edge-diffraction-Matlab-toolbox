@@ -26,13 +26,12 @@ function [treelines,directdeps] = EDshowcalltree(rootfunction,outputfile)
 % directly in the code. Calls via function handles stored in variables, or
 % via eval, are not found.
 %
-% Uses the Matlab function matlab.codetools.requiredFilesAndProducts
-%
-% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [treelines,directdeps] = EDshowcalltree(rootfunction,outputfile);
 
 % 14 Oct. 2026 First version (by Claude, prompted by PS)
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 if nargin < 2
     outputfile = '';

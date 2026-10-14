@@ -1,6 +1,6 @@
 function [surfacerecs,surfacerecnvecs,surfacerecweights] = EDgensurfreceivers(planedata,...
     surfacegaussorder,EDversionnumber)
-% EDgensurfreceivers distributes receivers along all the faces/polygons of
+% EDgensurfreceivers - Distributes receivers along all the faces/polygons of
 % a polyhedral object. A Gauss-Legendre distribution is used. The function
 % can handle general quadrilaterals and triangles.
 % The quadrature order is given as an input parameter, and this value will
@@ -14,7 +14,6 @@ function [surfacerecs,surfacerecnvecs,surfacerecweights] = EDgensurfreceivers(pl
 %                       implies that 5*5 receivers will be generated across
 %                       the largest surface.
 %   EDversionnumber
-%   showtext            (optional)
 % 
 % Output parameters:
 %   surfacerecs         Matrix, [nrec,3], of the coordinates
@@ -31,9 +30,11 @@ function [surfacerecs,surfacerecnvecs,surfacerecweights] = EDgensurfreceivers(pl
 % 2. P. M. Juhl, "The boundary element method for sound field calculations,"
 %    Report nr. 55, The acoustics laboratory, Technical University of Denmark, 1993.
 % 
-% Uses the function lgwt from Matlab Central
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% Peter Svensson (peter.svensson@ntnu.no) 10 Apr 2018
+% [surfacerecs,surfacerecnvecs,...
+%    surfacerecweights] = EDgensurfreceivers(planedata,surfacegaussorder,...
+%    EDversionnumber);
 
 % 1 Mar 2018 First version
 % 8 Mar 2018 Changed the displacement of the surface receivers to 0.1mm
@@ -42,6 +43,7 @@ function [surfacerecs,surfacerecnvecs,surfacerecweights] = EDgensurfreceivers(pl
 % 5 Apr 2018 Small error if no triangular elements. Implemented quadrature
 % from the Duvanant paper instead of the gaussTRINEW function.
 % 10 Apr 2018 Added some quadrature values
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 % distancefromsurf = 1e-4;
 distancefromsurf = 1e-3;

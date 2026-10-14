@@ -11,13 +11,12 @@ function numvect = EDextrnums(Str,delim)
 % Output parameters:
 %   numvect     A list, [1,nnums], of the numerical values that were found.
 %
-% Uses no special subroutines
-%
-% Peter Svensson (peter.svensson@ntnu.no) 24 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % numvect = EDextrnums(Str,delim);
 
 % 24 Nov. 2017 Copied, without changes, from ESIE2extrnums
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 if isempty(Str)
 	numvect = [];

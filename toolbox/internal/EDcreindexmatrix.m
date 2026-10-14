@@ -1,5 +1,5 @@
 function ivmatrix = EDcreindexmatrix(ndivvec)
-% EDcreindeixmatrix creates a matrix with index numbers.
+% EDcreindexmatrix - Creates a matrix with index numbers.
 %
 % Input parameters:
 %   ndivvec     A matrix, [1,specorder], with the maximum counter
@@ -9,12 +9,13 @@ function ivmatrix = EDcreindexmatrix(ndivvec)
 %   ivmatrix    A matrix, [prod(ndivvec),specorder] of all possible
 %               combinations of the integers
 %
-% Peter Svensson (peter.svensson@ntnu.no) 16 Mar 2018
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % ivmatrix = EDcreindexmatrix(ndivvec)
 
 % 5 May 2005 Functioning version in EDB1toolbox
 % 16 Mar 2018 Copied to EDtoolbox
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 n = length(ndivvec);
 

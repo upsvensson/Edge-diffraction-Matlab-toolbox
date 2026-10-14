@@ -67,9 +67,7 @@ function [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(CADfile,checkge
 %   elapsedtimecadgeo       This tells how long time was used inside this
 %                           function. 
 %
-% Uses the functions EDextrnums EDinfrontofplane
-% 
-% Peter Svensson (peter.svensson@ntnu.no) 11 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(CADfile,checkgeom,filehandlingparameters)
 
@@ -95,6 +93,7 @@ function [planedata,extraCATTdata,elapsedtimecadgeo] = EDreadcad(CADfile,checkge
 % the function call form, which avoids problems with spaces in file names.
 % 11 Oct. 2026 Removed the saving of the _cadgeo file (the setting
 % filehandlingparameters.savecadgeofile does not exist any more).
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 
 t00 = clock;

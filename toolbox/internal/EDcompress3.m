@@ -15,9 +15,7 @@ function [reftoshort,sho1,sho2,sho3,examplecombination] = EDcompress3(Big1,Big2,
 %   examplecombination      Vector of pointers from the short lists, back
 %                           to the input matrices.
 %
-% Uses no special subroutines
-%
-% Peter Svensson (peter.svensson@ntnu.no) 10 Nov. 2023
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [reftoshort,sho1,sho2,sho3,examplecombination] = EDcompress3(Big1,Big2,Big3);
 
@@ -25,6 +23,7 @@ function [reftoshort,sho1,sho2,sho3,examplecombination] = EDcompress3(Big1,Big2,
 % 2 Dec. 2014 Version compress3
 % 30 Nov. 2017 Copied over to EDtoolbox
 % 10 Nov. 2023 Expanded so 3D-matrices can be compressed as well.
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 accuracy = 1e-12;
 

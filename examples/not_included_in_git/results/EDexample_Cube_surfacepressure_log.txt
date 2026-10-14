@@ -1,0 +1,27 @@
+EDmain_convex, v.0.501 (25March2024)
+   filestem for results: EDexample_Cube_surfacepressure
+   directory for results: /Users/svensson/Documents/Projekt/Dokum_Matlab6files/EDtoolbox/examples/not_included_in_git/results
+Calculating transfer functions with the ESIE method
+   
+EDreadgeomatrices: 8 corners and 6 planes. Time: 0.000918 s
+EDedgeo: 12 edges. Time: 0.006321 s (Orig.: 0.078483s)
+   (Recycled and duplicated EDexample_Cube_surfacepressure_eddata)
+EDSorRgeo: 1 sources. Time: 0.006161 s (Orig.: 0.026682s)
+   (Recycled and duplicated EDexample_Cube_surfacepressure_Sdata)
+EDSorRgeo: 10 receivers. Time: 0.005443 s (Orig.: 0.011429s)
+   (Recycled and duplicated EDexample_Cube_surfacepressure_Rdata)
+EDfindconvexGApaths: 10 spec. paths and 120 diff. paths. Time: 0.006016 s (Orig.: 0.082896s)
+   (Recycled and duplicated EDexample_Cube_surfacepressure_paths)
+EDmakefirstordertfs: 5 frequencies. Time: 0.007358 s (Orig.: 0.16422s)
+   (Recycled and duplicated EDexample_Cube_surfacepressure_tf)
+   (Direct sound: 0.011303s, spec.refl.: 0.005406s, first-order diff.: 0.14026s)
+EDed2geo:  Time: 0.006277 s (Orig.: 0.04723s)
+   (Recycled and duplicated EDexample_Cube_surfacepressure_ed2data)
+EDinteg_submatrixstructure: 65 submatrices, out of 432, to compute. Time: 0.006866 s (Orig.: 0.007612s)
+   (Recycled and duplicated EDexample_Cube_surfacepressure_submatrixdata)
+   (Edges discretized with: 24-24 gauss points. 41472 edge source signals to compute.)
+   (The IE matrix has 5971968 non-zero elements. Some may be identical due to symmetries)
+EDintegralequation_convex_tf: 5 frequencies. Diffraction order: 10. Time: 0.007105 s (Orig.: 3.8416s)
+   (Recycled and duplicated EDexample_Cube_surfacepressure_tfinteq)
+   (H-matrix: 0.1097 s. Q_firstterm: 0.013536 s (per freq.))
+   (Qfinal: 0.77207 s. P at receiver: 0.030523 s.)

@@ -10,13 +10,12 @@ function [xvec, wvec] = EDgetGLrule(n)
 %   xvec    The array of nodes, in [0,1].
 %   wvec    The array of weight values belonging to the node values.
 %
-% Uses the function EDdistelements from EDtoolbox.
-%
-% By Claude, prompted by Peter Svensson 25 Sep. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [xvec, wvec] = EDgetGLrule(n);
 
 % 25 Sep. 2026 Firstversion, suggested by Claude
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 persistent GLrulecache
 if isempty(GLrulecache), GLrulecache = {}; end

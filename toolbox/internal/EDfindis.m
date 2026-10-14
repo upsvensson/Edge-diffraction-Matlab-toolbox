@@ -10,19 +10,18 @@ function xis = EDfindis(xsou,ivec,planeeqs)
 %               be = N.
 %   planeeqs	Matrix [nplanes,4] of the plane equations.
 %
-% Output paramaters:
+% Output parameters:
 %   xis			Matrix [N,3] of all image sources to the source(s)
 %               via all the planes specified in ivec and planeeqs.
 %
-% Uses no special subroutines
-%
-% Peter Svensson (peter.svensson@ntnu.no) 27 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % xis = EDfindis(xsou,ivec,planeeqs);
 
 % 6 July 2003 Functioning version
 % 27 Nov. 2017 Copied to EDtoolbox from ESIE2toolbox. Removed the input
 % parameters nsou and onesvec.
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 nsou = size(xsou,1);
 onesvec = ones(1,3);

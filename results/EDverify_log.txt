@@ -1,0 +1,12 @@
+EDmain_convex, v.0.401 (30Oct2023)
+   filestem for results: EDverify
+   directory for results: /Users/svensson/Documents/Projekt/Dokum_Matlab6files/EDtoolbox/results
+Calculating transfer functions with the ESIE method
+   
+EDreadgeomatrices: 8 corners and 6 planes. Time: 0.000997 s
+EDedgeo: 12 edges. Time: 0.020353 s
+EDSorRgeo: 1 sources. Time: 0.004648 s
+EDSorRgeo: 1 receivers. Time: 0.003362 s
+EDfindconvexGApaths: 0 spec. paths and 0 diff. paths. Time: 0.040323 s
+EDmakefirstordertfs: 1 frequencies. Time: 0.004553 s
+   Direct sound: 0.000123s, spec.refl.: 9.2e-05s, first-order diff.: 7.3e-05s

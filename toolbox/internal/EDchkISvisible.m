@@ -37,15 +37,17 @@ function [hitplanes,hitpoints,edgehits,edgehitpoints,edgehitnumbers,cornerhits,.
 %    cornerhitnumbers List, [nIS,1], with zeros, or the corner number that was
 %                   hit
 % 
-% Uses the subroutine EDpoinpla.
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 March 2021
-% 
-% [hitplanes,hitpoints,edgehits,edgehitpoints,cornerhits,cornerhitpoints] = EDchkISvisible(ISlist,R,planeeqs_lastvalue,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec);
+% [hitplanes,hitpoints,edgehits,edgehitpoints,edgehitnumbers,cornerhits,...
+%    cornerhitpoints,cornerhitnumbers] = EDchkISvisible(ISlist,R,...
+%    planeeqs_lastvalue,planenvecs,minvals,maxvals,planecorners,corners,...
+%    ncornersperplanevec);
 
 % 16 January 2005 Functioning version
 % 27 Nov. 2017 Copied to EDtoolbox
 % 14 Mar 2021 Update to change of EDpoinpla
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 % nsou = size(ISlist,1);
 nplanes = size(planeeqs_lastvalue,1);

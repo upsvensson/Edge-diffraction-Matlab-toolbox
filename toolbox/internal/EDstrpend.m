@@ -10,13 +10,12 @@ function Filenameout = EDstrpend(Filenamein,striptext)
 % Output parameters:
 %   Filenameout  A text string with the extension-stripped filename
 %
-% Uses no special subroutines
-%
-% Peter Svensson (peter.svensson@ntnu.no) 27 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % Filenameout = EDstrpend(Filenamein,strptext);
 
 % 27 Nov. 2017 Copied without changes from ESIE2toolbox
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 %Filenameout = ESIE2strpext(Filenamein);
 [Filepath,Filenameout,~] = fileparts(Filenamein);

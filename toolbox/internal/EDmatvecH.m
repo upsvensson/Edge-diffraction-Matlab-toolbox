@@ -13,9 +13,12 @@ function Hq = EDmatvecH(Q,Hsubmatrixdata,Hsubdatalists,ivuselists)
 % Output parameters:
 %   Hq              Vertical vector of size [N,1]
 %
-% Peter Svensson  9 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+%
+% Hq = EDmatvecH(Q,Hsubmatrixdata,Hsubdatalists,ivuselists);
 
 % 11 Sep. 2026 First version, by Claude, after prompting by PS.
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 N = double(Hsubmatrixdata.Qvecendnums(end));
 nsub = size(Hsubmatrixdata.listofsubmatrices,1);

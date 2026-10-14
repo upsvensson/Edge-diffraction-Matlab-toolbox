@@ -25,14 +25,13 @@ function [rs,thetas,zs,rr,thetar,zr] = EDcoordtrans2(xsou,xrec,xwedge,nvec1)
 %	rs, thetas, zs		cyl. coord. of the points in xsou
 %	rr, thetar, zr		cyl. coord. of the points in xrec
 %
-% Uses the subroutine EDcross
-%
-% Peter Svensson (svensson@iet.ntnu.no) 27 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [rs,thetas,zs,rr,thetar,zr] = EDcoordtrans2(xsou,xrec,xwedge,nvec1);
 
 % 19 Jul 2010 Functioning version
 % 27 Nov. 2017 Copied from ESIE2toolbox
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 xneworigo = xwedge(1,:);
 

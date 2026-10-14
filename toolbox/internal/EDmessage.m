@@ -29,7 +29,7 @@ function fid = EDmessage(filehandlingparameters,showprint,fid,showtextlevelneede
 %   fid                         The file id: either 0 or the value for the
 %                               actually opened file
 %
-% Peter Svensson 6 Oct. 2023 (peter.svensson@ntnu.no)
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % fid = EDmessage(filehandlingparameters,showprint,fid,showtextlevelneeded,...
 %    existingfilename,varargin);
@@ -53,6 +53,7 @@ function fid = EDmessage(filehandlingparameters,showprint,fid,showtextlevelneede
 % not overwrite the log of an earlier run. If such a file already exists
 % (two runs within the same second), a counter is added: ..._2.txt etc.
 % The calling function can get the name with fopen(fid).
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 ntextstrings = nargin - 5;
 

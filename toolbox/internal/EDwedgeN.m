@@ -1,12 +1,13 @@
 function [ir,ninit] = EDwedgeN(cylS,cylR,cylE,ncylrows,nyveclist,edgelengthlist,dzvec,method,...
 pathalongplane,nedgeelcombs,R_irstart,bc,cair,fs,BIGEDGE1stvalue)
 % EDwedgeN - Gives the Nth-order diffraction impulse response.
+% Output parameters:
 %   ir     The Nth order diffraction impulse response for a combination of edges
 %   ninit  The initial delay that has been cut away before the
 %          beginning of ir. Note that the time zero of the ir (including ninit)
 %		   corresponds to R_irstart.
 %
-% with input parameters
+% Input parameters:
 %	cylS	        List containing [rS,thetaS,zS] = cyl. coord. of the source rel. to the first edge
 %	cylR	        List containing [rR,thetaR,zR] = cyl. coord. of the receiver rel. to the last edge
 %   cylE            Matrix containing consecutive blocks of 
@@ -58,7 +59,7 @@ pathalongplane,nedgeelcombs,R_irstart,bc,cair,fs,BIGEDGE1stvalue)
 %           transferred separately as BIGEDGE1stvalue (see above).
 %
 % ----------------------------------------------------------------------------------------------
-% Peter Svensson (peter.svensson@ntnu.no) 21 May 2019
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [ir,ninit] = EDwedgeN(cylS,cylR,cylE,ncylrows,nyveclist,edgelengthlist,dzvec,method,...
 % pathalongplane,nedgeelcombs,R_irstart,bc,cair,fs,BIGEDGE1stvalue);
@@ -70,6 +71,7 @@ pathalongplane,nedgeelcombs,R_irstart,bc,cair,fs,BIGEDGE1stvalue)
 % 16 Mar 2018 Copied over to EDtoolbox
 % 21 May 2019 Implemented the handling of non-planar edge sequences (the
 %             recalculation of theta angles).
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 global BIGEDGESTEPMATRIX
 

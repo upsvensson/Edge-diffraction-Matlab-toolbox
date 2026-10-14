@@ -31,16 +31,16 @@ function [hitvec,edgehit,cornerhit] = EDpoinplax(bigplanelist,xpoints,planelist,
 %   cornerhit       List, [N,1], with 1 or 0 indicating if a hit was right at the
 %                   corner of a plane. These hits were not marked in hitvec.
 %
-% Uses no special functions
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% Peter Svensson (peter.svensson@ntnu.no) 27 Nov. 2017
-% 
-% [hitvec,edgehit] = EDpoinplax(bigplanelist,xpoints,planelist,minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs);
+% [hitvec,edgehit,cornerhit] = EDpoinplax(bigplanelist,xpoints,planelist,...
+%    minvals,maxvals,planecorners,corners,ncornersperplanevec,planenvecs);
 
 % 4 Febr. 2010 First version in the ESIE toolbox
 % 1 May 2017   Fixed one bug: the ray casting algorithm didn't work for
 %              rays that hit a corner.
 % 27 Nov. 2017 Copied from ESIE2toolbox
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 % global SHOWTEXT
 SHOWTEXT = 1;

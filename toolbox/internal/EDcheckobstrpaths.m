@@ -42,9 +42,7 @@ function [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstrpa
 %   cornerhits          A list, [N_cornerhits,1] of the indicies of paths that hit a
 %                       plane right at a corner.   
 %
-% Uses function EDchkISvisiblex
-%
-% Peter Svensson (peter.svensson@ntnu.no) 29 Nov. 2017
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstrpaths(fromcoords,tocoords,startplanes,endplanes,canplaneobstruct,planeseesplane,...
 %    planeeqs,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec,rearsideplane);
@@ -54,6 +52,7 @@ function [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstrpa
 % 28 Nov. 2017 Cleaned code a bit.
 % 29 Nov. 2017 Fixed a problem with mismatch between planesareseen (logical) 
 %              and canplaneobstruct (int8)
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 global BIGFROMCOORDSSHORTLIST REFTOFROMSHORTLIST BIGTOCOORDSSHORTLIST REFTOTOSHORTLIST
 

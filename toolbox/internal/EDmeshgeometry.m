@@ -1,5 +1,5 @@
 function [apertureelements,apertureelementdistances] = EDmeshgeometry(Lx,Ly,nx,ny,geotype,calcdistances)
-% EDgeometry creates two structs with geometry details for a
+% EDmeshgeometry - Creates two structs with geometry details for a
 % discretization of an aperture.
 % 
 % Input parameters:
@@ -40,11 +40,10 @@ function [apertureelements,apertureelementdistances] = EDmeshgeometry(Lx,Ly,nx,n
 %   .alldistances       Matrix, size [nx*ny,nx*ny], of all node-to-node
 %                       distances
 % 
-% Uses the function GEOdivrect, lgwt
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% peter.svensson@ntnu.no 6 Dec. 2021
-%
-% [apertureelements,apertureelementdistances] = APcreategeometry3(Lx,Ly,nx,ny,geotype,calcdistances);
+% [apertureelements,apertureelementdistances] = EDmeshgeometry(Lx,Ly,nx,ny,...
+%    geotype,calcdistances);
 
 % 25 Oct. 2021 First version
 %  2 Nov. 2021 Expansion to include Gauss-Legendre distribution of 
@@ -56,6 +55,7 @@ function [apertureelements,apertureelementdistances] = EDmeshgeometry(Lx,Ly,nx,n
 % shift in x- and y-direction is studied, instead of distances.
 % 6 Dec. 2021 Calculates distance squared instead of distances, to find
 % unique combinations.
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 if nargin < 5
     geotype = 1;

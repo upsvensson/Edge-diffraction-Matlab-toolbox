@@ -6,7 +6,7 @@ function [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_e
 % canplaneobstruct), i.e., if they are obstructed.
 %
 % Input parameters:
-%   canplaneobstruct,planeseesplane,planeeqs,planenvecs,minvals,maxvals,...
+%   canplaneobstruct,planeeqs,planenvecs,minvals,maxvals,...
 %   planecorners,corners,ncornersperplanevec,rearsideplane
 %                       Data that should have been passed on from the
 %                       eddatafile.
@@ -26,18 +26,19 @@ function [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_e
 %   cornerhits          A list, [N_cornerhits,1] of the indicies of paths that hit a
 %                       plane right at a corner.   
 %
-% Uses EDpoinpla
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 March 2021
-%
-% [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_edgetoedge(canplaneobstruct,planeseesplane,...
-%    planeeqs,planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec,rearsideplane)
+% [nonobstructedpaths,nobstructions,edgehits,...
+%    cornerhits] = EDcheckobstr_edgetoedge(canplaneobstruct,planeeqs,...
+%    planenvecs,minvals,maxvals,planecorners,corners,ncornersperplanevec,...
+%    rearsideplane);
 
 % 22 Sep. 2005 Functioning version
 % 27 Nov. 2017 Copied from ESIE2toolbox
 % 28 Nov. 2017 Removed input parameter planeseesplane after Matlab
 %               recommendation
 % 14 Mar 2021 Adapted to change of EDpoinpla
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 global  REFTOFROMCOSHO  REFTOTOCOSHO STARTPLANES ENDPLANES
 global BIGTOCOORDS BIGFROMCOORDS BIGSTARTPLANES BIGENDPLANES

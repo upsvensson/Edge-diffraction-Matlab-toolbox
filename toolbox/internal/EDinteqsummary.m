@@ -20,12 +20,13 @@ function [textlines,warninglines] = EDinteqsummary(inteqdiagnostics)
 % version of the EDtoolbox, some of the information might be missing. Then
 % those lines are left out.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 12 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % [textlines,warninglines] = EDinteqsummary(inteqdiagnostics);
 
 % 12 Oct. 2026 First version, by Claude, prompted by PS
 % 14 Oct. 2026 A line about the _qfinal file (computed and saved, or reused).
+% 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 
 textlines = {};
 warninglines = {};

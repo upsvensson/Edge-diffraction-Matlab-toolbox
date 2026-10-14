@@ -35,7 +35,7 @@ function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,.
 %                           reused then this variable is empty. For v1 of
 %                           this function, this variable is also empty.
 %
-% Uses functions EDcreindexmatrix,EDwedge2nd,EDwedgeN,EDrecycleresultfiles
+% Uses functions EDcreindexmatrix,EDwedge2nd,EDwedgeN,EDrecycleresultfiles,EDparenthash
 % from the EDtoolbox
 % Uses function DataHash from Matlab Central
 %
@@ -74,6 +74,11 @@ function [irhod,elapsedtimemakeirhod,existingfilename] = EDmakeHODirs(hodpaths,.
 % now a field in controlparameters.
 % 29 Nov. 2023 Fixed small bug: the parameter cair was changed to
 % envdata.cair for difforders 3 and higher.
+% 12 Oct. 2026 New EDinputdatahash: chained to the hashes of edgedata,
+% edgetoedgedata, Sdata and Rdata (instead of the complete structs), with a
+% local stageversion instead of the overall EDversionnumber. Since Sdata is
+% no longer hashed as a whole, sourceamplitudes and doaddsources are hashed
+% explicitly; of envdata, only cair is used. load/save without eval.
 
 t00 = clock;
 
@@ -83,18 +88,23 @@ fs = controlparameters.fs;
 Rstart = controlparameters.Rstart;
 elemsize = controlparameters.HODelemsize;
 
-EDinputdatastruct = struct('difforder',difforder);
+% stageversion identifies the version of the computations in this function.
+% Increase it by one whenever a change in this function changes its output
+% data, so that previously saved stage files are not reused. The overall
+% EDversionnumber is not part of the hash.
+stageversion = 1;
+
+EDinputdatastruct = struct('stage','EDmakeHODirs','stageversion',stageversion,...
+    'edgedatahash',EDparenthash(edgedata),'ed2datahash',EDparenthash(edgetoedgedata),...
+    'Sdatahash',EDparenthash(Sdata),'Rdatahash',EDparenthash(Rdata),...
+    'difforder',difforder,'fs',fs,'Rstart',Rstart,'cair',envdata.cair,...
+    'savealldifforders',controlparameters.savealldifforders,...
+    'sourceamplitudes',Sdata.sourceamplitudes,'doaddsources',Sdata.doaddsources);
+% hodpaths and hodpathsalongplane are cell variables, so they are added as
+% fields (struct(...) with a cell value would create a struct array)
 EDinputdatastruct.hodpaths = hodpaths;
 EDinputdatastruct.hodpathsalongplane = hodpathsalongplane;
 EDinputdatastruct.elemsize = elemsize;
-EDinputdatastruct.edgedata = edgedata;
-EDinputdatastruct.Sdata = Sdata;
-EDinputdatastruct.Rdata = Rdata;
-EDinputdatastruct.envdata = envdata;
-EDinputdatastruct.fs = fs;
-EDinputdatastruct.Rstart = Rstart;
-EDinputdatastruct.savealldifforders = controlparameters.savealldifforders;
-EDinputdatastruct.EDversionnumber = EDversionnumber;
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -114,7 +124,9 @@ desiredname = [filehandlingparameters.outputdirectory,filesep,...
 	filehandlingparameters.filestem,'_irhod.mat'];
 
 if foundmatch == 1
-	eval(['load(''',existingfilename,''')'])
+	filedata = load(existingfilename,'irhod','elapsedtimemakeirhod');
+	irhod = filedata.irhod;
+	elapsedtimemakeirhod = filedata.elapsedtimemakeirhod;
 	if ~strcmp(existingfilename,desiredname)
 		copyfile(existingfilename,desiredname);
 	end
@@ -443,4 +455,4 @@ end
 
 elapsedtimemakeirhod = etime(clock,t00);
 
-eval(['save(''',desiredname,''',''irhod'',''EDinputdatahash'',''elapsedtimemakeirhod'');'])
+save(desiredname,'irhod','EDinputdatahash','elapsedtimemakeirhod','stageversion','EDversionnumber');

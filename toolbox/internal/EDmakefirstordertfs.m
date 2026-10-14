@@ -31,7 +31,7 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 %                           reused then this variable is empty. For v1 of
 %                           this function, this variable is also empty.
 %   
-% Uses functions EDcoordtrans2, EDwedge1st_fd, EDrecycleresultfiles from EDtoolbox
+% Uses functions EDcoordtrans2, EDwedge1st_fd, EDrecycleresultfiles, EDparenthash from EDtoolbox
 % Uses function DataHash form Matlab Central
 % 
 % Peter Svensson 24 Sep. 2026 (peter.svensson@ntnu.no)
@@ -88,6 +88,13 @@ function [tfdirect,tfgeom,tfdiff,timingdata,elapsedtimemaketfs,existingfilename]
 % hash but it should be calcfirstorderdiff
 % 24 Sep. 2026 Adapted to the mew parameter diff1method etc for
 % EDwedge1st_fd
+% 12 Oct. 2026 New EDinputdatahash: chained to the hashes of
+% firstorderpathdata, edgedata, Sdata and Rdata, with a local stageversion
+% instead of the overall EDversionnumber. Fixed four gaps in the hash:
+% sourceamplitudes, doaddsources, diff1method and diff1GLorder were missing,
+% so an old _tf file could be reused after a change of any of them.
+% (diff1method and diff1GLorder are hashed only if first-order diffraction
+% is computed.) load/save without eval.
 
 t00 = clock;
 
@@ -103,17 +110,26 @@ diff1GLorder = controlparameters.diff1GLorder;
 % New parameter for the hash 25 Aug. 2021: calcfirstorderdiff
 calcfirstorderdiff = double(difforder > 0);
     
-EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
-    planedata.planecorners,'offedges',edgedata.offedges,...
-    'sources',Sdata.coordinates,'Snedgesubs',Sdata.nedgesubs,...
-    'doallSRcombinations',Sdata.doallSRcombinations,...
-    'sourcetype',Sdata.sourcetype,...
-    'pistoncornercoordinates',Sdata.pistoncornercoordinates,...
-    'pistoncornernumbers',Sdata.pistoncornernumbers,...
-    'pistongaussorder',Sdata.pistongaussorder,...
-    'receivers',Rdata.coordinates,'Rnedgesubs',Rdata.nedgesubs,...
+% stageversion identifies the version of the computations in this function.
+% Increase it by one whenever a change in this function changes its output
+% data, so that previously saved stage files are not reused. The overall
+% EDversionnumber is not part of the hash.
+stageversion = 1;
+
+if calcfirstorderdiff == 1
+    hashdiff1method = diff1method;
+    hashdiff1GLorder = diff1GLorder;
+else
+    hashdiff1method = NaN;
+    hashdiff1GLorder = NaN;
+end
+EDinputdatastruct = struct('stage','EDmakefirstordertfs','stageversion',stageversion,...
+    'pathshash',EDparenthash(firstorderpathdata),'edgedatahash',EDparenthash(edgedata),...
+    'Sdatahash',EDparenthash(Sdata),'Rdatahash',EDparenthash(Rdata),...
     'cair',envdata.cair,'frequencies',frequencies,'Rstart',Rstart,...
-     'calcfirstorderdiff',calcfirstorderdiff,'directsound',directsound,'EDversionnumber',EDversionnumber);
+    'calcfirstorderdiff',calcfirstorderdiff,'directsound',directsound,...
+    'diff1method',hashdiff1method,'diff1GLorder',hashdiff1GLorder,...
+    'sourceamplitudes',Sdata.sourceamplitudes,'doaddsources',Sdata.doaddsources);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -130,8 +146,12 @@ end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tf.mat'];
 
 if foundmatch == 1
-%        eval(['load ''',existingfilename,''''])
-    eval(['load(''',existingfilename,''')'])
+    filedata = load(existingfilename,'tfdirect','tfgeom','tfdiff','timingdata','elapsedtimemaketfs');
+    tfdirect = filedata.tfdirect;
+    tfgeom = filedata.tfgeom;
+    tfdiff = filedata.tfdiff;
+    timingdata = filedata.timingdata;
+    elapsedtimemaketfs = filedata.elapsedtimemaketfs;
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
@@ -672,4 +692,4 @@ timingdata(3) = etime(clock,t00sub);
 
 elapsedtimemaketfs = etime(clock,t00);
 
-eval(['save(''',desiredname,''',''tfdirect'',''tfgeom'',''tfdiff'',''timingdata'',''EDinputdatahash'',''elapsedtimemaketfs'');'])
+save(desiredname,'tfdirect','tfgeom','tfdiff','timingdata','EDinputdatahash','elapsedtimemaketfs','stageversion','EDversionnumber');

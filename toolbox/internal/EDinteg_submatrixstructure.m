@@ -38,7 +38,7 @@ controlparameters,EDversionnumber,filehandlingparameters)
 %                       reused then this variable is empty. For v1 of
 %                       this function, this variable is also empty.%
 %
-% Uses the functions  EDgetGLrule, EDrecycleresultfiles from EDtoolbox
+% Uses the functions  EDgetGLrule, EDrecycleresultfiles, EDparenthash from EDtoolbox
 % Uses the function DataHash from Matlab Central
 %
 % Peter Svensson (peter.svensson@ntnu.no) 9 Oct 2026 
@@ -83,6 +83,12 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % quadraturematrix arrays: sotring each order as a column rather than a
 % row.
 % 9 Oct. 2026 Code cleanup, changed bigmatrix... to Qvec...
+% 12 Oct. 2026 New EDinputdatahash: chained to the hashes of edgedata and
+% edgetoedgedata, with a local stageversion instead of the overall
+% EDversionnumber. Fixed: abs(ngauss) was hashed, so a negative ngauss
+% (enforce odd numbers) could reuse a file computed with the positive value,
+% and vice versa; now the signed value is hashed. The hash is stored as
+% the field .EDinputdatahash in Hsubmatrixdata. load/save without eval.
 
 t00 = clock;
 
@@ -96,9 +102,15 @@ else
 end
 inteq_discretizationtype = controlparameters.discretizationtype;
 
-EDinputdatastruct = struct('edgelengthvec',edgedata.edgelengthvec,'closwedangvec',edgedata.closwedangvec,...
-    'inteq_ngauss',inteq_ngauss,'inteq_discretizationtype',inteq_discretizationtype,...
-    'edgetoedgedata',edgetoedgedata,'planesatedge',edgedata.planesatedge,'EDversionnumber',EDversionnumber);
+% stageversion identifies the version of the computations in this function.
+% Increase it by one whenever a change in this function changes its output
+% data, so that previously saved stage files are not reused. The overall
+% EDversionnumber is not part of the hash.
+stageversion = 1;
+
+EDinputdatastruct = struct('stage','EDinteg_submatrixstructure','stageversion',stageversion,...
+    'edgedatahash',EDparenthash(edgedata),'ed2datahash',EDparenthash(edgetoedgedata),...
+    'ngauss',controlparameters.ngauss,'discretizationtype',inteq_discretizationtype);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -115,7 +127,9 @@ end
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_submatrixdata.mat'];
 
 if foundmatch == 1
-    eval(['load(''',existingfilename,''')'])
+    filedata = load(existingfilename,'Hsubmatrixdata','elapsedtimesubmatrix');
+    Hsubmatrixdata = filedata.Hsubmatrixdata;
+    elapsedtimesubmatrix = filedata.elapsedtimesubmatrix;
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
@@ -445,17 +459,10 @@ Hsubmatrixdata.edgepairsharecorner = edgepairsharecorner;
 Hsubmatrixdata.edgepairsharedcornertype_from = edgepairsharedcornertype_from;
 Hsubmatrixdata.edgepairsharedcornertype_to = edgepairsharedcornertype_to;
 Hsubmatrixdata.edgepairangle = edgepairangle;
+Hsubmatrixdata.EDinputdatahash = EDinputdatahash;
 
 elapsedtimesubmatrix = etime(clock,t00);
 
 if filehandlingparameters.savesubmatrixdata == 1
-	eval(['save(''',desiredname,''',''Hsubmatrixdata'',''EDinputdatahash'',''elapsedtimesubmatrix'');'])
+	save(desiredname,'Hsubmatrixdata','EDinputdatahash','elapsedtimesubmatrix','stageversion','EDversionnumber');
 end
-
-
-
-
-
-
-
-

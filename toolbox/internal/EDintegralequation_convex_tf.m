@@ -72,10 +72,10 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                       this function, this variable is also empty.
 %
 % Uses functions EDdistelements, EDcalcedgeinteqmatrixsub2_mex, EDinteg_souterm, 
-% EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1, EDmatvecH from EDtoolbox
+% EDcalcpropagatematrix, EDrecycleresultfiles, EDcoordtrans1, EDmatvecH, EDparenthash from EDtoolbox
 % Uses function DataHash from Matlab Central
 %           
-% Peter Svensson (peter.svensson@ntnu.no)  11 Oct. 2026  
+% Peter Svensson (peter.svensson@ntnu.no)  12 Oct. 2026  
 %                       
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %     EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,
@@ -175,6 +175,12 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % skipreceiverpropagation, the source type/amplitudes/doaddsources/
 % doallSRcombinations (and piston geometry), cair and savediff2result are
 % now part of the EDinputdatahash.
+% 12 Oct. 2026 Chained hash (by Claude, prompted by PS): the geometry and
+% S/R coordinates in the EDinputdatahash were replaced by the hashes of
+% Hsubmatrixdata, edgedata, edgetoedgedata, Sdata and Rdata, and a local
+% stageversion replaces the overall EDversionnumber. For the GMRES
+% methods, difforder is not hashed (any value > 2 gives the full
+% solution). load/save of the _tfinteq file without eval.
 
 t00_total = clock;
 t00 = clock;
@@ -184,14 +190,26 @@ if ~isfield(controlparameters,'skipreceiverpropagation')
     controlparameters.skipreceiverpropagation = 0;
 end
 
-EDinputdatastruct = struct('corners',planedata.corners,'planecorners',...
-    planedata.planecorners,'offedges',edgedata.offedges,...
-    'sources',Sdata.coordinates,'Snedgesubs',Sdata.nedgesubs,...
-    'receivers',Rdata.coordinates,'Rnedgesubs',Rdata.nedgesubs,...
-    'difforder',controlparameters.difforder,'frequencies',...
-    controlparameters.frequencies,'ngauss',controlparameters.ngauss, ...
-    'discretizationtype',controlparameters.discretizationtype,...
-    'Rstart',controlparameters.Rstart,'EDversionnumber',EDversionnumber);
+% stageversion identifies the version of the computations in this function.
+% Increase it by one whenever a change in this function changes its output
+% data, so that previously saved stage files are not reused. The overall
+% EDversionnumber is not part of the hash.
+stageversion = 1;
+
+% For the GMRES methods, the full solution is computed for any
+% difforder > 2, so the value of difforder does not affect the result.
+if strncmp(controlparameters.inteqsolutionmethod,'GMRES',5)
+    hashdifforder = 'full';
+else
+    hashdifforder = controlparameters.difforder;
+end
+EDinputdatastruct = struct('stage','EDintegralequation_convex_tf','stageversion',stageversion,...
+    'submatrixhash',EDparenthash(Hsubmatrixdata),'edgedatahash',EDparenthash(edgedata),...
+    'ed2datahash',EDparenthash(edgetoedgedata),...
+    'Sdatahash',EDparenthash(Sdata),'Rdatahash',EDparenthash(Rdata),...
+    'difforder',hashdifforder,'frequencies',controlparameters.frequencies,...
+    'ngauss',controlparameters.ngauss,'discretizationtype',controlparameters.discretizationtype,...
+    'Rstart',controlparameters.Rstart);
 
 % More settings that influence the result, and therefore must be part of
 % the hash. Otherwise, e.g., a change from 'legacy' to 'accurate', or of
@@ -231,13 +249,15 @@ EDinputdatahash_tfinteq = EDinputdatahash;
 desiredname = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_tfinteq.mat'];
 
 if foundmatch == 1
-    eval(['load(''',existingfilename,''')'])
+    filedata = load(existingfilename,'tfinteqdiff','extraoutputdata','timingdata','elapsedtimehodtf');
+    tfinteqdiff = filedata.tfinteqdiff;
+    extraoutputdata = filedata.extraoutputdata;
+    timingdata = filedata.timingdata;
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
     end
     elapsedtimehodtf_new = etime(clock,t00_total);
-    elapsedtimehodtf = [elapsedtimehodtf_new elapsedtimehodtf];
-    P_receiver = tfinteqdiff;
+    elapsedtimehodtf = [elapsedtimehodtf_new filedata.elapsedtimehodtf];
     return
 end
 
@@ -1012,7 +1032,7 @@ EDinputdatahash = EDinputdatahash_tfinteq;
 inteqdiagnostics.propdiagnostics = propdiagnostics;
 extraoutputdata.inteqdiagnostics = inteqdiagnostics;
 
-eval(['save(''',desiredname,''',''tfinteqdiff'',''extraoutputdata'',''EDinputdatahash'',''timingdata'',''elapsedtimehodtf'');'])
+save(desiredname,'tfinteqdiff','extraoutputdata','EDinputdatahash','timingdata','elapsedtimehodtf','stageversion','EDversionnumber');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

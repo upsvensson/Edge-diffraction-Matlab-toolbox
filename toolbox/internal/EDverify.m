@@ -5,11 +5,15 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % There are two kinds of tests:
 %   Tests 1-9 check the accuracy of the computed sound field, against
 %   known answers or physical requirements (such as continuity).
-%   Tests 10-15 check that the code paths, the files and the input
+%   Tests 10-17 check that the code paths, the files and the input
 %   handling work as intended (they compare the toolbox with itself).
+%   Tests 16 and 17 check the stage hashes: that the dependency lists in
+%   EDstageversions agree with the code, and that a change of one input
+%   parameter gives new stage files for exactly the stages that depend on
+%   it.
 %
 % All tests use their own filestem, EDverify_test<N>, in the output
-% directory, and (except test 15, which tests it) result recycling is
+% directory, and (except tests 15 and 17, which test it) result recycling is
 % switched off, so that every test really runs the present code.
 %
 % Input parameters:
@@ -96,8 +100,11 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 12 Oct. 2026 After the first run: test 9 has a more robust kink measure
 % (near the boundary vs. the rest of the window); the limits of tests 1
 % and 10 were set from the results with the accurate implementations.
+% 14 Oct. 2026 Added test 16 (the dependency lists in EDstageversions agree
+% with the actual calls in the code) and test 17 (which stage files get a
+% new hash when one input parameter is changed).
 
-ntests = 15;
+ntests = 17;
 
 if nargin < 1 || isempty(outputdirectory)
     outputdirectory = uigetdir('', 'Select the directory for the calculation results and the logfile');
@@ -150,7 +157,8 @@ disp(headerline)
 %   .pass   1 or -1
 
 testfunctions = {@edtest1,@edtest2,@edtest3,@edtest4,@edtest5,@edtest6,@edtest7,...
-    @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15};
+    @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15,...
+    @edtest16,@edtest17};
 
 for itest = 1:ntests
     if runtest(itest) ~= 1
@@ -722,4 +730,135 @@ recomputed = ~strcmp(hash1.EDinputdatahash,hash3.EDinputdatahash);
 r = edresult(title,description,reused && recomputed,...
     {['Unchanged rerun reused the file: ',mat2str(reused)],...
      ['Changed propagation implementation gave a new file: ',mat2str(recomputed)]});
+end
+
+function r = edtest16(~,~,~)
+title = 'The dependency lists in EDstageversions agree with the code';
+description = {'For each stage function in EDstageversions, all the functions it uses (directly or',...
+    'indirectly, found by matlab.codetools.requiredFilesAndProducts) must be either in its list of',...
+    'subroutines or in the ignored list. Listed functions that are not called are reported, but',...
+    'are not an error (e.g., a mex file that does not exist on this computer).'};
+
+info = EDstageversions;
+stagenames = fieldnames(info.stagesubroutines);
+allok = true;
+resultlines = {};
+for ii = 1:numel(stagenames)
+    stagename = stagenames{ii};
+    try
+        EDstageversions(stagename);    % checks that all listed functions have a version
+    catch ME
+        allok = false;
+        resultlines{end+1} = [stagename,': ',ME.message]; %#ok<AGROW>
+        continue
+    end
+    stagefile = which(stagename);
+    if isempty(stagefile)
+        allok = false;
+        resultlines{end+1} = [stagename,': the function can not be found on the Matlab path']; %#ok<AGROW>
+        continue
+    end
+    filelist = matlab.codetools.requiredFilesAndProducts(stagefile);
+    actual = {};
+    for jj = 1:numel(filelist)
+        if strcmp(filelist{jj},stagefile) || strncmp(filelist{jj},matlabroot,length(matlabroot))
+            continue
+        end
+        [~,name] = fileparts(filelist{jj});
+        actual{end+1} = name; %#ok<AGROW>
+    end
+    actual = unique(actual);
+    listed = info.stagesubroutines.(stagename);
+    missing = setdiff(actual,[listed(:).',info.ignored(:).']);
+    extra = setdiff(listed,actual);
+    if isempty(missing)
+        resultlines{end+1} = [stagename,': OK (',int2str(numel(listed)),' subroutines)']; %#ok<AGROW>
+    else
+        allok = false;
+        resultlines{end+1} = [stagename,': MISSING in EDstageversions: ',strjoin(missing,', ')]; %#ok<AGROW>
+    end
+    if ~isempty(extra)
+        resultlines{end+1} = ['   (listed, but not called: ',strjoin(extra,', '),')']; %#ok<AGROW>
+    end
+end
+
+r = edresult(title,description,allok,resultlines);
+end
+
+function r = edtest17(outputdirectory,filestem,~)
+title = 'A change of one input parameter gives new stage files for the right stages';
+description = {'1 m cube, with result recycling switched on. One reference run, and then one run per',...
+    'changed parameter. For each stage file, the stored hash is compared with that of the reference',...
+    'run: it should change if, and only if, the stage depends on the changed parameter.'};
+
+stagesuffixes = {'_eddata','_Sdata','_Rdata','_paths','_tf','_ed2data','_submatrixdata','_tfinteq'};
+
+% Each row: description, and which of the stage files above should get a
+% new hash (1) or keep the hash (0).
+changes = {
+    'Receiver positions',                    [0 0 1 1 1 0 0 1];
+    'Source position',                       [0 1 0 1 1 0 0 1];
+    'Source amplitudes',                     [0 0 0 0 1 0 0 1];
+    'Frequencies',                           [0 0 0 0 1 0 0 1];
+    'Speed of sound',                        [0 0 0 0 1 0 0 1];
+    'ngauss',                                [0 0 0 0 0 0 1 1];
+    'difforder 10 -> 15 (GMRES)',            [0 0 0 0 0 0 0 0];
+    'diff1method = GL',                      [0 0 0 0 1 0 0 0];
+    'ESIEpropagationimplementation = legacy',[0 0 0 0 0 0 0 1];
+    'savediff2result = 1',                   [0 0 0 0 0 0 0 1];
+    };
+
+[geoinputdata,Sinputdata,Rinputdata,controlparameters] = edsmallcube;
+envdata = struct;
+fh = edfilehandling(outputdirectory,filestem);
+fh.suppressresultrecycling = 0;
+
+EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,fh);
+refhashes = edreadstagehashes(outputdirectory,filestem,stagesuffixes);
+
+allok = true;
+resultlines = {['Stage files: ',strjoin(stagesuffixes,' ')]};
+for ii = 1:size(changes,1)
+    g = geoinputdata; S = Sinputdata; R = Rinputdata; e = envdata; cp = controlparameters; f = fh;
+    switch ii
+        case 1,  R.coordinates(1,:) = R.coordinates(1,:) + [0.1 0 0];
+        case 2,  S.coordinates = S.coordinates + [0 0.1 0];
+        case 3,  S.sourceamplitudes = 2;
+        case 4,  cp.frequencies = [100 250];
+        case 5,  e.cair = 340;
+        case 6,  cp.ngauss = 10;
+        case 7,  cp.difforder = 15;
+        case 8,  cp.diff1method = 'GL';
+        case 9,  cp.ESIEpropagationimplementation = 'legacy';
+        case 10, f.savediff2result = 1;
+    end
+    EDmain_convex(g,S,R,e,cp,f);
+    newhashes = edreadstagehashes(outputdirectory,filestem,stagesuffixes);
+    haschanged = double(~strcmp(newhashes,refhashes));
+    expected = changes{ii,2};
+    if isequal(haschanged,expected)
+        verdict = 'OK';
+    else
+        verdict = ['WRONG, expected ',mat2str(expected)];
+        allok = false;
+    end
+    resultlines{end+1} = sprintf('%-40s new hash: %s  %s',changes{ii,1},mat2str(haschanged),verdict); %#ok<AGROW>
+end
+
+r = edresult(title,description,allok,resultlines);
+end
+
+function hashes = edreadstagehashes(outputdirectory,filestem,stagesuffixes)
+% Reads the EDinputdatahash from each stage file. A missing file gives ''.
+hashes = cell(1,numel(stagesuffixes));
+for ii = 1:numel(stagesuffixes)
+    stagefile = fullfile(outputdirectory,[filestem,stagesuffixes{ii},'.mat']);
+    hashes{ii} = '';
+    if exist(stagefile,'file') == 2
+        filedata = load(stagefile,'EDinputdatahash');
+        if isfield(filedata,'EDinputdatahash')
+            hashes{ii} = filedata.EDinputdatahash;
+        end
+    end
+end
 end

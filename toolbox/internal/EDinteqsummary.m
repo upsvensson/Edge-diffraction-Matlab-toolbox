@@ -25,6 +25,7 @@ function [textlines,warninglines] = EDinteqsummary(inteqdiagnostics)
 % [textlines,warninglines] = EDinteqsummary(inteqdiagnostics);
 
 % 12 Oct. 2026 First version, by Claude, prompted by PS
+% 14 Oct. 2026 A line about the _qfinal file (computed and saved, or reused).
 
 textlines = {};
 warninglines = {};
@@ -79,4 +80,8 @@ else
                 num2str(lasttermratio,3),' of the norm of the first term'];
         end
     end
+end
+
+if isfield(dg,'qfinalfile') && ischar(dg.qfinalfile) && ~isempty(dg.qfinalfile)
+    textlines{end+1} = ['Integral equation solution (Qfinal): ',dg.qfinalfile];
 end

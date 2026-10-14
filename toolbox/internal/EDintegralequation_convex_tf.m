@@ -183,6 +183,19 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % solution). load/save of the _tfinteq file without eval.
 % 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
 % also contains the versions of the subroutines that this function uses.
+% 14 Oct. 2026 Solve/propagate split (by Claude, prompted by PS): the
+% solution of the integral equation, Qfinal (and Q_firstterm), for all
+% frequencies is saved in a stage file of its own, <filestem>_qfinal.mat,
+% with its own hash (everything except the receivers and the propagation
+% settings). If only the receivers, Rstart, ESIEpropagationimplementation,
+% skipreceiverpropagation, doallSRcombinations or savediff2result are
+% changed, Qfinal is taken from that file, and only the propagation to the
+% receivers is computed. The file is saved if
+% filehandlingparameters.saveinteqsolution = 1 (default) and it is smaller
+% than 4 GB. This replaces the per-frequency _sousigs files and the
+% parameters saveinteqsousigs/loadinteqsousigs (which had no hash check).
+% When the _tfinteq file is reused, a matching _qfinal file is copied to
+% this filestem too.
 
 t00_total = clock;
 t00 = clock;
@@ -197,6 +210,14 @@ end
 % stage files are not reused after a change in the computations.
 stageversion = EDstageversions('EDintegralequation_convex_tf');
 
+% Two hashes:
+%   EDinputdatahash_solve   for the solution of the integral equation,
+%                           Qfinal (the _qfinal file). It does not depend
+%                           on the receivers.
+%   EDinputdatahash         for the final result, at the receivers (the
+%                           _tfinteq file) = the solve hash + the receivers
+%                           and the propagation settings.
+%
 % For the GMRES methods, the full solution is computed for any
 % difforder > 2, so the value of difforder does not affect the result.
 if strncmp(controlparameters.inteqsolutionmethod,'GMRES',5)
@@ -204,34 +225,26 @@ if strncmp(controlparameters.inteqsolutionmethod,'GMRES',5)
 else
     hashdifforder = controlparameters.difforder;
 end
-EDinputdatastruct = struct('stage','EDintegralequation_convex_tf','stageversion',stageversion,...
+solvehashstruct = struct('stage','EDintegralequation_convex_tf_solve','stageversion',stageversion,...
     'submatrixhash',EDparenthash(Hsubmatrixdata),'edgedatahash',EDparenthash(edgedata),...
-    'ed2datahash',EDparenthash(edgetoedgedata),...
-    'Sdatahash',EDparenthash(Sdata),'Rdatahash',EDparenthash(Rdata),...
+    'ed2datahash',EDparenthash(edgetoedgedata),'Sdatahash',EDparenthash(Sdata),...
     'difforder',hashdifforder,'frequencies',controlparameters.frequencies,...
     'ngauss',controlparameters.ngauss,'discretizationtype',controlparameters.discretizationtype,...
-    'Rstart',controlparameters.Rstart);
+    'inteqsolutionmethod',controlparameters.inteqsolutionmethod,...
+    'inteqtargettol',controlparameters.inteqtargettol,...
+    'inteqgmresmaxiter',controlparameters.inteqgmresmaxiter,...
+    'ESIEsourcetermimplementation',controlparameters.ESIEsourcetermimplementation,...
+    'sourceamplitudes',Sdata.sourceamplitudes,'doaddsources',Sdata.doaddsources,...
+    'cair',envdata.cair);
+EDinputdatahash_solve = DataHash(solvehashstruct);
 
-% More settings that influence the result, and therefore must be part of
-% the hash. Otherwise, e.g., a change from 'legacy' to 'accurate', or of
-% the solution method, would lead to an old result file being reused.
-hashfields_cp = {'inteqsolutionmethod','inteqtargettol','inteqgmresmaxiter',...
-    'ESIEsourcetermimplementation','ESIEpropagationimplementation',...
-    'skipreceiverpropagation'};
-for ii = 1:length(hashfields_cp)
-    EDinputdatastruct.(hashfields_cp{ii}) = controlparameters.(hashfields_cp{ii});
-end
-% The piston fields are only present for piston sources
-hashfields_S = {'sourcetype','sourceamplitudes','doaddsources','doallSRcombinations',...
-    'pistoncornercoordinates','pistoncornernumbers','pistonplanes','pistongaussorder'};
-for ii = 1:length(hashfields_S)
-    if isfield(Sdata,hashfields_S{ii})
-        EDinputdatastruct.(hashfields_S{ii}) = Sdata.(hashfields_S{ii});
-    end
-end
-EDinputdatastruct.cair = envdata.cair;
-EDinputdatastruct.savediff2result = filehandlingparameters.savediff2result;
-
+EDinputdatastruct = struct('stage','EDintegralequation_convex_tf','stageversion',stageversion,...
+    'solvehash',EDinputdatahash_solve,'Rdatahash',EDparenthash(Rdata),...
+    'Rstart',controlparameters.Rstart,...
+    'ESIEpropagationimplementation',controlparameters.ESIEpropagationimplementation,...
+    'skipreceiverpropagation',controlparameters.skipreceiverpropagation,...
+    'doallSRcombinations',Sdata.doallSRcombinations,...
+    'savediff2result',filehandlingparameters.savediff2result);
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -256,6 +269,14 @@ if foundmatch == 1
     timingdata = filedata.timingdata;
     if ~strcmp(existingfilename,desiredname)
         copyfile(existingfilename,desiredname);
+    end
+    % If a matching _qfinal file exists (possibly with another filestem),
+    % it is also copied, so that this filestem has the complete set of
+    % stage files.
+    desiredname_qfinal = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_qfinal.mat'];
+    [qfinalfound,existingqfinalfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_qfinal',EDinputdatahash_solve);
+    if qfinalfound == 1 && ~strcmp(existingqfinalfile,desiredname_qfinal)
+        copyfile(existingqfinalfile,desiredname_qfinal);
     end
     elapsedtimehodtf_new = etime(clock,t00_total);
     elapsedtimehodtf = [elapsedtimehodtf_new filedata.elapsedtimehodtf];
@@ -365,6 +386,37 @@ else
     inteqdiagnostics.normQ = zeros(max(controlparameters.difforder-2,0),nfrequencies,ndiagcols);
 end
 
+%---------------------------------------------------------------
+% Can an existing solution of the integral equation (the _qfinal file) be
+% used? Then the H-matrix is not built and the integral equation is not
+% solved; only the propagation to the receivers is computed.
+
+desiredname_qfinal = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_qfinal.mat'];
+if filehandlingparameters.suppressresultrecycling == 1
+    qfinalreused = 0;
+    existingqfinalfile = '';
+else
+    [qfinalreused,existingqfinalfile] = EDrecycleresultfiles(filehandlingparameters.outputdirectory,'_qfinal',EDinputdatahash_solve);
+end
+if qfinalreused == 1
+    qfiledata = load(existingqfinalfile,'Qfinalstore','Qfirsttermstore','inteqdiagnostics_solve','timingdata_solve');
+    Qfinalstore = qfiledata.Qfinalstore;
+    Qfirsttermstore = qfiledata.Qfirsttermstore;
+    inteqdiagnostics = qfiledata.inteqdiagnostics_solve;
+    timingdata_solve = qfiledata.timingdata_solve;
+    clear qfiledata
+    if ~strcmp(existingqfinalfile,desiredname_qfinal)
+        copyfile(existingqfinalfile,desiredname_qfinal);
+    end
+    if showtext >= 1
+        [~,qfilestem] = fileparts(existingqfinalfile);
+        disp(['      Using the integral equation solution in ',qfilestem,'.mat'])
+    end
+else
+    Qfinalstore = cell(nfrequencies,ndiagcols);
+    Qfirsttermstore = cell(nfrequencies,ndiagcols);
+end
+
 for ifreq = 1:nfrequencies     
     frequency = controlparameters.frequencies(ifreq);
     if showtext >= 1
@@ -405,7 +457,7 @@ for ifreq = 1:nfrequencies
     % If difforder > 2, create the big H-matrix, in the form of separate sub-matrices
     % The H-matrix is independent of sources and receivers.
 
-    if controlparameters.difforder > 2
+    if controlparameters.difforder > 2 && qfinalreused == 0
         for nn = 1:nsubmatrices
 
             edge1 = Hsubmatrixdata.edgetripletlist(nn,3);
@@ -669,7 +721,7 @@ for ifreq = 1:nfrequencies
             P_receiver = zeros(nfrequencies,nreceivers);
         end
         
-        if filehandlingparameters.loadinteqsousigs == 0
+        if qfinalreused == 0
                         
             Q_firstterm = 0;
             for isou = 1:nsources
@@ -766,18 +818,15 @@ for ifreq = 1:nfrequencies
             end
 
             % End of CASE 1, PART 3 
-            % Qfinal has been computed
-            % Possibly save to a file
+            % Qfinal has been computed. It is stored, for the _qfinal file.
             
-            if filehandlingparameters.saveinteqsousigs == 1
-               filename_sousigs = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_f',int2str(ifreq),'_sousigs.mat'];  
-               eval(['save ''',filename_sousigs,''' Qfinal Q_firstterm doesQsegmenthavevalues'])             
-            end
+            Qfinalstore{ifreq,1} = Qfinal;
+            Qfirsttermstore{ifreq,1} = Q_firstterm;
 
-        else    % This 'else' part implies that controlparameters.loadinteqsousig = 1
-            filename_sousigs = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_f',int2str(ifreq),'_sousigs.mat'];  
-            eval(['load ''',filename_sousigs,'''']) 
-			disp(['      Using existing edgesourcesignalsfile: ',filename_sousigs])
+        else    % qfinalreused = 1: the solution is taken from the _qfinal file
+            Qfinal = Qfinalstore{ifreq,1};
+            Q_firstterm = Qfirsttermstore{ifreq,1};
+            doesQsegmenthavevalues = edQsegmentflags(Qfinal,Hsubmatrixdata);
         end
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -824,7 +873,7 @@ for ifreq = 1:nfrequencies
 
         % For GMRES_fast: the sparse H-matrix depends on frequency but not
         % on the source, so it is built once here, before the source loop.
-        if strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 && filehandlingparameters.loadinteqsousigs == 0
+        if strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 && qfinalreused == 0
             t00_gmres = clock;
             Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
             A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
@@ -840,7 +889,7 @@ for ifreq = 1:nfrequencies
         for isou = 1:nsources
             ISOU = int2str(isou);
             
-            if filehandlingparameters.loadinteqsousigs == 0
+            if qfinalreused == 0
                 
                 ISOU = int2str(isou); 
     
@@ -941,18 +990,16 @@ for ifreq = 1:nfrequencies
                 end
 
                 % End of CASE 2, PART 3 
-                % Qfinal has been computed
-                % Possibly save to a file
+                % Qfinal has been computed. It is stored, for the _qfinal
+                % file.
 
-                if filehandlingparameters.saveinteqsousigs == 1
-                   filename_sousigs = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_',ISOU,'_f',int2str(ifreq),'_sousigs.mat'];  
-                   eval(['save ''',filename_sousigs,''' Qfinal Q_firstterm doesQsegmenthavevalues'])             
-                end
+                Qfinalstore{ifreq,isou} = Qfinal;
+                Qfirsttermstore{ifreq,isou} = Q_firstterm;
             
-            else    % This 'else' part implies that filehandlingparameters.loadinteqsousig = 1                
-                filename_sousigs = [filehandlingparameters.outputdirectory,filesep,filehandlingparameters.filestem,'_',ISOU,'_f',int2str(ifreq),'_sousigs.mat'];  
-                eval(['load ''',filename_sousigs,''''])              	
-                disp(['   Using existing edgesourcesignalsfile: ',filename_sousigs])
+            else    % qfinalreused = 1: the solution is taken from the _qfinal file
+                Qfinal = Qfinalstore{ifreq,isou};
+                Q_firstterm = Qfirsttermstore{ifreq,isou};
+                doesQsegmenthavevalues = edQsegmentflags(Qfinal,Hsubmatrixdata);
             end  
 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1026,6 +1073,49 @@ for ifreq = 1:nfrequencies
     end  % if Sdata.doaddsources == 1 || nsources == 1
 end  % for ifreq = 1:nfrequencies     
 
+%---------------------------------------------------------------
+% Save the solution of the integral equation in the _qfinal file, so that
+% it can be reused for other receivers. Not saved if it would be larger
+% than maxqfinalbytes.
+
+maxqfinalbytes = 4e9;
+if qfinalreused == 1
+    timingdata(1:3) = timingdata_solve(1:3);
+    [~,qfilestem] = fileparts(existingqfinalfile);
+    qfinalfileinfo = ['reused from ',qfilestem,'.mat'];
+else
+    timingdata_solve = timingdata(1:3);
+    qfinalbytes = 0;
+    for ii = 1:numel(Qfinalstore)
+        qfinalbytes = qfinalbytes + 16*(numel(Qfinalstore{ii}) + numel(Qfirsttermstore{ii}));
+    end
+    [~,qfilestem] = fileparts(desiredname_qfinal);
+    if filehandlingparameters.saveinteqsolution ~= 1
+        qfinalfileinfo = 'computed, not saved (saveinteqsolution = 0)';
+    elseif qfinalbytes > maxqfinalbytes
+        qfinalfileinfo = sprintf('computed, not saved (%.1f GB, more than the limit of %.1f GB)',...
+            qfinalbytes/1e9,maxqfinalbytes/1e9);
+    else
+        qdata = struct;
+        qdata.Qfinalstore = Qfinalstore;
+        qdata.Qfirsttermstore = Qfirsttermstore;
+        qdata.inteqdiagnostics_solve = inteqdiagnostics;
+        qdata.timingdata_solve = timingdata_solve;
+        qdata.EDinputdatahash = EDinputdatahash_solve;
+        qdata.stageversion = stageversion;
+        qdata.EDversionnumber = EDversionnumber;
+        if qfinalbytes > 1.9e9
+            save(desiredname_qfinal,'-struct','qdata','-v7.3');
+        else
+            save(desiredname_qfinal,'-struct','qdata');
+        end
+        clear qdata
+        qfinalfileinfo = ['computed and saved in ',qfilestem,'.mat'];
+    end
+end
+clear Qfinalstore Qfirsttermstore
+inteqdiagnostics.qfinalfile = qfinalfileinfo;
+
 elapsedtimehodtf = etime(clock,t00_total);
 tfinteqdiff = P_receiver;
 
@@ -1051,7 +1141,18 @@ inteqdiagnosticstruct = struct(...
     'assemblytime',      [], ...
     'solvetime',         [], ...
     'normQ',             [], ...
-    'propdiagnostics',   []);
+    'propdiagnostics',   [], ...
+    'qfinalfile',        '');
+end
+
+function doesQsegmenthavevalues = edQsegmentflags(Qfinal,Hsubmatrixdata)
+% For each edge pair: 1 if any of its elements in Qfinal is non-zero.
+nedgepairs = length(Hsubmatrixdata.edgepairlist(:,1));
+doesQsegmenthavevalues = zeros(nedgepairs,1);
+for iicounter = 1:nedgepairs
+    sectionofQvec = (Hsubmatrixdata.Qvecstartnums(iicounter):Hsubmatrixdata.Qvecendnums(iicounter));
+    doesQsegmenthavevalues(iicounter) = any(Qfinal(sectionofQvec));
+end
 end
     
 end

@@ -74,8 +74,11 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %                   .saveeddatafile      (default: 1)
 %                   .saveed2datafile      (default: 1)
 %                   .savesubmatrixdata    (default: 1)
-%                   .saveinteqsousigs     (default: 0)
-%                   .loadinteqsousigs     (default: 0)
+%                   .saveinteqsolution    (default: 1) The solution of
+%                                         the integral equation is saved
+%                                         in the file _qfinal.mat (if it
+%                                         is smaller than 4 GB), so it can
+%                                         be reused for other receivers.
 %                   .savepathsfile        (default: 1)
 %                   .saveISEStree         (default: 0) Not used by
 %                                         EDmain_convexESIE
@@ -250,6 +253,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 12 Oct. 2026 controlparameters.difforder is obligatory: the unused
 % default value 10 in the table was replaced by NaN, and the header text
 % corrected.
+% 14 Oct. 2026 filehandlingparameters.saveinteqsousigs and
+% .loadinteqsousigs were removed (replaced by the hashed _qfinal file).
+% New field .saveinteqsolution (default 1).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Check if the needed non-EDtoolbox functions are available.
@@ -841,8 +847,7 @@ paramspec = {
     'saveeddatafile',           @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
     'saveed2datafile',          @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
     'savesubmatrixdata',        @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
-    'saveinteqsousigs',         @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) true, false; 
-    'loadinteqsousigs',         @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) true, false; 
+    'saveinteqsolution',        @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
     'savepathsfile',            @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
     'savediff2result',          @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) true, false; 
     'savelogfile',              @(x) isnumeric(x) && (x == 0 | x == 1),     1, @(s) true, false; 
@@ -851,7 +856,7 @@ paramspec = {
     'savehodpaths',             @(x) isnumeric(x) && (x == 0 | x == 1),     0, @(s) strcmp(controlparameters.generalmethod,'ir'), false; 
     };
 
-removedfields = {'savecadgeofile','savesetupfile','lineending','saveEDresfile'};
+removedfields = {'savecadgeofile','savesetupfile','lineending','saveEDresfile','saveinteqsousigs','loadinteqsousigs'};
 [filehandlingparameters,inputorigin.filehandlingparameters] = ...
     edapplyparamspec(filehandlingparameters,paramspec,'filehandlingparameters',{},removedfields,prevorigin.filehandlingparameters);
 if outputdirectoryderived

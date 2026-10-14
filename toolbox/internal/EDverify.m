@@ -5,7 +5,7 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % There are two kinds of tests:
 %   Tests 1-9 check the accuracy of the computed sound field, against
 %   known answers or physical requirements (such as continuity).
-%   Tests 10-17 check that the code paths, the files and the input
+%   Tests 10-18 check that the code paths, the files and the input
 %   handling work as intended (they compare the toolbox with itself).
 %   Tests 16 and 17 check the stage hashes: that the dependency lists in
 %   EDstageversions agree with the code, and that a change of one input
@@ -103,8 +103,12 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 14 Oct. 2026 Added test 16 (the dependency lists in EDstageversions agree
 % with the actual calls in the code) and test 17 (which stage files get a
 % new hash when one input parameter is changed).
+% 14 Oct. 2026 Test 17 also covers the _qfinal file. Added test 18 (reuse
+% of the integral equation solution for new receivers).
+% 14 Oct. 2026 Tests 17 and 18: the first run is done without recycling.
+% Test 18: a receiver was in the plane of a cube face.
 
-ntests = 17;
+ntests = 18;
 
 if nargin < 1 || isempty(outputdirectory)
     outputdirectory = uigetdir('', 'Select the directory for the calculation results and the logfile');
@@ -158,7 +162,7 @@ disp(headerline)
 
 testfunctions = {@edtest1,@edtest2,@edtest3,@edtest4,@edtest5,@edtest6,@edtest7,...
     @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15,...
-    @edtest16,@edtest17};
+    @edtest16,@edtest17,@edtest18};
 
 for itest = 1:ntests
     if runtest(itest) ~= 1
@@ -791,21 +795,21 @@ description = {'1 m cube, with result recycling switched on. One reference run, 
     'changed parameter. For each stage file, the stored hash is compared with that of the reference',...
     'run: it should change if, and only if, the stage depends on the changed parameter.'};
 
-stagesuffixes = {'_eddata','_Sdata','_Rdata','_paths','_tf','_ed2data','_submatrixdata','_tfinteq'};
+stagesuffixes = {'_eddata','_Sdata','_Rdata','_paths','_tf','_ed2data','_submatrixdata','_qfinal','_tfinteq'};
 
 % Each row: description, and which of the stage files above should get a
 % new hash (1) or keep the hash (0).
 changes = {
-    'Receiver positions',                    [0 0 1 1 1 0 0 1];
-    'Source position',                       [0 1 0 1 1 0 0 1];
-    'Source amplitudes',                     [0 0 0 0 1 0 0 1];
-    'Frequencies',                           [0 0 0 0 1 0 0 1];
-    'Speed of sound',                        [0 0 0 0 1 0 0 1];
-    'ngauss',                                [0 0 0 0 0 0 1 1];
-    'difforder 10 -> 15 (GMRES)',            [0 0 0 0 0 0 0 0];
-    'diff1method = GL',                      [0 0 0 0 1 0 0 0];
-    'ESIEpropagationimplementation = legacy',[0 0 0 0 0 0 0 1];
-    'savediff2result = 1',                   [0 0 0 0 0 0 0 1];
+    'Receiver positions',                    [0 0 1 1 1 0 0 0 1];
+    'Source position',                       [0 1 0 1 1 0 0 1 1];
+    'Source amplitudes',                     [0 0 0 0 1 0 0 1 1];
+    'Frequencies',                           [0 0 0 0 1 0 0 1 1];
+    'Speed of sound',                        [0 0 0 0 1 0 0 1 1];
+    'ngauss',                                [0 0 0 0 0 0 1 1 1];
+    'difforder 10 -> 15 (GMRES)',            [0 0 0 0 0 0 0 0 0];
+    'diff1method = GL',                      [0 0 0 0 1 0 0 0 0];
+    'ESIEpropagationimplementation = legacy',[0 0 0 0 0 0 0 0 1];
+    'savediff2result = 1',                   [0 0 0 0 0 0 0 0 1];
     };
 
 [geoinputdata,Sinputdata,Rinputdata,controlparameters] = edsmallcube;
@@ -813,7 +817,13 @@ envdata = struct;
 fh = edfilehandling(outputdirectory,filestem);
 fh.suppressresultrecycling = 0;
 
-EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,fh);
+% The reference run is computed without recycling, so that all its stage
+% files are written with this filestem (with recycling, a matching
+% _tfinteq file from an earlier run could be reused, and then no _qfinal
+% file would be written).
+fhref = fh;
+fhref.suppressresultrecycling = 1;
+EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,fhref);
 refhashes = edreadstagehashes(outputdirectory,filestem,stagesuffixes);
 
 allok = true;
@@ -846,6 +856,36 @@ for ii = 1:size(changes,1)
 end
 
 r = edresult(title,description,allok,resultlines);
+end
+
+function r = edtest18(outputdirectory,filestem,~)
+title = 'Reuse of the integral equation solution for new receivers';
+tolreuse = 1e-12;
+description = {'1 m cube, with result recycling switched on. After a first run, the receivers are moved.',...
+    'The second run should reuse the _qfinal file (the integral equation is not solved again),',...
+    ['and give the same result as a run without recycling, to ',num2str(tolreuse),' (relative to max abs(tftot)).']};
+
+[geoinputdata,Sinputdata,Rinputdata,controlparameters] = edsmallcube;
+fh = edfilehandling(outputdirectory,filestem);
+EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,fh);   % without recycling
+fh.suppressresultrecycling = 0;
+
+Rnew = Rinputdata;
+Rnew.coordinates = [-1.6 0.8 0.3; 0.3 -2.2 -0.6];
+EDres2 = EDmain_convex(geoinputdata,Sinputdata,Rnew,struct,controlparameters,fh);
+qfinalfile = '';
+if isfield(EDres2,'inteqdiagnostics') && isfield(EDres2.inteqdiagnostics,'qfinalfile')
+    qfinalfile = EDres2.inteqdiagnostics.qfinalfile;
+end
+reused = strncmp(qfinalfile,'reused',6);
+
+fhnorecycling = edfilehandling(outputdirectory,[filestem,'_norecycling']);
+EDres3 = EDmain_convex(geoinputdata,Sinputdata,Rnew,struct,controlparameters,fhnorecycling);
+relerr = max(abs(EDres2.tftot(:)-EDres3.tftot(:)))/max(abs(EDres3.tftot(:)));
+
+r = edresult(title,description,reused && relerr < tolreuse,...
+    {['Second run, integral equation solution: ',qfinalfile],...
+     ['Difference from a run without recycling: ',num2str(relerr,3)]});
 end
 
 function hashes = edreadstagehashes(outputdirectory,filestem,stagesuffixes)

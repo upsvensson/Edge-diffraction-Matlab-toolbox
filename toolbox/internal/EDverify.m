@@ -123,6 +123,8 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % date).
 % 15 Oct. 2026 Added test 20 (GL first-order diffraction close to a zone
 % boundary).
+% 15 Oct. 2026 Test 18 deletes its result files from earlier EDverify runs
+% first (the second run could reuse the _tfinteq file of an earlier run).
 
 ntests = 20;
 
@@ -971,6 +973,12 @@ description = {'1 m cube, with result recycling switched on. After a first run, 
     'The second run should reuse the _qfinal file (the integral equation is not solved again),',...
     ['and give the same result as a run without recycling, to ',num2str(tolreuse),' (relative to max abs(tftot)).']};
 
+% Result files from an earlier EDverify run in the same directory are
+% deleted first: the second run below could otherwise reuse the complete
+% _tfinteq file of the earlier third run (same input, same hash), and not
+% only the _qfinal file.
+eddeleteoldfiles(outputdirectory,filestem);
+
 [geoinputdata,Sinputdata,Rinputdata,controlparameters] = edsmallcube;
 fh = edfilehandling(outputdirectory,filestem);
 EDmain_convex(geoinputdata,Sinputdata,Rinputdata,struct,controlparameters,fh);   % without recycling
@@ -992,6 +1000,15 @@ relerr = max(abs(EDres2.tftot(:)-EDres3.tftot(:)))/max(abs(EDres3.tftot(:)));
 r = edresult(title,description,reused && relerr < tolreuse,...
     {['Second run, integral equation solution: ',qfinalfile],...
      ['Difference from a run without recycling: ',num2str(relerr,3)]});
+end
+
+function eddeleteoldfiles(outputdirectory,filestem)
+% Deletes the .mat files whose names start with filestem (also, e.g.,
+% filestem_norecycling_...).
+oldfiles = dir(fullfile(outputdirectory,[filestem,'_*.mat']));
+for ii = 1:numel(oldfiles)
+    delete(fullfile(outputdirectory,oldfiles(ii).name));
+end
 end
 
 function hashes = edreadstagehashes(outputdirectory,filestem,stagesuffixes)

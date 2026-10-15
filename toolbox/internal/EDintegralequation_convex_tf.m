@@ -182,6 +182,13 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % parameters saveinteqsousigs/loadinteqsousigs (which had no hash check).
 % When the _tfinteq file is reused, a matching _qfinal file is copied to
 % this filestem too.
+% 15 Oct. 2026 (by Claude, prompted by PS) The propagation to the
+% receivers is done after the frequency loop: EDcalcpropagatematrix is
+% called once per receiver (with frequency = 0, which gives the
+% frequency-independent part and the path lengths), instead of once per
+% frequency, receiver and source. Only exp(-1i*k*(L-Rstart)) is computed
+% per frequency. The same results up to rounding errors, but much faster
+% for many frequencies or sources.
 
 t00_total = clock;
 t00 = clock;
@@ -816,31 +823,8 @@ for ifreq = 1:nfrequencies
         end
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % CASE 1, PART 4: Qfinal has been computed, or loaded from a file
-        %
-        % Propagate Qfinal to the external receiver(s)
-        
-        if controlparameters.skipreceiverpropagation == 0
-            for irec = 1:nreceivers
-                if showtext >=2
-                    disp(['      Receiver number ',int2str(irec)]) 
-                end
-                
-                [Fmatrix,ivproblematic,propdiagnostics] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,Rdata.vispartedgesfromr(:,irec),...
-                        frequency,controlparameters.Rstart,...
-                        Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),...
-                        Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext,...
-                        controlparameters.ESIEpropagationimplementation);
-                 P_receiver(ifreq,irec) = Fmatrix*Qfinal;
-                 if filehandlingparameters.savediff2result == 1
-                    extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec) = Fmatrix*(Qfinal-Q_firstterm);
-                 end
-                 
-                if ifreq == 1
-                    timingdata(4) = etime(clock,t00);
-                end
-            end % for irec = 1:nreceivers
-        end
+        % CASE 1, PART 4: the propagation of Qfinal to the receivers is
+        % done after the frequency loop (see PART 4 below).
 
         % End of CASE 1, PART 4
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -989,75 +973,94 @@ for ifreq = 1:nfrequencies
             end  
 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            % CASE 2, PART 4: Qfinal has been computed, or loaded from a file
-            %
-            % Propagate Qfinal to the external receiver(s)
-            
-%             if inteqsettings.handlepropagation < 3
-            if controlparameters.skipreceiverpropagation == 0
-                if Sdata.doallSRcombinations == 1
-                    for irec = 1:nreceivers
-    
-                         if showtext >=2
-                            disp(['Receiver number ',int2str(irec)]) 
-                         end
-                         [Fmatrix,ivproblematic,propdiagnostics] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,...
-                            Rdata.vispartedgesfromr(:,irec),frequency,controlparameters.Rstart,...
-                            Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),...
-                            Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),...
-                            doesQsegmenthavevalues,filehandlingparameters.showtext,...
-                            controlparameters.ESIEpropagationimplementation);
-   
-                        if ifreq == 1 && ~isempty(ivproblematic)
-                            existinglength = size(ivproblematicmatrix,2);
-                            newlength = length(ivproblematic);
-                            if newlength > existinglength
-                                ivproblematicmatrix = [ivproblematicmatrix zeros(nreceivers,newlength-existinglength)];
-                            end
-                            ivproblematicmatrix(irec,1:newlength) = ivproblematic;
-                        end
-    
-                         P_receiver(ifreq,irec,isou) = Fmatrix*Qfinal;
-                         if filehandlingparameters.savediff2result == 1
-                             extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec,isou) = Fmatrix*(Qfinal-Q_firstterm);
-                         end
-    
-                    end %  for irec = 1:nreceivers
-                else
-                    irec = isou;
-                      if showtext >=2
-                        disp(['Receiver number ',int2str(irec)]) 
-                     end
-                     [Fmatrix,ivproblematic,propdiagnostics] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,isthinhole,...
-                        Rdata.vispartedgesfromr(:,irec),frequency,controlparameters.Rstart,...
-                        Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),...
-                        Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),...
-                        doesQsegmenthavevalues,filehandlingparameters.showtext,...
-                        controlparameters.ESIEpropagationimplementation);
-    
-                    if ifreq == 1 && ~isempty(ivproblematic)
-                        existinglength = size(ivproblematicmatrix,2);
-                        newlength = length(ivproblematic);
-                        if newlength > existinglength
-                            ivproblematicmatrix = [ivproblematicmatrix zeros(nreceivers,newlength-existinglength)];
-                        end
-                        ivproblematicmatrix(irec,1:newlength) = ivproblematic;
-                    end
-    
-                     P_receiver(ifreq,irec,isou) = Fmatrix*Qfinal;
-                     if filehandlingparameters.savediff2result == 1
-                         extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec,isou) = Fmatrix*(Qfinal-Q_firstterm);
-                     end
-                   
-                end
-                if ifreq == 1 && isou == 1
-                    timingdata(4) = etime(clock,t00);
-                end
-            end
+            % CASE 2, PART 4: the propagation of Qfinal to the receivers is
+            % done after the frequency loop (see PART 4 below).
         end   % for isou = 1:nsources
 
     end  % if Sdata.doaddsources == 1 || nsources == 1
 end  % for ifreq = 1:nfrequencies     
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PART 4: Propagate Qfinal to the receivers, for all frequencies (and all
+% sources, if they are handled separately).
+%
+% The propagation row vector depends on the frequency only through the
+% factor exp(-1i*k*(L-Rstart)), where L = l + m is the path length via the
+% two edge nodes to the receiver. Everything else (the beta terms, the
+% singularity treatment, 1/(l*m) and the quadrature weights) depends only
+% on the geometry. EDcalcpropagatematrix is therefore called once per
+% receiver, with frequency = 0, which gives the frequency-independent part
+% Fgeom and the path lengths. For each frequency, only the exponential
+% factor is computed.
+
+t00_prop = clock;
+if controlparameters.skipreceiverpropagation == 0
+    if Sdata.doaddsources == 1 || nsources == 1
+        nsolutions = 1;
+    else
+        nsolutions = nsources;
+    end
+    % The edge pairs where Qfinal has values, for some frequency and source
+    doesQsegmenthavevalues = zeros(size(Hsubmatrixdata.edgepairlist,1),1);
+    for ifreq = 1:nfrequencies
+        for isol = 1:nsolutions
+            doesQsegmenthavevalues = doesQsegmenthavevalues | edQsegmentflags(Qfinalstore{ifreq,isol},Hsubmatrixdata);
+        end
+    end
+    doesQsegmenthavevalues = double(doesQsegmenthavevalues);
+    kvec = 2*pi*controlparameters.frequencies/envdata.cair;
+
+    for irec = 1:nreceivers
+        if showtext >=2
+            disp(['      Receiver number ',int2str(irec)])
+        end
+        % The solutions (sources) that are propagated to this receiver
+        % (doallSRcombinations = 0: only source N to receiver N)
+        if nsolutions == 1
+            solutionlist = 1;
+        elseif Sdata.doallSRcombinations == 1
+            solutionlist = 1:nsolutions;
+        elseif irec <= nsolutions
+            solutionlist = irec;
+        else
+            continue
+        end
+
+        [Fgeom,ivproblematic,propdiagnostics,pathlengths] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,...
+            Hsubmatrixdata,isthinhole,Rdata.vispartedgesfromr(:,irec),0,controlparameters.Rstart,...
+            Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),...
+            Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext,...
+            controlparameters.ESIEpropagationimplementation);
+
+        if ~isempty(ivproblematic)
+            existinglength = size(ivproblematicmatrix,2);
+            newlength = length(ivproblematic);
+            if newlength > existinglength
+                ivproblematicmatrix = [ivproblematicmatrix zeros(nreceivers,newlength-existinglength)]; %#ok<AGROW>
+            end
+            ivproblematicmatrix(irec,1:newlength) = ivproblematic;
+        end
+
+        % Only the non-zero elements are used
+        ivnonzero = find(Fgeom);
+        Fgeomnonzero = Fgeom(ivnonzero);
+        pathlengthsnonzero = pathlengths(ivnonzero) - controlparameters.Rstart;
+
+        for ifreq = 1:nfrequencies
+            Fvec = Fgeomnonzero.*exp(-1i*kvec(ifreq)*pathlengthsnonzero);
+            for isol = solutionlist
+                Qfinal = Qfinalstore{ifreq,isol};
+                P_receiver(ifreq,irec,isol) = Fvec*Qfinal(ivnonzero);
+                if filehandlingparameters.savediff2result == 1
+                    Q_firstterm = Qfirsttermstore{ifreq,isol};
+                    extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec,isol) = Fvec*(Qfinal(ivnonzero)-Q_firstterm(ivnonzero));
+                end
+            end
+        end
+    end
+end
+% timingdata(4): the propagation time per frequency, as before
+timingdata(4) = etime(clock,t00_prop)/nfrequencies;
 
 %---------------------------------------------------------------
 % Save the solution of the integral equation in the _qfinal file, so that

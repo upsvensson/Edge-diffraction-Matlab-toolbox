@@ -1,4 +1,4 @@
-function [Fmatrix,ivproblematic,propdiagnostics] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
+function [Fmatrix,ivproblematic,propdiagnostics,pathlengths] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
 isthinhole,vispartedgesfromr,frequency,Rstart,rRvec,thetaRvec,zRvec,doesQsegmenthavevalues,...
 showtext,ESIEpropagationimplementation)
 % EDcalcpropagatematrix - propagates the sound pressure at the edges to a receiver
@@ -36,14 +36,24 @@ showtext,ESIEpropagationimplementation)
 %                    singularity, not speed; it does a little more work
 %                    than 'legacy', only for the flagged entries.
 %
+% The frequency enters Fmatrix only through the factor
+% exp(-1i*k*(pathlengths-Rstart)): everything else depends only on the
+% geometry. With frequency = 0, Fmatrix is therefore the frequency-
+% independent part, and for any k,
+%   Fmatrix(k) = Fmatrix(0).*exp(-1i*k*(pathlengths-Rstart))
+% EDintegralequation_convex_tf uses this to call this function only once
+% per receiver.
+%
 % Output parameters:
-%   Fmatrix
+%   Fmatrix         [1,nQ] the propagation row vector
 %   ivproblematic
 %   propdiagnostics
+%   pathlengths     [1,nQ] the path length, l + m, from each edge source
+%                   (node pair) to the receiver; 0 where Fmatrix is 0
 %
 % Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
-% [Fmatrix,ivproblematic,propdiagnostics] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
+% [Fmatrix,ivproblematic,propdiagnostics,pathlengths] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
 %     isthinhole,vispartedgesfromr,frequency,Rstart,...
 %     rRvec,thetaRvec,zRvec,doesQsegmenthavevalues,showtext,ESIEpropagationimplementation);
 
@@ -96,6 +106,10 @@ showtext,ESIEpropagationimplementation)
 % speeding up by Claude.
 % Code improvement: changed nbig to nQ, changed bigmatrix... to Qvec...
 % 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
+% 15 Oct. 2026 (by Claude, prompted by PS) New output parameter
+% pathlengths, so that Fmatrix can be computed once (with frequency = 0)
+% and then multiplied by exp(-1i*k*(pathlengths-Rstart)) for each
+% frequency.
 
 if nargin < 13
     showtext = 0;
@@ -111,6 +125,7 @@ end
 
 nQ = Hsubmatrixdata.Qvecendnums(end);
 Fmatrix = zeros(1, nQ);
+pathlengths = zeros(1, nQ);
 refto = edgetoedgedata.reftoshortlistE;
 
 k = 2*pi*frequency/envdata.cair;
@@ -408,6 +423,7 @@ for iicounter = 1:length(ivrelevantedgepairs)
 
             propdiagnostics.npairs = propdiagnostics.npairs + 1;
             Fmatrix(Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) =     Fmatrix(Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) + Fsub.';
+            pathlengths(Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) = (ldist + mdist).';
 
             if ~isempty(ivaddition)
                 sectionofQvec = [Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)].';

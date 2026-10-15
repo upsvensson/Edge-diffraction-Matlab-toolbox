@@ -3,6 +3,27 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## Unreleased
+
+No changes of the computed results (only rounding errors).
+
+**Speed**
+
+- EDintegralequation_convex_tf: the propagation to the receivers is done
+  after the frequency loop. EDcalcpropagatematrix is called once per
+  receiver (it has a new output, `pathlengths`, so that only the factor
+  exp(-jk(L-Rstart)) is computed per frequency), instead of once per
+  frequency, receiver and source. For a cube with 629 receivers, 11
+  frequencies and 2 separate sources, the propagation time went from
+  7.96 s to 0.91 s per frequency.
+
+**Tests**
+
+- EDverify test 18 deletes its result files from earlier EDverify runs
+  first. Before, a second EDverify run in the same directory could reuse
+  a complete _tfinteq file, and the test failed although the result was
+  correct.
+
 ## 0.611 (15 Oct. 2026)
 
 One change of the computed results (first-order diffraction with

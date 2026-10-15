@@ -176,6 +176,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % Claude, prompted by PS.)
 % 15 Oct. 2026 The difforder description says that, with the GMRES
 % methods, all diffraction orders are included for any difforder > 2.
+% 15 Oct. 2026 New field filehandlingparameters.parallelworkers (default 0).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Documentation mode: EDcheckinputstructs('paramspecs') returns the tables
@@ -1067,6 +1068,8 @@ switch structname
             '1: saved stage files are never reused, so everything is computed.';
         'showtext', @(x) isnumeric(x) && x >= 0 && round(x)==x, 1, @(s) true, false, ...
             '0: no text on the screen. 1: one line per stage. 2 or more: more details.';
+        'parallelworkers', @(x) isnumeric(x) && isscalar(x) && x >= 0 && (round(x)==x || isinf(x)), 0, @(s) true, false, ...
+            'The largest number of parallel workers (Parallel Computing Toolbox) for the propagation to the receivers in the integral equation stage. 0: no parallel computing. Inf: all the workers of the parallel pool, which is started if needed. The results are the same; it only affects the computing time.';
         'saveSRdatafiles', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...
             '1: the stage files _Sdata and _Rdata are saved.';
         'saveeddatafile', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...

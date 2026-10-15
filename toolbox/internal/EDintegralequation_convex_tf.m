@@ -196,6 +196,13 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % GMRES_fast, the sparse matrix is also built only once. The same results
 % up to rounding errors. New field inteqdiagnostics.maxcolumndistancediff
 % (a check, should be 0).
+% 15 Oct. 2026 (by Claude, prompted by PS) The propagation to the
+% receivers can run on parallel workers (parfor over the receivers), with
+% at most filehandlingparameters.parallelworkers workers (default 0 = no
+% parallel computing). The results are the same.
+% If the Parallel Computing Toolbox is not available, a note is given and
+% the loop runs serially. Qfirsttermstore is sent to the workers only if
+% savediff2result = 1.
 
 t00_total = clock;
 t00 = clock;
@@ -1050,6 +1057,35 @@ end  % for ifreq = 1:nfrequencies
 % factor is computed.
 
 t00_prop = clock;
+% The receivers are independent of each other, so this loop can run on
+% several parallel workers: filehandlingparameters.parallelworkers is the
+% largest number of workers (0 = an ordinary serial loop; parfor with 0
+% workers runs in this Matlab session). Every receiver gets its results in
+% cell arrays, which are collected after the loop.
+nworkers = 0;
+if isfield(filehandlingparameters,'parallelworkers') && ~isempty(filehandlingparameters.parallelworkers)
+    nworkers = filehandlingparameters.parallelworkers;
+end
+% Without the Parallel Computing Toolbox, parfor runs serially anyway; then
+% a note is given (on the screen and in the log file).
+parallelnote = '';
+if nworkers > 0
+    try
+        hasparallel = license('test','Distrib_Computing_Toolbox') && ~isempty(ver('parallel'));
+    catch
+        hasparallel = false;
+    end
+    if ~hasparallel
+        parallelnote = sprintf(['parallelworkers = %g, but the Parallel Computing Toolbox is not ',...
+            'available: the receivers are computed serially.'],nworkers);
+        nworkers = 0;
+        if showtext >= 1
+            disp(['      ',parallelnote])
+        end
+    end
+end
+inteqdiagnostics.parallelworkers = nworkers;
+inteqdiagnostics.parallelnote = parallelnote;
 if controlparameters.skipreceiverpropagation == 0
     if Sdata.doaddsources == 1 || nsources == 1
         nsolutions = 1;
@@ -1065,8 +1101,26 @@ if controlparameters.skipreceiverpropagation == 0
     end
     doesQsegmenthavevalues = double(doesQsegmenthavevalues);
     kvec = 2*pi*controlparameters.frequencies/envdata.cair;
+    savediff2 = filehandlingparameters.savediff2result;
+    doallSRcombinations = Sdata.doallSRcombinations;
+    Rstartvalue = controlparameters.Rstart;
+    propimplementation = controlparameters.ESIEpropagationimplementation;
 
-    for irec = 1:nreceivers
+    % Qfirsttermstore is only needed for savediff2result = 1; otherwise an
+    % empty cell array is used in the loop, so that it is not copied to the
+    % parallel workers.
+    if savediff2 == 1
+        Qfirsttermforloop = Qfirsttermstore;
+    else
+        Qfirsttermforloop = {};
+    end
+
+    Pcell = cell(nreceivers,1);
+    P2cell = cell(nreceivers,1);
+    ivproblematiccell = cell(nreceivers,1);
+    propdiagnosticscell = cell(nreceivers,1);
+
+    parfor (irec = 1:nreceivers, nworkers)
         if showtext >=2
             disp(['      Receiver number ',int2str(irec)])
         end
@@ -1074,20 +1128,55 @@ if controlparameters.skipreceiverpropagation == 0
         % (doallSRcombinations = 0: only source N to receiver N)
         if nsolutions == 1
             solutionlist = 1;
-        elseif Sdata.doallSRcombinations == 1
+        elseif doallSRcombinations == 1
             solutionlist = 1:nsolutions;
         elseif irec <= nsolutions
             solutionlist = irec;
         else
-            continue
+            solutionlist = [];
         end
+        Prec = zeros(nfrequencies,nsolutions);
+        P2rec = zeros(nfrequencies,nsolutions);
+        ivproblematicrec = [];
+        propdiagnosticsrec = [];
 
-        [Fgeom,ivproblematic,propdiagnostics,pathlengths] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,...
-            Hsubmatrixdata,isthinhole,Rdata.vispartedgesfromr(:,irec),0,controlparameters.Rstart,...
-            Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),...
-            Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,filehandlingparameters.showtext,...
-            controlparameters.ESIEpropagationimplementation);
+        if ~isempty(solutionlist)
+            [Fgeom,ivproblematicrec,propdiagnosticsrec,pathlengths] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,...
+                Hsubmatrixdata,isthinhole,Rdata.vispartedgesfromr(:,irec),0,Rstartvalue,...
+                Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),...
+                Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,showtext,...
+                propimplementation);
 
+            % Only the non-zero elements are used
+            ivnonzero = find(Fgeom);
+            Fgeomnonzero = Fgeom(ivnonzero);
+            pathlengthsnonzero = pathlengths(ivnonzero) - Rstartvalue;
+
+            for ifreq = 1:nfrequencies
+                Fvec = Fgeomnonzero.*exp(-1i*kvec(ifreq)*pathlengthsnonzero);
+                for isol = solutionlist
+                    Qfinalone = Qfinalstore{ifreq,isol};
+                    Prec(ifreq,isol) = Fvec*Qfinalone(ivnonzero);
+                    if savediff2 == 1
+                        Qfirsttermone = Qfirsttermforloop{ifreq,isol};
+                        P2rec(ifreq,isol) = Fvec*(Qfinalone(ivnonzero)-Qfirsttermone(ivnonzero));
+                    end
+                end
+            end
+        end
+        Pcell{irec} = Prec;
+        P2cell{irec} = P2rec;
+        ivproblematiccell{irec} = ivproblematicrec;
+        propdiagnosticscell{irec} = propdiagnosticsrec;
+    end
+
+    % Collect the results of all the receivers
+    for irec = 1:nreceivers
+        P_receiver(:,irec,:) = reshape(Pcell{irec},nfrequencies,1,nsolutions);
+        if savediff2 == 1
+            extraoutputdata.tfinteqdiff_nodiff2(:,irec,:) = reshape(P2cell{irec},nfrequencies,1,nsolutions);
+        end
+        ivproblematic = ivproblematiccell{irec};
         if ~isempty(ivproblematic)
             existinglength = size(ivproblematicmatrix,2);
             newlength = length(ivproblematic);
@@ -1096,24 +1185,11 @@ if controlparameters.skipreceiverpropagation == 0
             end
             ivproblematicmatrix(irec,1:newlength) = ivproblematic;
         end
-
-        % Only the non-zero elements are used
-        ivnonzero = find(Fgeom);
-        Fgeomnonzero = Fgeom(ivnonzero);
-        pathlengthsnonzero = pathlengths(ivnonzero) - controlparameters.Rstart;
-
-        for ifreq = 1:nfrequencies
-            Fvec = Fgeomnonzero.*exp(-1i*kvec(ifreq)*pathlengthsnonzero);
-            for isol = solutionlist
-                Qfinal = Qfinalstore{ifreq,isol};
-                P_receiver(ifreq,irec,isol) = Fvec*Qfinal(ivnonzero);
-                if filehandlingparameters.savediff2result == 1
-                    Q_firstterm = Qfirsttermstore{ifreq,isol};
-                    extraoutputdata.tfinteqdiff_nodiff2(ifreq,irec,isol) = Fvec*(Qfinal(ivnonzero)-Q_firstterm(ivnonzero));
-                end
-            end
+        if ~isempty(propdiagnosticscell{irec})
+            propdiagnostics = propdiagnosticscell{irec};
         end
     end
+    clear Pcell P2cell ivproblematiccell propdiagnosticscell
 end
 % timingdata(4): the propagation time per frequency, as before
 timingdata(4) = etime(clock,t00_prop)/nfrequencies;

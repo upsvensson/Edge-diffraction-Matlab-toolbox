@@ -3,6 +3,33 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## Unreleased
+
+**Changes that affect the results**
+
+- EDcalcpropagatematrix (bug fix): the weights and node positions of an
+  edge (dzvec2, ze2_re2, dzvec1) were only recomputed when the number of
+  edge nodes changed. An edge with the same number of nodes as the
+  previous one, but another length, got the values of the previous edge.
+  This affected the propagation from the edge sources to the receivers for
+  geometries with edges of different lengths that get the same number of
+  nodes (ceil(ngauss*length/maxlength)); e.g. a 1 x 0.95 x 0.45 m box with
+  ngauss = 8 had a 5% error in the higher-order diffraction, which did not
+  decrease with ngauss. Geometries with equal edge lengths, like cubes and
+  the EDverify geometries, were not affected. EDcalcpropagatematrix has
+  stage version 2, so saved results are recomputed.
+
+**Speed**
+
+- New field `filehandlingparameters.parallelworkers` (default 0): the
+  propagation to the receivers in the integral equation stage can run on
+  parallel workers (Parallel Computing Toolbox), with a parfor over the
+  receivers. 0 gives an ordinary serial loop; Inf uses all the workers of
+  the parallel pool. The results are the same. It is not part of any hash.
+  The log file says how many workers were used. Without the Parallel
+  Computing Toolbox the loop runs serially, with a note on the screen and
+  in the log file.
+
 ## 0.612 (15 Oct. 2026)
 
 Speed. No changes of the computed results (only rounding errors). For a

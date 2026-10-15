@@ -27,6 +27,8 @@ function [textlines,warninglines] = EDinteqsummary(inteqdiagnostics)
 % 12 Oct. 2026 First version, by Claude, prompted by PS
 % 14 Oct. 2026 A line about the _qfinal file (computed and saved, or reused).
 % 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
+% 15 Oct. 2026 Lines about the parallel workers for the propagation, and
+% the note if the Parallel Computing Toolbox is not available.
 
 textlines = {};
 warninglines = {};
@@ -85,4 +87,14 @@ end
 
 if isfield(dg,'qfinalfile') && ischar(dg.qfinalfile) && ~isempty(dg.qfinalfile)
     textlines{end+1} = ['Integral equation solution (Qfinal): ',dg.qfinalfile];
+end
+if isfield(dg,'parallelworkers') && isnumeric(dg.parallelworkers) && isscalar(dg.parallelworkers) && dg.parallelworkers > 0
+    if isinf(dg.parallelworkers)
+        textlines{end+1} = 'Propagation to the receivers: on all the workers of the parallel pool';
+    else
+        textlines{end+1} = ['Propagation to the receivers: on up to ',int2str(dg.parallelworkers),' parallel workers'];
+    end
+end
+if isfield(dg,'parallelnote') && ischar(dg.parallelnote) && ~isempty(dg.parallelnote)
+    textlines{end+1} = dg.parallelnote;
 end

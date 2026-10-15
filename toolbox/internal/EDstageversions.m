@@ -43,6 +43,7 @@ function stageinfo = EDstageversions(stagename)
 % 14 Oct. 2026 EDmakeHODirs, EDwedge1st_fd and EDpropagateESIEBEM to
 % version 2 (bug fixes).
 % 15 Oct. 2026 EDwedge1st_fd to version 3 (near-singular cases with 'GL').
+% 15 Oct. 2026 EDcalcpropagatematrix to version 2 (bug fix).
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -72,7 +73,7 @@ versions.EDcalcdist                   = 1;
 versions.EDcalcedgeinteqmatrixsub2_mex = 1;  % Compiled file: increase by
                                              % hand when it is recompiled
                                              % from changed source code.
-versions.EDcalcpropagatematrix        = 1;
+versions.EDcalcpropagatematrix        = 2;  % 2: bug fix, edge data for edges with the same number of nodes
 versions.EDcheckobstr_edgetoedge      = 1;
 versions.EDcheckobstr_pointtoedge     = 1;
 versions.EDcheckobstrpaths            = 1;

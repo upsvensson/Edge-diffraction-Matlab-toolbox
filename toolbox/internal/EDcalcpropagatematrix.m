@@ -110,6 +110,14 @@ showtext,ESIEpropagationimplementation)
 % pathlengths, so that Fmatrix can be computed once (with frequency = 0)
 % and then multiplied by exp(-1i*k*(pathlengths-Rstart)) for each
 % frequency.
+% 15 Oct. 2026 (by Claude, prompted by PS) Bug fix: dzvec2, ze2_re2 and
+% dzvec1 were only recomputed when the number of edge nodes changed. For
+% an edge with the same number of nodes as the previous edge, but another
+% length, the weights and node positions of the previous edge were used.
+% This happened for geometries with edges of different lengths that get
+% the same number of nodes (e.g. a 1 x 0.95 x 0.45 m box with ngauss = 8:
+% 5% error in the higher-order diffraction). Equal-length edges (cubes,
+% the EDverify geometries) were not affected.
 
 if nargin < 13
     showtext = 0;
@@ -184,34 +192,30 @@ for iicounter = 1:length(ivrelevantedgepairs)
 
             ny = pi/(2*pi-edgedata.closwedangvec(edge2));
 
+            % The node positions and weights depend only on the number of
+            % nodes, n2 or n1. The scaled values (dzvec2, ze2_re2, dzvec1)
+            % depend also on the edge length, so they are computed when the
+            % edge changes, even if the number of nodes is the same.
+            % (Before 15 Oct. 2026 they were only computed when the number
+            % of nodes changed, so an edge with the same number of nodes as
+            % the previous one, but another length, got the wrong values.)
             if n2 ~= n2previous
-%                n2vec = Hsubmatrixdata.quadraturematrix_pos(n2,1:n2);
                 n2vec = Hsubmatrixdata.quadraturematrix_pos(1:n2,n2);
- %               n2vec = n2vec(:);
-%                weightvec2 = Hsubmatrixdata.quadraturematrix_weights(n2,1:n2);
                 weightvec2 = Hsubmatrixdata.quadraturematrix_weights(1:n2,n2);
-%                weightvec2 = weightvec2(:);
-
-                if edge2 ~= edge2previous
-                    dzvec2 = weightvec2*edgedata.edgelengthvec(edge2);
-                    ze2_re2 = (0 + n2vec*len2);
-                    edge2previous = edge2;
-                end
-
+            end
+            if n2 ~= n2previous || edge2 ~= edge2previous
+                dzvec2 = weightvec2*edgedata.edgelengthvec(edge2);
+                ze2_re2 = (0 + n2vec*len2);
+                edge2previous = edge2;
             end
 
             if n1 ~= n1previous
-%                n1vec = Hsubmatrixdata.quadraturematrix_pos(n1,1:n1);
-               n1vec = Hsubmatrixdata.quadraturematrix_pos(1:n1,n1);
-%                n1vec = n1vec(:);
-%                weightvec1 = Hsubmatrixdata.quadraturematrix_weights(n1,1:n1);
+                n1vec = Hsubmatrixdata.quadraturematrix_pos(1:n1,n1);
                 weightvec1 = Hsubmatrixdata.quadraturematrix_weights(1:n1,n1);
-%                weightvec1 = weightvec1(:);
-                if edge1 ~= edge1previous
-                    dzvec1 = weightvec1*edgedata.edgelengthvec(edge1);
-                    edge1previous = edge1;
-                end
-
+            end
+            if n1 ~= n1previous || edge1 ~= edge1previous
+                dzvec1 = weightvec1*edgedata.edgelengthvec(edge1);
+                edge1previous = edge1;
             end
 
             ze1_re2 = edgetoedgedata.ze1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.ze2sho(refto(edge1,edge2))-edgetoedgedata.ze1sho(refto(edge1,edge2))   );

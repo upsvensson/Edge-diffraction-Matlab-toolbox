@@ -34,7 +34,7 @@ function stageinfo = EDstageversions(stagename)
 %                                    (struct of cell arrays)
 %                 .ignored           cell array with the ignored functions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
 % stageinfo = EDstageversions(stagename);
 
@@ -42,6 +42,7 @@ function stageinfo = EDstageversions(stagename)
 % made from the output of EDshowcalltree('EDmain_convex').
 % 14 Oct. 2026 EDmakeHODirs, EDwedge1st_fd and EDpropagateESIEBEM to
 % version 2 (bug fixes).
+% 15 Oct. 2026 EDwedge1st_fd to version 3 (near-singular cases with 'GL').
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -96,7 +97,7 @@ versions.EDpoinpla                    = 1;
 versions.EDpoinplax                   = 1;
 versions.EDquadgk                     = 1;
 versions.EDquadstep                   = 1;
-versions.EDwedge1st_fd                = 2;  % 2: 'GL' falls back to 'accurate' for singular cases
+versions.EDwedge1st_fd                = 3;  % 2: 'GL' falls back to 'accurate' for singular cases; 3: also near-singular
 versions.EDwedge1st_ir                = 1;
 versions.EDwedge2nd                   = 1;
 versions.EDwedgeN                     = 1;

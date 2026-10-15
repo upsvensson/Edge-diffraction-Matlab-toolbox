@@ -36,9 +36,13 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 %				    corresponds to the distance R0 via the apex point.
 %   bc (optional) 	boundary condition, [1 1] (default) => rigid-rigid, [-1 -1] => soft-soft
 %                   [1 -1] => rigid-soft. First plane should be the ref. plane.
-%   diff1method     (optional) 'accurate' or 'GL'. Default = 'accurate';
+%   diff1method     (optional) 'accurate' or 'GL'. Default = 'accurate'.
+%                   With 'GL', the 'accurate' method is still used for
+%                   receivers close to a zone boundary (when the apex
+%                   point is on the edge, and the peak of the integrand
+%                   there is narrower than 5 GL node spacings).
 %   diff1GLorder    (optional) GL order; only relevant if diff1method =
-%   'GL';
+%                   'GL'.
 %
 % Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
 %
@@ -78,6 +82,11 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 % the check for this was in the 'accurate' branch, so it was never used.
 % An unknown diff1method gives an error.
 % 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
+% 15 Oct. 2026 (by Claude, prompted by PS) For diff1method = 'GL', also
+% near-singular cases are computed with the 'accurate' method: when the
+% apex point is on the edge and the peak of the integrand at the apex
+% point is narrower than 5 GL node spacings. Before, GL gave errors of up
+% to 100% for receivers within a few degrees of a zone boundary.
 
 localshowtext = 0;
 
@@ -450,19 +459,40 @@ if strcmp(diff1method,'accurate')
         end
     end
 elseif strcmp(diff1method,'GL')
-    % A singular case (a receiver exactly on a zone boundary) can not be
-    % computed with GL quadrature; the 'accurate' method is used instead.
-    if any(absnyfivec < 1e4*eps | abs(absnyfivec - 2*pi) < 1e4*eps)
-        [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs+za,rr,thetar,zr+za,zw+za,Method,Rstart,bc,'accurate',NaN);
-        return
-    end
-    zfirst = NaN;
-    singularterm = [0 0 0 0];
-
 %    [nvec,wvec] = EDdistelements(diff1GLorder,2);
     [nvec,wvec] = EDgetGLrule(diff1GLorder);
     zwlength = zw(2) - zw(1);
     zvec = nvec*zwlength + zw(1);
+
+    % Close to a zone boundary, the integrand has a narrow peak at the
+    % apex point (z = 0 after the shift above). As in the analytical
+    % approximation of the 'accurate' branch, the integral over the peak
+    % behaves as atan(z/wpeak), with the half-width
+    %   wpeak = m0*l0*sqrt(2*(1-cos(ny*fi)))/(ny*R0)
+    % for each of the four terms. GL quadrature can not resolve a peak
+    % that is narrower than a few node spacings, so if the apex point is
+    % on the edge (with a 5% margin) and wpeak is smaller than 5 node
+    % spacings near the apex point, the 'accurate' method is used instead.
+    % This includes the singular case (a receiver exactly on a zone
+    % boundary), where wpeak = 0. Away from the zone boundaries, the
+    % relative error of the GL result is then below about 1e-8.
+    wpeak = m0*l0*sqrt(2*(1-cosnyfivec))/(ny*R0);
+    apexonedge = zw(1) <= 0.05*zwlength && zw(2) >= -0.05*zwlength;
+    if apexonedge
+        zsorted = sort([zw(1);zvec(:);zw(2)]);
+        zapexclamped = min(max(0,zw(1)),zw(2));
+        kinterval = find(zsorted <= zapexclamped,1,'last');
+        kinterval = min(kinterval,numel(zsorted)-1);
+        nodespacings = diff(zsorted);
+        hnearapex = max(nodespacings(max(1,kinterval-1):min(numel(nodespacings),kinterval+1)));
+        if any(wpeak < 5*hnearapex) || any(absnyfivec < 1e4*eps | abs(absnyfivec - 2*pi) < 1e4*eps)
+            [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs,thetas,zs+za,rr,thetar,zr+za,zw+za,Method,Rstart,bc,'accurate',NaN);
+            return
+        end
+    end
+    zfirst = NaN;
+    singularterm = [0 0 0 0];
+
     tf = zeros(nfrequencies,1);
     kvec = 2*pi*frequencies/cair;
     useterm = [1 1 1 1];

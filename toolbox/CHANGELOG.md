@@ -3,9 +3,18 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
-## Unreleased
+## 0.611 (15 Oct. 2026)
 
-No changes of the computed results.
+One change of the computed results (first-order diffraction with
+`diff1method = 'GL'`), and documentation.
+
+**Changes that affect the results**
+
+- EDwedge1st_fd: with `diff1method = 'GL'`, receivers close to a zone
+  boundary (not only exactly on it) are computed with the `'accurate'`
+  method. Before, GL gave errors of up to 100% within a few degrees of a
+  zone boundary. Results with `'accurate'` are unchanged. New EDverify
+  test 20.
 
 **Documentation**
 
@@ -19,8 +28,8 @@ No changes of the computed results.
   in EDcheckinputstructs have a description column, which EDinputdoc shows.
 - EDinputdoc can write the input descriptions as LaTeX:
   `EDinputdoc('','EDinputfields.tex')`. The new cheatsheet
-  (EDtoolbox_cheatsheet.tex, in the new folder doc/; the PDF is in the top
-  folder) inputs this file, so it follows the code.
+  (EDtoolbox_cheatsheet.pdf) is generated from this file, so it follows
+  the code.
 - EDverify test 19: doc/EDinputfields.tex agrees with the specification in
   EDcheckinputstructs.
 - New internal function EDcheckheaders, which checks that the headers

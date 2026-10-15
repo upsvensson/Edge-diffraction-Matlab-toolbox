@@ -69,6 +69,8 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 %     receivers, and gives the same result as a run without recycling.
 % 19. The input field descriptions for the cheatsheet (doc/EDinputfields.tex)
 %     agree with the specification in EDcheckinputstructs.
+% 20. First-order diffraction with diff1method = 'GL' agrees with
+%     'accurate' also close to a zone boundary (thin plate, plane wave).
 %
 % See also EDmain_convex, EDstageversions
 %
@@ -119,8 +121,10 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 15 Oct. 2026 The header was updated (tests 16-18 listed).
 % 15 Oct. 2026 Added test 19 (the cheatsheet input descriptions are up to
 % date).
+% 15 Oct. 2026 Added test 20 (GL first-order diffraction close to a zone
+% boundary).
 
-ntests = 19;
+ntests = 20;
 
 if nargin < 1 || isempty(outputdirectory)
     outputdirectory = uigetdir('', 'Select the directory for the calculation results and the logfile');
@@ -174,7 +178,7 @@ disp(headerline)
 
 testfunctions = {@edtest1,@edtest2,@edtest3,@edtest4,@edtest5,@edtest6,@edtest7,...
     @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15,...
-    @edtest16,@edtest17,@edtest18,@edtest19};
+    @edtest16,@edtest17,@edtest18,@edtest19,@edtest20};
 
 for itest = 1:ntests
     if runtest(itest) ~= 1
@@ -799,6 +803,41 @@ for ii = 1:numel(stagenames)
 end
 
 r = edresult(title,description,allok,resultlines);
+end
+
+function r = edtest20(outputdirectory,filestem,~)
+title = 'GL first-order diffraction agrees with accurate close to a zone boundary';
+tolGL = 1e-6;
+description = {'1 m x 1 m thin plate, plane wave from above, 500 Hz. 81 receivers on an arc (radius 1 m)',...
+    'from 20 to 40 degrees, across the reflection zone boundary of one edge at 30 degrees.',...
+    ['tfdiff with diff1method = ''GL'' (32 points) should agree with ''accurate'' to ',num2str(tolGL),' (relative'],...
+    'to max abs(tfdiff)). (Oct. 2026: before the near-singular fallback, the error was about 1.)'};
+
+halfside = 0.5;
+corners = halfside*[1 1 0;-1 1 0;-1 -1 0;1 -1 0];
+geoinputdata = struct('corners',corners,'planecorners',[1 2 3 4;4 3 2 1]);
+Sinputdata = struct('coordinates',[0 0 1e8]);
+thetavec = (20:0.25:40).'*pi/180;
+Rinputdata = struct('coordinates',[sin(thetavec) 0*thetavec cos(thetavec)]);
+controlparameters = struct('generalmethod','tf','frequencies',500,'difforder',1);
+envdata = struct('cair',343);
+
+methods = {'accurate','GL'};
+tfdiff = cell(1,2);
+for ii = 1:2
+    cp = controlparameters;
+    cp.diff1method = methods{ii};
+    if ii == 2
+        cp.diff1GLorder = 32;
+    end
+    EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,cp,...
+        edfilehandling(outputdirectory,[filestem,'_',methods{ii}]));
+    tfdiff{ii} = EDres.tfdiff(:);
+end
+[relerr,imax] = max(abs(tfdiff{2} - tfdiff{1}));
+relerr = relerr/max(abs(tfdiff{1}));
+resultlines = {sprintf('Max. relative difference: %.2g (at %.2f degrees)',relerr,thetavec(imax)*180/pi)};
+r = edresult(title,description,relerr < tolGL,resultlines);
 end
 
 function r = edtest19(~,~,~)

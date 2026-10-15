@@ -3,9 +3,12 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
-## Unreleased
+## 0.612 (15 Oct. 2026)
 
-No changes of the computed results (only rounding errors).
+Speed. No changes of the computed results (only rounding errors). For a
+cube with 629 receivers, 11 frequencies and 2 separate sources, the
+integral equation stage went from 189 s to 17 s, and first-order
+diffraction from 11.2 s to 1.7 s.
 
 **Speed**
 
@@ -23,6 +26,13 @@ No changes of the computed results (only rounding errors).
   are computed; for GMRES_fast, the sparse matrix is also built only once.
   New diagnostics field `maxcolumndistancediff` (a consistency check of
   the factorization; it should be 0).
+- EDwedge1st_fd: first-order diffraction is computed for all frequencies
+  at once. The adaptive integration (EDquadgk's algorithm, now with a
+  vector-valued integrand, in the local function edquadgkmultifreq) runs
+  once per integration interval instead of once per frequency, and beta,
+  m and l are computed once per node. The GL branch also handles all
+  frequencies at once. About 8 times faster for 30 frequencies; the
+  results agree with the earlier ones to about 1e-14.
 
 **Tests**
 

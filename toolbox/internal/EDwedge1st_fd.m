@@ -87,6 +87,14 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 % apex point is on the edge and the peak of the integrand at the apex
 % point is narrower than 5 GL node spacings. Before, GL gave errors of up
 % to 100% for receivers within a few degrees of a zone boundary.
+% 15 Oct. 2026 (by Claude, prompted by PS) All frequencies are computed at
+% once: the adaptive integration (new local function edquadgkmultifreq,
+% the EDquadgk algorithm with a vector-valued integrand) is done once per
+% integration interval instead of once per frequency, and the
+% frequency-independent part of the integrand (beta, m, l) is computed
+% once per node. Also the GL branch computes all frequencies at once. The
+% results agree with the earlier ones to within the integration
+% tolerance.
 
 localshowtext = 0;
 
@@ -290,13 +298,10 @@ if strcmp(diff1method,'accurate')
     
     if apexincluded == 0
         if bc(1) == 1
-            for ii = 1:nfrequencies
-                k = 2*pi*frequencies(ii)/cair;
-                integralparameters.k = k;
-    %              tf(ii) = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi);
-                   tf(ii) = EDquadgk(integralparameters,zw(1),zw(2),tol)*(-ny/4/pi);
-                tf(ii) = tf(ii)*exp(-1i*k*Rextra);
-            end
+            % All frequencies at once (15 Oct. 2026)
+            kvec = 2*pi*frequencies(:)/cair;
+            tf = edquadgkmultifreq(integralparameters,kvec,zw(1),zw(2),tol)*(-ny/4/pi);
+            tf = tf.*exp(-1i*kvec*Rextra);
         else
             for ii = 1:nfrequencies
                 k = 2*pi*frequencies(ii)/cair;
@@ -319,17 +324,28 @@ if strcmp(diff1method,'accurate')
     else  % if apexincluded == 0
     
         if bc(1) == 1
+            % The numerical integrals are computed for all frequencies at
+            % once, before the frequency loop (15 Oct. 2026).
+            kvec = 2*pi*frequencies(:)/cair;
+            if localselectanalytical == 0
+                tfwholevec = edquadgkmultifreq(integralparameters,kvec,zw(1),zw(2),tol);
+            else
+                if includepart1 == 1
+                    tf1vec = edquadgkmultifreq(integralparameters,kvec,zw(1),-zrangespecial,tol);
+                end
+                if includepart2 == 1
+                    tf3vec = edquadgkmultifreq(integralparameters,kvec,zrangespecial,zw(2),tol);
+                end
+            end
             for ii = 1:nfrequencies
                 k = 2*pi*frequencies(ii)/cair;
-                integralparameters.k = k;
                 if localselectanalytical == 0
-    %                 tf(ii) = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),zw(2),'RelTol',tol)*(-ny/4/pi)*exp(-1i*k*Rextra);
-                       tf(ii) = EDquadgk(integralparameters,zw(1),zw(2),tol)*(-ny/4/pi)*exp(-1i*k*Rextra);
+                       tf(ii) = tfwholevec(ii)*(-ny/4/pi)*exp(-1i*k*Rextra);
     
                 else                
                     if includepart1 == 1
     %                     tf1 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zw(1),-zrangespecial,'RelTol',tol);
-                        tf1 = EDquadgk(integralparameters,zw(1),-zrangespecial,tol);
+                        tf1 = tf1vec(ii);
                         tf1 = tf1*(-ny/4/pi);
                         if localshowtext
                            disp(['            Part1 included, from ',num2str(zw(1)),' to ',num2str(-zrangespecial)]);
@@ -343,7 +359,7 @@ if strcmp(diff1method,'accurate')
                     end
                     if includepart2 == 1
     %                     tf3 = quadgk(@(x)EDbetaoverml_fd(x,k,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstarttemp,useterm),zrangespecial,zw(2),'RelTol',tol);
-                       tf3 = EDquadgk(integralparameters,zrangespecial,zw(2),tol);
+                       tf3 = tf3vec(ii);
                         tf3 = tf3*(-ny/4/pi);
                         if localshowtext
                            disp(['            Part2 included, from ',num2str(zrangespecial),' to ',num2str(zw(2))]);
@@ -493,14 +509,129 @@ elseif strcmp(diff1method,'GL')
     zfirst = NaN;
     singularterm = [0 0 0 0];
 
-    tf = zeros(nfrequencies,1);
-    kvec = 2*pi*frequencies/cair;
+    kvec = 2*pi*frequencies(:)/cair;
     useterm = [1 1 1 1];
 
-    for ii = 1:nfrequencies
-        outval = EDbetaoverml_fd(zvec,kvec(ii),rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm);
-        tf(ii) = sum(outval(:).*wvec(:));
-    end
+    % All frequencies at once (15 Oct. 2026): with k = 0, EDbetaoverml_fd
+    % gives the frequency-independent part beta/(m*l); the factor
+    % exp(-1i*k*(m+l-Rstart)) is applied for all k as a matrix.
+    outval0 = EDbetaoverml_fd(zvec,0,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm);
+    pathlengthvec = sqrt( (zvec-zs).^2 + rs^2 ) + sqrt( (zvec-zr).^2 + rr^2 ) - Rstart;
+    tf = exp(-1i*kvec*pathlengthvec(:).')*(outval0(:).*wvec(:));
     tf = tf*(-ny/4/pi);
 end
 
+%--------------------------------------------------------------------------
+function q = edquadgkmultifreq(P,kvec,a,b,reltol)
+% Adaptive Gauss-Kronrod integration of the first-order diffraction
+% integrand, beta/(m*l)*exp(-1i*k*(m+l-Rstart)), for all the wavenumbers
+% in kvec at once. The same algorithm as EDquadgk (the same transformed
+% interval, the same 7/15-point rule, the same tolerances), but with a
+% vector-valued integrand: the geometry-dependent part (beta, m, l) is
+% computed once per node, and only the exponential per wavenumber. A
+% subinterval is accepted when the error estimate is small enough for all
+% wavenumbers, so each component is at least as accurate as with a
+% separate EDquadgk call. For a single wavenumber, the result is the same
+% as that of EDquadgk.
+%
+% P is the struct integralparameters (fields rs, rr, zs, zr, ny,
+% sinnyfivec, cosnyfivec, useterm, Rstart); kvec is a column vector.
+% q is a column vector, [numel(kvec),1].
+
+NODES = [-0.9914553711208126; -0.9491079123427585; -0.8648644233597691; ...
+         -0.7415311855993944; -0.5860872354676911; -0.4058451513773972; ...
+         -0.2077849550078985;                   0;  0.2077849550078985; ...
+          0.4058451513773972;  0.5860872354676911;  0.7415311855993944; ...
+          0.8648644233597691;  0.9491079123427585;  0.9914553711208126];
+WT = [ 0.02293532201052922, 0.06309209262997855, 0.1047900103222502, ...
+       0.1406532597155259,  0.1690047266392679,  0.1903505780647854, ...
+       0.2044329400752989,  0.2094821410847278,  0.2044329400752989, ...
+       0.1903505780647854,  0.1690047266392679,  0.1406532597155259, ...
+       0.1047900103222502,  0.06309209262997855, 0.02293532201052922];
+EWT = WT - [0,  0.1294849661688697,  0, 0.2797053914892767, 0, ...
+                0.3818300505051189,  0, 0.4179591836734694, 0, ...
+                0.3818300505051189,  0, 0.2797053914892767, 0, ...
+                0.1294849661688697,  0];
+ATOL = 1.e-10;                       % as the default in EDquadgk
+RTOL = max(reltol,100*eps);
+MININTERVALCOUNT = 10;
+MAXINTERVALCOUNT = 650;
+
+kvec = kvec(:);
+nk = numel(kvec);
+WT3  = reshape(WT,1,15);
+EWT3 = reshape(EWT,1,15);
+
+% The initial subintervals of [-1,1]
+tinterval = linspace(-1,1,MININTERVALCOUNT+1);
+pathlen = 2;
+subs = [tinterval(1:end-1);tinterval(2:end)];
+q_ok = zeros(nk,1);
+err_ok = zeros(nk,1);
+firsteval = true;
+q = zeros(nk,1);
+
+while true
+    midpt = sum(subs)/2;
+    halfh = diff(subs)/2;
+    x = NODES*halfh + midpt;
+    x = reshape(x,1,[]);
+    tt = 0.25*(b-a)*x.*(3 - x.^2) + 0.5*(b+a);
+    if ~firsteval
+        ax = abs(tt);
+        if any(abs(diff(tt)) <= 100*eps*max(ax(1:end-1),ax(2:end)))
+            warning('EDwedge1st_fd:minstepsize','Minimum step size reached; singularity possible.');
+            break
+        end
+    end
+    firsteval = false;
+
+    % The integrand, [nk, numel(tt)]
+    if any(P.useterm)
+        m = sqrt( (tt-P.zs).^2 + P.rs^2 );
+        l = sqrt( (tt-P.zr).^2 + P.rr^2 );
+        ml = m.*l;
+        ch = (ml + (tt-P.zs).*(tt-P.zr))./(P.rs*P.rr);
+        ch = real((real(sqrt(ch.^2-1) + ch)).^P.ny);
+        ch = 0.5*( ch + 1./ch);
+        betasum = 0;
+        for jterm = 1:4
+            if P.useterm(jterm) == 1
+                betasum = betasum + P.sinnyfivec(jterm)./(ch - P.cosnyfivec(jterm));
+            end
+        end
+        fx = (betasum./ml.*0.75*(b-a).*(1 - x.^2)) .* exp(-1i*kvec*(m+l-P.Rstart));
+    else
+        fx = zeros(nk,numel(tt));
+    end
+
+    nsubs = size(subs,2);
+    fx3 = reshape(fx,nk,15,nsubs);
+    qsubs   = reshape(sum(fx3.*WT3,2),nk,nsubs).*halfh;
+    errsubs = reshape(sum(fx3.*EWT3,2),nk,nsubs).*halfh;
+    q = sum(qsubs,2) + q_ok;
+    tol = max(ATOL,RTOL*abs(q));
+    isok = abs(errsubs) <= (2*tol/pathlen)*abs(halfh);
+    ndx = find(all(isok,1));
+    err_ok = err_ok + sum(errsubs(:,ndx),2);
+    errsubs(:,ndx) = [];
+    errbnd = abs(err_ok) + sum(abs(errsubs),2);
+    if ~all(isfinite(q)) || ~all(isfinite(errbnd))
+        warning('EDwedge1st_fd:nonfinite','Infinite or Not-a-Number value encountered.');
+        break
+    end
+    if all(errbnd <= tol)
+        break
+    end
+    subs(:,ndx) = [];
+    if isempty(subs)
+        break
+    end
+    q_ok = q_ok + sum(qsubs(:,ndx),2);
+    if 2*size(subs,2) > MAXINTERVALCOUNT
+        warning('EDwedge1st_fd:maxintervalcount','Maximum number of intervals reached; the error bound is %9.1e.',max(errbnd));
+        break
+    end
+    midpt(ndx) = [];
+    subs = reshape([subs(1,:); midpt; midpt; subs(2,:)],2,[]);
+end

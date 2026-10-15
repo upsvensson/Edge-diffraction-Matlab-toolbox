@@ -42,6 +42,10 @@ function EDinputdoc(structname,latexfile)
 % 15 Oct. 2026 New optional input parameter latexfile: the description is
 % written as LaTeX, for the cheatsheet and the manual.
 % 15 Oct. 2026 No date in the generated LaTeX file.
+% 15 Oct. 2026 The patterns for field and function names were rewritten
+% without nested groups (Matlab did not set the field names in typewriter
+% font). They were then replaced by a scan of the characters
+% (edmarknames), since Matlab still did not find the field names.
 
 specs = EDcheckinputstructs('paramspecs');
 allnames = {'geoinputdata','Sinputdata','Rinputdata','envdata','controlparameters','filehandlingparameters'};
@@ -241,12 +245,11 @@ function textstring = edlatextext(textstring)
 textstring = edlatexescape(textstring);
 % Quoted values: 'tf' -> \EDstr{tf}
 textstring = regexprep(textstring,'''([^''\s]+)''','\\EDstr{$1}');
-% Function names (EDmain_convex) and stage files (_eddata), after a blank
-% or a parenthesis
-textstring = regexprep(textstring,'(^|[\s(])(ED[A-Za-z0-9]*(\\_[A-Za-z0-9]+)*|\\_[A-Za-z][A-Za-z0-9]*)','$1\\EDfile{$2}');
-% Field names, like .corners or .geoinputfile, but not decimal points
-% (1.21) or the end of a sentence.
-textstring = regexprep(textstring,'(^|[\s(/])\.([A-Za-z][A-Za-z0-9]*(\\_[A-Za-z0-9]+)*)','$1\\texttt{.$2}');
+% Function names (EDmain_convex) and stage files (_eddata), and field
+% names (.corners), are found by a scan of the characters (the regular
+% expressions that were used first gave different results in Matlab and
+% Octave).
+textstring = edmarknames(textstring);
 
 end
 
@@ -260,4 +263,69 @@ textstring = strrep(textstring,'\textbackslash ','\textbackslash{}');
 textstring = strrep(textstring,'^','\^{}');
 textstring = strrep(textstring,'~','\~{}');
 
+end
+
+%--------------------------------------------------------------------------
+function outstring = edmarknames(textstring)
+% Marks names in an (escaped) description text:
+%   .corners        -> \texttt{.corners}  (a field name: a dot, after a
+%                      blank, '(' or '/', followed by a letter)
+%   EDmain\_convex  -> \EDfile{EDmain\_convex}  (after a blank or '(')
+%   \_eddata        -> \EDfile{\_eddata}        (after a blank or '(')
+% A name consists of letters and digits, and \_ followed by a letter or
+% digit.
+
+n = length(textstring);
+outstring = '';
+k = 1;
+while k <= n
+    if k == 1
+        previous = ' ';
+    else
+        previous = textstring(k-1);
+    end
+    isfield = textstring(k) == '.' && any(previous == ' (/') && ...
+        k < n && edisletter(textstring(k+1));
+    isfunction = any(previous == ' (') && k+1 <= n && strcmp(textstring(k:k+1),'ED');
+    isstagefile = any(previous == ' (') && k+2 <= n && strcmp(textstring(k:k+1),'\_') && ...
+        edisletter(textstring(k+2));
+    if ~(isfield || isfunction || isstagefile)
+        outstring = [outstring,textstring(k)]; %#ok<AGROW>
+        k = k + 1;
+        continue
+    end
+    % Find the end of the name
+    if isfield
+        j = k + 1;
+    elseif isfunction
+        j = k + 2;
+    else
+        j = k + 2;
+    end
+    while j <= n
+        if edisletter(textstring(j)) || edisdigit(textstring(j))
+            j = j + 1;
+        elseif j+2 <= n && strcmp(textstring(j:j+1),'\_') && ...
+                (edisletter(textstring(j+2)) || edisdigit(textstring(j+2)))
+            j = j + 2;
+        else
+            break
+        end
+    end
+    if isfield
+        outstring = [outstring,'\texttt{',textstring(k:j-1),'}']; %#ok<AGROW>
+    else
+        outstring = [outstring,'\EDfile{',textstring(k:j-1),'}']; %#ok<AGROW>
+    end
+    k = j;
+end
+
+end
+
+function yesno = edisletter(c)
+yesno = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+end
+
+function yesno = edisdigit(c)
+yesno = c >= '0' && c <= '9';
 end

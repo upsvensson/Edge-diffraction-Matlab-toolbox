@@ -189,6 +189,13 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % frequency, receiver and source. Only exp(-1i*k*(L-Rstart)) is computed
 % per frequency. The same results up to rounding errors, but much faster
 % for many frequencies or sources.
+% 15 Oct. 2026 (by Claude, prompted by PS) The H-matrix is built once,
+% before the frequency loop, without the factor exp(-1i*k*m), which
+% depends only on the column: H(k) = B*diag(dcol(k)). Per frequency, only
+% dcol = exp(-1i*k*mcol) is computed, and H*x = B*(dcol.*x). For
+% GMRES_fast, the sparse matrix is also built only once. The same results
+% up to rounding errors. New field inteqdiagnostics.maxcolumndistancediff
+% (a check, should be 0).
 
 t00_total = clock;
 t00 = clock;
@@ -410,6 +417,337 @@ else
     Qfirsttermstore = cell(nfrequencies,ndiagcols);
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PART 1, before the frequency loop: the frequency-independent part of the
+% H-matrix.
+%
+% Each element of an H-submatrix is
+%   (2-acrossface_out)*Hsubconstant*ny*beta*exp(-1i*k*m)/m*dz*thinplaneboost
+% where m is the distance from the node on the sending edge (edge1) to the
+% node on the edge in between (edge2). Only exp(-1i*k*m) depends on the
+% frequency, and m depends only on the column of H (a node pair of the
+% sending edge pair). Therefore
+%   H(k) = B*diag(dcol(k)),  dcol(k) = exp(-1i*k*mcol)
+% where B is real and frequency-independent. B is built once, here (in
+% Hsubdatalists, and for GMRES_fast also as the sparse matrix Bsp), and
+% for each frequency only dcol is computed: H*x = B*(dcol.*x).
+% Before 15 Oct. 2026, the H-matrix was built for every frequency, with the
+% same result up to rounding errors.
+
+% PART 1: Build the H-matrix
+
+if showtext >= 2 && controlparameters.difforder > 2
+    disp(' ')
+    disp(['      Building the H matrix of size (',int2str( nQ),',',int2str( nQ),') with ',int2str(Hsubmatrixdata.submatrixcounter),' submatrices'])
+end
+
+t00 = clock;
+
+% In the for-loop, nn will be the Hsub number
+% The ii value will refer to the row-number in the edgepairlist for the 
+% receiving edge-pair.
+% The jj value will refer to the row-number in the edgepairlist for the 
+% sending edge-pair.
+
+% mcol: the distance m (from the node on the sending edge to the node
+% on the edge in between) for each column of H. maxmcoldiff checks
+% that all submatrices give the same value for a column.
+mcol = zeros(nQ,1);
+mcolset = false(nQ,1);
+maxmcoldiff = 0;
+
+n1prev = 0;
+n2prev = 0;
+n3prev = 0;
+shortlistprev = 0;
+
+% ----------------------------------------------------------------------------------------------
+% ----------------------------------------------------------------------------------------------
+% ----------------------------------------------------------------------------------------------
+% If difforder > 2, create the big H-matrix, in the form of separate sub-matrices
+% The H-matrix is independent of sources and receivers.
+
+if controlparameters.difforder > 2 && qfinalreused == 0
+    for nn = 1:nsubmatrices
+
+        edge1 = Hsubmatrixdata.edgetripletlist(nn,3);
+        n1 = Hsubmatrixdata.nedgeelems(edge1);
+
+        edge2 = Hsubmatrixdata.edgetripletlist(nn,2);                   
+        n2 = Hsubmatrixdata.nedgeelems(edge2);
+           len2 = edgedata.edgelengthvec(edge2);
+
+        edge3 = Hsubmatrixdata.edgetripletlist(nn,1);
+        n3 = Hsubmatrixdata.nedgeelems(edge3);
+%             disp(['triplet no. ',int2str(nn),': n1,n2,n3 = ',int2str(n1),',',int2str(n2),',',int2str(n3)])
+        shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
+
+%             ind_start = 1 + (Hsubmatrixdata.Qvecstartnums(ii)-1) + (Hsubmatrixdata.Qvecstartnums(jj)-1)* nQ;
+
+       if showtext >= 3
+           disp(' ')
+            disp(['         H-submatrix ',int2str(nn),': From edge ',int2str(edge1),' via edge ',int2str(edge2),' to edge ',int2str(edge3)])
+            disp(['         of size ',int2str(n3*n2),' by ',int2str(n2*n1),'. Thinplaneboost = ',int2str(thinplaneboostvec(nn))])
+            if symmetrycompression ==1
+                disp(['         stored as shortlist number ',int2str(shortlistnumber)])
+            end
+       end
+
+       % Build vertical [n3,n2] matrices and expand them horizontally
+       % NB! n1 refers to edge 1, which is the source edge
+       %     n3 refers to edge 3, which is the target edge
+       % edgetriplets written in order [edge3 edge2 edge 1]
+
+       if n1 ~= n1prev || n2 ~= n2prev || n3 ~= n3prev
+
+%                if computer ~= 'MACI64'
+           if ~strcmp(computer, 'MACI64')
+               if n3 <= 255
+                   n3vertmat = uint8(1:n3);
+               else
+                   n3vertmat = uint16(1:n3);                   
+               end
+               n3vertmat = reshape(repmat(n3vertmat,n2,1),n2*n3,1);           
+               n3vertmat = n3vertmat(:,ones(1,n1*n2));
+
+               if n2 <= 255
+                   n2vertmat = uint8(1:n2).';
+               else
+                  n2vertmat = uint16(1:n2).'; 
+               end
+               n2vertmat = repmat(n2vertmat,n3,1);
+               n2vertmat = n2vertmat(:,ones(1,n1*n2));
+
+           % Build horizontal n2 and n1 matrices and expand them vertically
+                if n1 <= 255                    
+                   n1hormat = uint8(1:n1);
+                else
+                    n1hormat = uint16(1:n1);
+                end
+               n1hormat = repmat(n1hormat,1,n2);
+                   n1hormat = n1hormat(ones(n3*n2,1),:);
+
+                if n2 <= 255
+                   n2hormat = uint8(1:n2);
+                else
+                   n2hormat = uint16(1:n2); 
+                end
+                   n2hormat = reshape(repmat(n2hormat,n1,1),1,n2*n1);           
+               n2hormat = n2hormat(ones(n3*n2,1),:);
+
+           % Now, we should use only the combinations where n2vertmat ==
+           % n2hormat! Otherwise we get too many combinations: there should
+           % be n1*n2*n3 unique combinations, but the Hsub-matrix has size
+           % [n3*n2,n2*n1], which has n2 too many elements!
+           %
+           % Once we have the iv, which identifies the wanted matrix
+           % elements, we can throw away n2hormat because it is identical
+           % to n2vertmat in the wanted matrix elements!
+
+               ivuse = find(n2hormat==n2vertmat);
+               n3vertmat = n3vertmat(ivuse);
+               n2vertmat = n2vertmat(ivuse);
+               n1hormat  = n1hormat(ivuse);
+
+           else
+%                     [ivuse,n1hormat,n2vertmat,n3vertmat] = ESIE2calcedgeinteqmatrixsub2_mex(n1,n2,n3);       
+                [ivuse,n1hormat,n2vertmat,n3vertmat] = EDcalcedgeinteqmatrixsub2_mex(n1,n2,n3);       
+
+           end
+
+           ivuse = uint64(ivuse);
+
+       end
+
+       % Build vectors that will be referred to by the n1,n2,n3
+       % matrices
+
+       if n1 ~= n1prev
+            % n1vec = full(Hsubmatrixdata.quadraturematrix_pos(n1,1:n1));
+            % n1vec = n1vec(:);
+            n1vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n1,n1));
+            % weightvec = full(Hsubmatrixdata.quadraturematrix_weights(n1,1:n1));
+            % weightvec = weightvec(:);
+            weightvec = full(Hsubmatrixdata.quadraturematrix_weights(1:n1,n1));
+            n1prev = n1;
+       end       
+       dzvec = weightvec*edgedata.edgelengthvec(edge1);
+
+        if n2 ~= n2prev
+            % n2vec = full(Hsubmatrixdata.quadraturematrix_pos(n2,1:n2));
+            % n2vec = n2vec(:);
+            n2vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n2,n2));
+            n2prev = n2;
+        end
+        if n3 ~= n3prev        
+            % n3vec = full(Hsubmatrixdata.quadraturematrix_pos(n3,1:n3));
+            % n3vec = n3vec(:);
+            n3vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n3,n3));
+            n3prev = n3;
+        end
+
+        % Bug found and fixed 22 Sep. 2014: lines below did not always detect if another
+        % edge was skewed relative to the first one, because only the
+        % thetae1sho was used. Necessary to check thetae1sho and thetae2sho.
+
+       ny = pi/(2*pi-edgedata.closwedangvec(edge2));
+       thetain  = edgetoedgedata.thetae1sho(refto(edge1,edge2));
+       thetain_other_end_of_edge  = edgetoedgedata.thetae2sho(refto(edge1,edge2));
+    %    if abs(thetain) < 1e-10 || abs(thetain-(2*pi-closwedangvec(edge2))) < 1e-10   % Old erroneous line
+       if (abs(thetain) < 1e-10 || abs(thetain-(2*pi-edgedata.closwedangvec(edge2))) < 1e-10) && abs(thetain-thetain_other_end_of_edge) < 1e-10
+           acrossface_in = 1;       
+       else
+           acrossface_in = 0;
+       end
+       thetaout = edgetoedgedata.thetae1sho(refto(edge3,edge2));
+       thetaout_other_end_of_edge = edgetoedgedata.thetae2sho(refto(edge3,edge2));
+    %   if abs(thetaout) < 1e-10 || abs(thetaout-(2*pi-closwedangvec(edge2))) < 1e-10    % Old erroneous line
+       if (abs(thetaout) < 1e-10 || abs(thetaout-(2*pi-edgedata.closwedangvec(edge2))) < 1e-10) && abs(thetaout-thetaout_other_end_of_edge) < 1e-10
+           acrossface_out = 1;
+       else
+           acrossface_out = 0;
+       end
+
+       if showtext >= 3
+           disp(['         Acrossface-out = ',int2str(acrossface_out),' and Acrossface-in = ',int2str(acrossface_in), ' (not used)'])
+       end
+
+       ze2_re2 = n2vec*len2;
+       ze3_re2 = edgetoedgedata.ze1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.ze2sho(refto(edge3,edge2))-edgetoedgedata.ze1sho(refto(edge3,edge2))   );
+%        re3_re2 = edgetoedgedata.re1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.re2sho(refto(edge3,edge2))-edgetoedgedata.re1sho(refto(edge3,edge2))   );
+
+       if shortlistnumber ~= shortlistprev      
+
+           n1vec = n1vec(:).';
+
+           ze1_re2 = edgetoedgedata.ze1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.ze2sho(refto(edge1,edge2))-edgetoedgedata.ze1sho(refto(edge1,edge2))   );
+
+           % Bug fixed 26 Oct. 2017: the line below is wrong because the
+           % r-values are not distributed linearly.
+%            re1_re2 = edgetoedgedata.re1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.re2sho(refto(edge1,edge2))-edgetoedgedata.re1sho(refto(edge1,edge2))   );
+
+
+           if acrossface_in*acrossface_out == 0 % This case is a preparation for non-convex objects.
+                % Reconvert the cylindrical coordinates of
+                % edge1-re2 into cartesian! Then we can use the EDcoordtrans.
+                % We define our own cartesian coord syst such that the reference
+                % edge (edge2) has its starting point in [0 0 0], the z-axis along its
+                % own edge, and the x-axis is along (onto) the reference plane.
+
+                xedge1start = edgetoedgedata.re1sho(refto(edge1,edge2))*cos(edgetoedgedata.thetae1sho(refto(edge1,edge2)));
+                xedge1end   = edgetoedgedata.re2sho(refto(edge1,edge2))*cos(edgetoedgedata.thetae2sho(refto(edge1,edge2)));
+                yedge1start = edgetoedgedata.re1sho(refto(edge1,edge2))*sin(edgetoedgedata.thetae1sho(refto(edge1,edge2)));
+                yedge1end   = edgetoedgedata.re2sho(refto(edge1,edge2))*sin(edgetoedgedata.thetae2sho(refto(edge1,edge2)));
+                xe1_re2 = xedge1start + n1vec.*(xedge1end-xedge1start);
+                ye1_re2 = yedge1start + n1vec.*(yedge1end-yedge1start);
+
+                [re1_re2,thetae1_re2,~] = EDcoordtrans1([xe1_re2.' ye1_re2.' ze1_re2.'],[0 0 0;0 0 edgedata.edgelengthvec(edge2)],[0 1 0]);
+                re1_re2 = re1_re2(:).';
+                thetae1_re2 = thetae1_re2(:).';
+
+                xedge3start = edgetoedgedata.re1sho(refto(edge3,edge2))*cos(edgetoedgedata.thetae1sho(refto(edge3,edge2)));
+                xedge3end   = edgetoedgedata.re2sho(refto(edge3,edge2))*cos(edgetoedgedata.thetae2sho(refto(edge3,edge2)));
+                yedge3start = edgetoedgedata.re1sho(refto(edge3,edge2))*sin(edgetoedgedata.thetae1sho(refto(edge3,edge2)));
+                yedge3end   = edgetoedgedata.re2sho(refto(edge3,edge2))*sin(edgetoedgedata.thetae2sho(refto(edge3,edge2)));
+                xe3_re2 = xedge3start + n3vec.*(xedge3end-xedge3start);
+                ye3_re2 = yedge3start + n3vec.*(yedge3end-yedge3start);
+
+                [re3_re2,thetae3_re2,~] = EDcoordtrans1([xe3_re2 ye3_re2 ze3_re2],[0 0 0;0 0 edgedata.edgelengthvec(edge2)],[0 1 0]);
+                re3_re2 = re3_re2(:);
+                thetae3_re2 = thetae3_re2(:);
+
+           else
+
+                re1_re2 = edgetoedgedata.re1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.re2sho(refto(edge1,edge2))-edgetoedgedata.re1sho(refto(edge1,edge2))   );
+                re3_re2 = edgetoedgedata.re1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.re2sho(refto(edge3,edge2))-edgetoedgedata.re1sho(refto(edge3,edge2))   );
+
+           end
+
+           ldist = (ze3_re2(n3vertmat) - ze2_re2(n2vertmat)).^2   + re3_re2(n3vertmat).^2;
+           ldist = sqrt(ldist);
+
+           mdist = (ze1_re2(n1hormat).' - ze2_re2(n2vertmat)).^2   + (re1_re2(n1hormat).').^2;
+           mdist = sqrt(mdist);
+
+           % The factor exp(-1i*k*mdist) is not included here: it is
+           % applied per frequency, as dcol (see above).
+           dz_overm = dzvec(n1hormat)./mdist;
+
+           ch = ((ze2_re2(n2vertmat) - ze1_re2(n1hormat).').*(ze2_re2(n2vertmat) - ze3_re2(n3vertmat)) + mdist.*ldist)./re1_re2(n1hormat).'./re3_re2(n3vertmat);
+           ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
+           ch = ( ch + 1./ch)/2;
+
+           % PS 28 March 2011: The 4 beta terms are identical!       
+           if acrossface_in == 1 && acrossface_out == 1
+               beta = 4*( sin(ny*(pi + thetain + thetaout  ))./(ch - cos(ny*(pi + thetain + thetaout   ))));
+           else
+               beta = ( sin(ny*(pi + thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi + thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)   ))+eps*10)) + ...
+                      ( sin(ny*(pi + thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi + thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)   ))+eps*10)) + ...
+                      ( sin(ny*(pi - thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi - thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)   ))+eps*10)) + ...
+                      ( sin(ny*(pi - thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi - thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)   ))+eps*10));
+           end
+
+           if ismember(edge1,edgedata.offedges)==1 || ismember(edge2,edgedata.offedges)==1 || ismember(edge3,edgedata.offedges)==1
+               beta = beta*0;
+           else
+    %           disp(['Edge1: ',int2str(edge1),' edge2: ',int2str(edge2),' edge3: ',int2str(edge3)])
+           end
+
+            Hsubdatalists{nn} = (2-acrossface_out)*Hsubconstant*ny*beta.*dz_overm*thinplaneboostvec(nn);   
+            ivuselists{nn} = ivuse;
+            listofactiveHsubs(Hsubcounter) = nn;
+            Hsubcounter = Hsubcounter + 1;
+
+       end
+
+        % The distance mdist for each column of this submatrix, stored
+        % at the global column numbers. A column is a node pair of the
+        % sending edge pair, so mdist depends only on the column. For a
+        % submatrix that reuses the data of the previous one (symmetry
+        % compression), ivuse and mdist are those of that submatrix.
+        iiout = Hsubmatrixdata.listofsubmatrices(nn,2);
+        jjin  = Hsubmatrixdata.listofsubmatrices(nn,3);
+        nrowsHsub = double(Hsubmatrixdata.Qvecendnums(iiout)) - double(Hsubmatrixdata.Qvecstartnums(iiout)) + 1;
+        ivusedouble = double(ivuse);
+        rowHsub = rem(ivusedouble-1,nrowsHsub) + 1;
+        globalcol = double(Hsubmatrixdata.Qvecstartnums(jjin)) - 1 + (ivusedouble-rowHsub)/nrowsHsub + 1;
+        alreadyset = mcolset(globalcol);
+        if any(alreadyset)
+            maxmcoldiff = max([maxmcoldiff; abs(mcol(globalcol(alreadyset)) - mdist(alreadyset))]);
+        end
+        mcol(globalcol) = mdist;
+        mcolset(globalcol) = true;
+
+        shortlistprev = shortlistnumber;
+
+    end
+end
+
+ivactive = listofactiveHsubs~=0;
+listofactiveHsubs = listofactiveHsubs(ivactive);
+
+if maxmcoldiff > 1e-9*max([mcol;1])
+    warning('EDintegralequation_convex_tf:mcol',...
+        'The column distances of the H-matrix differ by %g between submatrices (should be 0)',maxmcoldiff)
+end
+inteqdiagnostics.maxcolumndistancediff = maxmcoldiff;
+
+% For GMRES_fast, the sparse matrix B is built once; per frequency,
+% H*x = B*(dcol.*x).
+if strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 && ...
+        controlparameters.difforder > 2 && qfinalreused == 0
+    t00_gmres = clock;
+    Bsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
+    inteqdiagnostics.assemblytime(1,1) = etime(clock,t00_gmres);
+    inteqdiagnostics.nnzH = nnz(Bsp);
+end
+
+timingdata(1) = etime(clock,t00);
+t00 = clock;
+
+% savetemp
+% pause
+
 for ifreq = 1:nfrequencies     
     frequency = controlparameters.frequencies(ifreq);
     if showtext >= 1
@@ -420,286 +758,17 @@ for ifreq = 1:nfrequencies
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % PART 1: Build the H-matrix
-
-    if showtext >= 2 && controlparameters.difforder > 2
-        disp(' ')
-        disp(['      Building the H matrix of size (',int2str( nQ),',',int2str( nQ),') with ',int2str(Hsubmatrixdata.submatrixcounter),' submatrices'])
-    end
-    
-    if ifreq == 1
-        t00 = clock;
-    end
-
     k = 2*pi*frequency/envdata.cair;
-    
-    % In the for-loop, nn will be the Hsub number
-    % The ii value will refer to the row-number in the edgepairlist for the 
-    % receiving edge-pair.
-    % The jj value will refer to the row-number in the edgepairlist for the 
-    % sending edge-pair.
 
-    n1prev = 0;
-    n2prev = 0;
-    n3prev = 0;
-    shortlistprev = 0;
-
-    % ----------------------------------------------------------------------------------------------
-    % ----------------------------------------------------------------------------------------------
-    % ----------------------------------------------------------------------------------------------
-    % If difforder > 2, create the big H-matrix, in the form of separate sub-matrices
-    % The H-matrix is independent of sources and receivers.
-
+    % PART 1: the frequency-dependent factor of the H-matrix, which was
+    % built (without this factor) before the frequency loop:
+    % H(k) = B*diag(dcol).
     if controlparameters.difforder > 2 && qfinalreused == 0
-        for nn = 1:nsubmatrices
-
-            edge1 = Hsubmatrixdata.edgetripletlist(nn,3);
-            n1 = Hsubmatrixdata.nedgeelems(edge1);
-
-            edge2 = Hsubmatrixdata.edgetripletlist(nn,2);                   
-            n2 = Hsubmatrixdata.nedgeelems(edge2);
-               len2 = edgedata.edgelengthvec(edge2);
-
-            edge3 = Hsubmatrixdata.edgetripletlist(nn,1);
-            n3 = Hsubmatrixdata.nedgeelems(edge3);
-%             disp(['triplet no. ',int2str(nn),': n1,n2,n3 = ',int2str(n1),',',int2str(n2),',',int2str(n3)])
-            shortlistnumber = Hsubmatrixdata.reftoshortlist(nn);
-
-%             ind_start = 1 + (Hsubmatrixdata.Qvecstartnums(ii)-1) + (Hsubmatrixdata.Qvecstartnums(jj)-1)* nQ;
-
-           if showtext >= 3
-               disp(' ')
-                disp(['         H-submatrix ',int2str(nn),': From edge ',int2str(edge1),' via edge ',int2str(edge2),' to edge ',int2str(edge3)])
-                disp(['         of size ',int2str(n3*n2),' by ',int2str(n2*n1),'. Thinplaneboost = ',int2str(thinplaneboostvec(nn))])
-                if symmetrycompression ==1
-                    disp(['         stored as shortlist number ',int2str(shortlistnumber)])
-                end
-           end
-
-           % Build vertical [n3,n2] matrices and expand them horizontally
-           % NB! n1 refers to edge 1, which is the source edge
-           %     n3 refers to edge 3, which is the target edge
-           % edgetriplets written in order [edge3 edge2 edge 1]
-
-           if n1 ~= n1prev || n2 ~= n2prev || n3 ~= n3prev
-
-%                if computer ~= 'MACI64'
-               if ~strcmp(computer, 'MACI64')
-                   if n3 <= 255
-                       n3vertmat = uint8(1:n3);
-                   else
-                       n3vertmat = uint16(1:n3);                   
-                   end
-                   n3vertmat = reshape(repmat(n3vertmat,n2,1),n2*n3,1);           
-                   n3vertmat = n3vertmat(:,ones(1,n1*n2));
-
-                   if n2 <= 255
-                       n2vertmat = uint8(1:n2).';
-                   else
-                      n2vertmat = uint16(1:n2).'; 
-                   end
-                   n2vertmat = repmat(n2vertmat,n3,1);
-                   n2vertmat = n2vertmat(:,ones(1,n1*n2));
-
-               % Build horizontal n2 and n1 matrices and expand them vertically
-                    if n1 <= 255                    
-                       n1hormat = uint8(1:n1);
-                    else
-                        n1hormat = uint16(1:n1);
-                    end
-                   n1hormat = repmat(n1hormat,1,n2);
-                       n1hormat = n1hormat(ones(n3*n2,1),:);
-
-                    if n2 <= 255
-                       n2hormat = uint8(1:n2);
-                    else
-                       n2hormat = uint16(1:n2); 
-                    end
-                       n2hormat = reshape(repmat(n2hormat,n1,1),1,n2*n1);           
-                   n2hormat = n2hormat(ones(n3*n2,1),:);
-
-               % Now, we should use only the combinations where n2vertmat ==
-               % n2hormat! Otherwise we get too many combinations: there should
-               % be n1*n2*n3 unique combinations, but the Hsub-matrix has size
-               % [n3*n2,n2*n1], which has n2 too many elements!
-               %
-               % Once we have the iv, which identifies the wanted matrix
-               % elements, we can throw away n2hormat because it is identical
-               % to n2vertmat in the wanted matrix elements!
-
-                   ivuse = find(n2hormat==n2vertmat);
-                   n3vertmat = n3vertmat(ivuse);
-                   n2vertmat = n2vertmat(ivuse);
-                   n1hormat  = n1hormat(ivuse);
-
-               else
-%                     [ivuse,n1hormat,n2vertmat,n3vertmat] = ESIE2calcedgeinteqmatrixsub2_mex(n1,n2,n3);       
-                    [ivuse,n1hormat,n2vertmat,n3vertmat] = EDcalcedgeinteqmatrixsub2_mex(n1,n2,n3);       
-
-               end
-
-               ivuse = uint64(ivuse);
-
-           end
-
-           % Build vectors that will be referred to by the n1,n2,n3
-           % matrices
-
-           if n1 ~= n1prev
-                % n1vec = full(Hsubmatrixdata.quadraturematrix_pos(n1,1:n1));
-                % n1vec = n1vec(:);
-                n1vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n1,n1));
-                % weightvec = full(Hsubmatrixdata.quadraturematrix_weights(n1,1:n1));
-                % weightvec = weightvec(:);
-                weightvec = full(Hsubmatrixdata.quadraturematrix_weights(1:n1,n1));
-                n1prev = n1;
-           end       
-           dzvec = weightvec*edgedata.edgelengthvec(edge1);
-
-            if n2 ~= n2prev
-                % n2vec = full(Hsubmatrixdata.quadraturematrix_pos(n2,1:n2));
-                % n2vec = n2vec(:);
-                n2vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n2,n2));
-                n2prev = n2;
-            end
-            if n3 ~= n3prev        
-                % n3vec = full(Hsubmatrixdata.quadraturematrix_pos(n3,1:n3));
-                % n3vec = n3vec(:);
-                n3vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n3,n3));
-                n3prev = n3;
-            end
-
-            % Bug found and fixed 22 Sep. 2014: lines below did not always detect if another
-            % edge was skewed relative to the first one, because only the
-            % thetae1sho was used. Necessary to check thetae1sho and thetae2sho.
-
-           ny = pi/(2*pi-edgedata.closwedangvec(edge2));
-           thetain  = edgetoedgedata.thetae1sho(refto(edge1,edge2));
-           thetain_other_end_of_edge  = edgetoedgedata.thetae2sho(refto(edge1,edge2));
-        %    if abs(thetain) < 1e-10 || abs(thetain-(2*pi-closwedangvec(edge2))) < 1e-10   % Old erroneous line
-           if (abs(thetain) < 1e-10 || abs(thetain-(2*pi-edgedata.closwedangvec(edge2))) < 1e-10) && abs(thetain-thetain_other_end_of_edge) < 1e-10
-               acrossface_in = 1;       
-           else
-               acrossface_in = 0;
-           end
-           thetaout = edgetoedgedata.thetae1sho(refto(edge3,edge2));
-           thetaout_other_end_of_edge = edgetoedgedata.thetae2sho(refto(edge3,edge2));
-        %   if abs(thetaout) < 1e-10 || abs(thetaout-(2*pi-closwedangvec(edge2))) < 1e-10    % Old erroneous line
-           if (abs(thetaout) < 1e-10 || abs(thetaout-(2*pi-edgedata.closwedangvec(edge2))) < 1e-10) && abs(thetaout-thetaout_other_end_of_edge) < 1e-10
-               acrossface_out = 1;
-           else
-               acrossface_out = 0;
-           end
-
-           if showtext >= 3
-               disp(['         Acrossface-out = ',int2str(acrossface_out),' and Acrossface-in = ',int2str(acrossface_in), ' (not used)'])
-           end
-
-           ze2_re2 = n2vec*len2;
-           ze3_re2 = edgetoedgedata.ze1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.ze2sho(refto(edge3,edge2))-edgetoedgedata.ze1sho(refto(edge3,edge2))   );
-    %        re3_re2 = edgetoedgedata.re1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.re2sho(refto(edge3,edge2))-edgetoedgedata.re1sho(refto(edge3,edge2))   );
-
-           if shortlistnumber ~= shortlistprev      
-
-               n1vec = n1vec(:).';
-
-               ze1_re2 = edgetoedgedata.ze1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.ze2sho(refto(edge1,edge2))-edgetoedgedata.ze1sho(refto(edge1,edge2))   );
-
-               % Bug fixed 26 Oct. 2017: the line below is wrong because the
-               % r-values are not distributed linearly.
-    %            re1_re2 = edgetoedgedata.re1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.re2sho(refto(edge1,edge2))-edgetoedgedata.re1sho(refto(edge1,edge2))   );
-
-
-               if acrossface_in*acrossface_out == 0 % This case is a preparation for non-convex objects.
-                    % Reconvert the cylindrical coordinates of
-                    % edge1-re2 into cartesian! Then we can use the EDcoordtrans.
-                    % We define our own cartesian coord syst such that the reference
-                    % edge (edge2) has its starting point in [0 0 0], the z-axis along its
-                    % own edge, and the x-axis is along (onto) the reference plane.
-
-                    xedge1start = edgetoedgedata.re1sho(refto(edge1,edge2))*cos(edgetoedgedata.thetae1sho(refto(edge1,edge2)));
-                    xedge1end   = edgetoedgedata.re2sho(refto(edge1,edge2))*cos(edgetoedgedata.thetae2sho(refto(edge1,edge2)));
-                    yedge1start = edgetoedgedata.re1sho(refto(edge1,edge2))*sin(edgetoedgedata.thetae1sho(refto(edge1,edge2)));
-                    yedge1end   = edgetoedgedata.re2sho(refto(edge1,edge2))*sin(edgetoedgedata.thetae2sho(refto(edge1,edge2)));
-                    xe1_re2 = xedge1start + n1vec.*(xedge1end-xedge1start);
-                    ye1_re2 = yedge1start + n1vec.*(yedge1end-yedge1start);
-
-                    [re1_re2,thetae1_re2,~] = EDcoordtrans1([xe1_re2.' ye1_re2.' ze1_re2.'],[0 0 0;0 0 edgedata.edgelengthvec(edge2)],[0 1 0]);
-                    re1_re2 = re1_re2(:).';
-                    thetae1_re2 = thetae1_re2(:).';
-
-                    xedge3start = edgetoedgedata.re1sho(refto(edge3,edge2))*cos(edgetoedgedata.thetae1sho(refto(edge3,edge2)));
-                    xedge3end   = edgetoedgedata.re2sho(refto(edge3,edge2))*cos(edgetoedgedata.thetae2sho(refto(edge3,edge2)));
-                    yedge3start = edgetoedgedata.re1sho(refto(edge3,edge2))*sin(edgetoedgedata.thetae1sho(refto(edge3,edge2)));
-                    yedge3end   = edgetoedgedata.re2sho(refto(edge3,edge2))*sin(edgetoedgedata.thetae2sho(refto(edge3,edge2)));
-                    xe3_re2 = xedge3start + n3vec.*(xedge3end-xedge3start);
-                    ye3_re2 = yedge3start + n3vec.*(yedge3end-yedge3start);
-
-                    [re3_re2,thetae3_re2,~] = EDcoordtrans1([xe3_re2 ye3_re2 ze3_re2],[0 0 0;0 0 edgedata.edgelengthvec(edge2)],[0 1 0]);
-                    re3_re2 = re3_re2(:);
-                    thetae3_re2 = thetae3_re2(:);
-
-               else
-
-                    re1_re2 = edgetoedgedata.re1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.re2sho(refto(edge1,edge2))-edgetoedgedata.re1sho(refto(edge1,edge2))   );
-                    re3_re2 = edgetoedgedata.re1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.re2sho(refto(edge3,edge2))-edgetoedgedata.re1sho(refto(edge3,edge2))   );
-
-               end
-
-               ldist = (ze3_re2(n3vertmat) - ze2_re2(n2vertmat)).^2   + re3_re2(n3vertmat).^2;
-               ldist = sqrt(ldist);
-
-               mdist = (ze1_re2(n1hormat).' - ze2_re2(n2vertmat)).^2   + (re1_re2(n1hormat).').^2;
-               mdist = sqrt(mdist);
-
-               dz_expjkmoverm = exp(-1i*k*mdist)./mdist.*dzvec(n1hormat);           
-
-               ch = ((ze2_re2(n2vertmat) - ze1_re2(n1hormat).').*(ze2_re2(n2vertmat) - ze3_re2(n3vertmat)) + mdist.*ldist)./re1_re2(n1hormat).'./re3_re2(n3vertmat);
-               ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
-               ch = ( ch + 1./ch)/2;
-
-               % PS 28 March 2011: The 4 beta terms are identical!       
-               if acrossface_in == 1 && acrossface_out == 1
-                   beta = 4*( sin(ny*(pi + thetain + thetaout  ))./(ch - cos(ny*(pi + thetain + thetaout   ))));
-               else
-                   beta = ( sin(ny*(pi + thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi + thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)   ))+eps*10)) + ...
-                          ( sin(ny*(pi + thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi + thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)   ))+eps*10)) + ...
-                          ( sin(ny*(pi - thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi - thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)   ))+eps*10)) + ...
-                          ( sin(ny*(pi - thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi - thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)   ))+eps*10));
-               end
-
-               if ismember(edge1,edgedata.offedges)==1 || ismember(edge2,edgedata.offedges)==1 || ismember(edge3,edgedata.offedges)==1
-                   beta = beta*0;
-               else
-        %           disp(['Edge1: ',int2str(edge1),' edge2: ',int2str(edge2),' edge3: ',int2str(edge3)])
-               end
-
-                Hsubdatalists{nn} = (2-acrossface_out)*Hsubconstant*ny*beta.*dz_expjkmoverm*thinplaneboostvec(nn);   
-                ivuselists{nn} = ivuse;
-                if ifreq == 1
-                    listofactiveHsubs(Hsubcounter) = nn;
-                    Hsubcounter = Hsubcounter + 1;
-                end
-
-           end
-
-            shortlistprev = shortlistnumber;
-
-        end
+        dcol = exp(-1i*k*mcol);
     end
-    
     if ifreq == 1
-        ivactive = listofactiveHsubs~=0;
-        listofactiveHsubs = listofactiveHsubs(ivactive);
-    end
-    
-    if ifreq == 1
-        timingdata(1) = etime(clock,t00);
         t00 = clock;
     end
-
-    % savetemp
-    % pause
 
     % End of PART 1: All the H submatrices have been built (for one freq.)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -763,7 +832,7 @@ for ifreq = 1:nfrequencies
                     if showtext >= 3
                        disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
                     end
-                    Q = EDmatvecH(Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
+                    Q = EDmatvecH(dcol.*Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                     Qfinal = Qfinal + Q; 
                     inteqdiagnostics.normQ(iiter,ifreq,1) = norm(Q);
                 end
@@ -772,11 +841,7 @@ for ifreq = 1:nfrequencies
                if showtext >= 2
                     disp('      Starting to solve the int.eq. with GMRES, fast version (for smaller problems)')
                 end
-                  t00_gmres = clock;
-                  Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
-                  A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
-                  inteqdiagnostics.assemblytime(ifreq,1) = etime(clock,t00_gmres);
-                  inteqdiagnostics.nnzH = nnz(Hsp);
+                  A = @(x) x - Bsp*(dcol.*x);     % H*x = B*(dcol.*x)
                   t00_gmres = clock;    
                   [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
                   inteqdiagnostics.solvetime(ifreq,1) = etime(clock,t00_gmres);
@@ -790,7 +855,7 @@ for ifreq = 1:nfrequencies
                     disp('      Starting to solve the int.eq. with GMRES, the version for larger problems')
                end
                t00_gmres = clock;    
-               afun = @(q) q - EDmatvecH(q, Hsubmatrixdata, Hsubdatalists, ivuselists);
+               afun = @(q) q - EDmatvecH(dcol.*q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
                inteqdiagnostics.solvetime(ifreq,1) = etime(clock,t00_gmres);
                inteqdiagnostics.gmresiter(ifreq,1) = iter(2);
@@ -841,19 +906,10 @@ for ifreq = 1:nfrequencies
             P_receiver = zeros(nfrequencies,nreceivers,nsources);
         end
 
-        % For GMRES_fast: the sparse H-matrix depends on frequency but not
-        % on the source, so it is built once here, before the source loop.
+        % For GMRES_fast: the sparse matrix B was built before the
+        % frequency loop; H*x = B*(dcol.*x).
         if strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 && qfinalreused == 0
-            t00_gmres = clock;
-            Hsp = EDbuildHsparse(Hsubmatrixdata,Hsubdatalists,ivuselists);
-            A = @(x) x - Hsp*x;     % or explicitly: A = speye(N) - Hsp;
-            inteqdiagnostics.assemblytime(ifreq,1) = etime(clock,t00_gmres);
-            inteqdiagnostics.nnzH = nnz(Hsp);
-            if ifreq == 1
-                % The matrix building is counted as part of the solving
-                timingdata(3) = inteqdiagnostics.assemblytime(ifreq,1);
-                t00 = clock;
-            end
+            A = @(x) x - Bsp*(dcol.*x);
         end
 
         for isou = 1:nsources
@@ -912,7 +968,7 @@ for ifreq = 1:nfrequencies
                        if showtext >= 3
                            disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
                        end
-                       Q = EDmatvecH(Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
+                       Q = EDmatvecH(dcol.*Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                         Qfinal = Qfinal + Q; 
 
                         inteqdiagnostics.normQ(iiter,ifreq,isou) = norm(Q);
@@ -935,7 +991,7 @@ for ifreq = 1:nfrequencies
                         disp('      Starting to solve the int.eq. with GMRES, the version for larger problems')
                     end
                     t00_gmres = clock;
-                    afun = @(q) q - EDmatvecH(q, Hsubmatrixdata, Hsubdatalists, ivuselists);
+                    afun = @(q) q - EDmatvecH(dcol.*q, Hsubmatrixdata, Hsubdatalists, ivuselists);
                     [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
                     inteqdiagnostics.solvetime(ifreq,isou) = etime(clock,t00_gmres);                     
                     inteqdiagnostics.gmresiter(ifreq,isou) = iter(2);

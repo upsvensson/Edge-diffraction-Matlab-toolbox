@@ -16,6 +16,13 @@ No changes of the computed results (only rounding errors).
   frequency, receiver and source. For a cube with 629 receivers, 11
   frequencies and 2 separate sources, the propagation time went from
   7.96 s to 0.91 s per frequency.
+- EDintegralequation_convex_tf: the H-matrix is built once, before the
+  frequency loop. Only the factor exp(-jkm) depends on the frequency, and
+  m depends only on the column of H, so H(k) = B*diag(exp(-jk*mcol)) with
+  a real, frequency-independent B. Per frequency, only the nQ exponentials
+  are computed; for GMRES_fast, the sparse matrix is also built only once.
+  New diagnostics field `maxcolumndistancediff` (a consistency check of
+  the factorization; it should be 0).
 
 **Tests**
 

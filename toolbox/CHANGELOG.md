@@ -17,6 +17,12 @@ No changes of the computed results.
 - New functions EDdatastructs (describes the internal data structs) and
   EDinputdoc (describes all input fields, with defaults). The input tables
   in EDcheckinputstructs have a description column, which EDinputdoc shows.
+- EDinputdoc can write the input descriptions as LaTeX:
+  `EDinputdoc('','EDinputfields.tex')`. The new cheatsheet
+  (EDtoolbox_cheatsheet.tex, in the new folder doc/; the PDF is in the top
+  folder) inputs this file, so it follows the code.
+- EDverify test 19: doc/EDinputfields.tex agrees with the specification in
+  EDcheckinputstructs.
 - New internal function EDcheckheaders, which checks that the headers
   follow the structure.
 - With the GMRES methods and difforder > 2, the log and screen text says

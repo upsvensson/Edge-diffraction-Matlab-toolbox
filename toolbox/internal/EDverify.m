@@ -67,6 +67,8 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 %     the stages that depend on it.
 % 18. The integral equation solution (_qfinal) is reused for new
 %     receivers, and gives the same result as a run without recycling.
+% 19. The input field descriptions for the cheatsheet (doc/EDinputfields.tex)
+%     agree with the specification in EDcheckinputstructs.
 %
 % See also EDmain_convex, EDstageversions
 %
@@ -115,8 +117,10 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 14 Oct. 2026 Tests 17 and 18: the first run is done without recycling.
 % Test 18: a receiver was in the plane of a cube face.
 % 15 Oct. 2026 The header was updated (tests 16-18 listed).
+% 15 Oct. 2026 Added test 19 (the cheatsheet input descriptions are up to
+% date).
 
-ntests = 18;
+ntests = 19;
 
 if nargin < 1 || isempty(outputdirectory)
     outputdirectory = uigetdir('', 'Select the directory for the calculation results and the logfile');
@@ -170,7 +174,7 @@ disp(headerline)
 
 testfunctions = {@edtest1,@edtest2,@edtest3,@edtest4,@edtest5,@edtest6,@edtest7,...
     @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15,...
-    @edtest16,@edtest17,@edtest18};
+    @edtest16,@edtest17,@edtest18,@edtest19};
 
 for itest = 1:ntests
     if runtest(itest) ~= 1
@@ -795,6 +799,61 @@ for ii = 1:numel(stagenames)
 end
 
 r = edresult(title,description,allok,resultlines);
+end
+
+function r = edtest19(~,~,~)
+title = 'The cheatsheet input descriptions are up to date';
+description = {'doc/EDinputfields.tex (input by doc/EDtoolbox_cheatsheet.tex) must be the same as a',...
+    'new file from EDinputdoc, apart from the comment lines. If not, run',...
+    '   EDinputdoc('''',''<EDtoolbox>/doc/EDinputfields.tex'')',...
+    'and compile EDtoolbox_cheatsheet.tex again (the PDF is in the top folder).'};
+
+% The doc folder is next to the toolbox folder (which has EDinputdoc.m)
+toolboxfolder = fileparts(which('EDinputdoc'));
+committedfile = fullfile(toolboxfolder,'..','doc','EDinputfields.tex');
+if exist(committedfile,'file') ~= 2
+    % Not an error in the toolbox: the doc folder is simply not there
+    resultlines = {['Not checked: the file ',committedfile,' was not found.']};
+    r = edresult(title,description,true,resultlines);
+    return
+end
+
+newfile = [tempname,'.tex'];
+cleanupobj = onCleanup(@() delete(newfile));
+EDinputdoc('',newfile);
+committedlines = edtexlines(committedfile);
+newlines = edtexlines(newfile);
+
+if isequal(committedlines,newlines)
+    resultlines = {sprintf('OK: %d lines agree.',numel(newlines))};
+    r = edresult(title,description,true,resultlines);
+    return
+end
+
+resultlines = {'doc/EDinputfields.tex is out of date. The first differences:'};
+nshown = 0;
+for ii = 1:max(numel(committedlines),numel(newlines))
+    if ii > numel(committedlines) || ii > numel(newlines) || ~strcmp(committedlines{ii},newlines{ii})
+        if ii <= numel(committedlines)
+            resultlines{end+1} = ['   file: ',committedlines{ii}]; %#ok<AGROW>
+        end
+        if ii <= numel(newlines)
+            resultlines{end+1} = ['   new:  ',newlines{ii}]; %#ok<AGROW>
+        end
+        nshown = nshown + 1;
+        if nshown >= 3
+            break
+        end
+    end
+end
+r = edresult(title,description,false,resultlines);
+end
+
+function textlines = edtexlines(filename)
+% The non-empty lines of a .tex file that are not comments.
+textlines = strsplit(strrep(fileread(filename),sprintf('\r'),''),sprintf('\n'));
+textlines = textlines(~cellfun(@isempty,strtrim(textlines)));
+textlines = textlines(~strncmp(textlines,'%',1));
 end
 
 function r = edtest17(outputdirectory,filestem,~)

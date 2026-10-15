@@ -3,7 +3,12 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
-## Unreleased
+## 0.613 (16 Oct. 2026)
+
+A bug fix that changes the results of the integral equation (ESIE) for
+geometries with edges of different lengths, and a new option for parallel
+computing. Results for such geometries from earlier versions should be
+recomputed.
 
 **Changes that affect the results**
 

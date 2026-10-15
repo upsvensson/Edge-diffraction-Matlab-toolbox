@@ -204,6 +204,8 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % prompted by PS).
 % 15 Oct. 2026 The list of called functions was replaced by a See also line.
 % 15 Oct. 2026 The header refers to EDinputdoc for the input fields.
+% 15 Oct. 2026 For the GMRES methods and difforder > 2, the log text says
+% that all diffraction orders are included.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -463,6 +465,14 @@ else
 end
 
 DIF = int2str(controlparameters.difforder);
+% With the GMRES methods, any difforder > 2 gives the full solution, so
+% the log and screen text for the integral equation says so.
+DIFinteq = DIF;
+if controlparameters.difforder > 2 && isfield(controlparameters,'inteqsolutionmethod') && ...
+        strncmp(controlparameters.inteqsolutionmethod,'GMRES',5)
+    DIFinteq = [DIF,' (with ',controlparameters.inteqsolutionmethod,...
+        ', all diffraction orders are included; the same for any difforder > 2)'];
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Find the paths for direct sound, first-order specular, and first-order
@@ -624,7 +634,7 @@ end
 
 %if controlparameters.difforder > 1 && ( controlparameters.docalctf == 1 || controlparameters.docalctf_ESIEBEM == 1)
 if controlparameters.difforder > 1 && ( strcmp(controlparameters.generalmethod,'tf') == 1 || strcmp(controlparameters.generalmethod,'tf_ESIEBEM') == 1)
-    textline2 = ['      ',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',DIF];
+    textline2 = ['      ',int2str(length(controlparameters.frequencies)),' frequencies. Diffraction order: ',DIFinteq];
     EDmessage(filehandlingparameters,'s',fid,1,'',['Calculating the HOD contribution with the FD integral equation'],textline2);
     [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
         EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
@@ -632,7 +642,7 @@ if controlparameters.difforder > 1 && ( strcmp(controlparameters.generalmethod,'
 
     EDpostfunctext('EDintegralequation_convex_tf',elapsedtimehodtf,existingfilename,...
         filehandlingparameters,fid,'',...
-        [int2str(nfrequencies),' frequencies. Diffraction order: ',DIF,'.'],...
+        [int2str(nfrequencies),' frequencies. Diffraction order: ',DIFinteq,'.'],...
         ['H-matrix: ',num2str(timingdata(1)),' s. Q_firstterm: ',num2str(timingdata(2)),' s (per freq.)'],...
         ['Qfinal: ',num2str(timingdata(3)),' s. P at receiver: ',num2str(timingdata(4)),' s.'])    
 
@@ -668,7 +678,7 @@ if strcmp(controlparameters.generalmethod,'tf_ESIEBEM') == 1
         controlparameters,envdata,EDversionnumber,filehandlingparameters);
     EDpostfunctext('EDpropagateESIEBEM',elapsedtimeESIEBEMpropagate,existingfilename,...
         filehandlingparameters,fid,'',...
-        [int2str(nfrequencies),' frequencies. Diffraction order: ',DIF,'.'])
+        [int2str(nfrequencies),' frequencies. Diffraction order: ',DIFinteq,'.'])
     timingstruct.esiebem = elapsedtimeESIEBEMpropagate;
 else
     tftot_ESIEBEM = [];

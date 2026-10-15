@@ -174,6 +174,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % function EDinputdoc). New call EDcheckinputstructs('paramspecs'). The
 % header was updated; the list of fields is now given by EDinputdoc. (By
 % Claude, prompted by PS.)
+% 15 Oct. 2026 The difforder description says that, with the GMRES
+% methods, all diffraction orders are included for any difforder > 2.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Documentation mode: EDcheckinputstructs('paramspecs') returns the tables
@@ -973,7 +975,7 @@ switch structname
         'skipfirstorder', @(x) isnumeric(x) && (x == 0 | x == 1), 0, @(cp) true, false, ...
             '1: the direct sound, the specular reflections and the first-order diffraction are not computed.';
         'difforder', @(x) isnumeric(x) && isscalar(x) && x>=0 && x==round(x), NaN, @(cp) true, true, ...
-            'The highest diffraction order. Required. For the GMRES methods, any value larger than 2 gives the full solution of the integral equation.';
+            'The highest diffraction order. Required. With the GMRES methods, any difforder > 2 gives the full solution, with all diffraction orders included.';
         'diff1method', @(x) ismember(x,{'GL','accurate'}), 'accurate', @(cp) cp.difforder>=1, false, ...
             'The method for first-order diffraction: ''accurate'' (adaptive integration, with an analytic treatment near the apex point) or ''GL'' (Gauss-Legendre quadrature, faster).';
         'diff1GLorder', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x > 0 && x==round(x), 16, @(cp) strcmp(cp.diff1method,'GL'), false, ...
@@ -1017,9 +1019,9 @@ switch structname
         'geoinputfile', @(x) (ischar(x) || (isstring(x) && isscalar(x))) && exist(char(x),'file')==2, NaN, @(g) context.usesgeofile, true, ...
             'The name of a geometry file (.cad). Either this, or .corners and .planecorners, must be given.';
         'corners', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,2)==3, NaN, @(g) context.usesgeomatrices, true, ...
-            '[ncorners,3] the corner coordinates. If a geometry file is given, corners is filled in from the file.';
+            '[ncorners,3] the corner coordinates (instead of a geometry file). If a geometry file is given, it is filled in from the file.';
         'planecorners', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && size(x,1)>=2, NaN, @(g) context.usesgeomatrices, true, ...
-            '[nplanes,nmaxcorners] the corner numbers of each plane; the order of the corners defines the front side of the plane according to the RH rule (thumb in normal vector direction). If a geometry file is given, planecorners is filled in from the file.';
+            '[nplanes,nmaxcorners] the corner numbers of each plane; the order of the corners defines the front side of the plane (instead of a geometry file). If a geometry file is given, it is filled in from the file.';
         'planerefltypes', @(x) isnumeric(x) && isreal(x) && numel(x)==size(context.geoinputdata.planecorners,1), @(g) ones(size(g.planecorners,1),1), @(g) context.usesgeomatrices, false, ...
             '[nplanes,1] for each plane: +1 rigid, 0 totally absorbing, -1 pressure release. Only with .corners/.planecorners. Default: all rigid.';
         'firstcornertoskip', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x>0, 1e6, @(g) true, false, ...

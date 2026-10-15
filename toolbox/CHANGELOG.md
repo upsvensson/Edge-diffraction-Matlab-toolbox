@@ -3,6 +3,26 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## Unreleased
+
+No changes of the computed results.
+
+**Documentation**
+
+- All function headers follow the same structure: the H1 line, the
+  description, input and output parameters, author and date, and the call
+  syntax. The local history comes after an empty line, so `help` does not
+  show it. The "Uses the functions..." lists were removed;
+  EDshowcalltree gives the call tree instead.
+- New functions EDdatastructs (describes the internal data structs) and
+  EDinputdoc (describes all input fields, with defaults). The input tables
+  in EDcheckinputstructs have a description column, which EDinputdoc shows.
+- New internal function EDcheckheaders, which checks that the headers
+  follow the structure.
+- With the GMRES methods and difforder > 2, the log and screen text says
+  that all diffraction orders are included (the same for any
+  difforder > 2).
+
 ## 0.61 (14 Oct. 2026)
 
 Large structural changes, and some changes that affect the results.

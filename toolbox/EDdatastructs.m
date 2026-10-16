@@ -225,17 +225,30 @@ function EDdatastructs
 %   .solutionmethod, .nQ (number of unknowns), .nnzH (GMRES_fast)
 %   GMRES: .gmresflag, .gmresrelres, .gmresiter, .solvetime, each
 %   [nfrequencies,ncols] (ncols = nsources if the sources are separate,
-%   otherwise 1); .assemblytime [nfrequencies,1] (GMRES_fast)
+%   otherwise 1); .assemblytime [nfrequencies,1] (GMRES_fast; the sparse
+%   matrix is built once, so only the first element is set)
 %   iterative: .normQ [difforder-2,nfrequencies,ncols]
-%   .propdiagnostics        from EDcalcpropagatematrix
+%   .maxcolumndistancediff  a check of the factorization H(k) = B*diag(dcol);
+%                           should be 0
+%   .propdiagnostics        from EDcalcpropagatematrix_block: totals over all
+%                           the receivers of the edge pairs, rows and
+%                           corrected (near-singular) rows
+%   .propagationblocksize   the number of receivers per block
+%   .parallelworkers        the number of parallel workers for the
+%                           propagation (0 = serial)
+%   .parallelnote           a note if parallel workers were asked for but
+%                           the Parallel Computing Toolbox is not available
 %   .qfinalfile             text: computed and saved, reused from, or
 %                           not saved
 %
-% Peter Svensson (peter.svensson@ntnu.no) 14 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 16 Oct. 2026
 %
 % EDdatastructs
 
 % 14 Oct. 2026 First version (by Claude, prompted by PS), collected from
 % the headers of the functions that create the structs.
+% 16 Oct. 2026 New fields of inteqdiagnostics (maxcolumndistancediff,
+% propagationblocksize, parallelworkers, parallelnote); propdiagnostics has
+% totals over all the receivers.
 
 help(mfilename)

@@ -3,6 +3,21 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## Unreleased
+
+**Speed**
+
+- New function EDcalcpropagatematrix_block: for the 'accurate'
+  propagation (the default), the receivers are handled in blocks, and for
+  each edge pair all the receivers of a block are computed at once
+  (including the near-singular corrections). EDintegralequation_convex_tf
+  uses it, with parfor over the blocks if parallelworkers > 0. The same
+  results up to rounding errors. In a test with 300 receivers, the
+  propagation was 30 times faster (in Octave). The 'legacy' propagation
+  still uses EDcalcpropagatematrix for one receiver at a time.
+- inteqdiagnostics.propdiagnostics now has totals over all the receivers
+  (before: the values for the last receiver).
+
 ## 0.613 (16 Oct. 2026)
 
 A bug fix that changes the results of the integral equation (ESIE) for

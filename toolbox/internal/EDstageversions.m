@@ -34,7 +34,7 @@ function stageinfo = EDstageversions(stagename)
 %                                    (struct of cell arrays)
 %                 .ignored           cell array with the ignored functions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 16 Oct. 2026
 %
 % stageinfo = EDstageversions(stagename);
 
@@ -44,6 +44,7 @@ function stageinfo = EDstageversions(stagename)
 % version 2 (bug fixes).
 % 15 Oct. 2026 EDwedge1st_fd to version 3 (near-singular cases with 'GL').
 % 15 Oct. 2026 EDcalcpropagatematrix to version 2 (bug fix).
+% 16 Oct. 2026 New function EDcalcpropagatematrix_block (version 1).
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -74,6 +75,7 @@ versions.EDcalcedgeinteqmatrixsub2_mex = 1;  % Compiled file: increase by
                                              % hand when it is recompiled
                                              % from changed source code.
 versions.EDcalcpropagatematrix        = 2;  % 2: bug fix, edge data for edges with the same number of nodes
+versions.EDcalcpropagatematrix_block  = 1;
 versions.EDcheckobstr_edgetoedge      = 1;
 versions.EDcheckobstr_pointtoedge     = 1;
 versions.EDcheckobstrpaths            = 1;
@@ -122,7 +124,7 @@ stagesubroutines.EDed2geo = {'EDcheckobstr_edgetoedge','EDpoinpla','EDcompress7'
     'EDcoordtrans2','EDcross','EDgetedgepoints','EDinfrontofplane'};
 stagesubroutines.EDinteg_submatrixstructure = {'EDgetGLrule','EDdistelements','lgwt'};
 stagesubroutines.EDintegralequation_convex_tf = {'EDinteg_souterm','EDintegratebetaoverm',...
-    'EDbetaoverm_fd','EDcalcpropagatematrix','EDbuildHsparse','EDmatvecH',...
+    'EDbetaoverm_fd','EDcalcpropagatematrix','EDcalcpropagatematrix_block','EDbuildHsparse','EDmatvecH',...
     'EDcalcedgeinteqmatrixsub2_mex','EDcoordtrans1','EDdistelements','lgwt'};
 stagesubroutines.EDfindHODpaths = {};
 stagesubroutines.EDmakeHODirs = {'EDwedge2nd','EDwedgeN','EDcreindexmatrix','EDcoordtrans1'};

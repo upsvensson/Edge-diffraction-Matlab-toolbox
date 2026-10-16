@@ -203,6 +203,12 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % If the Parallel Computing Toolbox is not available, a note is given and
 % the loop runs serially. Qfirsttermstore is sent to the workers only if
 % savediff2result = 1.
+% 16 Oct. 2026 (by Claude, prompted by PS) For the 'accurate' propagation,
+% the receivers are handled in blocks by the new function
+% EDcalcpropagatematrix_block (all the receivers of a block at once for
+% each edge pair), with parfor over the blocks. inteqdiagnostics.
+% propdiagnostics then has totals over all the receivers (before: the
+% values of the last receiver). The 'legacy' propagation is unchanged.
 
 t00_total = clock;
 t00 = clock;
@@ -1115,81 +1121,171 @@ if controlparameters.skipreceiverpropagation == 0
         Qfirsttermforloop = {};
     end
 
-    Pcell = cell(nreceivers,1);
-    P2cell = cell(nreceivers,1);
-    ivproblematiccell = cell(nreceivers,1);
-    propdiagnosticscell = cell(nreceivers,1);
-
-    parfor (irec = 1:nreceivers, nworkers)
-        if showtext >=2
-            disp(['      Receiver number ',int2str(irec)])
+    % For the 'accurate' propagation (the default), the receivers are
+    % handled in blocks by EDcalcpropagatematrix_block, which processes all
+    % the receivers of a block at once for each edge pair. The block size
+    % is chosen so that the arrays [blocksize,nQ] stay moderate (about
+    % 4e6 elements); with parallel workers, smaller blocks are used so that
+    % there are enough blocks to share. The 'legacy' propagation uses
+    % EDcalcpropagatematrix for one receiver at a time.
+    useblocks = strcmpi(propimplementation,'accurate') && isthinhole == 0;
+    if useblocks
+        blocksize = max(1,min(nreceivers,floor(4e6/double(nQ))));
+        if nworkers > 0
+            blocksize = min(blocksize,max(1,ceil(nreceivers/40)));
         end
-        % The solutions (sources) that are propagated to this receiver
-        % (doallSRcombinations = 0: only source N to receiver N)
-        if nsolutions == 1
-            solutionlist = 1;
-        elseif doallSRcombinations == 1
-            solutionlist = 1:nsolutions;
-        elseif irec <= nsolutions
-            solutionlist = irec;
-        else
-            solutionlist = [];
-        end
-        Prec = zeros(nfrequencies,nsolutions);
-        P2rec = zeros(nfrequencies,nsolutions);
-        ivproblematicrec = [];
-        propdiagnosticsrec = [];
+        blockstarts = 1:blocksize:nreceivers;
+        nblocks = numel(blockstarts);
+        inteqdiagnostics.propagationblocksize = blocksize;
+        Pcell = cell(nblocks,1);
+        P2cell = cell(nblocks,1);
+        propdiagnosticscell = cell(nblocks,1);
 
-        if ~isempty(solutionlist)
-            [Fgeom,ivproblematicrec,propdiagnosticsrec,pathlengths] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,...
-                Hsubmatrixdata,isthinhole,Rdata.vispartedgesfromr(:,irec),0,Rstartvalue,...
-                Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),...
-                Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,showtext,...
-                propimplementation);
-
-            % Only the non-zero elements are used
-            ivnonzero = find(Fgeom);
-            Fgeomnonzero = Fgeom(ivnonzero);
-            pathlengthsnonzero = pathlengths(ivnonzero) - Rstartvalue;
-
+        parfor (ib = 1:nblocks, nworkers)
+            recs = blockstarts(ib):min(blockstarts(ib)+blocksize-1,nreceivers);
+            nb = numel(recs);
+            if showtext >= 2
+                disp(['      Receivers ',int2str(recs(1)),' to ',int2str(recs(end))])
+            end
+            [Fgeom,pathlengthsblock,propdiagnosticscell{ib}] = EDcalcpropagatematrix_block(edgedata,edgetoedgedata,...
+                Hsubmatrixdata,Rdata.vispartedgesfromr(:,recs),...
+                reshape(Rdata.rRsho(Rdata.reftoshortlistR(:,recs)),[],nb),...
+                reshape(Rdata.thetaRsho(Rdata.reftoshortlistR(:,recs)),[],nb),...
+                reshape(Rdata.zRsho(Rdata.reftoshortlistR(:,recs)),[],nb),doesQsegmenthavevalues);
+            % Only the columns with non-zero elements are used
+            ivnonzero = find(any(Fgeom,1));
+            Fgeom = Fgeom(:,ivnonzero);
+            pathlengthsblock = pathlengthsblock(:,ivnonzero) - Rstartvalue;
+            Pblock = zeros(nfrequencies,nb,nsolutions);
+            P2block = zeros(nfrequencies,nb,nsolutions);
             for ifreq = 1:nfrequencies
-                Fvec = Fgeomnonzero.*exp(-1i*kvec(ifreq)*pathlengthsnonzero);
-                for isol = solutionlist
-                    Qfinalone = Qfinalstore{ifreq,isol};
-                    Prec(ifreq,isol) = Fvec*Qfinalone(ivnonzero);
-                    if savediff2 == 1
-                        Qfirsttermone = Qfirsttermforloop{ifreq,isol};
-                        P2rec(ifreq,isol) = Fvec*(Qfinalone(ivnonzero)-Qfirsttermone(ivnonzero));
+                Fk = Fgeom.*exp(-1i*kvec(ifreq)*pathlengthsblock);    % [nb x nnonzero]
+                if nsolutions == 1 || doallSRcombinations == 1
+                    for isol = 1:nsolutions
+                        Qfinalone = Qfinalstore{ifreq,isol};
+                        Pblock(ifreq,:,isol) = Fk*Qfinalone(ivnonzero);
+                        if savediff2 == 1
+                            Qfirsttermone = Qfirsttermforloop{ifreq,isol};
+                            P2block(ifreq,:,isol) = Fk*(Qfinalone(ivnonzero)-Qfirsttermone(ivnonzero));
+                        end
+                    end
+                else
+                    % doallSRcombinations = 0: only source N to receiver N
+                    for jr = 1:nb
+                        jsol = recs(jr);   % (not isol: parfor does not allow assigning a for-loop variable)
+                        if jsol <= nsolutions
+                            Qfinalone = Qfinalstore{ifreq,jsol};
+                            Pblock(ifreq,jr,jsol) = Fk(jr,:)*Qfinalone(ivnonzero);
+                            if savediff2 == 1
+                                Qfirsttermone = Qfirsttermforloop{ifreq,jsol};
+                                P2block(ifreq,jr,jsol) = Fk(jr,:)*(Qfinalone(ivnonzero)-Qfirsttermone(ivnonzero));
+                            end
+                        end
                     end
                 end
             end
+            Pcell{ib} = Pblock;
+            P2cell{ib} = P2block;
         end
-        Pcell{irec} = Prec;
-        P2cell{irec} = P2rec;
-        ivproblematiccell{irec} = ivproblematicrec;
-        propdiagnosticscell{irec} = propdiagnosticsrec;
-    end
 
-    % Collect the results of all the receivers
-    for irec = 1:nreceivers
-        P_receiver(:,irec,:) = reshape(Pcell{irec},nfrequencies,1,nsolutions);
+        % Collect the results of all the blocks
+        propdiagnostics = struct('npairs',0,'npairs_eligible',0,'npairs_corrected',0, ...
+            'nrows',0,'nrows_corrected',0,'correctedpairs',zeros(0,4));
         if savediff2 == 1
-            extraoutputdata.tfinteqdiff_nodiff2(:,irec,:) = reshape(P2cell{irec},nfrequencies,1,nsolutions);
+            extraoutputdata.tfinteqdiff_nodiff2 = zeros(size(P_receiver));
         end
-        ivproblematic = ivproblematiccell{irec};
-        if ~isempty(ivproblematic)
-            existinglength = size(ivproblematicmatrix,2);
-            newlength = length(ivproblematic);
-            if newlength > existinglength
-                ivproblematicmatrix = [ivproblematicmatrix zeros(nreceivers,newlength-existinglength)]; %#ok<AGROW>
+        for ib = 1:nblocks
+            recs = blockstarts(ib):min(blockstarts(ib)+blocksize-1,nreceivers);
+            P_receiver(:,recs,:) = Pcell{ib};
+            if savediff2 == 1
+                extraoutputdata.tfinteqdiff_nodiff2(:,recs,:) = P2cell{ib};
             end
-            ivproblematicmatrix(irec,1:newlength) = ivproblematic;
+            pd = propdiagnosticscell{ib};
+            propdiagnostics.npairs = propdiagnostics.npairs + pd.npairs;
+            propdiagnostics.npairs_eligible = propdiagnostics.npairs_eligible + pd.npairs_eligible;
+            propdiagnostics.npairs_corrected = propdiagnostics.npairs_corrected + pd.npairs_corrected;
+            propdiagnostics.nrows = propdiagnostics.nrows + pd.nrows;
+            propdiagnostics.nrows_corrected = propdiagnostics.nrows_corrected + pd.nrows_corrected;
+            propdiagnostics.correctedpairs = [propdiagnostics.correctedpairs; pd.correctedpairs];
         end
-        if ~isempty(propdiagnosticscell{irec})
-            propdiagnostics = propdiagnosticscell{irec};
+        clear Pcell P2cell propdiagnosticscell
+    else
+        Pcell = cell(nreceivers,1);
+        P2cell = cell(nreceivers,1);
+        ivproblematiccell = cell(nreceivers,1);
+        propdiagnosticscell = cell(nreceivers,1);
+
+        parfor (irec = 1:nreceivers, nworkers)
+            if showtext >=2
+                disp(['      Receiver number ',int2str(irec)])
+            end
+            % The solutions (sources) that are propagated to this receiver
+            % (doallSRcombinations = 0: only source N to receiver N)
+            if nsolutions == 1
+                solutionlist = 1;
+            elseif doallSRcombinations == 1
+                solutionlist = 1:nsolutions;
+            elseif irec <= nsolutions
+                solutionlist = irec;
+            else
+                solutionlist = [];
+            end
+            Prec = zeros(nfrequencies,nsolutions);
+            P2rec = zeros(nfrequencies,nsolutions);
+            ivproblematicrec = [];
+            propdiagnosticsrec = [];
+
+            if ~isempty(solutionlist)
+                [Fgeom,ivproblematicrec,propdiagnosticsrec,pathlengths] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,...
+                    Hsubmatrixdata,isthinhole,Rdata.vispartedgesfromr(:,irec),0,Rstartvalue,...
+                    Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),...
+                    Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,showtext,...
+                    propimplementation);
+
+                % Only the non-zero elements are used
+                ivnonzero = find(Fgeom);
+                Fgeomnonzero = Fgeom(ivnonzero);
+                pathlengthsnonzero = pathlengths(ivnonzero) - Rstartvalue;
+
+                for ifreq = 1:nfrequencies
+                    Fvec = Fgeomnonzero.*exp(-1i*kvec(ifreq)*pathlengthsnonzero);
+                    for isol = solutionlist
+                        Qfinalone = Qfinalstore{ifreq,isol};
+                        Prec(ifreq,isol) = Fvec*Qfinalone(ivnonzero);
+                        if savediff2 == 1
+                            Qfirsttermone = Qfirsttermforloop{ifreq,isol};
+                            P2rec(ifreq,isol) = Fvec*(Qfinalone(ivnonzero)-Qfirsttermone(ivnonzero));
+                        end
+                    end
+                end
+            end
+            Pcell{irec} = Prec;
+            P2cell{irec} = P2rec;
+            ivproblematiccell{irec} = ivproblematicrec;
+            propdiagnosticscell{irec} = propdiagnosticsrec;
         end
+
+        % Collect the results of all the receivers
+        for irec = 1:nreceivers
+            P_receiver(:,irec,:) = reshape(Pcell{irec},nfrequencies,1,nsolutions);
+            if savediff2 == 1
+                extraoutputdata.tfinteqdiff_nodiff2(:,irec,:) = reshape(P2cell{irec},nfrequencies,1,nsolutions);
+            end
+            ivproblematic = ivproblematiccell{irec};
+            if ~isempty(ivproblematic)
+                existinglength = size(ivproblematicmatrix,2);
+                newlength = length(ivproblematic);
+                if newlength > existinglength
+                    ivproblematicmatrix = [ivproblematicmatrix zeros(nreceivers,newlength-existinglength)]; %#ok<AGROW>
+                end
+                ivproblematicmatrix(irec,1:newlength) = ivproblematic;
+            end
+            if ~isempty(propdiagnosticscell{irec})
+                propdiagnostics = propdiagnosticscell{irec};
+            end
+        end
+        clear Pcell P2cell ivproblematiccell propdiagnosticscell
     end
-    clear Pcell P2cell ivproblematiccell propdiagnosticscell
 end
 % timingdata(4): the propagation time per frequency, as before
 timingdata(4) = etime(clock,t00_prop)/nfrequencies;

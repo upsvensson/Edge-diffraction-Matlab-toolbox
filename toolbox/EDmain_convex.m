@@ -45,7 +45,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 %
 % See also EDinputdoc, EDdatastructs, EDgetresults, EDcheckinputstructs, EDshowcalltree
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -206,6 +206,8 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % 15 Oct. 2026 The header refers to EDinputdoc for the input fields.
 % 15 Oct. 2026 For the GMRES methods and difforder > 2, the log text says
 % that all diffraction orders are included.
+% 18 Oct. 2026 New timing lines for the integral equation: once (H-matrix),
+% per frequency (and source), and the propagation in total.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -640,11 +642,60 @@ if controlparameters.difforder > 1 && ( strcmp(controlparameters.generalmethod,'
         EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
     	Snewdata,Rnewdata,envdata,controlparameters,EDversionnumber,filehandlingparameters);
 
+    % The timing lines. timingdata has totals: H-matrix (built once),
+    % source term and solution (summed over frequencies and sources), and
+    % the propagation (all frequencies). The source term and the solution
+    % are written as averages per frequency (and per source, if the
+    % sources are handled separately).
+    nsourcesinteq = size(Snewdata.coordinates,1);
+    nreceiversinteq = size(Rnewdata.coordinates,1);
+    separatesources = nsourcesinteq > 1 && Snewdata.doaddsources ~= 1;
+    if separatesources
+        naverage = nfrequencies*nsourcesinteq;
+        addednote = '';
+    else
+        naverage = nfrequencies;
+        addednote = '';
+        if nsourcesinteq > 1
+            addednote = [' (',int2str(nsourcesinteq),' sources added)'];
+        end
+    end
+    fromqfilenote = '';
+    if isfield(extraoutputdata,'inteqdiagnostics') && isstruct(extraoutputdata.inteqdiagnostics) && ...
+            isfield(extraoutputdata.inteqdiagnostics,'qfinalfile') && strncmp(extraoutputdata.inteqdiagnostics.qfinalfile,'reused',6)
+        fromqfilenote = ' (from the _qfinal file)';
+    end
+    Htext = num2str(timingdata(1),3);
+    Q1text = num2str(timingdata(2)/naverage,3);
+    Qftext = num2str(timingdata(3)/naverage,3);
+    if controlparameters.skipreceiverpropagation == 1
+        proptext = 'Propagation to the receivers: skipped.';
+    elseif nfrequencies > 1
+        proptext = ['Propagation to ',int2str(nreceiversinteq),' receivers, all frequencies: ',num2str(timingdata(4),3),' s.'];
+    else
+        proptext = ['Propagation to ',int2str(nreceiversinteq),' receivers: ',num2str(timingdata(4),3),' s.'];
+    end
+    if nfrequencies == 1 && ~separatesources
+        timinglines = {['H-matrix: ',Htext,' s. Q_firstterm: ',Q1text,' s',addednote,'. Qfinal: ',Qftext,' s',fromqfilenote,'.'],...
+            proptext};
+    elseif nfrequencies == 1
+        timinglines = {['H-matrix: ',Htext,' s',fromqfilenote,'.'],...
+            ['Per source: Q_firstterm: ',Q1text,' s. Qfinal: ',Qftext,' s. Averages over ',int2str(nsourcesinteq),' sources.'],...
+            proptext};
+    elseif ~separatesources
+        timinglines = {['Once:          H-matrix: ',Htext,' s',fromqfilenote,'.'],...
+            ['Per frequency: Q_firstterm: ',Q1text,' s',addednote,'. Qfinal: ',Qftext,' s. Averages over ',int2str(nfrequencies),' frequencies.'],...
+            proptext};
+    else
+        timinglines = {['Once:          H-matrix: ',Htext,' s',fromqfilenote,'.'],...
+            ['Per frequency and source: Q_firstterm: ',Q1text,' s. Qfinal: ',Qftext,' s. Averages over ',...
+            int2str(nfrequencies),' frequencies and ',int2str(nsourcesinteq),' sources.'],...
+            proptext};
+    end
     EDpostfunctext('EDintegralequation_convex_tf',elapsedtimehodtf,existingfilename,...
         filehandlingparameters,fid,'',...
         [int2str(nfrequencies),' frequencies. Diffraction order: ',DIFinteq,'.'],...
-        ['H-matrix: ',num2str(timingdata(1)),' s. Q_firstterm: ',num2str(timingdata(2)),' s (per freq.)'],...
-        ['Qfinal: ',num2str(timingdata(3)),' s. P at receiver: ',num2str(timingdata(4)),' s.'])    
+        timinglines{:})
 
     % A summary of the solver diagnostics goes to the log file. A warning
     % (if GMRES did not converge for some frequency) is also shown on the

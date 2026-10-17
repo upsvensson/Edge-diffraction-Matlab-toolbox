@@ -42,9 +42,12 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                   [nfrequencies,nreceivers] if the sources are added
 %                   (Sdata.doaddsources = 1), otherwise
 %                   [nfrequencies,nreceivers,nsources].
-%   timingdata      [1,4] the times, for the first frequency, for building
-%                   the H-matrix, the source term, solving the integral
-%                   equation, and the propagation to the receivers.
+%   timingdata      [1,4] the times for building the H-matrix (once), the
+%                   source term and the solution of the integral equation
+%                   (both summed over all frequencies and sources), and the
+%                   propagation to the receivers (all frequencies). If the
+%                   solution was taken from a _qfinal file, the first
+%                   three values come from that file.
 %   extraoutputdata  struct with the fields
 %     .tfinteqdiff_nodiff2  the same as tfinteqdiff but without the second-
 %                   order diffraction (only if savediff2result = 1)
@@ -58,7 +61,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %
 % See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
 %
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %    EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
@@ -209,6 +212,10 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % each edge pair), with parfor over the blocks. inteqdiagnostics.
 % propdiagnostics then has totals over all the receivers (before: the
 % values of the last receiver). The 'legacy' propagation is unchanged.
+% 18 Oct. 2026 (by Claude, prompted by PS) timingdata has totals: the
+% source term and the solution summed over all frequencies and sources,
+% and the propagation for all frequencies (before: the first frequency,
+% and the propagation per frequency).
 
 t00_total = clock;
 t00 = clock;
@@ -779,9 +786,9 @@ for ifreq = 1:nfrequencies
     if controlparameters.difforder > 2 && qfinalreused == 0
         dcol = exp(-1i*k*mcol);
     end
-    if ifreq == 1
-        t00 = clock;
-    end
+    % The times for the source term and the solution are summed over all
+    % frequencies (and sources): timingdata(2) and timingdata(3).
+    t00 = clock;
 
     % End of PART 1: All the H submatrices have been built (for one freq.)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -822,10 +829,8 @@ for ifreq = 1:nfrequencies
                 Q_firstterm = Q_firstterm + Q_firstterm_addition*Sdata.sourceamplitudes(isou,ifreq);
             end
         
-            if ifreq == 1
-                timingdata(2) = etime(clock,t00);
-                t00 = clock;
-            end
+            timingdata(2) = timingdata(2) + etime(clock,t00);
+            t00 = clock;
             
             % End of CASE 1, PART 2 
             % Q_firstterm has been computed
@@ -883,10 +888,8 @@ for ifreq = 1:nfrequencies
                doesQsegmenthavevalues(iicounter) = any(Qfinal(sectionofQvec));
             end        
 
-            if ifreq == 1
-                timingdata(3) = etime(clock,t00);
-                t00 = clock;
-            end
+            timingdata(3) = timingdata(3) + etime(clock,t00);
+            t00 = clock;
 
             % End of CASE 1, PART 3 
             % Qfinal has been computed. It is stored, for the _qfinal file.
@@ -956,10 +959,8 @@ for ifreq = 1:nfrequencies
 
                 Q_firstterm = Q_firstterm*Sdata.sourceamplitudes(isou,ifreq);
 
-                if ifreq == 1 && isou == 1
-                    timingdata(2) = etime(clock,t00);
-                    t00 = clock;
-                end
+                timingdata(2) = timingdata(2) + etime(clock,t00);
+                t00 = clock;
                               
                 % End of CASE 2, PART 2 
                 % Q_firstterm has been computed
@@ -1023,10 +1024,8 @@ for ifreq = 1:nfrequencies
                    doesQsegmenthavevalues(iicounter) = any(Qfinal(sectionofQvec));
                 end
 
-                if ifreq == 1 && isou == 1
-                    timingdata(3) = timingdata(3) + etime(clock,t00);
-                    t00 = clock;
-                end
+                timingdata(3) = timingdata(3) + etime(clock,t00);
+                t00 = clock;
 
                 % End of CASE 2, PART 3 
                 % Qfinal has been computed. It is stored, for the _qfinal
@@ -1287,8 +1286,8 @@ if controlparameters.skipreceiverpropagation == 0
         clear Pcell P2cell ivproblematiccell propdiagnosticscell
     end
 end
-% timingdata(4): the propagation time per frequency, as before
-timingdata(4) = etime(clock,t00_prop)/nfrequencies;
+% timingdata(4): the total propagation time, for all frequencies
+timingdata(4) = etime(clock,t00_prop);
 
 %---------------------------------------------------------------
 % Save the solution of the integral equation in the _qfinal file, so that

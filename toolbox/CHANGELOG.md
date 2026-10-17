@@ -18,6 +18,17 @@ comments at the top of its .m file.
 - inteqdiagnostics.propdiagnostics now has totals over all the receivers
   (before: the values for the last receiver).
 
+**Log file**
+
+- New timing lines for the integral equation: the H-matrix (built once),
+  the source term and the solution as averages per frequency (and per
+  source, if the sources are handled separately; "N sources added"
+  otherwise), and the propagation to the receivers in total. With one
+  frequency, the per-frequency labels are left out. If the solution was
+  taken from a _qfinal file, this is noted. timingdata (and
+  EDres.timingstruct.integralequation) now has totals instead of the
+  times for the first frequency.
+
 ## 0.613 (16 Oct. 2026)
 
 A bug fix that changes the results of the integral equation (ESIE) for

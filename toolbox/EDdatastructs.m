@@ -214,6 +214,9 @@ function EDdatastructs
 %                           order (savealldifforders = 1)
 %   .inteqdiagnostics       (method 'tf') see below
 %   .timingstruct           the computation times of the stages
+%                           (.integralequation: [H-matrix, source term,
+%                           solution, propagation], totals over all
+%                           frequencies and sources)
 %   .geoinputdata ... .filehandlingparameters  the six input structs, each
 %                           with .inputorigin
 %   .EDversionnumber, .inputhash, .logfilename
@@ -241,7 +244,7 @@ function EDdatastructs
 %   .qfinalfile             text: computed and saved, reused from, or
 %                           not saved
 %
-% Peter Svensson (peter.svensson@ntnu.no) 16 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
 %
 % EDdatastructs
 
@@ -250,5 +253,6 @@ function EDdatastructs
 % 16 Oct. 2026 New fields of inteqdiagnostics (maxcolumndistancediff,
 % propagationblocksize, parallelworkers, parallelnote); propdiagnostics has
 % totals over all the receivers.
+% 18 Oct. 2026 timingstruct.integralequation has totals.
 
 help(mfilename)

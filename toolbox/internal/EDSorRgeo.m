@@ -36,7 +36,7 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
 %
 % See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
 %
 % [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo(planedata,...
 %    edgedata,inputstruct,typeofcoords,EDversionnumber,filehandlingparameters);
@@ -98,6 +98,10 @@ function [outputstruct,elapsedtimeSRgeo,existingfilename] = EDSorRgeo...
 % 14 Oct. 2026 The header was updated to the standard structure (by Claude,
 % prompted by PS).
 % 15 Oct. 2026 The list of called functions was replaced by a See also line.
+% 18 Oct. 2026 The piston fields .pistongaussweights and .pistonareas were
+% added to the EDinputdatahash. They are passed on in Sdata and used by
+% EDmakefirstordertfs and EDintegralequation_convex_tf, so a change in them
+% must give new hashes in those stages too.
 
 t00 = clock;
 geomacc = 1e-9;
@@ -119,7 +123,8 @@ stageversion = EDstageversions('EDSorRgeo');
 
 if typeofcoords == 's'
     hashfields = {'coordinates','nedgesubs','sourcetype','pistoncornercoordinates',...
-        'pistoncornernumbers','pistonplanes','pistongaussorder','pistongausscoordinates'};
+        'pistoncornernumbers','pistonplanes','pistongaussorder','pistongausscoordinates',...
+        'pistongaussweights','pistonareas'};
 else
     hashfields = {'coordinates','nedgesubs'};
 end

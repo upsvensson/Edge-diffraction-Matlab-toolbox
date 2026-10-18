@@ -48,7 +48,9 @@ function EDdatastructs
 %   .coordinates            [npistons,3] the center points of the pistons
 %   .pistongausscoordinates cell {npistons,1}, each [npoints,3]: the
 %                           quadrature points of the piston
-%   .pistongaussweights     cell {npistons,1}, each [npoints,1]
+%   .pistongaussweights     cell {npistons,1}, each [npoints,1]; the
+%                           weights of each piston sum to 1
+%                           (see EDpolygonquadrature)
 %   .ncornersperpiston      [npistons,1]
 %   .pistonareas            [npistons,1] in m2
 % .sourceamplitudes is expanded to [nsources,nfrequencies] (tf) or
@@ -264,5 +266,6 @@ function EDdatastructs
 % 18 Oct. 2026 timingstruct.integralequation has totals.
 % 18 Oct. 2026 The q segments and the edge numbering of Hsubmatrixdata are
 % described.
+% 18 Oct. 2026 The piston weights sum to 1.
 
 help(mfilename)

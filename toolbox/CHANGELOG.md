@@ -3,7 +3,44 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
-## Unreleased
+## 0.614 (18 Oct. 2026)
+
+Two bug fixes for polygon piston sources, which change the results for
+rectangular (non-square) and quadrilateral pistons, and for triangular
+pistons with the default pistongaussorder = 3. Results for such pistons
+from earlier versions should be recomputed. Also faster propagation in
+the integral equation, and new timing lines in the log file.
+
+**Changes that affect the results**
+
+- Piston area (bug fix): the area of 4-sided pistons was wrong, except for
+  squares; e.g. a 2 x 1 m rectangle got the area 1.66 m2 instead of 2 m2.
+  The area is only used for the direct sound of a piston (in
+  EDmakefirstordertfs), which was too strong by the factor
+  true area/wrong area (20% for the 2 x 1 m rectangle).
+- Triangle quadrature of order 3 (bug fix): the weights summed to 0.5
+  instead of 1. This affected triangular pistons with pistongaussorder = 3
+  (the default), where the diffraction (first order and integral equation)
+  was half as strong as it should be, and surface receivers on triangular
+  faces with surfacegaussorder = 3 ('tf_ESIEBEM'). The other orders were
+  correct.
+- EDSorRgeo: .pistongaussweights and .pistonareas are now part of the hash
+  of Sdata, so the stages that use them get new hashes when they change
+  (before, a _tf file computed with the wrong area would have been reused).
+
+**Input and output**
+
+- New function EDpolygonquadrature, which gives the quadrature points,
+  weights and area of a polygon. It replaces the two copies of the
+  quadrature code in EDcheckinputstructs (pistons) and EDgensurfreceivers
+  (surface receivers). Apart from the two bug fixes, the points and
+  weights are the same as before.
+- Pistons, and faces for 'tf_ESIEBEM', with more than 4 corners now work
+  for any convex polygon in any plane: the polygon is divided into
+  triangles from its center point. Before, pistons had to be regular
+  polygons, and the code called the missing function GEOcirclepoints.
+- An error is given if the pistons have different numbers of quadrature
+  points (different numbers of corners), which EDSorRgeo can not handle.
 
 **Speed**
 

@@ -18,6 +18,12 @@ comments at the top of its .m file.
 - inteqdiagnostics.propdiagnostics now has totals over all the receivers
   (before: the values for the last receiver).
 
+**Documentation**
+
+- New function EDdevguide: a checklist of the steps for changes to the
+  toolbox (results affected or not, new or removed parameters and
+  functions, new tests, new versions, the cheatsheet).
+
 **Log file**
 
 - New timing lines for the integral equation: the H-matrix (built once),

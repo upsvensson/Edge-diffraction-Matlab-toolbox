@@ -20,6 +20,12 @@ comments at the top of its .m file.
 
 **Documentation**
 
+- The edge numbering of the integral equation is described in the headers
+  of EDintegralequation_convex_tf, EDinteg_souterm, EDcalcpropagatematrix,
+  EDcalcpropagatematrix_block and EDinteg_submatrixstructure, and in
+  EDdatastructs: edge 2 is always the diffracting edge, with
+  q0(z3 <- z2) = G(z3 <- z2 <- S), q(z3 <- z2) = q0 + int H(z3 <- z2 <- z1)
+  q(z2 <- z1) dz1, and p(R) = int int F(R <- z2 <- z1) q(z2 <- z1) dz1 dz2.
 - New function EDdevguide: a checklist of the steps for changes to the
   toolbox (results affected or not, new or removed parameters and
   functions, new tests, new versions, the cheatsheet).

@@ -4,6 +4,25 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 % EDinteg_souterm - Does the first step of the ED int eq: compute the 
 % first term of the edge source signals.
 %
+% EDGE NUMBERING (the same in all the integral equation functions)
+% Each kernel is one first-order diffraction step, from an incoming point
+% via a diffracting edge to an outgoing point, and the diffracting edge is
+% always edge 2 (position z2):
+%   source term:      q0(z3 <- z2) = G(z3 <- z2 <- S)
+%   integral eq.:     q(z3 <- z2)  = q0(z3 <- z2) + int H(z3 <- z2 <- z1) q(z2 <- z1) dz1
+%   propagation:      p(R)         = int int F(R <- z2 <- z1) q(z2 <- z1) dz1 dz2
+% q(zb <- za) is the edge source amplitude at za (on the edge that the q
+% segment is "from"), radiating towards zb (on the "to" edge). The wedge
+% index ny, the beta terms and the cylindrical coordinates (the suffix
+% _re2, e.g. ze1_re2) are those of edge 2. S or R takes the place of
+% edge 1 or edge 3 where the kernel starts or ends at a point.
+% In Hsubmatrixdata, edgepairlist(ii,:) = [to-edge from-edge] of the q
+% segment ii, and edgetripletlist(nn,:) = [edge3 edge2 edge1]. Inside a q
+% segment, the node index of the from-edge runs fastest: element
+% ifrom + (ito-1)*nfrom.
+% In this function: S -> edge2 -> edge3. It computes q0(z3 <- z2), and the
+% q segment ii has edgepairlist(ii,:) = [edge3 edge2].
+%
 % Input parameters:
 %   envdata,edgedata,edgetoedgedata,
 %   Hsubmatrixdata,controlparameters   structs
@@ -58,7 +77,7 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 %                   .npairs_skew, .npairs_partlyvisible, .npairs_nodesnotGL
 %                                       pairs left to the legacy code, by reason
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
 %
 % [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,...
 %    edgetoedgedata,Hsubmatrixdata,controlparameters,vispartedgesfroms,...
@@ -102,6 +121,8 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 % optional output soudiagnostics.
 % 9 Oct. 2026 Code cleanup, changed bigmatrix... to Qvec...
 % 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
+% 18 Oct. 2026 (by Claude, prompted by PS) The edge numbering (edge 2 is
+% always the diffracting edge) is described in the header.
 
 if nargin < 14
     showtext = 0;

@@ -180,7 +180,12 @@ function EDdatastructs
 %--------------------------------------------------------------------------
 % Hsubmatrixdata  (the structure of the integral equation)
 %   .edgepairlist           [nedgepairs,2] [to-edge, from-edge] for each
-%                           edge pair = each block of unknowns
+%                           edge pair = each block (q segment) of unknowns.
+%                           A q segment holds q(zto <- zfrom): the edge
+%                           source amplitudes at the from-edge nodes,
+%                           radiating towards the to-edge nodes. Inside a
+%                           segment, the from-edge node index runs fastest:
+%                           element ifrom + (ito-1)*nfrom.
 %   .nedgeelems             [nedges,1] number of quadrature points per edge
 %   .Qvecstartnums, .Qvecendnums  [nedgepairs,1] the rows of each edge pair
 %                           in the vector of unknowns (length nQ =
@@ -188,7 +193,10 @@ function EDdatastructs
 %   .Hsubmatrix             [nedgepairs,nedgepairs] the submatrix number of
 %                           each block of the H-matrix (0 = no block)
 %   .edgetripletlist        [nsub,3] [to-edge, via-edge, from-edge] of each
-%                           submatrix
+%                           submatrix. In the code these are edge3, edge2
+%                           and edge1: the diffracting edge is always called
+%                           edge 2 (see the header of
+%                           EDintegralequation_convex_tf, EDGE NUMBERING).
 %   .listofsubmatrices      [nsub,3]
 %   .submatrixcounter, .nuniquesubmatrices
 %   .reftoshortlist         [nsub,1] for identical (symmetric) submatrices
@@ -254,5 +262,7 @@ function EDdatastructs
 % propagationblocksize, parallelworkers, parallelnote); propdiagnostics has
 % totals over all the receivers.
 % 18 Oct. 2026 timingstruct.integralequation has totals.
+% 18 Oct. 2026 The q segments and the edge numbering of Hsubmatrixdata are
+% described.
 
 help(mfilename)

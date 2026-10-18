@@ -15,6 +15,25 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 % For each receiver r and frequency (wavenumber k), the propagation row
 % vector is Fgeom(r,:).*exp(-1i*k*(pathlengths(r,:)-Rstart)).
 %
+% EDGE NUMBERING (the same in all the integral equation functions)
+% Each kernel is one first-order diffraction step, from an incoming point
+% via a diffracting edge to an outgoing point, and the diffracting edge is
+% always edge 2 (position z2):
+%   source term:      q0(z3 <- z2) = G(z3 <- z2 <- S)
+%   integral eq.:     q(z3 <- z2)  = q0(z3 <- z2) + int H(z3 <- z2 <- z1) q(z2 <- z1) dz1
+%   propagation:      p(R)         = int int F(R <- z2 <- z1) q(z2 <- z1) dz1 dz2
+% q(zb <- za) is the edge source amplitude at za (on the edge that the q
+% segment is "from"), radiating towards zb (on the "to" edge). The wedge
+% index ny, the beta terms and the cylindrical coordinates (the suffix
+% _re2, e.g. ze1_re2) are those of edge 2. S or R takes the place of
+% edge 1 or edge 3 where the kernel starts or ends at a point.
+% In Hsubmatrixdata, edgepairlist(ii,:) = [to-edge from-edge] of the q
+% segment ii, and edgetripletlist(nn,:) = [edge3 edge2 edge1]. Inside a q
+% segment, the node index of the from-edge runs fastest: element
+% ifrom + (ito-1)*nfrom.
+% In this function: edge1 -> edge2 -> R. The q segment ii has
+% edgepairlist(ii,:) = [edge2 edge1].
+%
 % Input parameters:
 %   edgedata, edgetoedgedata, Hsubmatrixdata   Structs (see EDdatastructs)
 %   vispartedgesfromr   [nedges,nrec] the visibility of the edges from
@@ -37,7 +56,7 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 %
 % See also EDcalcpropagatematrix, EDintegralequation_convex_tf
 %
-% Peter Svensson (peter.svensson@ntnu.no) 16 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
 %
 % [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edgedata,...
 %    edgetoedgedata,Hsubmatrixdata,vispartedgesfromr,rRmat,thetaRmat,zRmat,...
@@ -47,6 +66,8 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 % functions gaussLegendreNodes, legendreVandermonde, glStandardCached,
 % neumannQupward and modifiedWeightsLorentzianVec are copies of those in
 % EDcalcpropagatematrix.
+% 18 Oct. 2026 (by Claude, prompted by PS) The edge numbering (edge 2 is
+% always the diffracting edge) is described in the header.
 
 nQ = double(Hsubmatrixdata.Qvecendnums(end));
 nrec = size(vispartedgesfromr,2);

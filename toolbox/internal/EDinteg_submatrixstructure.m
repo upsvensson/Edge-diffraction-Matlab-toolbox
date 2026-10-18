@@ -8,6 +8,25 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % the stage file <filestem>_submatrixdata.mat, which is reused when the
 % input data are the same.
 %
+% EDGE NUMBERING (the same in all the integral equation functions)
+% Each kernel is one first-order diffraction step, from an incoming point
+% via a diffracting edge to an outgoing point, and the diffracting edge is
+% always edge 2 (position z2):
+%   source term:      q0(z3 <- z2) = G(z3 <- z2 <- S)
+%   integral eq.:     q(z3 <- z2)  = q0(z3 <- z2) + int H(z3 <- z2 <- z1) q(z2 <- z1) dz1
+%   propagation:      p(R)         = int int F(R <- z2 <- z1) q(z2 <- z1) dz1 dz2
+% q(zb <- za) is the edge source amplitude at za (on the edge that the q
+% segment is "from"), radiating towards zb (on the "to" edge). The wedge
+% index ny, the beta terms and the cylindrical coordinates (the suffix
+% _re2, e.g. ze1_re2) are those of edge 2. S or R takes the place of
+% edge 1 or edge 3 where the kernel starts or ends at a point.
+% In Hsubmatrixdata, edgepairlist(ii,:) = [to-edge from-edge] of the q
+% segment ii, and edgetripletlist(nn,:) = [edge3 edge2 edge1]. Inside a q
+% segment, the node index of the from-edge runs fastest: element
+% ifrom + (ito-1)*nfrom.
+% This function builds edgepairlist ([to-edge from-edge]) and
+% edgetripletlist ([edge3 edge2 edge1] = [to-edge via-edge from-edge]).
+%
 % Input parameters:
 %   edgedata, edgetoedgedata  structs, see help EDdatastructs
 %   controlparameters  struct; these fields are used:
@@ -32,7 +51,7 @@ controlparameters,EDversionnumber,filehandlingparameters)
 %
 % See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 %    EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
@@ -85,6 +104,8 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % 14 Oct. 2026 The header was updated to the standard structure (by Claude,
 % prompted by PS).
 % 15 Oct. 2026 The list of called functions was replaced by a See also line.
+% 18 Oct. 2026 (by Claude, prompted by PS) The edge numbering (edge 2 is
+% always the diffracting edge) is described in the header.
 
 t00 = clock;
 

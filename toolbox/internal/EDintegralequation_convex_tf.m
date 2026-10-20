@@ -81,7 +81,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %
 % See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
 %
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %    EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
@@ -238,6 +238,8 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % and the propagation per frequency).
 % 18 Oct. 2026 (by Claude, prompted by PS) The edge numbering (edge 2 is
 % always the diffracting edge) is described in the header.
+% 20 Oct. 2026 The node and weight table (gaussvectors) also covers edges
+% with more points than abs(ngauss) (controlparameters.ngaussmin).
 
 t00_total = clock;
 t00 = clock;
@@ -349,6 +351,9 @@ maxngauss = abs(controlparameters.ngauss);
 if controlparameters.ngauss < 0
     maxngauss = maxngauss +2;
 end
+% 20 Oct. 2026: with controlparameters.ngaussmin, short edges can have more
+% points than abs(ngauss)
+maxngauss = max([maxngauss; double(Hsubmatrixdata.nedgeelems(:))]);
 gaussvectors = cell(maxngauss,1);
 for ii = 2:maxngauss
     [gaussvec1,gaussvec2] = EDdistelements(ii,controlparameters.discretizationtype);

@@ -33,6 +33,10 @@ controlparameters,EDversionnumber,filehandlingparameters)
 %     .ngauss       The number of Gauss-Legendre points on the longest edge;
 %                   shorter edges get proportionally fewer (at least 2).
 %                   A negative value enforces an odd number on every edge.
+%     .ngaussmin    (optional) The minimum number of Gauss-Legendre points
+%                   on every edge (default 2). Useful for very short edges,
+%                   e.g. extra corners inserted near the corners. With a
+%                   negative ngauss, the number is still odd.
 %     .discretizationtype  Must be 2 (Gauss-Legendre).
 %   EDversionnumber  The version number of the EDtoolbox (stored in the
 %                   stage file).
@@ -51,7 +55,7 @@ controlparameters,EDversionnumber,filehandlingparameters)
 %
 % See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 %    EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
@@ -106,6 +110,9 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % 15 Oct. 2026 The list of called functions was replaced by a See also line.
 % 18 Oct. 2026 (by Claude, prompted by PS) The edge numbering (edge 2 is
 % always the diffracting edge) is described in the header.
+% 20 Oct. 2026 New optional field controlparameters.ngaussmin, the minimum
+% number of points per edge (by Claude, prompted by PS). It is hashed only
+% if it is not 2.
 
 t00 = clock;
 
@@ -118,6 +125,11 @@ else
     enforceoddngauss = 0;    
 end
 inteq_discretizationtype = controlparameters.discretizationtype;
+if isfield(controlparameters,'ngaussmin') && ~isempty(controlparameters.ngaussmin) && ~isnan(controlparameters.ngaussmin)
+    ngaussmin = controlparameters.ngaussmin;
+else
+    ngaussmin = 2;
+end
 
 % The version of this function, and of the subroutines it uses, are
 % defined in EDstageversions. They are part of the hash, so that saved
@@ -127,6 +139,12 @@ stageversion = EDstageversions('EDinteg_submatrixstructure');
 EDinputdatastruct = struct('stage','EDinteg_submatrixstructure','stageversion',stageversion,...
     'edgedatahash',EDparenthash(edgedata),'ed2datahash',EDparenthash(edgetoedgedata),...
     'ngauss',controlparameters.ngauss,'discretizationtype',inteq_discretizationtype);
+% ngaussmin is hashed only if it is not the default value 2, which gives
+% the same discretization as before ngaussmin was introduced (so that
+% saved stage files remain valid).
+if ngaussmin ~= 2
+    EDinputdatastruct.ngaussmin = ngaussmin;
+end
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -218,6 +236,15 @@ end
 % 25 Jan 2018: Make sure there are at least 2 edge elements per edge.
 iv = (nedgeelems == 1);
 nedgeelems(iv) = 2;
+
+% 20 Oct. 2026: at least ngaussmin points on every edge (odd if ngauss < 0)
+if ngaussmin > 2
+    nedgeelems = max(nedgeelems,ngaussmin);
+    if enforceoddngauss == 1
+        iv = (mod(nedgeelems,2) == 0);
+        nedgeelems(iv) = nedgeelems(iv) + 1;
+    end
+end
 
 [~,sortvec] = sortrows([nedgeelems(edgepairlist(:,1)) nedgeelems(edgepairlist(:,2))]);
 edgepairlist = [edgepairlist(sortvec,1) edgepairlist(sortvec,2)];

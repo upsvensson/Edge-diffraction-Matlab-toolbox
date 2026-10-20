@@ -35,7 +35,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %
 % See also EDinputdoc, EDmain_convex, EDdatastructs
 %
-% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
 %
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,inputorigin] = ...
 %    EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -187,6 +187,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % plane (before: only regular polygons, and the function GEOcirclepoints
 % was missing). An error is given if the pistons have different numbers
 % of quadrature points (which EDSorRgeo can not handle).
+% 20 Oct. 2026 New field controlparameters.ngaussmin (default 2).
+% 20 Oct. 2026 A negative ngauss (odd numbers of points) is accepted, as
+% described; the check required ngauss > 0 before.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Documentation mode: EDcheckinputstructs('paramspecs') returns the tables
@@ -848,8 +851,10 @@ switch structname
             'The propagation from the edge sources to the receivers: ''accurate'' uses singularity subtraction near the zone boundaries; ''legacy'' uses plain Gauss-Legendre quadrature.';
         'skipreceiverpropagation', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1), 0, @(cp) cp.difforder>=2, false, ...
             '1: the integral equation is solved, but the propagation to the receivers is skipped (the result is zero).';
-        'ngauss', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 16, @(cp) true, false, ...
+        'ngauss', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x ~= 0, 16, @(cp) true, false, ...
             'The number of Gauss-Legendre points on the longest edge; shorter edges get proportionally fewer (at least 2). A negative value gives an odd number on every edge. The log file reports the points per wavelength.';
+        'ngaussmin', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && x == round(x), 2, @(cp) true, false, ...
+            'The minimum number of Gauss-Legendre points on every edge, e.g. for very short edges near the corners (odd if ngauss < 0).';
         'discretizationtype', @(x) isnumeric(x) && (x == 0 | x == 1 | x == 2), 2, @(cp) true, false, ...
             'The edge discretization: 2 = Gauss-Legendre (the only one that is supported).';
         'surfacegaussorder', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 5, @(cp) strcmp(cp.generalmethod,'tf_ESIEBEM'), false, ...

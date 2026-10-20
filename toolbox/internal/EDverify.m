@@ -71,10 +71,15 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 %     agree with the specification in EDcheckinputstructs.
 % 20. First-order diffraction with diff1method = 'GL' agrees with
 %     'accurate' also close to a zone boundary (thin plate, plane wave).
+% 21. First-order diffraction with diff1method = 'GL' agrees with
+%     'accurate' for edges of different lengths (a box).
+% 22. controlparameters.ngaussmin gives at least that number of points on
+%     every edge (odd numbers for a negative ngauss), and a more accurate
+%     result for a plate with short edges at the corners (0 Hz).
 %
 % See also EDmain_convex, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
 %
 % passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams);
 
@@ -125,8 +130,11 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % boundary).
 % 15 Oct. 2026 Test 18 deletes its result files from earlier EDverify runs
 % first (the second run could reuse the _tfinteq file of an earlier run).
+% 20 Oct. 2026 Added test 21 (GL first-order diffraction for edges of
+% different lengths; it fails with EDwedge1st_fd version 3) and test 22
+% (ngaussmin). Test 17 also changes ngaussmin.
 
-ntests = 20;
+ntests = 22;
 
 if nargin < 1 || isempty(outputdirectory)
     outputdirectory = uigetdir('', 'Select the directory for the calculation results and the logfile');
@@ -180,7 +188,7 @@ disp(headerline)
 
 testfunctions = {@edtest1,@edtest2,@edtest3,@edtest4,@edtest5,@edtest6,@edtest7,...
     @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15,...
-    @edtest16,@edtest17,@edtest18,@edtest19,@edtest20};
+    @edtest16,@edtest17,@edtest18,@edtest19,@edtest20,@edtest21,@edtest22};
 
 for itest = 1:ntests
     if runtest(itest) ~= 1
@@ -842,6 +850,79 @@ resultlines = {sprintf('Max. relative difference: %.2g (at %.2f degrees)',relerr
 r = edresult(title,description,relerr < tolGL,resultlines);
 end
 
+function r = edtest21(outputdirectory,filestem,~)
+title = 'GL first-order diffraction agrees with accurate for edges of different lengths';
+tolGL = 1e-6;
+description = {'Box 1 m x 0.6 m x 0.3 m, a source and 5 receivers, 100 and 500 Hz.',...
+    ['tfdiff with diff1method = ''GL'' (32 points) should agree with ''accurate'' to ',num2str(tolGL),' (relative'],...
+    'to max abs(tfdiff)). (Oct. 2026: before the bug fix, GL was only correct for edges of length 1.)'};
+
+[corners,planecorners] = EDmakegeo_shoebox(1,0.6,0.3);
+geoinputdata = struct('corners',corners,'planecorners',planecorners);
+Sinputdata = struct('coordinates',[1.1 0.8 0.6]);
+Rinputdata = struct('coordinates',[0.9 -0.7 0.4; -1.2 0.5 0.2; 0.3 1.3 -0.6; -0.8 -0.9 -0.5; 1.4 0.1 0.05]);
+controlparameters = struct('generalmethod','tf','frequencies',[100 500],'difforder',1);
+envdata = struct('cair',343);
+
+methods = {'accurate','GL'};
+tfdiff = cell(1,2);
+for ii = 1:2
+    cp = controlparameters;
+    cp.diff1method = methods{ii};
+    if ii == 2
+        cp.diff1GLorder = 32;
+    end
+    EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,cp,...
+        edfilehandling(outputdirectory,[filestem,'_',methods{ii}]));
+    tfdiff{ii} = EDres.tfdiff(:);
+end
+relerr = max(abs(tfdiff{2} - tfdiff{1}))/max(abs(tfdiff{1}));
+resultlines = {sprintf('Max. relative difference: %.2g',relerr)};
+r = edresult(title,description,relerr < tolGL,resultlines);
+end
+
+function r = edtest22(outputdirectory,filestem,~)
+title = 'ngaussmin: the minimum number of points per edge';
+description = {'1 m x 1 m thin plate with extra corners 5 mm from each corner (12 edges, 8 of them',...
+    '5 mm long), plane wave from a far source, 0 Hz (the exact total is 1). ngauss = 20.',...
+    'Checks: ngaussmin = 8 gives at least 8 points on every edge; ngauss = -20 with ngaussmin = 8',...
+    'gives odd numbers, at least 9; and the max. error of tftot is below 75% of that with',...
+    'the default ngaussmin = 2 (where the short edges get 2 points).'};
+
+a = 0.5;
+d = 0.005;
+corners = [ a a 0;a-d a 0; -a+d a 0;-a a 0;-a a-d 0; -a -a+d 0;-a -a 0; -a+d -a 0;...
+            a-d -a 0; a -a 0; a -a+d 0; a a-d 0];
+geoinputdata = struct('corners',corners,'planecorners',[1:12;12:-1:1]);
+Sdist = 1e8;
+Sinputdata = struct('coordinates',Sdist*[1 1 1]/sqrt(3),'sourceamplitudes',Sdist);
+Rinputdata = struct('coordinates',[0.3 0.2 0.6; -0.4 0.7 -0.5; 1.2 -0.4 0.3; 0.49 -1.46 -0.56; 0.13 -1.26 0.45; -1.59 -0.89 -0.36]);
+envdata = struct('cair',343);
+controlparameters = struct('generalmethod','tf','frequencies',0,'difforder',10,'ngauss',20,'Rstart',Sdist);
+
+cases = {[20 2],[20 8],[-20 8]};    % [ngauss ngaussmin]
+nedgeelems = cell(1,3);
+tferr = zeros(1,3);
+for ii = 1:3
+    cp = controlparameters;
+    cp.ngauss = cases{ii}(1);
+    cp.ngaussmin = cases{ii}(2);
+    fh = edfilehandling(outputdirectory,sprintf('%s_case%d',filestem,ii));
+    EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,cp,fh);
+    tferr(ii) = max(abs(EDres.tftot(:) - 1));
+    sm = load(fullfile(outputdirectory,[fh.filestem,'_submatrixdata.mat']),'Hsubmatrixdata');
+    nedgeelems{ii} = double(sm.Hsubmatrixdata.nedgeelems(:));
+end
+ok1 = min(nedgeelems{1}) == 2;
+ok2 = min(nedgeelems{2}) >= 8;
+ok3 = min(nedgeelems{3}) >= 9 && all(mod(nedgeelems{3},2) == 1);
+ok4 = tferr(2) < 0.75*tferr(1);
+resultlines = {sprintf('Points per edge (min, max): default %d, %d; ngaussmin = 8: %d, %d; ngauss = -20: %d, %d',...
+    min(nedgeelems{1}),max(nedgeelems{1}),min(nedgeelems{2}),max(nedgeelems{2}),min(nedgeelems{3}),max(nedgeelems{3})),...
+    sprintf('Max. error of tftot: default %.2g, ngaussmin = 8: %.2g, ngauss = -20 and ngaussmin = 8: %.2g',tferr)};
+r = edresult(title,description,ok1 && ok2 && ok3 && ok4,resultlines);
+end
+
 function r = edtest19(~,~,~)
 title = 'The cheatsheet input descriptions are up to date';
 description = {'doc/EDinputfields.tex (input by doc/EDtoolbox_cheatsheet.tex) must be the same as a',...
@@ -918,6 +999,7 @@ changes = {
     'diff1method = GL',                      [0 0 0 0 1 0 0 0 0];
     'ESIEpropagationimplementation = legacy',[0 0 0 0 0 0 0 0 1];
     'savediff2result = 1',                   [0 0 0 0 0 0 0 0 1];
+    'ngaussmin = 6',                         [0 0 0 0 0 0 1 1 1];
     };
 
 [geoinputdata,Sinputdata,Rinputdata,controlparameters] = edsmallcube;
@@ -949,6 +1031,7 @@ for ii = 1:size(changes,1)
         case 8,  cp.diff1method = 'GL';
         case 9,  cp.ESIEpropagationimplementation = 'legacy';
         case 10, f.savediff2result = 1;
+        case 11, cp.ngaussmin = 6;
     end
     EDmain_convex(g,S,R,e,cp,f);
     newhashes = edreadstagehashes(outputdirectory,filestem,stagesuffixes);

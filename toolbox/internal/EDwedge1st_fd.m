@@ -44,7 +44,7 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 %   diff1GLorder    (optional) GL order; only relevant if diff1method =
 %                   'GL'.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
 %
 % [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs,...
 %    thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc,diff1method,diff1GLorder);
@@ -95,6 +95,10 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 % once per node. Also the GL branch computes all frequencies at once. The
 % results agree with the earlier ones to within the integration
 % tolerance.
+% 20 Oct. 2026 Bug fix (by Claude, prompted by PS): for diff1method = 'GL',
+% the GL sum was not multiplied by the length of the integration interval
+% (the GL weights are for [0,1]), so the result was only correct for edges
+% of length 1. Found with a plate with extra corners near the corners.
 
 localshowtext = 0;
 
@@ -517,7 +521,10 @@ elseif strcmp(diff1method,'GL')
     % exp(-1i*k*(m+l-Rstart)) is applied for all k as a matrix.
     outval0 = EDbetaoverml_fd(zvec,0,rs,rr,zs,zr,ny,sinnyfivec,cosnyfivec,Rstart,useterm);
     pathlengthvec = sqrt( (zvec-zs).^2 + rs^2 ) + sqrt( (zvec-zr).^2 + rr^2 ) - Rstart;
-    tf = exp(-1i*kvec*pathlengthvec(:).')*(outval0(:).*wvec(:));
+    % The GL weights are for the interval [0,1]: the factor zwlength
+    % (bug fix 20 Oct. 2026; before, the result was only correct for
+    % edges of length 1)
+    tf = exp(-1i*kvec*pathlengthvec(:).')*(outval0(:).*wvec(:))*zwlength;
     tf = tf*(-ny/4/pi);
 end
 

@@ -3,6 +3,50 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.615 (20 Oct. 2026)
+
+A bug fix for first-order diffraction with diff1method = 'GL', which gave
+wrong results for all edges that are not 1 m long (the default 'accurate'
+was correct). A new parameter, controlparameters.ngaussmin, and a
+prototype of EDrefineQvec.
+
+**Changes that affect the results**
+
+- EDwedge1st_fd (bug fix): with diff1method = 'GL', the Gauss-Legendre sum
+  was not multiplied by the length of the edge (the weights are for the
+  interval [0,1]). The first-order diffraction was therefore only correct
+  for edges of length 1: e.g. 37% wrong for a 1 x 0.5 m plate and 89% for
+  a 1 x 0.95 x 0.45 m box. Present since 'GL' was introduced (24 Sep. 2026).
+  Results computed with 'GL' should be recomputed. EDwedge1st_fd has
+  version 4 in EDstageversions, so saved _tf files are recomputed.
+
+**Input and output**
+
+- New parameter controlparameters.ngaussmin (default 2): the minimum number
+  of Gauss-Legendre points on every edge (odd if ngauss < 0). With the
+  default, the discretization is the same as before, and saved stage files
+  remain valid (ngaussmin is hashed only if it is not 2). Useful for very
+  short edges, e.g. extra corners inserted near the corners of a plate,
+  which otherwise get 2 points for any ngauss. EDintegralequation_convex_tf
+  handles edges with more points than abs(ngauss).
+- New function EDrefineQvec (a prototype): refines a computed solution
+  of the integral equation (Qfinal, e.g. from a _qfinal file) to more
+  Gauss-Legendre nodes on some or all edges, without solving the integral
+  equation again, and optionally propagates it to the receivers. Two
+  methods: 'nystrom' (the Nystrom interpolation formula, in two steps for
+  the to- and from-variables) and 'lagrange' (polynomial interpolation).
+  It can be used to separate the errors of the integral equation and of
+  the propagation in convergence studies. EDrefineQvec_demo shows how.
+  Does not change any results.
+
+**Tests**
+
+- EDverify test 21: 'GL' and 'accurate' first-order diffraction agree for
+  edges of different lengths (fails with the old EDwedge1st_fd).
+- EDverify test 22: ngaussmin gives the right number of points per edge,
+  and a smaller error for a plate with short edges at the corners.
+- EDverify test 17 also changes ngaussmin.
+
 ## 0.614 (18 Oct. 2026)
 
 Two bug fixes for polygon piston sources, which change the results for

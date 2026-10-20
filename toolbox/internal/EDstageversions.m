@@ -34,7 +34,7 @@ function stageinfo = EDstageversions(stagename)
 %                                    (struct of cell arrays)
 %                 .ignored           cell array with the ignored functions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 16 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
 %
 % stageinfo = EDstageversions(stagename);
 
@@ -45,6 +45,8 @@ function stageinfo = EDstageversions(stagename)
 % 15 Oct. 2026 EDwedge1st_fd to version 3 (near-singular cases with 'GL').
 % 15 Oct. 2026 EDcalcpropagatematrix to version 2 (bug fix).
 % 16 Oct. 2026 New function EDcalcpropagatematrix_block (version 1).
+% 20 Oct. 2026 EDwedge1st_fd to version 4 (bug fix: 'GL' results were only
+% correct for edges of length 1).
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -100,7 +102,7 @@ versions.EDpoinpla                    = 1;
 versions.EDpoinplax                   = 1;
 versions.EDquadgk                     = 1;
 versions.EDquadstep                   = 1;
-versions.EDwedge1st_fd                = 3;  % 2: 'GL' falls back to 'accurate' for singular cases; 3: also near-singular
+versions.EDwedge1st_fd                = 4;  % 2: 'GL' falls back to 'accurate' for singular cases; 3: also near-singular; 4: 'GL' bug fix (edge length)
 versions.EDwedge1st_ir                = 1;
 versions.EDwedge2nd                   = 1;
 versions.EDwedgeN                     = 1;

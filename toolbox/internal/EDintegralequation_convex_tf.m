@@ -262,6 +262,8 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % timingdata(5), the time for the refinement, and
 % inteqdiagnostics.nQpropagated, the number of propagated unknowns (only
 % when the refinement is used).
+% 28 Oct. 2026 The refinement uses the parallel workers too
+% (filehandlingparameters.parallelworkers).
 % 20 Oct. 2026 The node and weight table (gaussvectors) also covers edges
 % with more points than abs(ngauss) (controlparameters.ngaussmin).
 
@@ -941,7 +943,7 @@ if controlparameters.skipreceiverpropagation == 0
             'controlparameters',controlparameters);
         refineinput.Qfinalstore = Qfinalstore;
         refined = EDrefineQvec(refineinput,struct('method','nystrom','nedgeelems',nedgeelems_refined,...
-            'propagate',0,'showtext',double(showtext >= 2)));
+            'propagate',0,'showtext',double(showtext >= 2),'parallelworkers',nworkers));
         clear refineinput
         Hsubmatrixdata_prop = refined.Hsubmatrixdata;
         Qfinalstore_prop = refined.Qfinalstore;

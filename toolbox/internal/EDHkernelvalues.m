@@ -40,6 +40,10 @@ function [Hvalues,mdist] = EDHkernelvalues(edgedata,edgetoedgedata,edge1,edge2,e
 % 28 Oct. 2026 First version (by Claude, prompted by PS): the kernel
 % computation of PART 1 of EDintegralequation_convex_tf, moved here
 % unchanged, so that EDrefineQvec can use the same code.
+% 28 Oct. 2026 The test for off-edges uses any(... == ...) instead of
+% ismember (faster; the same result). The distances l and m are computed
+% for the node combinations of two edges and then picked out for the index
+% lists (fewer operations; the same values).
 
 Hsubconstant = -1/4/pi/2;
 refto = edgetoedgedata.reftoshortlistE;
@@ -111,11 +115,19 @@ else
 
 end
 
-ldist = (ze3_re2(n3ind) - ze2_re2(n2ind)).^2   + re3_re2(n3ind).^2;
-ldist = sqrt(ldist);
+% l depends only on (i2,i3), and m only on (i1,i2), so they are computed
+% for all the node combinations of two edges (the same operations, so the
+% same values), and then picked out for the index lists.
+n2len = numel(ze2_re2);
+ltable = (ze3_re2(:).' - ze2_re2(:)).^2   + (re3_re2(:).').^2;      % [n2,n3]
+ltable = sqrt(ltable);
+% (double: the index lists can be uint8/uint16, where the arithmetic would
+% saturate)
+ldist = ltable(double(n2ind) + (double(n3ind)-1)*n2len);
 
-mdist = (ze1_re2(n1ind).' - ze2_re2(n2ind)).^2   + (re1_re2(n1ind).').^2;
-mdist = sqrt(mdist);
+mtable = (ze1_re2(:).' - ze2_re2(:)).^2   + (re1_re2(:).').^2;      % [n2,n1]
+mtable = sqrt(mtable);
+mdist = mtable(double(n2ind) + (double(n1ind)-1)*n2len);
 
 % The factor exp(-1i*k*mdist) is not included here: it is
 % applied per frequency (see EDintegralequation_convex_tf).
@@ -135,7 +147,9 @@ else
           ( sin(ny*(pi - thetae1_re2(n1ind).' - thetae3_re2(n3ind)  ))./(ch - cos(ny*(pi - thetae1_re2(n1ind).' - thetae3_re2(n3ind)   ))+eps*10));
 end
 
-if ismember(edge1,edgedata.offedges)==1 || ismember(edge2,edgedata.offedges)==1 || ismember(edge3,edgedata.offedges)==1
+% (any(... == ...) instead of ismember, which has a large overhead per call)
+offedges = edgedata.offedges(:);
+if any(offedges == edge1) || any(offedges == edge2) || any(offedges == edge3)
    beta = beta*0;
 end
 

@@ -32,6 +32,17 @@ comments at the top of its .m file.
   time for the refinement, and inteqdiagnostics.nQpropagated gives the
   number of propagated unknowns when the refinement is used.
 
+**Speed**
+
+- EDrefineQvec (and so ESIEpropagationrefine): kernel blocks of the
+  Nystrom step with identical input data (e.g. symmetric edge triplets)
+  are computed only once, optionally on parallel workers, and shared. New
+  output field .nkernelblocks. The results are unchanged (bitwise).
+- EDHkernelvalues (used for the H-matrix and by EDrefineQvec): the
+  distances l and m are computed for the node combinations of two edges
+  and then picked out, and a faster test for off-edges. The results are
+  unchanged (bitwise).
+
 **Code structure (no change of the results)**
 
 - Three new functions, with code moved from EDintegralequation_convex_tf:

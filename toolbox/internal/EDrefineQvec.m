@@ -97,6 +97,7 @@ function refined = EDrefineQvec(inteqdata,refineopts)
 %                   a vector of part numbers 1,2,..., one per edge pair
 %     .showtext     0 (default) or 1
 %     .parallelworkers  the largest number of parallel workers for the
+%                   kernel blocks of the Nystrom step and for the
 %                   propagation (default 0 = serial; see
 %                   filehandlingparameters.parallelworkers)
 %     .forcerecompute  1: a test; the edges in .edges are recomputed with
@@ -132,6 +133,9 @@ function refined = EDrefineQvec(inteqdata,refineopts)
 %                       unknowns in the refined solution (row 2) per part
 %     .pairdistances    ('sharecorner_near') the shortest distance between
 %                       the two edges of each edge pair
+%     .nkernelblocks    ('nystrom', difforder > 2) [the number of kernel
+%                       blocks, the number that were computed]; blocks
+%                       with identical input data are computed once
 %     .method, .refinededges, .timing ([refinement propagation] in s)
 %                       .method is 'none' if no edge was refined (then the
 %                       original solution is returned, e.g. to propagate
@@ -177,6 +181,10 @@ function refined = EDrefineQvec(inteqdata,refineopts)
 % and EDpropagateQvec. The results are the same as before, except that the
 % propagation now follows controlparameters.ESIEpropagationimplementation
 % (before: always 'accurate', the default). New option .parallelworkers.
+% 28 Oct. 2026 Kernel blocks with identical input data (e.g. symmetric edge
+% triplets) are computed only once, optionally on parallel workers
+% (.parallelworkers), and shared. New output field .nkernelblocks =
+% [number of blocks, number computed]. The results are unchanged.
 
 t00 = clock;
 
@@ -383,33 +391,65 @@ if strcmp(method,'nystrom')
     % that are needed, and the distances m for the frequency factor.
     % step 1: rows (f' new, g old), columns (g old, h old)
     % step 2: rows (t' new or old, f' new), columns (f' new, g old)
+    % Edge triplets with identical input data (the same edge-to-edge
+    % geometry, numbers of nodes, edge lengths etc., e.g. symmetric
+    % triplets) have identical kernel blocks, which are computed only once
+    % (optionally on parallel workers) and shared.
     kernel1 = cell(npairs,1);
     kernel2 = cell(npairs,1);
     if usekernel
-        for ii = step1segs(:).'
-            nnlist = find(rowseg == ii);
-            kernel1{ii} = cell(numel(nnlist),1);
-            for jj = 1:numel(nnlist)
-                nn = nnlist(jj);
-                e3 = Hsub.edgetripletlist(nn,1); e2 = Hsub.edgetripletlist(nn,2); e1 = Hsub.edgetripletlist(nn,3);
-                [B,mdist] = edHgeomblock(edgedata,edgetoedgedata,Hsub,nn,...
-                    edglnodes(HsubN,nnew(e3)),edglnodes(Hsub,nold(e2)),edglnodes(Hsub,nold(e1)),...
-                    edglweights(Hsub,nold(e1))*edgedata.edgelengthvec(e1));
-                kernel1{ii}{jj} = struct('B',B,'mdist',mdist,'colseg',colseg(nn),'n2',nold(e2));
+        % All the (step, triplet) combinations that are needed
+        nnlist1 = find(ismember(rowseg,step1segs));
+        nnlist2 = find(ismember(rowseg,step2segs));
+        tripletlist = [ones(numel(nnlist1),1) nnlist1(:); 2*ones(numel(nnlist2),1) nnlist2(:)];
+        ntrip = size(tripletlist,1);
+        refto = edgetoedgedata.reftoshortlistE;
+        keys = zeros(ntrip,12);
+        nvecs = zeros(ntrip,3);    % [n1 n2 n3]
+        for it = 1:ntrip
+            nn = tripletlist(it,2);
+            e3 = Hsub.edgetripletlist(nn,1); e2 = Hsub.edgetripletlist(nn,2); e1 = Hsub.edgetripletlist(nn,3);
+            if tripletlist(it,1) == 1
+                nvecs(it,:) = [nold(e1) nold(e2) nnew(e3)];
+            else
+                nvecs(it,:) = [nold(e1) nnew(e2) nnew(e3)];
+            end
+            keys(it,:) = [refto(e1,e2) refto(e3,e2) nvecs(it,:) edgedata.edgelengthvec([e1 e2]).' ...
+                edgedata.closwedangvec(e2) any(edgedata.offedges(:) == e1) any(edgedata.offedges(:) == e2) ...
+                any(edgedata.offedges(:) == e3) double(Hsub.isthinplanetriplet(nn))+1];
+        end
+        [~,iunique,ikey] = unique(keys,'rows');
+        Bstore = cell(numel(iunique),1);
+        mstore = cell(numel(iunique),1);
+        nworkers = edgetopt(refineopts,'parallelworkers',0);
+        parfor (iu = 1:numel(iunique), nworkers)
+            it = iunique(iu);
+            nn = tripletlist(it,2);
+            e1 = Hsub.edgetripletlist(nn,3);
+            n1 = nvecs(it,1); n2 = nvecs(it,2); n3 = nvecs(it,3);
+            n2vec = [];
+            if tripletlist(it,1) == 1
+                n2vec = edglnodes(Hsub,n2);
+            else
+                n2vec = edglnodes(HsubN,n2);
+            end
+            [Bstore{iu},mstore{iu}] = edHgeomblock(edgedata,edgetoedgedata,Hsub,nn,...
+                edglnodes(HsubN,n3),n2vec,edglnodes(Hsub,n1),...
+                edglweights(Hsub,n1)*edgedata.edgelengthvec(e1));
+        end
+        % The blocks of each segment (the arrays are shared, not copied)
+        for it = 1:ntrip
+            nn = tripletlist(it,2);
+            K = struct('B',Bstore{ikey(it)},'mdist',mstore{ikey(it)},'colseg',colseg(nn),'n2',nvecs(it,2));
+            ii = rowseg(nn);
+            if tripletlist(it,1) == 1
+                kernel1{ii}{end+1} = K;
+            else
+                kernel2{ii}{end+1} = K;
             end
         end
-        for ii = step2segs(:).'
-            nnlist = find(rowseg == ii);
-            kernel2{ii} = cell(numel(nnlist),1);
-            for jj = 1:numel(nnlist)
-                nn = nnlist(jj);
-                e3 = Hsub.edgetripletlist(nn,1); e2 = Hsub.edgetripletlist(nn,2); e1 = Hsub.edgetripletlist(nn,3);
-                [B,mdist] = edHgeomblock(edgedata,edgetoedgedata,Hsub,nn,...
-                    edglnodes(HsubN,nnew(e3)),edglnodes(HsubN,nnew(e2)),edglnodes(Hsub,nold(e1)),...
-                    edglweights(Hsub,nold(e1))*edgedata.edgelengthvec(e1));
-                kernel2{ii}{jj} = struct('B',B,'mdist',mdist,'colseg',colseg(nn),'n2',nnew(e2));
-            end
-        end
+        clear Bstore mstore
+        refined.nkernelblocks = [ntrip numel(iunique)];
     end
 
     % Layouts for the source term of step 1, for the segments [f g] where
@@ -716,12 +756,13 @@ edge1 = Hsub.edgetripletlist(nn,3);
 n1 = numel(n1vec); n2 = numel(n2vec); n3 = numel(n3vec);
 thinplaneboost = double(Hsub.isthinplanetriplet(nn)) + 1;
 
-% Index lists for the elements of B, column by column
-i2row = repmat((1:n2).',n3,1);
-i3row = reshape(repmat(1:n3,n2,1),n2*n3,1);
-n2ind = repmat(i2row,n1,1);
-n3ind = repmat(i3row,n1,1);
-n1ind = reshape(repmat(1:n1,n2*n3,1),n1*n2*n3,1);
+% Index lists for the elements of B, column by column: element e
+% (0-based) has i2 = mod(e,n2), i3 = mod(floor(e/n2),n3),
+% i1 = floor(e/(n2*n3)) (plus 1)
+e = (0:n1*n2*n3-1).';
+n2ind = mod(e,n2) + 1;
+n3ind = mod(floor(e/n2),n3) + 1;
+n1ind = floor(e/(n2*n3)) + 1;
 
 [Bvalues,mvalues] = EDHkernelvalues(edgedata,edgetoedgedata,edge1,edge2,edge3,...
     n1vec,n2vec,n3vec,dzvec(:),n1ind,n2ind,n3ind,thinplaneboost);

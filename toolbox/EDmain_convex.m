@@ -45,7 +45,7 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 %
 % See also EDinputdoc, EDdatastructs, EDgetresults, EDcheckinputstructs, EDshowcalltree
 %
-% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 28 Oct. 2026
 %
 % EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
 
@@ -208,6 +208,8 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % that all diffraction orders are included.
 % 18 Oct. 2026 New timing lines for the integral equation: once (H-matrix),
 % per frequency (and source), and the propagation in total.
+% 28 Oct. 2026 The timing line of the propagation also gives the time for
+% the refinement (controlparameters.ESIEpropagationrefine), if it is used.
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -674,6 +676,15 @@ if controlparameters.difforder > 1 && ( strcmp(controlparameters.generalmethod,'
         proptext = ['Propagation to ',int2str(nreceiversinteq),' receivers, all frequencies: ',num2str(timingdata(4),3),' s.'];
     else
         proptext = ['Propagation to ',int2str(nreceiversinteq),' receivers: ',num2str(timingdata(4),3),' s.'];
+    end
+    % With controlparameters.ESIEpropagationrefine, the solution was
+    % refined before the propagation (timingdata(5)).
+    if numel(timingdata) >= 5 && timingdata(5) > 0 && controlparameters.skipreceiverpropagation == 0
+        refinetext = [' Refined before the propagation: ',num2str(timingdata(5),3),' s'];
+        if isfield(extraoutputdata.inteqdiagnostics,'nQpropagated')
+            refinetext = [refinetext,', ',int2str(extraoutputdata.inteqdiagnostics.nQpropagated),' unknowns propagated'];
+        end
+        proptext = [proptext,refinetext,'.'];
     end
     if nfrequencies == 1 && ~separatesources
         timinglines = {['H-matrix: ',Htext,' s. Q_firstterm: ',Q1text,' s',addednote,'. Qfinal: ',Qftext,' s',fromqfilenote,'.'],...

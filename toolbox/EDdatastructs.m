@@ -22,6 +22,9 @@ function EDdatastructs
 %   Hsubmatrixdata      EDinteg_submatrixstructure     _submatrixdata
 %   (results)           EDmakefirstordertfs            _tf
 %                       EDintegralequation_convex_tf   _qfinal, _tfinteq
+%                       (with EDpropagateQvec, and
+%                       EDrefineQvec if
+%                       ESIEpropagationrefine is used)
 %                       EDmakefirstorderirs            _ir
 %                       EDfindHODpaths, EDmakeHODirs   _hodpaths, _irhod
 %                       EDpropagateESIEBEM             _tfESIEBEM
@@ -225,8 +228,10 @@ function EDdatastructs
 %   .inteqdiagnostics       (method 'tf') see below
 %   .timingstruct           the computation times of the stages
 %                           (.integralequation: [H-matrix, source term,
-%                           solution, propagation], totals over all
-%                           frequencies and sources)
+%                           solution, propagation, refinement], totals over
+%                           all frequencies and sources; the refinement for
+%                           the propagation is 0 if ESIEpropagationrefine
+%                           is not used)
 %   .geoinputdata ... .filehandlingparameters  the six input structs, each
 %                           with .inputorigin
 %   .EDversionnumber, .inputhash, .logfilename
@@ -247,6 +252,9 @@ function EDdatastructs
 %                           the receivers of the edge pairs, rows and
 %                           corrected (near-singular) rows
 %   .propagationblocksize   the number of receivers per block
+%   .nQpropagated           (only if ESIEpropagationrefine is used) the
+%                           number of unknowns of the refined solution that
+%                           was propagated to the receivers
 %   .parallelworkers        the number of parallel workers for the
 %                           propagation (0 = serial)
 %   .parallelnote           a note if parallel workers were asked for but
@@ -254,7 +262,7 @@ function EDdatastructs
 %   .qfinalfile             text: computed and saved, reused from, or
 %                           not saved
 %
-% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 28 Oct. 2026
 %
 % EDdatastructs
 
@@ -267,5 +275,8 @@ function EDdatastructs
 % 18 Oct. 2026 The q segments and the edge numbering of Hsubmatrixdata are
 % described.
 % 18 Oct. 2026 The piston weights sum to 1.
+% 28 Oct. 2026 timingstruct.integralequation has a 5th value (the
+% refinement for the propagation), and inteqdiagnostics.nQpropagated is
+% new (controlparameters.ESIEpropagationrefine).
 
 help(mfilename)

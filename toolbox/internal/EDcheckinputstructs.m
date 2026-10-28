@@ -35,7 +35,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %
 % See also EDinputdoc, EDmain_convex, EDdatastructs
 %
-% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 28 Oct. 2026
 %
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,inputorigin] = ...
 %    EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -190,6 +190,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 20 Oct. 2026 New field controlparameters.ngaussmin (default 2).
 % 20 Oct. 2026 A negative ngauss (odd numbers of points) is accepted, as
 % described; the check required ngauss > 0 before.
+% 20 Oct. 2026 New field controlparameters.nedgeelemsuser (default []).
+% 28 Oct. 2026 New field controlparameters.ESIEpropagationrefine (default 1).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Documentation mode: EDcheckinputstructs('paramspecs') returns the tables
@@ -849,12 +851,16 @@ switch structname
             'The source term of the integral equation: ''accurate'' uses singularity subtraction when a source is close to the plane of a face; ''legacy'' is the earlier method.';
         'ESIEpropagationimplementation', @(x) ismember(x,{'legacy','accurate'}), 'accurate', @(cp) cp.difforder>=2, false, ...
             'The propagation from the edge sources to the receivers: ''accurate'' uses singularity subtraction near the zone boundaries; ''legacy'' uses plain Gauss-Legendre quadrature.';
+        'ESIEpropagationrefine', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && ((isscalar(x) && x >= 1) || (size(x,2) == 2 && all(x(:,1) > 0) && all(x(:,2) >= 1))), 1, @(cp) cp.difforder>=2, false, ...
+            'Advanced: the solution of the integral equation is refined to more points per edge (Nystrom interpolation, EDrefineQvec) before the propagation to the receivers, which is then more accurate. A factor for all edges (1 = no refinement), or rows [maxlength factor]: the edges not longer than maxlength get the factor (the smallest maxlength that fits); longer edges are not refined. The new number of points is ceil(factor*npoints). The solution and the _qfinal file are not changed.';
         'skipreceiverpropagation', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1), 0, @(cp) cp.difforder>=2, false, ...
             '1: the integral equation is solved, but the propagation to the receivers is skipped (the result is zero).';
         'ngauss', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x ~= 0, 16, @(cp) true, false, ...
             'The number of Gauss-Legendre points on the longest edge; shorter edges get proportionally fewer (at least 2). A negative value gives an odd number on every edge. The log file reports the points per wavelength.';
         'ngaussmin', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x >= 2 && x == round(x), 2, @(cp) true, false, ...
             'The minimum number of Gauss-Legendre points on every edge, e.g. for very short edges near the corners (odd if ngauss < 0).';
+        'nedgeelemsuser', @(x) isnumeric(x) && isreal(x) && (isempty(x) || ((size(x,2) == 2 || size(x,2) == 3) && all(x(:) > 0) && all(x(:,end) >= 2) && all(x(:,end) == round(x(:,end))))), [], @(cp) true, false, ...
+            'Advanced: the number of Gauss-Legendre points on chosen edges, overriding ngauss and ngaussmin. Rows [maxlength npoints]: the edges not longer than maxlength get npoints (the smallest maxlength that fits). Or rows [corner1 corner2 npoints]: the edge between these corners (rows of geoinputdata.corners).';
         'discretizationtype', @(x) isnumeric(x) && (x == 0 | x == 1 | x == 2), 2, @(cp) true, false, ...
             'The edge discretization: 2 = Gauss-Legendre (the only one that is supported).';
         'surfacegaussorder', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && isscalar(x) && x > 0, 5, @(cp) strcmp(cp.generalmethod,'tf_ESIEBEM'), false, ...

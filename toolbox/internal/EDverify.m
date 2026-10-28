@@ -76,6 +76,9 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 22. controlparameters.ngaussmin gives at least that number of points on
 %     every edge (odd numbers for a negative ngauss), and a more accurate
 %     result for a plate with short edges at the corners (0 Hz).
+% 23. controlparameters.nedgeelemsuser sets the number of points on chosen
+%     edges, by edge length and by corner pair; a wrong corner pair gives
+%     an error.
 %
 % See also EDmain_convex, EDstageversions
 %
@@ -133,8 +136,11 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 20 Oct. 2026 Added test 21 (GL first-order diffraction for edges of
 % different lengths; it fails with EDwedge1st_fd version 3) and test 22
 % (ngaussmin). Test 17 also changes ngaussmin.
+% 20 Oct. 2026 Added test 23 (nedgeelemsuser). Test 17 also changes
+% nedgeelemsuser. The common local function of tests 2 and 3 was renamed
+% from edtest23 to edtest2and3.
 
-ntests = 22;
+ntests = 23;
 
 if nargin < 1 || isempty(outputdirectory)
     outputdirectory = uigetdir('', 'Select the directory for the calculation results and the logfile');
@@ -188,7 +194,7 @@ disp(headerline)
 
 testfunctions = {@edtest1,@edtest2,@edtest3,@edtest4,@edtest5,@edtest6,@edtest7,...
     @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15,...
-    @edtest16,@edtest17,@edtest18,@edtest19,@edtest20,@edtest21,@edtest22};
+    @edtest16,@edtest17,@edtest18,@edtest19,@edtest20,@edtest21,@edtest22,@edtest23};
 
 for itest = 1:ntests
     if runtest(itest) ~= 1
@@ -292,7 +298,7 @@ r = edresult(title,description,relerr(1) < 5e-6 && relerr(2) < 1.4e-5,...
     {['Computed rel. errors: ',num2str(relerr(1)),' and ',num2str(relerr(2))]});
 end
 
-function r = edtest23(outputdirectory,filestem,plotdiagrams,receiverheight,hittype)
+function r = edtest2and3(outputdirectory,filestem,plotdiagrams,receiverheight,hittype)
 % Tests 2 and 3 differ only in the receiver height (perpendicular or
 % skewed edge hit).
 title = ['First-order diffraction continuity across zone boundaries, 100 Hz, ',hittype,' edge hit'];
@@ -334,11 +340,11 @@ r = edresult(title,description,relerrZBdirect < 1e-5 && relerrZBspec < 1e-5,...
 end
 
 function r = edtest2(outputdirectory,filestem,plotdiagrams)
-r = edtest23(outputdirectory,filestem,plotdiagrams,0,'perpendicular');
+r = edtest2and3(outputdirectory,filestem,plotdiagrams,0,'perpendicular');
 end
 
 function r = edtest3(outputdirectory,filestem,plotdiagrams)
-r = edtest23(outputdirectory,filestem,plotdiagrams,1,'skewed');
+r = edtest2and3(outputdirectory,filestem,plotdiagrams,1,'skewed');
 end
 
 function r = edtest4(outputdirectory,filestem,~)
@@ -923,6 +929,58 @@ resultlines = {sprintf('Points per edge (min, max): default %d, %d; ngaussmin = 
 r = edresult(title,description,ok1 && ok2 && ok3 && ok4,resultlines);
 end
 
+function r = edtest23(outputdirectory,filestem,~)
+title = 'nedgeelemsuser: the number of points on chosen edges';
+description = {'1 m x 1 m thin plate with extra corners 5 mm from each corner (12 edges, 8 of them',...
+    '5 mm long), ngauss = 8. Checks: nedgeelemsuser = [0.006 5] gives 5 points on the 8 short',...
+    'edges and 8 on the long ones; [1 2 7] gives 7 points on the edge between corners 1 and 2 only;',...
+    'and [1 3 7] (no such edge) gives an error.'};
+
+a = 0.5;
+d = 0.005;
+corners = [ a a 0;a-d a 0; -a+d a 0;-a a 0;-a a-d 0; -a -a+d 0;-a -a 0; -a+d -a 0;...
+            a-d -a 0; a -a 0; a -a+d 0; a a-d 0];
+geoinputdata = struct('corners',corners,'planecorners',[1:12;12:-1:1]);
+Sinputdata = struct('coordinates',[0.3 0.2 1]);
+Rinputdata = struct('coordinates',[-0.2 0.4 -0.7]);
+envdata = struct('cair',343);
+controlparameters = struct('generalmethod','tf','frequencies',100,'difforder',10,'ngauss',8);
+
+settings = {[0.006 5],[1 2 7]};
+npoints = cell(1,2);
+edgelengths = [];
+edgecorners = [];
+for ii = 1:2
+    cp = controlparameters;
+    cp.nedgeelemsuser = settings{ii};
+    fh = edfilehandling(outputdirectory,sprintf('%s_case%d',filestem,ii));
+    EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,cp,fh);
+    sm = load(fullfile(outputdirectory,[fh.filestem,'_submatrixdata.mat']),'Hsubmatrixdata');
+    npoints{ii} = double(sm.Hsubmatrixdata.nedgeelems(:));
+    if ii == 1
+        ed = load(fullfile(outputdirectory,[fh.filestem,'_eddata.mat']),'edgedata');
+        edgelengths = ed.edgedata.edgelengthvec(:);
+        edgecorners = double(ed.edgedata.edgecorners);
+    end
+end
+isshort = edgelengths < 0.006;
+ok1 = all(npoints{1}(isshort) == 5) && all(npoints{1}(~isshort) == 8);
+is12 = (edgecorners(:,1) == 1 & edgecorners(:,2) == 2) | (edgecorners(:,1) == 2 & edgecorners(:,2) == 1);
+ok2 = sum(is12) == 1 && npoints{2}(is12) == 7 && all(npoints{2}(~is12 & isshort) == 2);
+gaveerror = false;
+try
+    cp = controlparameters;
+    cp.nedgeelemsuser = [1 3 7];
+    EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,cp,edfilehandling(outputdirectory,[filestem,'_case3']));
+catch
+    gaveerror = true;
+end
+resultlines = {sprintf('By length: short edges %s, long edges %s',mat2str(unique(npoints{1}(isshort)).'),mat2str(unique(npoints{1}(~isshort)).')),...
+    sprintf('By corner pair: edge 1-2 has %s points, the other short edges %s',mat2str(npoints{2}(is12)),mat2str(unique(npoints{2}(~is12 & isshort)).')),...
+    sprintf('A corner pair which is not an edge gives an error: %d',gaveerror)};
+r = edresult(title,description,ok1 && ok2 && gaveerror,resultlines);
+end
+
 function r = edtest19(~,~,~)
 title = 'The cheatsheet input descriptions are up to date';
 description = {'doc/EDinputfields.tex (input by doc/EDtoolbox_cheatsheet.tex) must be the same as a',...
@@ -1000,6 +1058,7 @@ changes = {
     'ESIEpropagationimplementation = legacy',[0 0 0 0 0 0 0 0 1];
     'savediff2result = 1',                   [0 0 0 0 0 0 0 0 1];
     'ngaussmin = 6',                         [0 0 0 0 0 0 1 1 1];
+    'nedgeelemsuser = [0.5 6]',              [0 0 0 0 0 0 1 1 1];
     };
 
 [geoinputdata,Sinputdata,Rinputdata,controlparameters] = edsmallcube;
@@ -1032,6 +1091,7 @@ for ii = 1:size(changes,1)
         case 9,  cp.ESIEpropagationimplementation = 'legacy';
         case 10, f.savediff2result = 1;
         case 11, cp.ngaussmin = 6;
+        case 12, cp.nedgeelemsuser = [0.5 6];
     end
     EDmain_convex(g,S,R,e,cp,f);
     newhashes = edreadstagehashes(outputdirectory,filestem,stagesuffixes);

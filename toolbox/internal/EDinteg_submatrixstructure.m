@@ -37,6 +37,16 @@ controlparameters,EDversionnumber,filehandlingparameters)
 %                   on every edge (default 2). Useful for very short edges,
 %                   e.g. extra corners inserted near the corners. With a
 %                   negative ngauss, the number is still odd.
+%     .nedgeelemsuser  (optional) The number of points on chosen edges,
+%                   which overrides ngauss and ngaussmin for those edges.
+%                   Either rows [maxlength npoints]: an edge gets the
+%                   npoints of the row with the smallest maxlength that is
+%                   not shorter than the edge (edges longer than all
+%                   maxlength values keep ngauss/ngaussmin); or rows
+%                   [corner1 corner2 npoints]: the edge between these two
+%                   corners (the corner numbers of planedata.corners, i.e.
+%                   the rows of geoinputdata.corners) gets npoints.
+%                   Default: [] (not used).
 %     .discretizationtype  Must be 2 (Gauss-Legendre).
 %   EDversionnumber  The version number of the EDtoolbox (stored in the
 %                   stage file).
@@ -113,6 +123,12 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % 20 Oct. 2026 New optional field controlparameters.ngaussmin, the minimum
 % number of points per edge (by Claude, prompted by PS). It is hashed only
 % if it is not 2.
+% 20 Oct. 2026 New optional field controlparameters.nedgeelemsuser: the
+% number of points on chosen edges, by edge length or by corner pair. It
+% is hashed only if it is given. The search for identical submatrices
+% (symmetry) also compares the numbers of points on the three edges; with
+% numbers given per corner pair, geometrically identical triplets can have
+% different numbers of points.
 
 t00 = clock;
 
@@ -130,6 +146,10 @@ if isfield(controlparameters,'ngaussmin') && ~isempty(controlparameters.ngaussmi
 else
     ngaussmin = 2;
 end
+nedgeelemsuser = [];
+if isfield(controlparameters,'nedgeelemsuser') && ~isempty(controlparameters.nedgeelemsuser) && ~all(isnan(controlparameters.nedgeelemsuser(:)))
+    nedgeelemsuser = double(controlparameters.nedgeelemsuser);
+end
 
 % The version of this function, and of the subroutines it uses, are
 % defined in EDstageversions. They are part of the hash, so that saved
@@ -144,6 +164,10 @@ EDinputdatastruct = struct('stage','EDinteg_submatrixstructure','stageversion',s
 % saved stage files remain valid).
 if ngaussmin ~= 2
     EDinputdatastruct.ngaussmin = ngaussmin;
+end
+% The same for nedgeelemsuser (hashed only if it is given)
+if ~isempty(nedgeelemsuser)
+    EDinputdatastruct.nedgeelemsuser = nedgeelemsuser;
 end
 EDinputdatahash = DataHash(EDinputdatastruct);
 
@@ -244,6 +268,37 @@ if ngaussmin > 2
         iv = (mod(nedgeelems,2) == 0);
         nedgeelems(iv) = nedgeelems(iv) + 1;
     end
+end
+
+% 20 Oct. 2026: the user's numbers of points on chosen edges
+% (controlparameters.nedgeelemsuser), by edge length or by corner pair.
+% They override ngauss and ngaussmin (and the odd rule) for those edges.
+if ~isempty(nedgeelemsuser)
+    if size(nedgeelemsuser,2) == 2
+        rows = sortrows(nedgeelemsuser,1);
+        assigned = false(size(nedgeelems));
+        for ir = 1:size(rows,1)
+            iv = ~assigned & edgedata.edgelengthvec(:) <= rows(ir,1)*(1+1e-9);
+            nedgeelems(iv) = rows(ir,2);
+            assigned(iv) = true;
+        end
+    elseif size(nedgeelemsuser,2) == 3
+        ec = double(edgedata.edgecorners);
+        for ir = 1:size(nedgeelemsuser,1)
+            c1 = nedgeelemsuser(ir,1);
+            c2 = nedgeelemsuser(ir,2);
+            iv = (ec(:,1) == c1 & ec(:,2) == c2) | (ec(:,1) == c2 & ec(:,2) == c1);
+            if ~any(iv)
+                error('ERROR: controlparameters.nedgeelemsuser, row %d: corners %d and %d do not form an edge',ir,c1,c2)
+            end
+            nedgeelems(iv) = nedgeelemsuser(ir,3);
+        end
+    else
+        error('ERROR: controlparameters.nedgeelemsuser must have 2 columns [maxlength npoints] or 3 columns [corner1 corner2 npoints]')
+    end
+    % savetemp
+    % pause
+    
 end
 
 [~,sortvec] = sortrows([nedgeelems(edgepairlist(:,1)) nedgeelems(edgepairlist(:,2))]);
@@ -364,7 +419,7 @@ if symmetrycompression == 1
 
     refto = edgetoedgedata.reftoshortlistE;
 
-    datamatrix = zeros(submatrixcounter,12);
+    datamatrix = zeros(submatrixcounter,15);
     alledge3 = edgetripletlist(:,1);
     alledge2 = edgetripletlist(:,2);
     alledge1 = edgetripletlist(:,3);
@@ -381,6 +436,12 @@ if symmetrycompression == 1
                                    edgetoedgedata.re1sho(refto(alledge1(ii),alledge2(ii))),edgetoedgedata.re2sho(refto(alledge1(ii),alledge2(ii)))];
     end
     
+    % The numbers of points on the three edges (20 Oct. 2026): two triplets
+    % with the same geometry can only share a submatrix if they also have
+    % the same numbers of points. Before nedgeelemsuser, the numbers were
+    % given by the edge lengths, so this did not change anything.
+    datamatrix(:,13:15) = [nedgeelems(alledge3) nedgeelems(alledge2) nedgeelems(alledge1)];
+
     [shortlist,~,reftoshortlist] = unique(round(datamatrix*1e5)/1e5,'rows');
     nuniquesubmatrices = size(shortlist,1);    
 

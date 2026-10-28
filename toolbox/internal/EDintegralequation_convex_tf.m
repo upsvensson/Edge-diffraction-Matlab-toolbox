@@ -6,7 +6,14 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % source amplitudes is set up (q0 = the source term, from EDinteg_souterm)
 % and solved, either with GMRES (explicit sparse matrix, or matrix-free)
 % or with a fixed number of terms of the Neumann series. The solution is
-% then propagated to the receivers (EDcalcpropagatematrix).
+% then propagated to the receivers (EDpropagateQvec). Optionally, the
+% solution is first refined to more nodes per edge (EDrefineQvec, with the
+% Nystrom interpolation formula), and propagated on the refined nodes
+% (controlparameters.ESIEpropagationrefine).
+%
+% The source term (EDinteg_soutermsources), the kernel of the H-matrix
+% (EDHkernelvalues) and the propagation (EDpropagateQvec) are separate
+% functions, which EDrefineQvec uses too.
 %
 % Two stage files are saved, each with its own hash:
 %   <filestem>_qfinal.mat   the solution, Qfinal (and Q_firstterm), for all
@@ -46,8 +53,9 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                   .inteqsolutionmethod ('GMRES_fast', 'GMRES_large' or
 %                   'iterative_fixeddifforder'), .inteqtargettol,
 %                   .inteqgmresmaxiter, .ESIEsourcetermimplementation,
-%                   .ESIEpropagationimplementation, .skipreceiverpropagation,
-%                   .ngauss, .discretizationtype and .Rstart are used. For
+%                   .ESIEpropagationimplementation, .ESIEpropagationrefine,
+%                   .skipreceiverpropagation, .ngauss, .discretizationtype
+%                   and .Rstart are used. For
 %                   the GMRES methods, any difforder > 2 gives the full
 %                   solution.
 %   EDversionnumber  The version number of the EDtoolbox (stored in the
@@ -62,12 +70,13 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %                   [nfrequencies,nreceivers] if the sources are added
 %                   (Sdata.doaddsources = 1), otherwise
 %                   [nfrequencies,nreceivers,nsources].
-%   timingdata      [1,4] the times for building the H-matrix (once), the
+%   timingdata      [1,5] the times for building the H-matrix (once), the
 %                   source term and the solution of the integral equation
-%                   (both summed over all frequencies and sources), and the
-%                   propagation to the receivers (all frequencies). If the
-%                   solution was taken from a _qfinal file, the first
-%                   three values come from that file.
+%                   (both summed over all frequencies and sources), the
+%                   propagation to the receivers (all frequencies), and the
+%                   refinement for the propagation (0 if it is not used).
+%                   If the solution was taken from a _qfinal file, the
+%                   first three values come from that file.
 %   extraoutputdata  struct with the fields
 %     .tfinteqdiff_nodiff2  the same as tfinteqdiff but without the second-
 %                   order diffraction (only if savediff2result = 1)
@@ -79,9 +88,10 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 %   existingfilename  The name of the stage file that was reused, or empty
 %                   if the data were computed.
 %
-% See also EDdatastructs, EDstageversions
+% See also EDdatastructs, EDstageversions, EDpropagateQvec, EDrefineQvec,
+% EDinteg_soutermsources, EDHkernelvalues
 %
-% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 28 Oct. 2026
 %
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %    EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
@@ -238,6 +248,20 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % and the propagation per frequency).
 % 18 Oct. 2026 (by Claude, prompted by PS) The edge numbering (edge 2 is
 % always the diffracting edge) is described in the header.
+% 28 Oct. 2026 (by Claude, prompted by PS) Refactoring, without changes of
+% the results: the propagation (PART 4) was moved to the new function
+% EDpropagateQvec, the source term for one or several sources (PART 2) to
+% EDinteg_soutermsources, and the kernel of the H-matrix (PART 1) to
+% EDHkernelvalues, so that EDrefineQvec uses the same code. The solution
+% (PART 3), which was written out twice (CASE 1 and CASE 2), is in the
+% local function edsolveinteq.
+% 28 Oct. 2026 (by Claude, prompted by PS) New option
+% controlparameters.ESIEpropagationrefine (default 1 = not used): the
+% solution is refined to more nodes per edge (EDrefineQvec) before the
+% propagation. It is part of the _tfinteq hash only if it is used. New
+% timingdata(5), the time for the refinement, and
+% inteqdiagnostics.nQpropagated, the number of propagated unknowns (only
+% when the refinement is used).
 % 20 Oct. 2026 The node and weight table (gaussvectors) also covers edges
 % with more points than abs(ngauss) (controlparameters.ngaussmin).
 
@@ -282,6 +306,10 @@ solvehashstruct = struct('stage','EDintegralequation_convex_tf_solve','stagevers
     'cair',envdata.cair);
 EDinputdatahash_solve = DataHash(solvehashstruct);
 
+% The optional refinement of the nodes for the propagation
+% (controlparameters.ESIEpropagationrefine). It is hashed only if it is
+% used, so that the hash stays the same as before for the default value.
+dorefine = edisrefinementused(controlparameters);
 EDinputdatastruct = struct('stage','EDintegralequation_convex_tf','stageversion',stageversion,...
     'solvehash',EDinputdatahash_solve,'Rdatahash',EDparenthash(Rdata),...
     'Rstart',controlparameters.Rstart,...
@@ -289,6 +317,9 @@ EDinputdatastruct = struct('stage','EDintegralequation_convex_tf','stageversion'
     'skipreceiverpropagation',controlparameters.skipreceiverpropagation,...
     'doallSRcombinations',Sdata.doallSRcombinations,...
     'savediff2result',filehandlingparameters.savediff2result);
+if dorefine
+    EDinputdatastruct.ESIEpropagationrefine = controlparameters.ESIEpropagationrefine;
+end
 EDinputdatahash = DataHash(EDinputdatastruct);
 
 %---------------------------------------------------------------
@@ -331,7 +362,7 @@ extraoutputdata = struct('tfinteqdiff_nodiff2',[]);
 
 nfrequencies = length(controlparameters.frequencies);
 
-timingdata = zeros(1,4);
+timingdata = zeros(1,5);
 
 propdiagnostics = [];
 
@@ -633,118 +664,16 @@ if controlparameters.difforder > 2 && qfinalreused == 0
             n3prev = n3;
         end
 
-        % Bug found and fixed 22 Sep. 2014: lines below did not always detect if another
-        % edge was skewed relative to the first one, because only the
-        % thetae1sho was used. Necessary to check thetae1sho and thetae2sho.
-
-       ny = pi/(2*pi-edgedata.closwedangvec(edge2));
-       thetain  = edgetoedgedata.thetae1sho(refto(edge1,edge2));
-       thetain_other_end_of_edge  = edgetoedgedata.thetae2sho(refto(edge1,edge2));
-    %    if abs(thetain) < 1e-10 || abs(thetain-(2*pi-closwedangvec(edge2))) < 1e-10   % Old erroneous line
-       if (abs(thetain) < 1e-10 || abs(thetain-(2*pi-edgedata.closwedangvec(edge2))) < 1e-10) && abs(thetain-thetain_other_end_of_edge) < 1e-10
-           acrossface_in = 1;       
-       else
-           acrossface_in = 0;
-       end
-       thetaout = edgetoedgedata.thetae1sho(refto(edge3,edge2));
-       thetaout_other_end_of_edge = edgetoedgedata.thetae2sho(refto(edge3,edge2));
-    %   if abs(thetaout) < 1e-10 || abs(thetaout-(2*pi-closwedangvec(edge2))) < 1e-10    % Old erroneous line
-       if (abs(thetaout) < 1e-10 || abs(thetaout-(2*pi-edgedata.closwedangvec(edge2))) < 1e-10) && abs(thetaout-thetaout_other_end_of_edge) < 1e-10
-           acrossface_out = 1;
-       else
-           acrossface_out = 0;
-       end
-
-       if showtext >= 3
-           disp(['         Acrossface-out = ',int2str(acrossface_out),' and Acrossface-in = ',int2str(acrossface_in), ' (not used)'])
-       end
-
-       ze2_re2 = n2vec*len2;
-       ze3_re2 = edgetoedgedata.ze1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.ze2sho(refto(edge3,edge2))-edgetoedgedata.ze1sho(refto(edge3,edge2))   );
-%        re3_re2 = edgetoedgedata.re1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.re2sho(refto(edge3,edge2))-edgetoedgedata.re1sho(refto(edge3,edge2))   );
-
-       if shortlistnumber ~= shortlistprev      
-
-           n1vec = n1vec(:).';
-
-           ze1_re2 = edgetoedgedata.ze1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.ze2sho(refto(edge1,edge2))-edgetoedgedata.ze1sho(refto(edge1,edge2))   );
-
-           % Bug fixed 26 Oct. 2017: the line below is wrong because the
-           % r-values are not distributed linearly.
-%            re1_re2 = edgetoedgedata.re1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.re2sho(refto(edge1,edge2))-edgetoedgedata.re1sho(refto(edge1,edge2))   );
-
-
-           if acrossface_in*acrossface_out == 0 % This case is a preparation for non-convex objects.
-                % Reconvert the cylindrical coordinates of
-                % edge1-re2 into cartesian! Then we can use the EDcoordtrans.
-                % We define our own cartesian coord syst such that the reference
-                % edge (edge2) has its starting point in [0 0 0], the z-axis along its
-                % own edge, and the x-axis is along (onto) the reference plane.
-
-                xedge1start = edgetoedgedata.re1sho(refto(edge1,edge2))*cos(edgetoedgedata.thetae1sho(refto(edge1,edge2)));
-                xedge1end   = edgetoedgedata.re2sho(refto(edge1,edge2))*cos(edgetoedgedata.thetae2sho(refto(edge1,edge2)));
-                yedge1start = edgetoedgedata.re1sho(refto(edge1,edge2))*sin(edgetoedgedata.thetae1sho(refto(edge1,edge2)));
-                yedge1end   = edgetoedgedata.re2sho(refto(edge1,edge2))*sin(edgetoedgedata.thetae2sho(refto(edge1,edge2)));
-                xe1_re2 = xedge1start + n1vec.*(xedge1end-xedge1start);
-                ye1_re2 = yedge1start + n1vec.*(yedge1end-yedge1start);
-
-                [re1_re2,thetae1_re2,~] = EDcoordtrans1([xe1_re2.' ye1_re2.' ze1_re2.'],[0 0 0;0 0 edgedata.edgelengthvec(edge2)],[0 1 0]);
-                re1_re2 = re1_re2(:).';
-                thetae1_re2 = thetae1_re2(:).';
-
-                xedge3start = edgetoedgedata.re1sho(refto(edge3,edge2))*cos(edgetoedgedata.thetae1sho(refto(edge3,edge2)));
-                xedge3end   = edgetoedgedata.re2sho(refto(edge3,edge2))*cos(edgetoedgedata.thetae2sho(refto(edge3,edge2)));
-                yedge3start = edgetoedgedata.re1sho(refto(edge3,edge2))*sin(edgetoedgedata.thetae1sho(refto(edge3,edge2)));
-                yedge3end   = edgetoedgedata.re2sho(refto(edge3,edge2))*sin(edgetoedgedata.thetae2sho(refto(edge3,edge2)));
-                xe3_re2 = xedge3start + n3vec.*(xedge3end-xedge3start);
-                ye3_re2 = yedge3start + n3vec.*(yedge3end-yedge3start);
-
-                [re3_re2,thetae3_re2,~] = EDcoordtrans1([xe3_re2 ye3_re2 ze3_re2],[0 0 0;0 0 edgedata.edgelengthvec(edge2)],[0 1 0]);
-                re3_re2 = re3_re2(:);
-                thetae3_re2 = thetae3_re2(:);
-
-           else
-
-                re1_re2 = edgetoedgedata.re1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.re2sho(refto(edge1,edge2))-edgetoedgedata.re1sho(refto(edge1,edge2))   );
-                re3_re2 = edgetoedgedata.re1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.re2sho(refto(edge3,edge2))-edgetoedgedata.re1sho(refto(edge3,edge2))   );
-
-           end
-
-           ldist = (ze3_re2(n3vertmat) - ze2_re2(n2vertmat)).^2   + re3_re2(n3vertmat).^2;
-           ldist = sqrt(ldist);
-
-           mdist = (ze1_re2(n1hormat).' - ze2_re2(n2vertmat)).^2   + (re1_re2(n1hormat).').^2;
-           mdist = sqrt(mdist);
-
-           % The factor exp(-1i*k*mdist) is not included here: it is
-           % applied per frequency, as dcol (see above).
-           dz_overm = dzvec(n1hormat)./mdist;
-
-           ch = ((ze2_re2(n2vertmat) - ze1_re2(n1hormat).').*(ze2_re2(n2vertmat) - ze3_re2(n3vertmat)) + mdist.*ldist)./re1_re2(n1hormat).'./re3_re2(n3vertmat);
-           ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
-           ch = ( ch + 1./ch)/2;
-
-           % PS 28 March 2011: The 4 beta terms are identical!       
-           if acrossface_in == 1 && acrossface_out == 1
-               beta = 4*( sin(ny*(pi + thetain + thetaout  ))./(ch - cos(ny*(pi + thetain + thetaout   ))));
-           else
-               beta = ( sin(ny*(pi + thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi + thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)   ))+eps*10)) + ...
-                      ( sin(ny*(pi + thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi + thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)   ))+eps*10)) + ...
-                      ( sin(ny*(pi - thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi - thetae1_re2(n1hormat).' + thetae3_re2(n3vertmat)   ))+eps*10)) + ...
-                      ( sin(ny*(pi - thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)  ))./(ch - cos(ny*(pi - thetae1_re2(n1hormat).' - thetae3_re2(n3vertmat)   ))+eps*10));
-           end
-
-           if ismember(edge1,edgedata.offedges)==1 || ismember(edge2,edgedata.offedges)==1 || ismember(edge3,edgedata.offedges)==1
-               beta = beta*0;
-           else
-    %           disp(['Edge1: ',int2str(edge1),' edge2: ',int2str(edge2),' edge3: ',int2str(edge3)])
-           end
-
-            Hsubdatalists{nn} = (2-acrossface_out)*Hsubconstant*ny*beta.*dz_overm*thinplaneboostvec(nn);   
+       % The kernel values (without the factor exp(-1i*k*m)) are computed
+       % by EDHkernelvalues, which EDrefineQvec uses too. With symmetry
+       % compression, a submatrix with the same shortlist number as the
+       % previous one reuses its data.
+       if shortlistnumber ~= shortlistprev
+           [Hsubdatalists{nn},mdist] = EDHkernelvalues(edgedata,edgetoedgedata,edge1,edge2,edge3,...
+               n1vec,n2vec,n3vec,dzvec,n1hormat,n2vertmat,n3vertmat,thinplaneboostvec(nn));
             ivuselists{nn} = ivuse;
             listofactiveHsubs(Hsubcounter) = nn;
             Hsubcounter = Hsubcounter + 1;
-
        end
 
         % The distance mdist for each column of this submatrix, stored
@@ -795,6 +724,12 @@ t00 = clock;
 % savetemp
 % pause
 
+% dcol is only defined if the H-matrix is used (difforder > 2), and Bsp
+% only for GMRES_fast; they are given to edsolveinteq in any case.
+dcol = [];
+if ~exist('Bsp','var')
+    Bsp = [];
+end
 for ifreq = 1:nfrequencies     
     frequency = controlparameters.frequencies(ifreq);
     if showtext >= 1
@@ -831,83 +766,21 @@ for ifreq = 1:nfrequencies
         end
         
         if qfinalreused == 0
-                        
-            Q_firstterm = 0;
-            for isou = 1:nsources
-                ISOU = int2str(isou);
+            Q_firstterm = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
+                controlparameters,Sdata,frequency,ifreq,gaussvectors,1:nsources,1,filehandlingparameters.showtext);
 
-                if strcmp(Sdata.sourcetype,'monopole') == 1
-                     Q_firstterm_addition = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...                    
-                        controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
-                        Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
-                        Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
-                elseif strcmp(Sdata.sourcetype,'polygonpiston') == 1
-                    Q_firstterm_sumpistongaussorder = 0;
-                    for np = 1:size(Sdata.pistongausscoordinates{1},1)
-                        Q_firstterm_addition = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...                    
-                            controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
-                            Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou,np)),...
-                            Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou,np)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou,np)),filehandlingparameters.showtext);
-                        Q_firstterm_sumpistongaussorder = Q_firstterm_sumpistongaussorder + Q_firstterm_addition*squeeze(Sdata.pistongaussweights{isou}(np,1));
-                    end
-                    Q_firstterm_addition = Q_firstterm_sumpistongaussorder;
-                end
-%                 Q_firstterm = Q_firstterm + Q_firstterm_addition;
-                Q_firstterm = Q_firstterm + Q_firstterm_addition*Sdata.sourceamplitudes(isou,ifreq);
-            end
-        
             timingdata(2) = timingdata(2) + etime(clock,t00);
             t00 = clock;
-            
-            % End of CASE 1, PART 2 
+
+            % End of CASE 1, PART 2
             % Q_firstterm has been computed
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            % CASE 1,PART 3: Starting from Q_firstterm, iterate to find Qfinal.
-            %
-            % Two for-loops: iterations (iiter) and submatrices (nn)            
-        
-            Q = Q_firstterm;
-            Qfinal = Q;   
-            if strcmp(controlparameters.inteqsolutionmethod,'iterative_fixeddifforder') == 1
-                if showtext >= 2
-                    disp('      Starting to solve the int.eq. with the iterative method')
-                end
+            % CASE 1,PART 3: Starting from Q_firstterm, find Qfinal (the
+            % local function edsolveinteq).
 
-                for iiter = 1:(controlparameters.difforder-2)
-                    if showtext >= 3
-                       disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
-                    end
-                    Q = EDmatvecH(dcol.*Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
-                    Qfinal = Qfinal + Q; 
-                    inteqdiagnostics.normQ(iiter,ifreq,1) = norm(Q);
-                end
-
-            elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 % Here we do the GMRES, fast version
-               if showtext >= 2
-                    disp('      Starting to solve the int.eq. with GMRES, fast version (for smaller problems)')
-                end
-                  A = @(x) x - Bsp*(dcol.*x);     % H*x = B*(dcol.*x)
-                  t00_gmres = clock;    
-                  [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
-                  inteqdiagnostics.solvetime(ifreq,1) = etime(clock,t00_gmres);
-                  inteqdiagnostics.gmresiter(ifreq,1) = iter(2);
-                  inteqdiagnostics.gmresflag(ifreq,1) = flag;
-                  inteqdiagnostics.gmresrelres(ifreq,1) = relres;
-                  
-            elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_large') == 1 % Here we do the GMRES for large problems
-
-               if showtext >= 2
-                    disp('      Starting to solve the int.eq. with GMRES, the version for larger problems')
-               end
-               t00_gmres = clock;    
-               afun = @(q) q - EDmatvecH(dcol.*q, Hsubmatrixdata, Hsubdatalists, ivuselists);
-               [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
-               inteqdiagnostics.solvetime(ifreq,1) = etime(clock,t00_gmres);
-               inteqdiagnostics.gmresiter(ifreq,1) = iter(2);
-               inteqdiagnostics.gmresflag(ifreq,1) = flag;
-               inteqdiagnostics.gmresrelres(ifreq,1) = relres;
-
-            end
+            [Qfinal,solvediag] = edsolveinteq(Q_firstterm,dcol,Bsp,Hsubmatrixdata,Hsubdatalists,ivuselists,...
+                controlparameters,showtext);
+            inteqdiagnostics = edstoresolvediag(inteqdiagnostics,solvediag,ifreq,1);
 
             doesQsegmenthavevalues = zeros(length(Hsubmatrixdata.edgepairlist(:,1)),1);
             for iicounter = 1:length(Hsubmatrixdata.edgepairlist(:,1))
@@ -949,11 +822,6 @@ for ifreq = 1:nfrequencies
             P_receiver = zeros(nfrequencies,nreceivers,nsources);
         end
 
-        % For GMRES_fast: the sparse matrix B was built before the
-        % frequency loop; H*x = B*(dcol.*x).
-        if strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 && qfinalreused == 0
-            A = @(x) x - Bsp*(dcol.*x);
-        end
 
         for isou = 1:nsources
             ISOU = int2str(isou);
@@ -966,80 +834,21 @@ for ifreq = 1:nfrequencies
                     disp(['Source no. ',ISOU,' of ',int2str(nsources)])
                 end
                 
-                if strcmp(Sdata.sourcetype,'monopole') == 1
-                    Q_firstterm = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
-                        controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
-                        Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),...
-                        Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),filehandlingparameters.showtext);
-                elseif strcmp(Sdata.sourcetype,'polygonpiston') == 1
-                    Q_firstterm_sumpistongaussorder = 0;
-                    for np = 1:size(Sdata.pistongausscoordinates{1},1)
-                            Q_firstterm_addition = EDinteg_souterm(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...                    
-                            controlparameters,Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
-                            Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,Sdata.rSsho(Sdata.reftoshortlistS(:,isou,np)),...
-                            Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou,np)),Sdata.zSsho(Sdata.reftoshortlistS(:,isou,np)),filehandlingparameters.showtext);
-                        Q_firstterm_sumpistongaussorder = Q_firstterm_sumpistongaussorder + Q_firstterm_addition*squeeze(Sdata.pistongaussweights{isou}(np,1));
-                    end
-                    Q_firstterm = Q_firstterm_sumpistongaussorder;
-
-                end
-
-                Q_firstterm = Q_firstterm*Sdata.sourceamplitudes(isou,ifreq);
+                Q_firstterm = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
+                    controlparameters,Sdata,frequency,ifreq,gaussvectors,isou,0,filehandlingparameters.showtext);
 
                 timingdata(2) = timingdata(2) + etime(clock,t00);
                 t00 = clock;
-                              
-                % End of CASE 2, PART 2 
+
+                % End of CASE 2, PART 2
                 % Q_firstterm has been computed
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                % CASE 2,PART 3: Starting from Q_firstterm, iterate to find Qfinal.
-                %
-                % Two for-loops: iterations (iiter) and submatrices (nn)
-                  
+                % CASE 2,PART 3: Starting from Q_firstterm, find Qfinal (the
+                % local function edsolveinteq).
 
-                 Q = Q_firstterm;
-                Qfinal = Q;   
-                
-                if strcmp(controlparameters.inteqsolutionmethod,'iterative_fixeddifforder') == 1
-                   if showtext >= 2
-                        disp('      Starting to solve the int.eq. with the iterative method')
-                    end
-
-                    for iiter = 1:(controlparameters.difforder-2)
-                       if showtext >= 3
-                           disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
-                       end
-                       Q = EDmatvecH(dcol.*Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
-                        Qfinal = Qfinal + Q; 
-
-                        inteqdiagnostics.normQ(iiter,ifreq,isou) = norm(Q);
-                        
-                    end % for iiter = ....
- 
-                elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 
-                   if showtext >= 2
-                        disp('      Starting to solve the int.eq. with GMRES, fast version (for smaller problems)')
-                   end
-                     t00_gmres = clock;
-                     [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
-                     inteqdiagnostics.solvetime(ifreq,isou) = etime(clock,t00_gmres);                    
-                     inteqdiagnostics.gmresiter(ifreq,isou) = iter(2);
-                     inteqdiagnostics.gmresflag(ifreq,isou) = flag;
-                     inteqdiagnostics.gmresrelres(ifreq,isou) = relres;
-                    
-                elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_large') == 1 
-                   if showtext >= 2
-                        disp('      Starting to solve the int.eq. with GMRES, the version for larger problems')
-                    end
-                    t00_gmres = clock;
-                    afun = @(q) q - EDmatvecH(dcol.*q, Hsubmatrixdata, Hsubdatalists, ivuselists);
-                    [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
-                    inteqdiagnostics.solvetime(ifreq,isou) = etime(clock,t00_gmres);                     
-                    inteqdiagnostics.gmresiter(ifreq,isou) = iter(2);
-                    inteqdiagnostics.gmresflag(ifreq,isou) = flag;
-                    inteqdiagnostics.gmresrelres(ifreq,isou) = relres;
-
-                end
+                [Qfinal,solvediag] = edsolveinteq(Q_firstterm,dcol,Bsp,Hsubmatrixdata,Hsubdatalists,ivuselists,...
+                    controlparameters,showtext);
+                inteqdiagnostics = edstoresolvediag(inteqdiagnostics,solvediag,ifreq,isou);
 
                 % savetemp
                 % pause
@@ -1077,16 +886,13 @@ end  % for ifreq = 1:nfrequencies
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PART 4: Propagate Qfinal to the receivers, for all frequencies (and all
-% sources, if they are handled separately).
+% sources, if they are handled separately), with EDpropagateQvec.
 %
-% The propagation row vector depends on the frequency only through the
-% factor exp(-1i*k*(L-Rstart)), where L = l + m is the path length via the
-% two edge nodes to the receiver. Everything else (the beta terms, the
-% singularity treatment, 1/(l*m) and the quadrature weights) depends only
-% on the geometry. EDcalcpropagatematrix is therefore called once per
-% receiver, with frequency = 0, which gives the frequency-independent part
-% Fgeom and the path lengths. For each frequency, only the exponential
-% factor is computed.
+% Optionally (controlparameters.ESIEpropagationrefine), the solution is
+% first refined to more nodes, with the Nystrom interpolation formula
+% (EDrefineQvec), and propagated on the refined nodes. The solution of the
+% integral equation (and the _qfinal file) is not changed; only the
+% quadrature of the propagation integral is finer.
 
 t00_prop = clock;
 % The receivers are independent of each other, so this loop can run on
@@ -1119,202 +925,58 @@ end
 inteqdiagnostics.parallelworkers = nworkers;
 inteqdiagnostics.parallelnote = parallelnote;
 if controlparameters.skipreceiverpropagation == 0
-    if Sdata.doaddsources == 1 || nsources == 1
-        nsolutions = 1;
+    propsettings = struct('Rstart',controlparameters.Rstart,...
+        'implementation',controlparameters.ESIEpropagationimplementation,...
+        'doallSRcombinations',Sdata.doallSRcombinations,...
+        'savediff2',filehandlingparameters.savediff2result,...
+        'nworkers',nworkers,'showtext',showtext,'isthinhole',isthinhole);
+    if dorefine
+        % The refined discretization: the number of nodes on each edge is
+        % multiplied by its factor from ESIEpropagationrefine.
+        t00_refine = clock;
+        nedgeelems_refined = edrefinednodes(double(Hsubmatrixdata.nedgeelems(:)),...
+            edgedata.edgelengthvec(:),controlparameters.ESIEpropagationrefine);
+        refineinput = struct('Hsubmatrixdata',Hsubmatrixdata,'edgedata',edgedata,...
+            'edgetoedgedata',edgetoedgedata,'Sdata',Sdata,'envdata',envdata,...
+            'controlparameters',controlparameters);
+        refineinput.Qfinalstore = Qfinalstore;
+        refined = EDrefineQvec(refineinput,struct('method','nystrom','nedgeelems',nedgeelems_refined,...
+            'propagate',0,'showtext',double(showtext >= 2)));
+        clear refineinput
+        Hsubmatrixdata_prop = refined.Hsubmatrixdata;
+        Qfinalstore_prop = refined.Qfinalstore;
+        if isfield(refined,'Qfirsttermstore')
+            Qfirsttermstore_prop = refined.Qfirsttermstore;
+        else
+            Qfirsttermstore_prop = Qfirsttermstore;
+        end
+        clear refined
+        timingdata(5) = etime(clock,t00_refine);
+        inteqdiagnostics.nQpropagated = double(Hsubmatrixdata_prop.Qvecendnums(end));
     else
-        nsolutions = nsources;
-    end
-    % The edge pairs where Qfinal has values, for some frequency and source
-    doesQsegmenthavevalues = zeros(size(Hsubmatrixdata.edgepairlist,1),1);
-    for ifreq = 1:nfrequencies
-        for isol = 1:nsolutions
-            doesQsegmenthavevalues = doesQsegmenthavevalues | edQsegmentflags(Qfinalstore{ifreq,isol},Hsubmatrixdata);
+        Hsubmatrixdata_prop = Hsubmatrixdata;
+        Qfinalstore_prop = Qfinalstore;
+        Qfirsttermstore_prop = Qfirsttermstore;
+        if isfield(inteqdiagnostics,'nQpropagated')
+            inteqdiagnostics = rmfield(inteqdiagnostics,'nQpropagated');
         end
     end
-    doesQsegmenthavevalues = double(doesQsegmenthavevalues);
-    kvec = 2*pi*controlparameters.frequencies/envdata.cair;
-    savediff2 = filehandlingparameters.savediff2result;
-    doallSRcombinations = Sdata.doallSRcombinations;
-    Rstartvalue = controlparameters.Rstart;
-    propimplementation = controlparameters.ESIEpropagationimplementation;
 
-    % Qfirsttermstore is only needed for savediff2result = 1; otherwise an
-    % empty cell array is used in the loop, so that it is not copied to the
-    % parallel workers.
-    if savediff2 == 1
-        Qfirsttermforloop = Qfirsttermstore;
-    else
-        Qfirsttermforloop = {};
+    [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgedata,Hsubmatrixdata_prop,Rdata,...
+        Qfinalstore_prop,Qfirsttermstore_prop,controlparameters.frequencies,envdata,propsettings);
+    clear Hsubmatrixdata_prop Qfinalstore_prop Qfirsttermstore_prop
+    if filehandlingparameters.savediff2result == 1
+        extraoutputdata.tfinteqdiff_nodiff2 = P_nodiff2;
     end
-
-    % For the 'accurate' propagation (the default), the receivers are
-    % handled in blocks by EDcalcpropagatematrix_block, which processes all
-    % the receivers of a block at once for each edge pair. The block size
-    % is chosen so that the arrays [blocksize,nQ] stay moderate (about
-    % 4e6 elements); with parallel workers, smaller blocks are used so that
-    % there are enough blocks to share. The 'legacy' propagation uses
-    % EDcalcpropagatematrix for one receiver at a time.
-    useblocks = strcmpi(propimplementation,'accurate') && isthinhole == 0;
-    if useblocks
-        blocksize = max(1,min(nreceivers,floor(4e6/double(nQ))));
-        if nworkers > 0
-            blocksize = min(blocksize,max(1,ceil(nreceivers/40)));
-        end
-        blockstarts = 1:blocksize:nreceivers;
-        nblocks = numel(blockstarts);
-        inteqdiagnostics.propagationblocksize = blocksize;
-        Pcell = cell(nblocks,1);
-        P2cell = cell(nblocks,1);
-        propdiagnosticscell = cell(nblocks,1);
-
-        parfor (ib = 1:nblocks, nworkers)
-            recs = blockstarts(ib):min(blockstarts(ib)+blocksize-1,nreceivers);
-            nb = numel(recs);
-            if showtext >= 2
-                disp(['      Receivers ',int2str(recs(1)),' to ',int2str(recs(end))])
-            end
-            [Fgeom,pathlengthsblock,propdiagnosticscell{ib}] = EDcalcpropagatematrix_block(edgedata,edgetoedgedata,...
-                Hsubmatrixdata,Rdata.vispartedgesfromr(:,recs),...
-                reshape(Rdata.rRsho(Rdata.reftoshortlistR(:,recs)),[],nb),...
-                reshape(Rdata.thetaRsho(Rdata.reftoshortlistR(:,recs)),[],nb),...
-                reshape(Rdata.zRsho(Rdata.reftoshortlistR(:,recs)),[],nb),doesQsegmenthavevalues);
-            % Only the columns with non-zero elements are used
-            ivnonzero = find(any(Fgeom,1));
-            Fgeom = Fgeom(:,ivnonzero);
-            pathlengthsblock = pathlengthsblock(:,ivnonzero) - Rstartvalue;
-            Pblock = zeros(nfrequencies,nb,nsolutions);
-            P2block = zeros(nfrequencies,nb,nsolutions);
-            for ifreq = 1:nfrequencies
-                Fk = Fgeom.*exp(-1i*kvec(ifreq)*pathlengthsblock);    % [nb x nnonzero]
-                if nsolutions == 1 || doallSRcombinations == 1
-                    for isol = 1:nsolutions
-                        Qfinalone = Qfinalstore{ifreq,isol};
-                        Pblock(ifreq,:,isol) = Fk*Qfinalone(ivnonzero);
-                        if savediff2 == 1
-                            Qfirsttermone = Qfirsttermforloop{ifreq,isol};
-                            P2block(ifreq,:,isol) = Fk*(Qfinalone(ivnonzero)-Qfirsttermone(ivnonzero));
-                        end
-                    end
-                else
-                    % doallSRcombinations = 0: only source N to receiver N
-                    for jr = 1:nb
-                        jsol = recs(jr);   % (not isol: parfor does not allow assigning a for-loop variable)
-                        if jsol <= nsolutions
-                            Qfinalone = Qfinalstore{ifreq,jsol};
-                            Pblock(ifreq,jr,jsol) = Fk(jr,:)*Qfinalone(ivnonzero);
-                            if savediff2 == 1
-                                Qfirsttermone = Qfirsttermforloop{ifreq,jsol};
-                                P2block(ifreq,jr,jsol) = Fk(jr,:)*(Qfinalone(ivnonzero)-Qfirsttermone(ivnonzero));
-                            end
-                        end
-                    end
-                end
-            end
-            Pcell{ib} = Pblock;
-            P2cell{ib} = P2block;
-        end
-
-        % Collect the results of all the blocks
-        propdiagnostics = struct('npairs',0,'npairs_eligible',0,'npairs_corrected',0, ...
-            'nrows',0,'nrows_corrected',0,'correctedpairs',zeros(0,4));
-        if savediff2 == 1
-            extraoutputdata.tfinteqdiff_nodiff2 = zeros(size(P_receiver));
-        end
-        for ib = 1:nblocks
-            recs = blockstarts(ib):min(blockstarts(ib)+blocksize-1,nreceivers);
-            P_receiver(:,recs,:) = Pcell{ib};
-            if savediff2 == 1
-                extraoutputdata.tfinteqdiff_nodiff2(:,recs,:) = P2cell{ib};
-            end
-            pd = propdiagnosticscell{ib};
-            propdiagnostics.npairs = propdiagnostics.npairs + pd.npairs;
-            propdiagnostics.npairs_eligible = propdiagnostics.npairs_eligible + pd.npairs_eligible;
-            propdiagnostics.npairs_corrected = propdiagnostics.npairs_corrected + pd.npairs_corrected;
-            propdiagnostics.nrows = propdiagnostics.nrows + pd.nrows;
-            propdiagnostics.nrows_corrected = propdiagnostics.nrows_corrected + pd.nrows_corrected;
-            propdiagnostics.correctedpairs = [propdiagnostics.correctedpairs; pd.correctedpairs];
-        end
-        clear Pcell P2cell propdiagnosticscell
-    else
-        Pcell = cell(nreceivers,1);
-        P2cell = cell(nreceivers,1);
-        ivproblematiccell = cell(nreceivers,1);
-        propdiagnosticscell = cell(nreceivers,1);
-
-        parfor (irec = 1:nreceivers, nworkers)
-            if showtext >=2
-                disp(['      Receiver number ',int2str(irec)])
-            end
-            % The solutions (sources) that are propagated to this receiver
-            % (doallSRcombinations = 0: only source N to receiver N)
-            if nsolutions == 1
-                solutionlist = 1;
-            elseif doallSRcombinations == 1
-                solutionlist = 1:nsolutions;
-            elseif irec <= nsolutions
-                solutionlist = irec;
-            else
-                solutionlist = [];
-            end
-            Prec = zeros(nfrequencies,nsolutions);
-            P2rec = zeros(nfrequencies,nsolutions);
-            ivproblematicrec = [];
-            propdiagnosticsrec = [];
-
-            if ~isempty(solutionlist)
-                [Fgeom,ivproblematicrec,propdiagnosticsrec,pathlengths] = EDcalcpropagatematrix(envdata,edgedata,edgetoedgedata,...
-                    Hsubmatrixdata,isthinhole,Rdata.vispartedgesfromr(:,irec),0,Rstartvalue,...
-                    Rdata.rRsho(Rdata.reftoshortlistR(:,irec)),Rdata.thetaRsho(Rdata.reftoshortlistR(:,irec)),...
-                    Rdata.zRsho(Rdata.reftoshortlistR(:,irec)),doesQsegmenthavevalues,showtext,...
-                    propimplementation);
-
-                % Only the non-zero elements are used
-                ivnonzero = find(Fgeom);
-                Fgeomnonzero = Fgeom(ivnonzero);
-                pathlengthsnonzero = pathlengths(ivnonzero) - Rstartvalue;
-
-                for ifreq = 1:nfrequencies
-                    Fvec = Fgeomnonzero.*exp(-1i*kvec(ifreq)*pathlengthsnonzero);
-                    for isol = solutionlist
-                        Qfinalone = Qfinalstore{ifreq,isol};
-                        Prec(ifreq,isol) = Fvec*Qfinalone(ivnonzero);
-                        if savediff2 == 1
-                            Qfirsttermone = Qfirsttermforloop{ifreq,isol};
-                            P2rec(ifreq,isol) = Fvec*(Qfinalone(ivnonzero)-Qfirsttermone(ivnonzero));
-                        end
-                    end
-                end
-            end
-            Pcell{irec} = Prec;
-            P2cell{irec} = P2rec;
-            ivproblematiccell{irec} = ivproblematicrec;
-            propdiagnosticscell{irec} = propdiagnosticsrec;
-        end
-
-        % Collect the results of all the receivers
-        for irec = 1:nreceivers
-            P_receiver(:,irec,:) = reshape(Pcell{irec},nfrequencies,1,nsolutions);
-            if savediff2 == 1
-                extraoutputdata.tfinteqdiff_nodiff2(:,irec,:) = reshape(P2cell{irec},nfrequencies,1,nsolutions);
-            end
-            ivproblematic = ivproblematiccell{irec};
-            if ~isempty(ivproblematic)
-                existinglength = size(ivproblematicmatrix,2);
-                newlength = length(ivproblematic);
-                if newlength > existinglength
-                    ivproblematicmatrix = [ivproblematicmatrix zeros(nreceivers,newlength-existinglength)]; %#ok<AGROW>
-                end
-                ivproblematicmatrix(irec,1:newlength) = ivproblematic;
-            end
-            if ~isempty(propdiagnosticscell{irec})
-                propdiagnostics = propdiagnosticscell{irec};
-            end
-        end
-        clear Pcell P2cell ivproblematiccell propdiagnosticscell
+    propdiagnostics = propinfo.propdiagnostics;
+    if ~isempty(propinfo.propagationblocksize)
+        inteqdiagnostics.propagationblocksize = propinfo.propagationblocksize;
     end
+    clear propinfo P_nodiff2
 end
-% timingdata(4): the total propagation time, for all frequencies
-timingdata(4) = etime(clock,t00_prop);
+% timingdata(4): the total propagation time, for all frequencies (without
+% the refinement, which is in timingdata(5))
+timingdata(4) = etime(clock,t00_prop) - timingdata(5);
 
 %---------------------------------------------------------------
 % Save the solution of the integral equation in the _qfinal file, so that
@@ -1371,6 +1033,117 @@ save(desiredname,'tfinteqdiff','extraoutputdata','EDinputdatahash','timingdata',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%--------------------------------------------------------------------------
+function [Qfinal,solvediag] = edsolveinteq(Q_firstterm,dcol,Bsp,Hsubmatrixdata,Hsubdatalists,ivuselists,...
+    controlparameters,showtext)
+% Solves the integral equation Q = Q_firstterm + H*Q for one frequency
+% (and one source, or the added sources), with H(k)*x = B*(dcol.*x).
+% (Before 28 Oct. 2026, this code was written out twice, for CASE 1 and
+% CASE 2.) solvediag has the diagnostics for this solution: .normQ for
+% the iterative method, and .solvetime, .gmresiter, .gmresflag,
+% .gmresrelres for the GMRES methods.
+
+solvediag = struct;
+Q = Q_firstterm;
+Qfinal = Q;
+if strcmp(controlparameters.inteqsolutionmethod,'iterative_fixeddifforder') == 1
+    if showtext >= 2
+        disp('      Starting to solve the int.eq. with the iterative method')
+    end
+    solvediag.normQ = zeros(max(controlparameters.difforder-2,0),1);
+    for iiter = 1:(controlparameters.difforder-2)
+        if showtext >= 3
+           disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
+        end
+        Q = EDmatvecH(dcol.*Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
+        Qfinal = Qfinal + Q;
+        solvediag.normQ(iiter) = norm(Q);
+    end
+
+elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 % Here we do the GMRES, fast version
+    if showtext >= 2
+        disp('      Starting to solve the int.eq. with GMRES, fast version (for smaller problems)')
+    end
+    A = @(x) x - Bsp*(dcol.*x);     % H*x = B*(dcol.*x)
+    t00_gmres = clock;
+    [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+    solvediag.solvetime = etime(clock,t00_gmres);
+    solvediag.gmresiter = iter(2);
+    solvediag.gmresflag = flag;
+    solvediag.gmresrelres = relres;
+
+elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_large') == 1 % Here we do the GMRES for large problems
+    if showtext >= 2
+        disp('      Starting to solve the int.eq. with GMRES, the version for larger problems')
+    end
+    t00_gmres = clock;
+    afun = @(q) q - EDmatvecH(dcol.*q, Hsubmatrixdata, Hsubdatalists, ivuselists);
+    [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+    solvediag.solvetime = etime(clock,t00_gmres);
+    solvediag.gmresiter = iter(2);
+    solvediag.gmresflag = flag;
+    solvediag.gmresrelres = relres;
+end
+end
+
+%--------------------------------------------------------------------------
+function inteqdiagnostics = edstoresolvediag(inteqdiagnostics,solvediag,ifreq,icol)
+% Stores the diagnostics of one solution (from edsolveinteq) in column icol
+% of the per-frequency diagnostics.
+
+if isfield(solvediag,'normQ')
+    for iiter = 1:numel(solvediag.normQ)
+        inteqdiagnostics.normQ(iiter,ifreq,icol) = solvediag.normQ(iiter);
+    end
+end
+if isfield(solvediag,'solvetime')
+    inteqdiagnostics.solvetime(ifreq,icol) = solvediag.solvetime;
+    inteqdiagnostics.gmresiter(ifreq,icol) = solvediag.gmresiter;
+    inteqdiagnostics.gmresflag(ifreq,icol) = solvediag.gmresflag;
+    inteqdiagnostics.gmresrelres(ifreq,icol) = solvediag.gmresrelres;
+end
+end
+
+%--------------------------------------------------------------------------
+function dorefine = edisrefinementused(controlparameters)
+% 1 if controlparameters.ESIEpropagationrefine asks for a refinement (not
+% the default value 1).
+
+dorefine = 0;
+if isfield(controlparameters,'ESIEpropagationrefine')
+    r = controlparameters.ESIEpropagationrefine;
+    if isnumeric(r) && ~isempty(r) && ~(isscalar(r) && (isnan(r) || r == 1))
+        dorefine = 1;
+    end
+end
+end
+
+%--------------------------------------------------------------------------
+function nnew = edrefinednodes(nold,edgelengths,refinespec)
+% The refined number of nodes on each edge, for the propagation.
+%   refinespec  a scalar factor (for all edges), or rows [maxlength factor]:
+%               the edges not longer than maxlength get the factor (the
+%               smallest maxlength that fits); longer edges are not refined.
+% The new number is ceil(factor*nold).
+
+if isscalar(refinespec)
+    factors = refinespec*ones(size(nold));
+else
+    [maxlengths,iv] = sort(refinespec(:,1));
+    tablefactors = refinespec(iv,2);
+    factors = ones(size(nold));
+    for ee = 1:numel(nold)
+        irow = find(edgelengths(ee) <= maxlengths*(1+1e-9),1);
+        if ~isempty(irow)
+            factors(ee) = tablefactors(irow);
+        end
+    end
+end
+% (The small subtraction avoids that e.g. 1.1*10 = 11.000000000000002
+% gives 12.)
+nnew = max(ceil(factors.*nold - 1e-9),nold);
+end
 
 function inteqdiagnosticstruct = edinteqdiagnosticstemplate
 

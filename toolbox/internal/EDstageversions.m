@@ -34,7 +34,7 @@ function stageinfo = EDstageversions(stagename)
 %                                    (struct of cell arrays)
 %                 .ignored           cell array with the ignored functions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 28 Oct. 2026
 %
 % stageinfo = EDstageversions(stagename);
 
@@ -47,6 +47,9 @@ function stageinfo = EDstageversions(stagename)
 % 16 Oct. 2026 New function EDcalcpropagatematrix_block (version 1).
 % 20 Oct. 2026 EDwedge1st_fd to version 4 (bug fix: 'GL' results were only
 % correct for edges of length 1).
+% 28 Oct. 2026 New functions EDpropagateQvec, EDHkernelvalues,
+% EDinteg_soutermsources (code moved from EDintegralequation_convex_tf) and
+% EDrefineQvec (now used by EDintegralequation_convex_tf), all version 1.
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -93,15 +96,19 @@ versions.EDdistelements               = 1;
 versions.EDfindis                     = 1;
 versions.EDgetedgepoints              = 1;
 versions.EDgetGLrule                  = 1;
+versions.EDHkernelvalues              = 1;
 versions.EDinfrontofplane             = 1;
 versions.EDinteg_souterm              = 1;
+versions.EDinteg_soutermsources       = 1;
 versions.EDintegratebetaoverm         = 1;
 versions.EDmatvecH                    = 1;
 versions.EDpistonedgeintegrand        = 1;
 versions.EDpoinpla                    = 1;
 versions.EDpoinplax                   = 1;
+versions.EDpropagateQvec              = 1;
 versions.EDquadgk                     = 1;
 versions.EDquadstep                   = 1;
+versions.EDrefineQvec                 = 1;
 versions.EDwedge1st_fd                = 4;  % 2: 'GL' falls back to 'accurate' for singular cases; 3: also near-singular; 4: 'GL' bug fix (edge length)
 versions.EDwedge1st_ir                = 1;
 versions.EDwedge2nd                   = 1;
@@ -125,9 +132,9 @@ stagesubroutines.EDmakefirstorderirs = {'EDcoordtrans2','EDcross','EDwedge1st_ir
 stagesubroutines.EDed2geo = {'EDcheckobstr_edgetoedge','EDpoinpla','EDcompress7',...
     'EDcoordtrans2','EDcross','EDgetedgepoints','EDinfrontofplane'};
 stagesubroutines.EDinteg_submatrixstructure = {'EDgetGLrule','EDdistelements','lgwt'};
-stagesubroutines.EDintegralequation_convex_tf = {'EDinteg_souterm','EDintegratebetaoverm',...
-    'EDbetaoverm_fd','EDcalcpropagatematrix','EDcalcpropagatematrix_block','EDbuildHsparse','EDmatvecH',...
-    'EDcalcedgeinteqmatrixsub2_mex','EDcoordtrans1','EDdistelements','lgwt'};
+stagesubroutines.EDintegralequation_convex_tf = {'EDinteg_souterm','EDinteg_soutermsources','EDintegratebetaoverm',...
+    'EDbetaoverm_fd','EDpropagateQvec','EDcalcpropagatematrix','EDcalcpropagatematrix_block','EDbuildHsparse','EDmatvecH',...
+    'EDHkernelvalues','EDrefineQvec','EDcalcedgeinteqmatrixsub2_mex','EDcoordtrans1','EDdistelements','EDgetGLrule','lgwt'};
 stagesubroutines.EDfindHODpaths = {};
 stagesubroutines.EDmakeHODirs = {'EDwedge2nd','EDwedgeN','EDcreindexmatrix','EDcoordtrans1'};
 stagesubroutines.EDpropagateESIEBEM = {'EDcalccosfi','EDcalcdist'};

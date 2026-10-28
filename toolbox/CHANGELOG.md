@@ -3,6 +3,57 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## Unreleased
+
+**Input and output**
+
+- New parameter controlparameters.nedgeelemsuser (advanced, default []):
+  the number of Gauss-Legendre points on chosen edges, overriding ngauss
+  and ngaussmin. Rows [maxlength npoints] set it by edge length (all edges
+  not longer than maxlength); rows [corner1 corner2 npoints] set it for
+  the edge between two corners (the rows of geoinputdata.corners), so the
+  edge numbers need not be known. Hashed only if it is given; without it,
+  the results are the same as before.
+- EDinteg_submatrixstructure: the search for identical submatrices also
+  compares the numbers of points on the three edges (needed when the
+  numbers are given per corner pair). For all earlier input, the
+  submatrices and results are unchanged.
+- New parameter controlparameters.ESIEpropagationrefine (advanced,
+  default 1 = not used): the solution of the integral equation is refined
+  to more points per edge with the Nystrom interpolation formula
+  (EDrefineQvec) before the propagation to the receivers. A factor for all
+  edges, or rows [maxlength factor] (by edge length, as nedgeelemsuser).
+  The solution and the _qfinal file are not changed, and the setting is
+  part of the _tfinteq hash only if it is used. In convergence studies for
+  a thin plate at frequency 0, most of the error came from the quadrature
+  of the propagation integral, and refining by 3 on the short pieces near
+  the corners and 1.5 on the middle piece gave 4-9 times smaller errors.
+  timingdata (EDres.timingstruct.integralequation) has a 5th value, the
+  time for the refinement, and inteqdiagnostics.nQpropagated gives the
+  number of propagated unknowns when the refinement is used.
+
+**Code structure (no change of the results)**
+
+- Three new functions, with code moved from EDintegralequation_convex_tf:
+  EDpropagateQvec (the propagation to the receivers), EDinteg_soutermsources
+  (the source term for one or several sources) and EDHkernelvalues (the
+  kernel of the H-matrix). EDrefineQvec uses the same functions instead of
+  its own copies. The solution of the integral equation, which was written
+  out twice, is a local function. The results are the same as before.
+- EDrefineQvec: the propagation follows
+  controlparameters.ESIEpropagationimplementation (before: always
+  'accurate', the default). New option .parallelworkers.
+- EDstageversions: the new functions are listed for
+  EDintegralequation_convex_tf, so saved _qfinal and _tfinteq files are
+  computed again once.
+
+**Tests**
+
+- EDverify test 23: nedgeelemsuser by length and by corner pair, and an
+  error for a corner pair that is not an edge. Test 17 also changes
+  nedgeelemsuser. The local function of tests 2 and 3 was renamed
+  edtest2and3.
+
 ## 0.615 (20 Oct. 2026)
 
 A bug fix for first-order diffraction with diff1method = 'GL', which gave

@@ -50,7 +50,10 @@ function refined = EDrefineQvec(inteqdata,refineopts)
 %                   <filestem>_submatrixdata, _eddata, _ed2data, _Sdata,
 %                   _Rdata, _qfinal and _settings (.mat).
 %   refineopts      (optional) struct with the fields
-%     .method       'nystrom' (default) or 'lagrange'
+%     .method       'nystrom' (default), 'lagrange', or 'none' (no
+%                   refinement: the solution is propagated on its own
+%                   nodes, whatever .ngauss etc. say; e.g. with
+%                   .propagationsplit)
 %     .edges        the edges to refine (default: all edges)
 %     .nedgeelems   the new number of nodes on each of .edges: a scalar
 %                   (the same for all) or a vector with one value per edge
@@ -58,7 +61,16 @@ function refined = EDrefineQvec(inteqdata,refineopts)
 %                   given by the same rule as in EDinteg_submatrixstructure,
 %                   ceil(ngauss*edgelength/maxedgelength), at least 2 (a
 %                   negative value gives odd numbers). Default: 2 times the
-%                   original ngauss.
+%                   original ngauss, unless controlparameters.nedgeelemsuser
+%                   was used (see .nfactor).
+%     .nfactor      instead of .nedgeelems and .ngauss: each of .edges gets
+%                   ceil(nfactor*n) nodes, where n is its number of nodes in
+%                   the solution. This keeps any node distribution, e.g.
+%                   from controlparameters.nedgeelemsuser on a graded
+%                   geometry. Default: 2 if controlparameters.nedgeelemsuser
+%                   was used and neither .nedgeelems nor .ngauss is given
+%                   (the ngauss rule would then give the short pieces fewer
+%                   nodes than they have).
 %     .frequencyindices  the frequencies (indices into
 %                   controlparameters.frequencies) to refine. Default: all.
 %     .propagate    1 (default, if Rdata is available): propagate the
@@ -84,6 +96,9 @@ function refined = EDrefineQvec(inteqdata,refineopts)
 %                   a logical vector: part 1 = true, part 2 = false
 %                   a vector of part numbers 1,2,..., one per edge pair
 %     .showtext     0 (default) or 1
+%     .parallelworkers  the largest number of parallel workers for the
+%                   propagation (default 0 = serial; see
+%                   filehandlingparameters.parallelworkers)
 %     .forcerecompute  1: a test; the edges in .edges are recomputed with
 %                   the Nystrom formula even if their number of nodes is
 %                   unchanged. The result should equal the original
@@ -122,22 +137,26 @@ function refined = EDrefineQvec(inteqdata,refineopts)
 %                       original solution is returned, e.g. to propagate
 %                       it with the split)
 %
-% Limitations of this prototype:
+% The kernel of the H-matrix (EDHkernelvalues), the source term
+% (EDinteg_soutermsources) and the propagation (EDpropagateQvec) are the
+% same functions that EDintegralequation_convex_tf uses. The propagation
+% uses controlparameters.ESIEpropagationimplementation ('accurate' or
+% 'legacy'); the split into parts (.propagationsplit) needs 'accurate'.
+% EDintegralequation_convex_tf calls this function (with .propagate = 0)
+% when controlparameters.ESIEpropagationrefine is used.
+%
+% Limitations:
 % - Only Gauss-Legendre nodes (a higher number of nodes per edge), not
 %   arbitrary or graded node distributions.
-% - The H-matrix kernel is a copy of the code in
-%   EDintegralequation_convex_tf (local function edHgeomblock below);
-%   symmetric submatrices are not reused.
+% - Symmetric submatrices are not reused.
 % - For inteqsolutionmethod = 'iterative_fixeddifforder', Qfinal is a
 %   truncated series, and the Nystrom step adds one more diffraction
 %   order.
-% - The propagation always uses the 'accurate' implementation
-%   (EDcalcpropagatematrix_block), serially.
 %
-% See also EDintegralequation_convex_tf, EDinteg_souterm,
-% EDcalcpropagatematrix_block, EDinteg_submatrixstructure
+% See also EDintegralequation_convex_tf, EDpropagateQvec, EDHkernelvalues,
+% EDinteg_soutermsources, EDinteg_submatrixstructure
 %
-% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 28 Oct. 2026
 %
 % refined = EDrefineQvec(inteqdata,refineopts);
 
@@ -147,6 +166,17 @@ function refined = EDrefineQvec(inteqdata,refineopts)
 % If no edge is refined, the original solution is returned directly.
 % New options .minnedgeelems and propagationsplit = 'sharecorner_near'
 % (three parts) or part numbers.
+% 20 Oct. 2026 New method 'none': no refinement, whatever ngauss etc. say.
+% 25 Oct. 2026 New option .nfactor: the number of nodes on each refined edge
+% is scaled, which keeps the distribution of controlparameters.nedgeelemsuser.
+% It is the default (nfactor = 2) when nedgeelemsuser was used. An error if
+% an edge would get fewer nodes than before with .ngauss.
+% 28 Oct. 2026 The local copies of the H-matrix kernel, the source term and
+% the propagation were replaced by the functions that
+% EDintegralequation_convex_tf uses: EDHkernelvalues, EDinteg_soutermsources
+% and EDpropagateQvec. The results are the same as before, except that the
+% propagation now follows controlparameters.ESIEpropagationimplementation
+% (before: always 'accurate', the default). New option .parallelworkers.
 
 t00 = clock;
 
@@ -170,8 +200,8 @@ Qfinalstore = inteqdata.Qfinalstore;
 haveRdata = isfield(inteqdata,'Rdata') && ~isempty(inteqdata.Rdata);
 
 method = edgetopt(refineopts,'method','nystrom');
-if ~any(strcmpi(method,{'nystrom','lagrange'}))
-    error('EDrefineQvec:method','refineopts.method must be ''nystrom'' or ''lagrange''')
+if ~any(strcmpi(method,{'nystrom','lagrange','none'}))
+    error('EDrefineQvec:method','refineopts.method must be ''nystrom'', ''lagrange'' or ''none''')
 end
 method = lower(method);
 showtext = edgetopt(refineopts,'showtext',0);
@@ -195,7 +225,22 @@ nold = double(Hsub.nedgeelems(:));
 edgelist = edgetopt(refineopts,'edges',1:nedges);
 edgelist = edgelist(:);
 nnew = nold;
-if isfield(refineopts,'nedgeelems') && ~isempty(refineopts.nedgeelems)
+haveuserdistribution = isfield(controlparameters,'nedgeelemsuser') && ~isempty(controlparameters.nedgeelemsuser);
+givennedgeelems = isfield(refineopts,'nedgeelems') && ~isempty(refineopts.nedgeelems);
+givenngauss = isfield(refineopts,'ngauss') && ~isempty(refineopts.ngauss);
+nfactor = edgetopt(refineopts,'nfactor',[]);
+if isempty(nfactor) && haveuserdistribution && ~givennedgeelems && ~givenngauss
+    nfactor = 2;
+end
+if ~isempty(nfactor) && (givennedgeelems || givenngauss)
+    error('EDrefineQvec:nfactor','Give only one of refineopts.nfactor, .nedgeelems and .ngauss')
+end
+if ~isempty(nfactor)
+    if ~isscalar(nfactor) || nfactor <= 0
+        error('EDrefineQvec:nfactor','refineopts.nfactor must be a positive scalar')
+    end
+    nnew(edgelist) = max(ceil(nfactor*nold(edgelist)),2);
+elseif givennedgeelems
     nspec = refineopts.nedgeelems(:);
     if numel(nspec) == 1
         nspec = nspec*ones(numel(edgelist),1);
@@ -212,6 +257,15 @@ else
         nrule = ceil(abs(newngauss)*lenratio/2)*2+1;
     end
     nrule(nrule < 2) = 2;
+    if any(nrule(edgelist) < nold(edgelist))
+        if haveuserdistribution
+            error('EDrefineQvec:ngauss',['With controlparameters.nedgeelemsuser, the ngauss rule would give ',...
+                'some edges fewer nodes than in the solution. Use refineopts.nfactor instead.'])
+        else
+            warning('EDrefineQvec:fewernodes',['The ngauss rule gives some edges fewer nodes than in the ',...
+                'solution (e.g. if the solution used nedgeelemsuser). Consider refineopts.nfactor.'])
+        end
+    end
     nnew(edgelist) = nrule(edgelist);
 end
 % A minimum number of nodes on the refined edges (e.g. for very short
@@ -220,6 +274,11 @@ minn = edgetopt(refineopts,'minnedgeelems',0);
 nnew(edgelist) = max(nnew(edgelist),minn);
 if any(nnew < 2) || any(nnew ~= round(nnew))
     error('EDrefineQvec:nedgeelems','The number of nodes per edge must be an integer >= 2')
+end
+if strcmp(method,'none')
+    % No refinement: the discretization of the solution itself (e.g. to
+    % propagate it with propagationsplit)
+    nnew = nold;
 end
 isrefined = (nnew ~= nold);
 % Test option: recompute the listed edges with the Nystrom formula even if
@@ -492,14 +551,16 @@ end
 
 if dopropagate
     [refined.tfinteqdiff,parts] = edpropagate(edgedata,edgetoedgedata,HsubN,inteqdata.Rdata,...
-        refined.Qfinalstore,controlparameters,envdata,Sdata,freqindices,showtext,splitlabels);
+        refined.Qfinalstore,controlparameters,envdata,Sdata,freqindices,showtext,splitlabels,...
+        edgetopt(refineopts,'parallelworkers',0));
     if ~isempty(splitlabels)
         refined.tfinteqdiff_parts = parts;
     end
 end
 if dopropagateoriginal
     [refined.tfinteqdiff_original,parts] = edpropagate(edgedata,edgetoedgedata,Hsub,inteqdata.Rdata,...
-        Qfinalstore(freqindices,:),controlparameters,envdata,Sdata,freqindices,showtext,splitlabels);
+        Qfinalstore(freqindices,:),controlparameters,envdata,Sdata,freqindices,showtext,splitlabels,...
+        edgetopt(refineopts,'parallelworkers',0));
     if ~isempty(splitlabels)
         refined.tfinteqdiff_original_parts = parts;
     end
@@ -604,37 +665,18 @@ end
 %--------------------------------------------------------------------------
 function Q0 = edsourceterm(envdata,edgedata,edgetoedgedata,HsubX,controlparameters,...
     Sdata,gaussvectors,ifreq,isol,nsolutions)
-% The source term on the layout HsubX, as in EDintegralequation_convex_tf:
-% the sum over the sources if they are added (nsolutions = 1), otherwise
-% source number isol.
+% The source term on the layout HsubX, as in EDintegralequation_convex_tf
+% (with EDinteg_soutermsources): the sum over the sources if they are
+% added (nsolutions = 1), otherwise source number isol.
 
 frequency = controlparameters.frequencies(ifreq);
 nsources = size(Sdata.coordinates,1);
 if nsolutions == 1
-    sourcelist = 1:nsources;
+    Q0 = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,HsubX,controlparameters,...
+        Sdata,frequency,ifreq,gaussvectors,1:nsources,1,0);
 else
-    sourcelist = isol;
-end
-Q0 = 0;
-for isou = sourcelist
-    if strcmp(Sdata.sourcetype,'monopole')
-        Q0add = EDinteg_souterm(envdata,edgedata,edgetoedgedata,HsubX,controlparameters,...
-            Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
-            Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,...
-            Sdata.rSsho(Sdata.reftoshortlistS(:,isou)),Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou)),...
-            Sdata.zSsho(Sdata.reftoshortlistS(:,isou)),0);
-    else   % polygonpiston
-        Q0add = 0;
-        for np = 1:size(Sdata.pistongausscoordinates{1},1)
-            Q0one = EDinteg_souterm(envdata,edgedata,edgetoedgedata,HsubX,controlparameters,...
-                Sdata.vispartedgesfroms(:,isou),Sdata.vispartedgesfroms_start(:,isou),...
-                Sdata.vispartedgesfroms_end(:,isou),frequency,gaussvectors,...
-                Sdata.rSsho(Sdata.reftoshortlistS(:,isou,np)),Sdata.thetaSsho(Sdata.reftoshortlistS(:,isou,np)),...
-                Sdata.zSsho(Sdata.reftoshortlistS(:,isou,np)),0);
-            Q0add = Q0add + Q0one*Sdata.pistongaussweights{isou}(np,1);
-        end
-    end
-    Q0 = Q0 + Q0add*Sdata.sourceamplitudes(isou,ifreq);
+    Q0 = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,HsubX,controlparameters,...
+        Sdata,frequency,ifreq,gaussvectors,isol,0,0);
 end
 if isscalar(Q0)
     Q0 = zeros(HsubX.Qvecendnums(end),1);
@@ -661,182 +703,53 @@ qadd = qadd(:);
 function [B,mdist] = edHgeomblock(edgedata,edgetoedgedata,Hsub,nn,n3vec,n2vec,n1vec,dzvec)
 % The frequency-independent part of one H-submatrix (edge triplet nn =
 % [edge3 edge2 edge1]), for the given normalized node positions on the
-% three edges and the weights dzvec (in m) on edge 1.
+% three edges and the weights dzvec (in m) on edge 1, computed by
+% EDHkernelvalues (the same kernel as in EDintegralequation_convex_tf) for
+% the full grid of node combinations.
 %   B      [n3*n2,n1]; row i2 + (i3-1)*n2, column i1. The element of H is
 %          B*exp(-1i*k*mdist(i2,i1)).
 %   mdist  [n2,n1] the distance from node i1 on edge 1 to node i2 on edge 2
-% A COPY of the kernel in EDintegralequation_convex_tf (PART 1), for
-% arbitrary node sets.
-
-Hsubconstant = -1/4/pi/2;
-refto = edgetoedgedata.reftoshortlistE;
 
 edge3 = Hsub.edgetripletlist(nn,1);
 edge2 = Hsub.edgetripletlist(nn,2);
 edge1 = Hsub.edgetripletlist(nn,3);
-len2 = edgedata.edgelengthvec(edge2);
 n1 = numel(n1vec); n2 = numel(n2vec); n3 = numel(n3vec);
-n1vec = n1vec(:).';
-n2vec = n2vec(:);
-n3vec = n3vec(:);
-dzvec = dzvec(:).';
-
 thinplaneboost = double(Hsub.isthinplanetriplet(nn)) + 1;
 
-ny = pi/(2*pi-edgedata.closwedangvec(edge2));
-thetain  = edgetoedgedata.thetae1sho(refto(edge1,edge2));
-thetain_other_end_of_edge  = edgetoedgedata.thetae2sho(refto(edge1,edge2));
-acrossface_in = double((abs(thetain) < 1e-10 || abs(thetain-(2*pi-edgedata.closwedangvec(edge2))) < 1e-10) ...
-    && abs(thetain-thetain_other_end_of_edge) < 1e-10);
-thetaout = edgetoedgedata.thetae1sho(refto(edge3,edge2));
-thetaout_other_end_of_edge = edgetoedgedata.thetae2sho(refto(edge3,edge2));
-acrossface_out = double((abs(thetaout) < 1e-10 || abs(thetaout-(2*pi-edgedata.closwedangvec(edge2))) < 1e-10) ...
-    && abs(thetaout-thetaout_other_end_of_edge) < 1e-10);
-
-ze2_re2 = n2vec*len2;                                        % [n2,1]
-ze3_re2 = edgetoedgedata.ze1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.ze2sho(refto(edge3,edge2))-edgetoedgedata.ze1sho(refto(edge3,edge2)) );
-ze1_re2 = edgetoedgedata.ze1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.ze2sho(refto(edge1,edge2))-edgetoedgedata.ze1sho(refto(edge1,edge2)) );
-
-if acrossface_in*acrossface_out == 0
-    xedge1start = edgetoedgedata.re1sho(refto(edge1,edge2))*cos(edgetoedgedata.thetae1sho(refto(edge1,edge2)));
-    xedge1end   = edgetoedgedata.re2sho(refto(edge1,edge2))*cos(edgetoedgedata.thetae2sho(refto(edge1,edge2)));
-    yedge1start = edgetoedgedata.re1sho(refto(edge1,edge2))*sin(edgetoedgedata.thetae1sho(refto(edge1,edge2)));
-    yedge1end   = edgetoedgedata.re2sho(refto(edge1,edge2))*sin(edgetoedgedata.thetae2sho(refto(edge1,edge2)));
-    xe1_re2 = xedge1start + n1vec.*(xedge1end-xedge1start);
-    ye1_re2 = yedge1start + n1vec.*(yedge1end-yedge1start);
-    [re1_re2,thetae1_re2,~] = EDcoordtrans1([xe1_re2.' ye1_re2.' ze1_re2.'],[0 0 0;0 0 len2],[0 1 0]);
-    re1_re2 = re1_re2(:).';
-    thetae1_re2 = thetae1_re2(:).';
-
-    xedge3start = edgetoedgedata.re1sho(refto(edge3,edge2))*cos(edgetoedgedata.thetae1sho(refto(edge3,edge2)));
-    xedge3end   = edgetoedgedata.re2sho(refto(edge3,edge2))*cos(edgetoedgedata.thetae2sho(refto(edge3,edge2)));
-    yedge3start = edgetoedgedata.re1sho(refto(edge3,edge2))*sin(edgetoedgedata.thetae1sho(refto(edge3,edge2)));
-    yedge3end   = edgetoedgedata.re2sho(refto(edge3,edge2))*sin(edgetoedgedata.thetae2sho(refto(edge3,edge2)));
-    xe3_re2 = xedge3start + n3vec.*(xedge3end-xedge3start);
-    ye3_re2 = yedge3start + n3vec.*(yedge3end-yedge3start);
-    [re3_re2,thetae3_re2,~] = EDcoordtrans1([xe3_re2 ye3_re2 ze3_re2],[0 0 0;0 0 len2],[0 1 0]);
-    re3_re2 = re3_re2(:);
-    thetae3_re2 = thetae3_re2(:);
-else
-    re1_re2 = edgetoedgedata.re1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.re2sho(refto(edge1,edge2))-edgetoedgedata.re1sho(refto(edge1,edge2)) );
-    re3_re2 = edgetoedgedata.re1sho(refto(edge3,edge2)) + n3vec*( edgetoedgedata.re2sho(refto(edge3,edge2))-edgetoedgedata.re1sho(refto(edge3,edge2)) );
-end
-
-% Index vectors for the rows: row = i2 + (i3-1)*n2
+% Index lists for the elements of B, column by column
 i2row = repmat((1:n2).',n3,1);
 i3row = reshape(repmat(1:n3,n2,1),n2*n3,1);
+n2ind = repmat(i2row,n1,1);
+n3ind = repmat(i3row,n1,1);
+n1ind = reshape(repmat(1:n1,n2*n3,1),n1*n2*n3,1);
 
-mdist = sqrt( (ze1_re2 - ze2_re2).^2 + re1_re2.^2 );          % [n2,n1]
-ldist = sqrt( (ze3_re2(i3row) - ze2_re2(i2row)).^2 + re3_re2(i3row).^2 );   % [n3*n2,1]
-
-M = mdist(i2row,:);                                          % [n3*n2,n1]
-dz_overm = dzvec./M;
-ch = ((ze2_re2(i2row) - ze1_re2).*(ze2_re2(i2row) - ze3_re2(i3row)) + M.*ldist)./re1_re2./re3_re2(i3row);
-ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
-ch = ( ch + 1./ch)/2;
-
-if acrossface_in == 1 && acrossface_out == 1
-    beta = 4*( sin(ny*(pi + thetain + thetaout  ))./(ch - cos(ny*(pi + thetain + thetaout   ))));
-else
-    t1 = thetae1_re2;            % [1,n1]
-    t3 = thetae3_re2(i3row);     % [n3*n2,1]
-    beta = ( sin(ny*(pi + t1 + t3))./(ch - cos(ny*(pi + t1 + t3))+eps*10)) + ...
-           ( sin(ny*(pi + t1 - t3))./(ch - cos(ny*(pi + t1 - t3))+eps*10)) + ...
-           ( sin(ny*(pi - t1 + t3))./(ch - cos(ny*(pi - t1 + t3))+eps*10)) + ...
-           ( sin(ny*(pi - t1 - t3))./(ch - cos(ny*(pi - t1 - t3))+eps*10));
-end
-
-if ismember(edge1,edgedata.offedges) || ismember(edge2,edgedata.offedges) || ismember(edge3,edgedata.offedges)
-    beta = beta*0;
-end
-
-B = (2-acrossface_out)*Hsubconstant*ny*beta.*dz_overm*thinplaneboost;
+[Bvalues,mvalues] = EDHkernelvalues(edgedata,edgetoedgedata,edge1,edge2,edge3,...
+    n1vec,n2vec,n3vec,dzvec(:),n1ind,n2ind,n3ind,thinplaneboost);
+B = reshape(Bvalues,n3*n2,n1);
+mdist = reshape(mvalues,n3*n2,n1);
+mdist = mdist(1:n2,:);
 
 %--------------------------------------------------------------------------
 function [tfinteqdiff,parts] = edpropagate(edgedata,edgetoedgedata,HsubX,Rdata,Qstore,...
-    controlparameters,envdata,Sdata,freqindices,showtext,splitlabels)
-% Propagation of the solutions in Qstore to all receivers, as in PART 4
-% of EDintegralequation_convex_tf ('accurate', in blocks, serially).
-% If splitlabels (a part number 1..nparts per edge pair) is given, parts
-% gets the parts [nfreq,nreceivers,nsolutions,nparts]. The propagation
-% matrix is computed once; each column belongs to one edge pair, so the
-% parts add up to the total exactly.
+    controlparameters,envdata,Sdata,freqindices,showtext,splitlabels,nworkers)
+% Propagation of the solutions in Qstore to all receivers, with
+% EDpropagateQvec (as in EDintegralequation_convex_tf). If splitlabels (a
+% part number 1..nparts per edge pair) is given, parts gets the parts
+% [nfreq,nreceivers,nsolutions,nparts], which add up to the total.
 
-nfreq = numel(freqindices);
-nsolutions = size(Qstore,2);
-nreceivers = size(Rdata.coordinates,1);
-nQ = double(HsubX.Qvecendnums(end));
-kvec = 2*pi*controlparameters.frequencies(freqindices)/envdata.cair;
-
-npairs = size(HsubX.edgepairlist,1);
-flags = false(npairs,1);
-for jf = 1:nfreq
-    for isol = 1:nsolutions
-        for ii = 1:npairs
-            flags(ii) = flags(ii) || any(Qstore{jf,isol}(HsubX.Qvecstartnums(ii):HsubX.Qvecendnums(ii)));
-        end
-    end
+implementation = 'accurate';
+if isfield(controlparameters,'ESIEpropagationimplementation') && ischar(controlparameters.ESIEpropagationimplementation)
+    implementation = controlparameters.ESIEpropagationimplementation;
 end
-flags = double(flags);
-
-tfinteqdiff = zeros(nfreq,nreceivers,nsolutions);
-dosplit = ~isempty(splitlabels);
+propsettings = struct('Rstart',controlparameters.Rstart,'implementation',implementation,...
+    'doallSRcombinations',Sdata.doallSRcombinations,'savediff2',0,'nworkers',nworkers,...
+    'showtext',showtext);
+propsettings.splitlabels = splitlabels;
+[tfinteqdiff,~,propinfo] = EDpropagateQvec(edgedata,edgetoedgedata,HsubX,Rdata,Qstore,{},...
+    controlparameters.frequencies(freqindices),envdata,propsettings);
 parts = [];
-if dosplit
-    nparts = max(splitlabels);
-    parts = zeros(nfreq,nreceivers,nsolutions,nparts);
-    % the part number of each element of the Q vector
-    partofQ = zeros(nQ,1);
-    for ii = 1:npairs
-        partofQ(HsubX.Qvecstartnums(ii):HsubX.Qvecendnums(ii)) = splitlabels(ii);
-    end
-end
-blocksize = max(1,min(nreceivers,floor(4e6/nQ)));
-for r0 = 1:blocksize:nreceivers
-    recs = r0:min(r0+blocksize-1,nreceivers);
-    nb = numel(recs);
-    if showtext >= 1
-        disp(['      Propagation: receivers ',int2str(recs(1)),' to ',int2str(recs(end))])
-    end
-    [Fgeom,pathlengths] = EDcalcpropagatematrix_block(edgedata,edgetoedgedata,HsubX,...
-        Rdata.vispartedgesfromr(:,recs),...
-        reshape(Rdata.rRsho(Rdata.reftoshortlistR(:,recs)),[],nb),...
-        reshape(Rdata.thetaRsho(Rdata.reftoshortlistR(:,recs)),[],nb),...
-        reshape(Rdata.zRsho(Rdata.reftoshortlistR(:,recs)),[],nb),flags);
-    ivnonzero = find(any(Fgeom,1));
-    Fgeom = Fgeom(:,ivnonzero);
-    pathlengths = pathlengths(:,ivnonzero) - controlparameters.Rstart;
-    for jf = 1:nfreq
-        Fk = Fgeom.*exp(-1i*kvec(jf)*pathlengths);
-        if nsolutions == 1 || Sdata.doallSRcombinations == 1
-            for isol = 1:nsolutions
-                Qone = Qstore{jf,isol}(ivnonzero);
-                tfinteqdiff(jf,recs,isol) = Fk*Qone;
-                if dosplit
-                    pnz = partofQ(ivnonzero);
-                    for jp = 1:nparts
-                        inp = (pnz == jp);
-                        parts(jf,recs,isol,jp) = Fk(:,inp)*Qone(inp);
-                    end
-                end
-            end
-        else
-            for jr = 1:nb
-                isol = recs(jr);
-                if isol <= nsolutions
-                    Qone = Qstore{jf,isol}(ivnonzero);
-                    tfinteqdiff(jf,isol,isol) = Fk(jr,:)*Qone;
-                    if dosplit
-                        pnz = partofQ(ivnonzero);
-                        for jp = 1:nparts
-                            inp = (pnz == jp);
-                            parts(jf,isol,isol,jp) = Fk(jr,inp)*Qone(inp);
-                        end
-                    end
-                end
-            end
-        end
-    end
+if isfield(propinfo,'parts')
+    parts = propinfo.parts;
 end
 
 %--------------------------------------------------------------------------

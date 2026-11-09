@@ -32,6 +32,25 @@ comments at the top of its .m file.
   time for the refinement, and inteqdiagnostics.nQpropagated gives the
   number of propagated unknowns when the refinement is used.
 
+- New value 'exactpole' for controlparameters.ESIEpropagationimplementation
+  (the default is still 'accurate'). For the near-singular rows of the
+  propagation from the edge sources to the receivers (receivers close to
+  the plane of a face), the two poles of the singular beta term are found
+  exactly, by Newton iteration started from the Taylor values of
+  Svensson & Calamia (2006), and the row is integrated by product
+  integration with the exact pole pair as the weight function (the
+  principle of singularity swap quadrature, af Klinteberg & Barnett). With
+  'accurate', the Taylor model of the poles leaves a remainder that the
+  Gauss-Legendre rule cannot resolve, and the error near the face planes
+  converged irregularly. Cube, plane wave, 0 Hz, 629 receivers in a
+  circle: with 'exactpole' the error of every receiver falls as 1/ngauss^2
+  (ngauss = 16 to 160), and two-point Richardson extrapolation reaches
+  a maximum error of about 1e-6 (before: about 3e-4, at the face planes).
+  The extra time is about 10-20% of the propagation. Not implemented for
+  thin holes, where 'accurate' is used (noted in
+  propinfo.implementationnote of EDpropagateQvec). New
+  propdiagnostics fields .nrows_exactpole and .nrows_fallback.
+
 **Speed**
 
 - EDrefineQvec (and so ESIEpropagationrefine): kernel blocks of the
@@ -60,6 +79,12 @@ comments at the top of its .m file.
 
 **Tests**
 
+- EDverify test 24: the propagation rows of an edge pair across a face,
+  for a receiver 0.01 rad from the plane of the face, against stored
+  high-precision values (EDcalcpropagatematrix_block called directly):
+  the exact-pole treatment must agree to 1e-9 (relative); the default
+  must equal an explicit 'taylor'. Test 17 also changes
+  ESIEpropagationimplementation to 'exactpole'.
 - EDverify test 23: nedgeelemsuser by length and by corner pair, and an
   error for a corner pair that is not an edge. Test 17 also changes
   nedgeelemsuser. The local function of tests 2 and 3 was renamed

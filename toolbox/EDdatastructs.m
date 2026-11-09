@@ -250,7 +250,12 @@ function EDdatastructs
 %                           should be 0
 %   .propdiagnostics        from EDcalcpropagatematrix_block: totals over all
 %                           the receivers of the edge pairs, rows and
-%                           corrected (near-singular) rows
+%                           corrected (near-singular) rows; with
+%                           ESIEpropagationimplementation = 'exactpole' also
+%                           .nrows_exactpole and .nrows_fallback (the
+%                           corrected rows, per beta term, with the exact
+%                           pole, and those where its Newton iteration
+%                           failed and the Taylor model was used)
 %   .propagationblocksize   the number of receivers per block
 %   .nQpropagated           (only if ESIEpropagationrefine is used) the
 %                           number of unknowns of the refined solution that
@@ -262,7 +267,7 @@ function EDdatastructs
 %   .qfinalfile             text: computed and saved, reused from, or
 %                           not saved
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 9 Nov. 2026
 %
 % EDdatastructs
 
@@ -278,5 +283,7 @@ function EDdatastructs
 % 28 Oct. 2026 timingstruct.integralequation has a 5th value (the
 % refinement for the propagation), and inteqdiagnostics.nQpropagated is
 % new (controlparameters.ESIEpropagationrefine).
+% 9 Nov. 2026 propdiagnostics: the fields .nrows_exactpole and
+% .nrows_fallback ('exactpole').
 
 help(mfilename)

@@ -12,11 +12,14 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 % on the geometry, so the geometric part is computed once per receiver and
 % only the exponential factor per frequency.
 %
-% For the 'accurate' propagation, the receivers are handled in blocks by
-% EDcalcpropagatematrix_block, which processes all the receivers of a block
-% at once for each edge pair. The 'legacy' propagation uses
-% EDcalcpropagatematrix for one receiver at a time. Both loops can run on
-% parallel workers (parfor).
+% For the 'accurate' and 'exactpole' propagation, the receivers are handled
+% in blocks by EDcalcpropagatematrix_block, which processes all the
+% receivers of a block at once for each edge pair; 'exactpole' uses its
+% exact-pole treatment of the near-singular rows (polemethod = 'exact'). The
+% 'legacy' propagation uses EDcalcpropagatematrix for one receiver at a
+% time, and so do thin holes (isthinhole = 1), where 'exactpole' is replaced
+% by 'accurate' (noted in propinfo.implementationnote). Both loops can run
+% on parallel workers (parfor).
 %
 % Used by EDintegralequation_convex_tf (PART 4) and EDrefineQvec. The
 % layout can be that of the solution, or a refined one (EDrefineQvec).
@@ -35,7 +38,7 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 %   envdata         struct; the field .cair is used
 %   propsettings    struct with the fields
 %     .Rstart           the phase reference distance (controlparameters.Rstart)
-%     .implementation   'accurate' or 'legacy'
+%     .implementation   'accurate', 'exactpole' or 'legacy'
 %                       (controlparameters.ESIEpropagationimplementation)
 %     .doallSRcombinations   (Sdata.doallSRcombinations)
 %     .savediff2        1: also the result without the second-order
@@ -48,7 +51,7 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 %                       per edge pair (row of Hsubmatrixdata.edgepairlist).
 %                       The propagated pressure is then also given in
 %                       parts, which add up to the total. Only for the
-%                       'accurate' propagation.
+%                       'accurate' and 'exactpole' propagation.
 %
 % Output parameters:
 %   P_receiver      [nfrequencies,nreceivers,nsolutions] the propagated
@@ -59,7 +62,8 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 %   propinfo        struct with the fields
 %     .propdiagnostics    the totals of the singularity corrections (see
 %                         EDcalcpropagatematrix_block); for 'legacy', the
-%                         values of the last receiver
+%                         values of the last receiver. For 'exactpole' also
+%                         .nrows_exactpole and .nrows_fallback.
 %     .propagationblocksize  the number of receivers per block ('accurate'),
 %                         or [] ('legacy')
 %     .ivproblematicmatrix   ('legacy') the near-singular entries per receiver
@@ -67,11 +71,13 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 %                         vector has non-zero values
 %     .parts              (if splitlabels is given) [nfrequencies,
 %                         nreceivers,nsolutions,nparts]
+%     .implementationnote  '' or a note that 'exactpole' was replaced by
+%                         'accurate' (thin holes)
 %
 % See also EDintegralequation_convex_tf, EDrefineQvec,
 % EDcalcpropagatematrix_block, EDcalcpropagatematrix
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 9 Nov. 2026
 %
 % [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgedata,Hsubmatrixdata,Rdata,...
 %    Qfinalstore,Qfirsttermstore,frequencies,envdata,propsettings);
@@ -80,6 +86,10 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 % EDintegralequation_convex_tf, moved here unchanged, so that
 % EDrefineQvec can use the same code. New option: the split into parts by
 % edge pair (from EDrefineQvec).
+% 9 Nov. 2026 (by Claude, prompted by PS) New implementation 'exactpole':
+% the block propagation with polemethod = 'exact'. The totals of the new
+% propdiagnostics fields are collected. For thin holes, 'exactpole' is
+% replaced by 'accurate'.
 
 showtext = edgetsetting(propsettings,'showtext',0);
 isthinhole = edgetsetting(propsettings,'isthinhole',0);
@@ -89,6 +99,19 @@ savediff2 = propsettings.savediff2;
 doallSRcombinations = propsettings.doallSRcombinations;
 Rstartvalue = propsettings.Rstart;
 propimplementation = propsettings.implementation;
+if ~any(strcmpi(propimplementation,{'accurate','exactpole','legacy'}))
+    error('EDpropagateQvec:implementation','propsettings.implementation must be ''accurate'', ''exactpole'' or ''legacy''')
+end
+implementationnote = '';
+if strcmpi(propimplementation,'exactpole') && isthinhole ~= 0
+    propimplementation = 'accurate';
+    implementationnote = 'ESIEpropagationimplementation = ''exactpole'' is not implemented for thin holes; ''accurate'' was used.';
+end
+if strcmpi(propimplementation,'exactpole')
+    polemethod = 'exact';
+else
+    polemethod = 'taylor';
+end
 
 [nfrequencies,nsolutions] = size(Qfinalstore);
 nreceivers = size(Rdata.coordinates,1);
@@ -145,9 +168,9 @@ end
 % 4e6 elements); with parallel workers, smaller blocks are used so that
 % there are enough blocks to share. The 'legacy' propagation uses
 % EDcalcpropagatematrix for one receiver at a time.
-useblocks = strcmpi(propimplementation,'accurate') && isthinhole == 0;
+useblocks = any(strcmpi(propimplementation,{'accurate','exactpole'})) && isthinhole == 0;
 if dosplit && ~useblocks
-    error('EDpropagateQvec:split','The split into parts is only implemented for the ''accurate'' propagation')
+    error('EDpropagateQvec:split','The split into parts is only implemented for the ''accurate'' and ''exactpole'' propagation')
 end
 propagationblocksize = [];
 if useblocks
@@ -173,7 +196,7 @@ if useblocks
             Hsubmatrixdata,Rdata.vispartedgesfromr(:,recs),...
             reshape(Rdata.rRsho(Rdata.reftoshortlistR(:,recs)),[],nb),...
             reshape(Rdata.thetaRsho(Rdata.reftoshortlistR(:,recs)),[],nb),...
-            reshape(Rdata.zRsho(Rdata.reftoshortlistR(:,recs)),[],nb),doesQsegmenthavevalues);
+            reshape(Rdata.zRsho(Rdata.reftoshortlistR(:,recs)),[],nb),doesQsegmenthavevalues,polemethod);
         % Only the columns with non-zero elements are used
         ivnonzero = find(any(Fgeom,1));
         Fgeom = Fgeom(:,ivnonzero);
@@ -235,6 +258,10 @@ if useblocks
     % Collect the results of all the blocks
     propdiagnostics = struct('npairs',0,'npairs_eligible',0,'npairs_corrected',0, ...
         'nrows',0,'nrows_corrected',0,'correctedpairs',zeros(0,4));
+    if strcmp(polemethod,'exact')
+        propdiagnostics.nrows_exactpole = 0;
+        propdiagnostics.nrows_fallback = 0;
+    end
     if savediff2 == 1
         P_nodiff2 = zeros(size(P_receiver));
     end
@@ -257,6 +284,10 @@ if useblocks
         propdiagnostics.nrows = propdiagnostics.nrows + pd.nrows;
         propdiagnostics.nrows_corrected = propdiagnostics.nrows_corrected + pd.nrows_corrected;
         propdiagnostics.correctedpairs = [propdiagnostics.correctedpairs; pd.correctedpairs];
+        if strcmp(polemethod,'exact')
+            propdiagnostics.nrows_exactpole = propdiagnostics.nrows_exactpole + pd.nrows_exactpole;
+            propdiagnostics.nrows_fallback = propdiagnostics.nrows_fallback + pd.nrows_fallback;
+        end
     end
     clear Pcell P2cell Partscell propdiagnosticscell
 else
@@ -342,6 +373,7 @@ propinfo.propdiagnostics = propdiagnostics;
 propinfo.propagationblocksize = propagationblocksize;
 propinfo.ivproblematicmatrix = ivproblematicmatrix;
 propinfo.doesQsegmenthavevalues = doesQsegmenthavevalues;
+propinfo.implementationnote = implementationnote;
 if dosplit
     propinfo.parts = parts;
 end

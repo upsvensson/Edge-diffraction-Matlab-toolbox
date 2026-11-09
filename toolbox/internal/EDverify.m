@@ -79,10 +79,14 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 23. controlparameters.nedgeelemsuser sets the number of points on chosen
 %     edges, by edge length and by corner pair; a wrong corner pair gives
 %     an error.
+% 24. The exact-pole propagation (ESIEpropagationimplementation =
+%     'exactpole'): the propagation rows of an edge pair across a face, for a
+%     receiver close to the plane of the face, agree with high-precision
+%     reference values (EDcalcpropagatematrix_block called directly).
 %
 % See also EDmain_convex, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 9 Nov. 2026
 %
 % passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams);
 
@@ -139,8 +143,10 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 20 Oct. 2026 Added test 23 (nedgeelemsuser). Test 17 also changes
 % nedgeelemsuser. The common local function of tests 2 and 3 was renamed
 % from edtest23 to edtest2and3.
+% 9 Nov. 2026 Added test 24 (the exact-pole propagation, by Claude, prompted
+% by PS). Test 17 also changes ESIEpropagationimplementation to 'exactpole'.
 
-ntests = 23;
+ntests = 24;
 
 if nargin < 1 || isempty(outputdirectory)
     outputdirectory = uigetdir('', 'Select the directory for the calculation results and the logfile');
@@ -194,7 +200,7 @@ disp(headerline)
 
 testfunctions = {@edtest1,@edtest2,@edtest3,@edtest4,@edtest5,@edtest6,@edtest7,...
     @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15,...
-    @edtest16,@edtest17,@edtest18,@edtest19,@edtest20,@edtest21,@edtest22,@edtest23};
+    @edtest16,@edtest17,@edtest18,@edtest19,@edtest20,@edtest21,@edtest22,@edtest23,@edtest24};
 
 for itest = 1:ntests
     if runtest(itest) ~= 1
@@ -981,6 +987,63 @@ resultlines = {sprintf('By length: short edges %s, long edges %s',mat2str(unique
 r = edresult(title,description,ok1 && ok2 && gaveerror,resultlines);
 end
 
+function r = edtest24(~,~,~)
+title = 'Exact-pole propagation close to the plane of a face';
+tolexact = 1e-9;
+description = {'Two perpendicular 1 m edges of a 90-degree wedge, which share a corner and lie in one',...
+    'face; a receiver 0.01 rad from the plane of that face (r = 0.6 m, z = 0.5 m from the corner).',...
+    'EDcalcpropagatematrix_block is called directly, with 64 Gauss-Legendre points per edge.',...
+    'For 8 edge-1 points (0.055 to 0.99 m from the corner), the row sums, i.e. the integrals over',...
+    'edge 2 of the two singular beta terms divided by m*l, are compared with high-precision values',...
+    ['(40 digits, adaptive quadrature). polemethod = ''exact'' must agree to ',num2str(tolexact),' (relative).'],...
+    'The default (''taylor'') must equal an explicit ''taylor''. The error of ''taylor'' is reported',...
+    'for information (Nov. 2026: 5e-3).'};
+
+n = 64;
+[xpos,wpos] = edglrule01(n);
+qpos = sparse(n,n);
+qw = sparse(n,n);
+qpos(1:n,n) = xpos;
+qw(1:n,n) = wpos;
+H = struct('edgepairlist',[1 2],'nedgeelems',[n;n],'Qvecstartnums',1,'Qvecendnums',n*n,...
+    'isthinplaneedgepair',0,'quadraturematrix_pos',qpos,'quadraturematrix_weights',qw);
+ed = struct('edgelengthvec',[1;1],'closwedangvec',[pi/2;pi/2]);
+% Edge 1 (the diffracting edge 2 of the propagation) along z = 0..1; edge 2
+% in the face theta = 0, from the shared corner (z = 0, r = 0) to r = 1.
+e2e = struct('reftoshortlistE',[0 0;1 0],'ze1sho',0,'ze2sho',0,'re1sho',0,'re2sho',1,...
+    'thetae1sho',0,'thetae2sho',0);
+dtheta = 0.01;
+args = {ed,e2e,H,[1;1],[0.6;1],[pi-dtheta;0],[0.5;0],1};
+Fexact = EDcalcpropagatematrix_block(args{:},'exact');
+Fdefault = EDcalcpropagatematrix_block(args{:});
+Ftaylor = EDcalcpropagatematrix_block(args{:},'taylor');
+
+ny = pi/(2*pi - pi/2);
+scale = -ny/4/2/pi*2*wpos;          % -ny/(8 pi) * termboost * dz1
+rows = [10 13 17 21 25 33 45 60];
+refvalues = [9.3140698445993877; 9.0648185006432893; 8.6268719838318155; 8.1172087020657759;...
+    7.5849702339919087; 6.5925715097794511; 5.5142554735910938; 4.9116256484606273];
+Sexact = sum(reshape(Fexact,n,n),2)./scale;
+Staylor = sum(reshape(Ftaylor,n,n),2)./scale;
+errexact = max(abs(Sexact(rows) - refvalues)./abs(refvalues));
+errtaylor = max(abs(Staylor(rows) - refvalues)./abs(refvalues));
+defaultok = isequal(Fdefault,Ftaylor);
+resultlines = {sprintf('Max. relative error, ''exact'': %.2g; ''taylor'': %.2g',errexact,errtaylor),...
+    sprintf('Default equals ''taylor'': %d',defaultok)};
+r = edresult(title,description,errexact < tolexact && defaultok,resultlines);
+end
+
+function [x,w] = edglrule01(n)
+% The n-point Gauss-Legendre rule on [0,1] (Golub-Welsch), weights summing to 1
+J = diag((1:n-1)./sqrt(4*(1:n-1).^2-1),1);
+J = J + J.';
+[V,D] = eig(J);
+[x,ix] = sort(diag(D));
+w = 2*V(1,ix).^2;
+x = (x(:)+1)/2;
+w = w(:)/2;
+end
+
 function r = edtest19(~,~,~)
 title = 'The cheatsheet input descriptions are up to date';
 description = {'doc/EDinputfields.tex (input by doc/EDtoolbox_cheatsheet.tex) must be the same as a',...
@@ -1059,6 +1122,7 @@ changes = {
     'savediff2result = 1',                   [0 0 0 0 0 0 0 0 1];
     'ngaussmin = 6',                         [0 0 0 0 0 0 1 1 1];
     'nedgeelemsuser = [0.5 6]',              [0 0 0 0 0 0 1 1 1];
+    'ESIEpropagationimplementation = exactpole',[0 0 0 0 0 0 0 0 1];
     };
 
 [geoinputdata,Sinputdata,Rinputdata,controlparameters] = edsmallcube;
@@ -1092,6 +1156,7 @@ for ii = 1:size(changes,1)
         case 10, f.savediff2result = 1;
         case 11, cp.ngaussmin = 6;
         case 12, cp.nedgeelemsuser = [0.5 6];
+        case 13, cp.ESIEpropagationimplementation = 'exactpole';
     end
     EDmain_convex(g,S,R,e,cp,f);
     newhashes = edreadstagehashes(outputdirectory,filestem,stagesuffixes);

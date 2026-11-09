@@ -3,8 +3,24 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
-## Unreleased
+## 0.62 (9 Nov. 2026)
 
+The changes listed below were committed before the version number was
+set; this entry makes them version 0.62. One change affects the results:
+the new propagation method 'exactpole' is the default for
+controlparameters.ESIEpropagationimplementation. It changes the
+higher-order diffraction, mainly for receivers within a few degrees of
+the plane of a face, where the error now converges regularly, as
+1/ngauss^2. The earlier results are obtained with
+ESIEpropagationimplementation = 'accurate'. Saved _tfinteq files are
+computed again (the setting is part of their hash); _qfinal files are
+reused.
+
+**Changes that affect the results**
+
+- 'exactpole' is the default for controlparameters.ESIEpropagationimplementation
+  (see the description of 'exactpole' under Input and output).
+  
 **Input and output**
 
 - New parameter controlparameters.nedgeelemsuser (advanced, default []):

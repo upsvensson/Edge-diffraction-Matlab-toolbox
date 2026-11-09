@@ -194,7 +194,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 28 Oct. 2026 New field controlparameters.ESIEpropagationrefine (default 1).
 % 9 Nov. 2026 New value 'exactpole' for
 % controlparameters.ESIEpropagationimplementation (the default is still
-% 'accurate').
+% 'accurate'). 'exactpole' was made default because it gives more accurate
+% results in the "dangerous" directions, and also the extrapolation works
+% better in those directions. Tested for a cube at DC and 1 kHz.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Documentation mode: EDcheckinputstructs('paramspecs') returns the tables
@@ -852,7 +854,7 @@ switch structname
             'The maximum number of GMRES iterations.';
         'ESIEsourcetermimplementation', @(x) ismember(x,{'legacy','accurate'}), 'accurate', @(cp) cp.difforder>=2, false, ...
             'The source term of the integral equation: ''accurate'' uses singularity subtraction when a source is close to the plane of a face; ''legacy'' is the earlier method.';
-        'ESIEpropagationimplementation', @(x) ismember(x,{'legacy','accurate','exactpole'}), 'accurate', @(cp) cp.difforder>=2, false, ...
+        'ESIEpropagationimplementation', @(x) ismember(x,{'legacy','accurate','exactpole'}), 'exactpole', @(cp) cp.difforder>=2, false, ...
             'The propagation from the edge sources to the receivers: ''exactpole'' integrates the near-singular terms close to the zone boundaries with their exact complex poles (product integration), which converges regularly, as 1/ngauss^2; ''accurate'' uses singularity subtraction with a Taylor model of the poles, which leaves an irregular error for receivers within a few degrees of the plane of a face; ''legacy'' uses plain Gauss-Legendre quadrature. ''exactpole'' is not implemented for thin holes (''accurate'' is used).';
         'ESIEpropagationrefine', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && ((isscalar(x) && x >= 1) || (size(x,2) == 2 && all(x(:,1) > 0) && all(x(:,2) >= 1))), 1, @(cp) cp.difforder>=2, false, ...
             'Advanced: the solution of the integral equation is refined to more points per edge (Nystrom interpolation, EDrefineQvec) before the propagation to the receivers, which is then more accurate. A factor for all edges (1 = no refinement), or rows [maxlength factor]: the edges not longer than maxlength get the factor (the smallest maxlength that fits); longer edges are not refined. The new number of points is ceil(factor*npoints). The solution and the _qfinal file are not changed.';

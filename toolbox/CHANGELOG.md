@@ -33,7 +33,7 @@ comments at the top of its .m file.
   number of propagated unknowns when the refinement is used.
 
 - New value 'exactpole' for controlparameters.ESIEpropagationimplementation
-  (the default is still 'accurate'). For the near-singular rows of the
+  (the default is 'exactpole'). For the near-singular rows of the
   propagation from the edge sources to the receivers (receivers close to
   the plane of a face), the two poles of the singular beta term are found
   exactly, by Newton iteration started from the Taylor values of
@@ -84,7 +84,7 @@ comments at the top of its .m file.
   high-precision values (EDcalcpropagatematrix_block called directly):
   the exact-pole treatment must agree to 1e-9 (relative); the default
   must equal an explicit 'taylor'. Test 17 also changes
-  ESIEpropagationimplementation to 'exactpole'.
+  ESIEpropagationimplementation to 'accurate'.
 - EDverify test 23: nedgeelemsuser by length and by corner pair, and an
   error for a corner pair that is not an edge. Test 17 also changes
   nedgeelemsuser. The local function of tests 2 and 3 was renamed

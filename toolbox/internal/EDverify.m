@@ -144,7 +144,9 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % nedgeelemsuser. The common local function of tests 2 and 3 was renamed
 % from edtest23 to edtest2and3.
 % 9 Nov. 2026 Added test 24 (the exact-pole propagation, by Claude, prompted
-% by PS). Test 17 also changes ESIEpropagationimplementation to 'exactpole'.
+% by PS). Test 17 also changes ESIEpropagationimplementation, to 'accurate'
+% (the default is now 'exactpole'). Test 1 uses the default propagation, so
+% from now on 'exactpole'; its limits were set with 'accurate'.
 
 ntests = 24;
 
@@ -1122,7 +1124,7 @@ changes = {
     'savediff2result = 1',                   [0 0 0 0 0 0 0 0 1];
     'ngaussmin = 6',                         [0 0 0 0 0 0 1 1 1];
     'nedgeelemsuser = [0.5 6]',              [0 0 0 0 0 0 1 1 1];
-    'ESIEpropagationimplementation = exactpole',[0 0 0 0 0 0 0 0 1];
+    'ESIEpropagationimplementation = accurate',[0 0 0 0 0 0 0 0 1];
     };
 
 [geoinputdata,Sinputdata,Rinputdata,controlparameters] = edsmallcube;
@@ -1156,7 +1158,7 @@ for ii = 1:size(changes,1)
         case 10, f.savediff2result = 1;
         case 11, cp.ngaussmin = 6;
         case 12, cp.nedgeelemsuser = [0.5 6];
-        case 13, cp.ESIEpropagationimplementation = 'exactpole';
+        case 13, cp.ESIEpropagationimplementation = 'accurate';
     end
     EDmain_convex(g,S,R,e,cp,f);
     newhashes = edreadstagehashes(outputdirectory,filestem,stagesuffixes);

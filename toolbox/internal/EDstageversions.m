@@ -50,6 +50,14 @@ function stageinfo = EDstageversions(stagename)
 % 28 Oct. 2026 New functions EDpropagateQvec, EDHkernelvalues,
 % EDinteg_soutermsources (code moved from EDintegralequation_convex_tf) and
 % EDrefineQvec (now used by EDintegralequation_convex_tf), all version 1.
+% 20 Nov. 2026 New stage EDfindGApaths and new function EDimagepointdata
+% (non-convex models), version 1. EDinteg_souterm,
+% EDcalcpropagatematrix_block, EDpropagateQvec, EDmakefirstordertfs and
+% EDintegralequation_convex_tf got new code for non-convex models; the
+% results for convex models are unchanged, so their versions are not
+% increased. EDinteg_submatrixstructure to version 2: the thin-plane edge
+% pairs and triplets are defined differently, which changes the results
+% for several connected thin plates (e.g., a folded plate).
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -60,10 +68,11 @@ versions = struct;
 versions.EDedgeo                      = 1;
 versions.EDSorRgeo                    = 1;
 versions.EDfindconvexGApaths          = 1;
+versions.EDfindGApaths                = 1;
 versions.EDmakefirstordertfs          = 1;
 versions.EDmakefirstorderirs          = 1;
 versions.EDed2geo                     = 1;
-versions.EDinteg_submatrixstructure   = 1;
+versions.EDinteg_submatrixstructure   = 2;  % 2: thin-plane pairs/triplets defined by the incoming edge pair (non-convex models)
 versions.EDintegralequation_convex_tf = 1;
 versions.EDfindHODpaths               = 1;
 versions.EDmakeHODirs                 = 2;  % 2: source amplitudes applied also for doaddsources = 0
@@ -97,6 +106,7 @@ versions.EDfindis                     = 1;
 versions.EDgetedgepoints              = 1;
 versions.EDgetGLrule                  = 1;
 versions.EDHkernelvalues              = 1;
+versions.EDimagepointdata             = 1;
 versions.EDinfrontofplane             = 1;
 versions.EDinteg_souterm              = 1;
 versions.EDinteg_soutermsources       = 1;
@@ -125,7 +135,8 @@ stagesubroutines.EDedgeo = {'EDcheckobstrpaths','EDchkISvisiblex','EDpoinplax',.
 stagesubroutines.EDSorRgeo = {'EDcheckobstr_pointtoedge','EDpoinpla','EDcompress3',...
     'EDcoordtrans1','EDgetedgepoints','EDinfrontofplane'};
 stagesubroutines.EDfindconvexGApaths = {'EDchkISvisible','EDpoinpla','EDfindis'};
-stagesubroutines.EDmakefirstordertfs = {'EDpistonedgeintegrand','EDwedge1st_fd',...
+stagesubroutines.EDfindGApaths = {'EDfindconvexGApaths','EDchkISvisible','EDpoinpla','EDfindis'};
+stagesubroutines.EDmakefirstordertfs = {'EDpistonedgeintegrand','EDwedge1st_fd','EDcoordtrans1',...
     'EDbetaoverml_fd','EDquadgk','EDgetGLrule','EDdistelements','lgwt'};
 stagesubroutines.EDmakefirstorderirs = {'EDcoordtrans2','EDcross','EDwedge1st_ir',...
     'EDbetaoverml','EDquadstep'};

@@ -587,6 +587,45 @@ if difforder > 0
 
     iv = find(firstorderpathdata.edgeisactive);
 
+    % 20 Nov. 2026: for a non-convex object (paths from EDfindGApaths),
+    % the first-order diffraction components are given as a list, one row
+    % per (image) source, (image) receiver, edge and visible part of the
+    % edge. The edge-related coordinates are computed here, since the image
+    % points are not in the short lists of Sdata and Rdata.
+    if isfield(firstorderpathdata,'diffpathlist')
+        iv = [];
+        Spoints = firstorderpathdata.Spoints;
+        Rpoints = firstorderpathdata.Rpoints;
+        diffpathlist = firstorderpathdata.diffpathlist;
+        for jj = 1:size(diffpathlist,1)
+            Snumber = diffpathlist(jj,1);
+            Rnumber = diffpathlist(jj,2);
+            edgenumber = diffpathlist(jj,3);
+            Spointrow = diffpathlist(jj,4);
+            Rpointrow = diffpathlist(jj,5);
+            edgecoords = [edgedata.edgestartcoords(edgenumber,:);edgedata.edgeendcoords(edgenumber,:)];
+            Bmatrix = reshape(edgedata.edgerelatedcoordsysmatrices(edgenumber,:),3,3);
+            [rs,thetas,zs] = EDcoordtrans1(Spoints.coordinates(Spointrow,:),edgecoords,...
+                edgedata.edgenvecs(edgenumber,:),Bmatrix);
+            [rr,thetar,zr] = EDcoordtrans1(Rpoints.coordinates(Rpointrow,:),edgecoords,...
+                edgedata.edgenvecs(edgenumber,:),Bmatrix);
+            if showtext >= 2
+                disp(['   Edge ',int2str(edgenumber),', source ',int2str(Snumber),...
+                    ' (point ',int2str(Spointrow),'), rec. ',int2str(Rnumber),' (point ',int2str(Rpointrow),')'])
+            end
+            [tfnew,singularterm,zfirst] = EDwedge1st_fd(envdata.cair,frequencies,edgedata.closwedangvec(edgenumber),...
+                rs,thetas,zs,rr,thetar,zr,...
+                edgedata.edgelengthvec(edgenumber)*diffpathlist(jj,6:7),'n',Rstart,[1 1],diff1method,diff1GLorder);
+            tfnew = tfnew.*(Sdata.sourceamplitudes( Snumber,: ).')*...
+                Spoints.amplitude(Spointrow)*Rpoints.amplitude(Rpointrow);
+            if Sdata.doaddsources == 1
+                tfdiff(:,Rnumber) =  tfdiff(:,Rnumber) + tfnew;
+            else
+                tfdiff(:,Rnumber,Snumber) =  tfdiff(:,Rnumber,Snumber) + tfnew;
+            end
+        end
+    end
+
     sou_vs_edges = sign(squeeze(sum(firstorderpathdata.diffpaths,1)));
     if size(sou_vs_edges,2) == 1
         sou_vs_edges = sou_vs_edges.';

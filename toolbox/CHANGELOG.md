@@ -3,6 +3,50 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.63 (20 Nov. 2026)
+
+First step towards non-convex models (geoinputdata.allownonconvex = 1,
+method 'tf'): specular reflections up to controlparameters.specorder,
+first-order diffraction over the visible parts of the edges, and image
+sources/image receivers for the source term and the propagation of the
+integral equation. Edge-to-edge paths via specular reflections are not
+included yet, and slope diffraction is not included, so the results for
+non-convex models are approximate. Results for convex models are
+unchanged, except for several connected thin plates (see below). EDverify
+passes all tests.
+
+**Changes that affect the results**
+
+- Several connected thin plates (e.g., a folded plate): the thin-plane
+  factor 2 of the integral equation now applies to every triplet whose
+  incoming edge pair lies in one thin plate (before: only when all three
+  edges belonged to the same plate). EDinteg_submatrixstructure version 2.
+- Non-convex models (allownonconvex = 1): new stage EDfindGApaths instead
+  of EDfindconvexGApaths, and image sources/receivers in the integral
+  equation (EDimagepointdata).
+
+**Input and output**
+
+- New parameters controlparameters.specorder (default 1) and
+  controlparameters.nedgesamples (default 32), used only with
+  allownonconvex = 1. (specorder was earlier on the list of removed fields.)
+- firstorderpathdata from EDfindGApaths has the new fields .diffpathlist,
+  .Spoints, .Rpoints, .specreflplanes and .specorder (see EDdatastructs).
+- allownonconvex = 1 with the 'ir' method gives an error.
+- The description of geoinputdata.allownonconvex (EDcheckinputstructs)
+  was updated, and doc/EDinputfields.tex was generated again.
+
+**Bug fixes**
+
+- EDed2geo stopped with an error for any plane with indents (variables
+  without the edgedata./planedata. prefix). An unused analysis of indented
+  planes is skipped. Edges of the same plane that are across an indent now
+  get their computed angle (the path runs through the air).
+- EDinteg_souterm: the edge points outside the visible part of an edge got
+  their position set to zero (the start of the edge) instead of a zero
+  source term. (Without effect so far, since the visible part was always
+  the whole edge.)
+
 ## 0.62 (9 Nov. 2026)
 
 The changes listed below were committed before the version number was

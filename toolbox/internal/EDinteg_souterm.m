@@ -197,9 +197,12 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         weight2vec = gaussvectors{n2}(:,2);
         % New 4 Nov. 2017: here we zero out the edge points that are not
         % visible.
-        if vispartedgesfroms(edge2) ~= 1
-            n2vec = n2vec.*(n2vec >= vispartedgesfroms_start(edge2)).*(n2vec <= vispartedgesfroms_end(edge2));
-        end
+        % 20 Nov. 2026: the edge points that are not visible get a zero
+        % source term (before, their positions were set to zero, which moved
+        % them to the start of the edge). visiblemask2 is applied to Gsub
+        % below. For a fully visible edge (_start = 0, _end = 1) nothing
+        % changes.
+        visiblemask2 = (n2vec >= double(vispartedgesfroms_start(edge2))) & (n2vec <= double(vispartedgesfroms_end(edge2)));
         % Change 24 Nov. 2023 gaussvectors is now a cell variable
         % containing gauss nodes and weights for all orders up to the
         % maximum one.
@@ -364,7 +367,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         % 8 Oct. 2026 (later): "fully visible" is tested on the nodes
         % themselves (unchanged by the windowing above), not on the value
         % of vispartedgesfroms, which is not 1 for a fully visible edge.
-        fullyvisible = isequal(n2vec,gaussvectors{n2}(:,1));
+        fullyvisible = all(visiblemask2);
         if useaccurate
             soudiagnostics.npairs_skew = soudiagnostics.npairs_skew + (skewedges ~= 0);
             soudiagnostics.npairs_partlyvisible = soudiagnostics.npairs_partlyvisible + (fullyvisible == 0);
@@ -401,7 +404,9 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             dofixsingularity = 0;
             iv1 = find( abs(dGrel(1)+1) < 2e-3 );
             iv2 = find( abs(dGrel) > 0.8e3 );
-            if any(iv1) || any(iv2)
+            if (any(iv1) || any(iv2)) && fullyvisible
+                % (20 Nov. 2026: not for a partly visible edge, since the
+                % correction integrates over the whole edge)
                 dofixsingularity = 1;
             end
                         
@@ -458,6 +463,9 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
 
         end    % if accuratedone == 0
          
+        if ~fullyvisible
+            Gsub = Gsub.*visiblemask2(n2vertmat);
+        end
         G(Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) =     G(Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) + Gsub;
                 
     end

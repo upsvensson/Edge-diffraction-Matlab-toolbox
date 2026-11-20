@@ -654,20 +654,23 @@ if ~isempty(ivplaneswindents)
    uppertri_planeseesplane = triu(planedata.planeseesplane);
    for ii = 1:length(ivplaneswindents)
         indpl = ivplaneswindents(ii);
-        disp(['Plane ',int2str(indpl),' has ind'])
-        edgelist = edgesatplane(indpl,:);
-        connplanes = planesatedge(edgelist,:);
+        % 20 Nov. 2026: the edgedata/planedata fields were not
+        % prefixed (an error for any plane with indents), and the zero
+        % padding of edgesatplane is removed.
+        edgelist = edgedata.edgesatplane(indpl,:);
+        edgelist = edgelist(edgelist > 0);
+        connplanes = double(edgedata.planesatedge(edgelist,:));
         connplanes = reshape(connplanes,size(connplanes,1)*size(connplanes,2),1);
         connplanes = setdiff(connplanes,indpl);
         for jj = 1:length(connplanes)
 
             % First find connected plane-pairs that see each other. Their
             % edges can not see each other.
-            planepairs = connplanes(uppertri_planeseesplane(connplanes(jj),connplanes));
+            planepairs = connplanes(uppertri_planeseesplane(connplanes(jj),connplanes) == 1);
             if ~isempty(planepairs)
                 for kk = 1:length(planepairs)
-                    edge1 = intersect(edgesatplane(connplanes(jj),:),edgesatplane(indpl,:));
-                    edge2 = intersect(edgesatplane(planepairs(kk),:),edgesatplane(indpl,:));
+                    edge1 = setdiff(intersect(edgedata.edgesatplane(connplanes(jj),:),edgedata.edgesatplane(indpl,:)),0);
+                    edge2 = setdiff(intersect(edgedata.edgesatplane(planepairs(kk),:),edgedata.edgesatplane(indpl,:)),0);
                     edgeseesedge(edge1,edge2) = 0;
                     edgeseesedge(edge2,edge1) = 0;
                     
@@ -678,7 +681,7 @@ if ~isempty(ivplaneswindents)
         % Second, find connected plane-pairs that have plane normal
         % vectors in the same direction. Their edges can never see each
         % other.
-        A1 = planenvecs(connplanes,:);
+        A1 = planedata.planeeqs(connplanes,1:3);
         [A2,A2sort] = sortrows(A1);
         findnodiffs = sum(abs(diff(A2)).').';
         if any(findnodiffs==0)
@@ -687,8 +690,8 @@ if ~isempty(ivplaneswindents)
             planepairs = connplanes([A2sort(ivnodiffs) A2sort(ivnodiffs+1)]);
             if ~isempty(planepairs)
                 for kk = 1:length(planepairs)
-                    edge1 = intersect(edgesatplane(planepairs(kk,1),:),edgesatplane(indpl,:));
-                    edge2 = intersect(edgesatplane(planepairs(kk,2),:),edgesatplane(indpl,:));
+                    edge1 = setdiff(intersect(edgedata.edgesatplane(planepairs(kk,1),:),edgedata.edgesatplane(indpl,:)),0);
+                    edge2 = setdiff(intersect(edgedata.edgesatplane(planepairs(kk,2),:),edgedata.edgesatplane(indpl,:)),0);
                     edgeseesedge(edge1,edge2) = 0;
                     edgeseesedge(edge2,edge1) = 0;
                     
@@ -704,7 +707,11 @@ end
 %
 % 12 Nov. 2014
 
+% 20 Nov. 2026: this analysis is skipped. Its result
+% (combinededgetoedgerelation) was never used, and the code used variables
+% that are not defined here (an error for any plane with indents).
 iv = find(planedata.planehasindents);
+iv = [];
 
 for ii = 1:length(iv)
    jj = iv(ii);
@@ -1309,6 +1316,9 @@ if difforder >= 2 && ~isempty(edgeseespartialedge)
 	end
 	
     zerosvec4 = zeros(nedges,nedges);
+	% 20 Nov. 2026: edge pairs in the same plane where the path runs
+	% across an indent of the plane (through the air)
+	acrossindentpairs = zeros(0,2);
 	Bigre1 = (zerosvec4);
 	Bigthetae1 = (zerosvec4);
 	Bigze1 = (zerosvec4);
@@ -1355,7 +1365,7 @@ if difforder >= 2 && ~isempty(edgeseespartialedge)
 % % % 			Bigthetae2(iv1,edge1) = 0*iv1;
 % % % 			Bigze2(iv1,edge1) = zs;
 
-            [rs,~,zs,rr,~,zr] = ...
+            [rs,thetas,zs,rr,thetar,zr] = ...
 			EDcoordtrans2(edgestart,edgeend,edge1coords,edgedata.edgenvecs(edge1,:));
 			Bigre1(iv1,edge1) = rs;
 			Bigthetae1(iv1,edge1) = 0*iv1;
@@ -1363,6 +1373,16 @@ if difforder >= 2 && ~isempty(edgeseespartialedge)
 			Bigre2(iv1,edge1) = rr;
 			Bigthetae2(iv1,edge1) = 0*iv1;
 			Bigze2(iv1,edge1) = zr;
+            % 20 Nov. 2026: for a plane with indents (a non-convex polygon),
+            % another edge of the same plane can be on the far side of the
+            % edge, across the indent. The path then runs through the air,
+            % not along the plane, and the computed angle (pi) is kept.
+            notonface = edoffface(thetas,thetar,0);
+            if any(notonface)
+                Bigthetae1(iv1(notonface),edge1) = thetas(notonface);
+                Bigthetae2(iv1(notonface),edge1) = thetar(notonface);
+                acrossindentpairs = [acrossindentpairs;[iv1(notonface) edge1*ones(sum(notonface),1)]];
+            end
 
 % % % 			sameedgesold = ESIE2findsame(iv,iv1);
             [samevalues,iivec,~] = intersect(iv,iv1);
@@ -1403,7 +1423,7 @@ if difforder >= 2 && ~isempty(edgeseespartialedge)
 % % % 						Bigthetae2(iv2,edge1) = (2*pi-closwedangvec(edge1))*ones(size(iv2));
 % % % 						Bigze2(iv2,edge1) = zs;
 
-                        [rs,~,zs,rr,~,zr] = ...
+                        [rs,thetas,zs,rr,thetar,zr] = ...
 						EDcoordtrans2(edgestart,edgeend,edge1coords,edgedata.edgenvecs(edge1,:));
 						Bigre1(iv2,edge1) = rs;
 						Bigthetae1(iv2,edge1) = (2*pi-edgedata.closwedangvec(edge1))*ones(size(iv2));
@@ -1411,6 +1431,13 @@ if difforder >= 2 && ~isempty(edgeseespartialedge)
 						Bigre2(iv2,edge1) = rr;
 						Bigthetae2(iv2,edge1) = (2*pi-edgedata.closwedangvec(edge1))*ones(size(iv2));
 						Bigze2(iv2,edge1) = zr;
+                        % 20 Nov. 2026: as for the reference plane above
+                        notonface = edoffface(thetas,thetar,2*pi-edgedata.closwedangvec(edge1));
+                        if any(notonface)
+                            Bigthetae1(iv2(notonface),edge1) = thetas(notonface);
+                            Bigthetae2(iv2(notonface),edge1) = thetar(notonface);
+                            acrossindentpairs = [acrossindentpairs;[iv2(notonface) edge1*ones(sum(notonface),1)]];
+                        end
 
 %						sameedges = ESIE2findsame(iv,iv2);
 % Bug found 050421!!!
@@ -1542,6 +1569,15 @@ if difforder >= 2 && ~isempty(edgeseespartialedge)
 % %   
 % %     pause
    
+    % 20 Nov. 2026: the paths across an indent do not run along a plane,
+    % so edgeseespartialedge gets a negative value for them
+    for kk = 1:size(acrossindentpairs,1)
+        e_a = acrossindentpairs(kk,1);
+        e_b = acrossindentpairs(kk,2);
+        edgeseespartialedge(e_a,e_b) = -abs(edgeseespartialedge(e_a,e_b));
+        edgeseespartialedge(e_b,e_a) = -abs(edgeseespartialedge(e_b,e_a));
+    end
+
     if showtext >= 3
         disp('   Looking for identical combinations')    
     end
@@ -1585,3 +1621,22 @@ elapsedtimeed2geo = etime(clock,t00);
 if filehandlingparameters.saveed2datafile == 1
 	save(desiredname,'planedata','edgedata','edgetoedgedata','EDinputdatahash','elapsedtimeed2geo','stageversion','EDversionnumber');
 end
+
+%--------------------------------------------------------------------------
+function notonface = edoffface(thetas,thetar,faceangle)
+% 20 Nov. 2026: for edges in the plane of a face of another edge: 1 if the
+% start or end point of the edge is not on the face side (angle faceangle,
+% or 2*pi for faceangle = 0) but across an indent (angle pi).
+tol = 1e-3;
+thetas = thetas(:);
+thetar = thetar(:);
+onface_s = abs(thetas-faceangle) < tol;
+onface_r = abs(thetar-faceangle) < tol;
+% (0 and 2*pi are the same direction; for a thin edge, both faces are in
+% that direction)
+if abs(faceangle) < tol || abs(faceangle-2*pi) < tol
+    onface_s = abs(thetas) < tol | abs(thetas-2*pi) < tol;
+    onface_r = abs(thetar) < tol | abs(thetar-2*pi) < tol;
+end
+notonface = ~(onface_s & onface_r);
+

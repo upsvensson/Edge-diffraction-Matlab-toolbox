@@ -378,6 +378,34 @@ inteqdiagnostics = edinteqdiagnosticstemplate;
 nsources = size(Sdata.coordinates,1);
 nreceivers = size(Rdata.coordinates,1);
 
+% 20 Nov. 2026: for a non-convex object, Sdata and Rdata come from
+% EDimagepointdata and contain extra points (image sources and image
+% receivers, and extra columns for edges that are seen over several
+% separate intervals). Each extra source point belongs to a parent source
+% (.parentsource), and its source term is added to that of its parent;
+% each extra receiver point belongs to a parent receiver (.parentreceiver),
+% and its propagated sound pressure is added to that of its parent.
+nsourcepoints = nsources;
+parentsource = (1:nsources).';
+if isfield(Sdata,'parentsource')
+    parentsource = double(Sdata.parentsource(:));
+    nsources = max(parentsource);
+end
+nreceiverpoints = nreceivers;
+parentreceiver = (1:nreceivers).';
+receiveramplitude = ones(nreceivers,1);
+if isfield(Rdata,'parentreceiver')
+    parentreceiver = double(Rdata.parentreceiver(:));
+    nreceivers = max(parentreceiver);
+    if isfield(Rdata,'receiveramplitude')
+        receiveramplitude = Rdata.receiveramplitude(:);
+    end
+end
+if Sdata.doallSRcombinations == 0 && (nsourcepoints > nsources || nreceiverpoints > nreceivers)
+    error(['ERROR: image sources or image receivers (non-convex objects) can not be used ',...
+        'with doallSRcombinations = 0'])
+end
+
 % 11 Feb. 2025 by PS Make sure that one higher quadrature order than before
 % has its weights and nodes pre-calculated.
 maxngauss = abs(controlparameters.ngauss);
@@ -769,7 +797,7 @@ for ifreq = 1:nfrequencies
         
         if qfinalreused == 0
             Q_firstterm = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
-                controlparameters,Sdata,frequency,ifreq,gaussvectors,1:nsources,1,filehandlingparameters.showtext);
+                controlparameters,Sdata,frequency,ifreq,gaussvectors,1:nsourcepoints,1,filehandlingparameters.showtext);
 
             timingdata(2) = timingdata(2) + etime(clock,t00);
             t00 = clock;
@@ -836,8 +864,16 @@ for ifreq = 1:nfrequencies
                     disp(['Source no. ',ISOU,' of ',int2str(nsources)])
                 end
                 
-                Q_firstterm = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
-                    controlparameters,Sdata,frequency,ifreq,gaussvectors,isou,0,filehandlingparameters.showtext);
+                % The points of this source (more than one for a non-convex
+                % object with image sources): their source terms are added
+                sourcepointlist = find(parentsource == isou);
+                if numel(sourcepointlist) == 1
+                    Q_firstterm = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
+                        controlparameters,Sdata,frequency,ifreq,gaussvectors,sourcepointlist,0,filehandlingparameters.showtext);
+                else
+                    Q_firstterm = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
+                        controlparameters,Sdata,frequency,ifreq,gaussvectors,sourcepointlist,1,filehandlingparameters.showtext);
+                end
 
                 timingdata(2) = timingdata(2) + etime(clock,t00);
                 t00 = clock;
@@ -967,6 +1003,14 @@ if controlparameters.skipreceiverpropagation == 0
     [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgedata,Hsubmatrixdata_prop,Rdata,...
         Qfinalstore_prop,Qfirsttermstore_prop,controlparameters.frequencies,envdata,propsettings);
     clear Hsubmatrixdata_prop Qfinalstore_prop Qfirsttermstore_prop
+    % 20 Nov. 2026: add the results of the extra receiver points (image
+    % receivers, non-convex objects) to their parent receivers
+    if nreceiverpoints > nreceivers
+        P_receiver = edfoldreceivers(P_receiver,parentreceiver,receiveramplitude,nreceivers);
+        if ~isempty(P_nodiff2)
+            P_nodiff2 = edfoldreceivers(P_nodiff2,parentreceiver,receiveramplitude,nreceivers);
+        end
+    end
     if filehandlingparameters.savediff2result == 1
         extraoutputdata.tfinteqdiff_nodiff2 = P_nodiff2;
     end
@@ -1035,6 +1079,18 @@ save(desiredname,'tfinteqdiff','extraoutputdata','EDinputdatahash','timingdata',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%--------------------------------------------------------------------------
+function Pfolded = edfoldreceivers(P,parentreceiver,receiveramplitude,nreceivers)
+% Adds the columns (receiver points) of P [nfrequencies,npoints,nsolutions]
+% to their parent receivers, with the factors receiveramplitude (the
+% products of the reflection factors of the image receivers).
+[nf,npoints,nsol] = size(P);
+Pfolded = zeros(nf,nreceivers,nsol);
+for jj = 1:npoints
+    Pfolded(:,parentreceiver(jj),:) = Pfolded(:,parentreceiver(jj),:) + P(:,jj,:)*receiveramplitude(jj);
+end
+end
 
 %--------------------------------------------------------------------------
 function [Qfinal,solvediag] = edsolveinteq(Q_firstterm,dcol,Bsp,Hsubmatrixdata,Hsubdatalists,ivuselists,...

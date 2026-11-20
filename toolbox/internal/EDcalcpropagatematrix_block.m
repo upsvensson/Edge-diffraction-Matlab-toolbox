@@ -1,5 +1,6 @@
 function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edgedata,edgetoedgedata,...
-    Hsubmatrixdata,vispartedgesfromr,rRmat,thetaRmat,zRmat,doesQsegmenthavevalues,polemethod)
+    Hsubmatrixdata,vispartedgesfromr,rRmat,thetaRmat,zRmat,doesQsegmenthavevalues,polemethod,...
+    visstartmat,visendmat)
 % EDcalcpropagatematrix_block - Propagation rows from the edge sources to a block of receivers.
 % The same computation as EDcalcpropagatematrix with frequency = 0 and
 % ESIEpropagationimplementation = 'accurate' (isthinhole = 0), but for
@@ -105,6 +106,9 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 % EDcalcpropagatematrix.
 % 18 Oct. 2026 (by Claude, prompted by PS) The edge numbering (edge 2 is
 % always the diffracting edge) is described in the header.
+% 20 Nov. 2026 (by Claude, prompted by PS) New optional inputs visstartmat
+% and visendmat: the visible parts of the edges for each receiver (non-
+% convex objects).
 % 9 Nov. 2026 (by Claude, prompted by PS) New optional input polemethod:
 % 'exact' finds the exact poles of the near-singular beta terms by Newton
 % iteration and integrates the flagged rows by product integration with
@@ -115,6 +119,10 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 if nargin < 9 || isempty(polemethod)
     polemethod = 'taylor';
 end
+% 20 Nov. 2026: optional visible parts of the edges, [nedges,nrec]
+% fractions 0-1 (for a non-convex object, from EDimagepointdata). The
+% edge-2 nodes outside the visible part get zero row elements.
+usewindows = nargin >= 11 && ~isempty(visstartmat) && ~isempty(visendmat);
 if ~ischar(polemethod) || ~any(strcmp(polemethod,{'taylor','exact'}))
     error('EDcalcpropagatematrix_block:polemethod','polemethod must be ''taylor'' or ''exact''')
 end
@@ -332,6 +340,15 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                 sin(ny*(pi - thetae1_re2(n1vertmat) + thetaout  ))./(ch - cos(ny*(pi - thetae1_re2(n1vertmat) + thetaout   ))) + ...
                 sin(ny*(pi - thetae1_re2(n1vertmat) - thetaout  ))./(ch - cos(ny*(pi - thetae1_re2(n1vertmat) - thetaout   )));
         Fsub = -ny/4/2/pi*beta.*kernelfactor.*(dzvec2(n2vertmat).*dzvec1(n1vertmat))*thinplaneboost;
+    end
+
+    if usewindows
+        winstart = double(visstartmat(edge2,rr));    % [1 x nr]
+        winend = double(visendmat(edge2,rr));
+        if any(winstart > 0) || any(winend < 1)
+            windowmask = (n2vec >= winstart) & (n2vec <= winend);     % [n2 x nr]
+            Fsub = Fsub.*windowmask(n2vertmat,:);
+        end
     end
 
     propdiagnostics.npairs = propdiagnostics.npairs + nr;

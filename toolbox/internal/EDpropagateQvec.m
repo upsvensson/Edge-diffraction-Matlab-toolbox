@@ -173,6 +173,23 @@ if dosplit && ~useblocks
     error('EDpropagateQvec:split','The split into parts is only implemented for the ''accurate'' and ''exactpole'' propagation')
 end
 propagationblocksize = [];
+% 20 Nov. 2026: the visible parts of the edges, for each receiver (for a
+% non-convex object they come from EDimagepointdata; otherwise they are
+% 0 and 1, which changes nothing).
+visstartall = [];
+visendall = [];
+if isfield(Rdata,'vispartedgesfromr_start') && isfield(Rdata,'vispartedgesfromr_end')
+    visstartall = double(Rdata.vispartedgesfromr_start);
+    visendall = double(Rdata.vispartedgesfromr_end);
+    if ~useblocks && (any(visstartall(:) > 0) || any(visendall(Rdata.vispartedgesfromr > 0) < 1))
+        error('EDpropagateQvec:windows',['Receivers that see only part of an edge (non-convex objects) ',...
+            'need ESIEpropagationimplementation = ''accurate'' or ''exactpole'''])
+    end
+end
+if isempty(visstartall)
+    visstartall = zeros(size(Rdata.vispartedgesfromr));
+    visendall = ones(size(Rdata.vispartedgesfromr));
+end
 if useblocks
     blocksize = max(1,min(nreceivers,floor(4e6/double(nQ))));
     if nworkers > 0
@@ -196,7 +213,8 @@ if useblocks
             Hsubmatrixdata,Rdata.vispartedgesfromr(:,recs),...
             reshape(Rdata.rRsho(Rdata.reftoshortlistR(:,recs)),[],nb),...
             reshape(Rdata.thetaRsho(Rdata.reftoshortlistR(:,recs)),[],nb),...
-            reshape(Rdata.zRsho(Rdata.reftoshortlistR(:,recs)),[],nb),doesQsegmenthavevalues,polemethod);
+            reshape(Rdata.zRsho(Rdata.reftoshortlistR(:,recs)),[],nb),doesQsegmenthavevalues,polemethod,...
+            visstartall(:,recs),visendall(:,recs));
         % Only the columns with non-zero elements are used
         ivnonzero = find(any(Fgeom,1));
         Fgeom = Fgeom(:,ivnonzero);

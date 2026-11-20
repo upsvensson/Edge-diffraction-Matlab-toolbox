@@ -18,6 +18,7 @@ function EDdatastructs
 %   edgedata            EDedgeo                        _eddata
 %   Sdata, Rdata        EDSorRgeo                      _Sdata, _Rdata
 %   firstorderpathdata  EDfindconvexGApaths            _paths
+%                       (or EDfindGApaths, for allownonconvex = 1)
 %   edgetoedgedata      EDed2geo                       _ed2data
 %   Hsubmatrixdata      EDinteg_submatrixstructure     _submatrixdata
 %   (results)           EDmakefirstordertfs            _tf
@@ -159,6 +160,26 @@ function EDdatastructs
 %   .ncomponents            [1,3] number of direct sound, specular and
 %                           diffraction components
 %   .EDinputdatahash
+% From EDfindGApaths (geoinputdata.allownonconvex = 1), also:
+%   .specrefllist           the specular reflections of all orders up to
+%                           controlparameters.specorder; column 3 includes
+%                           the product of the reflection factors
+%   .specreflplanes         [nIS,specorder] the reflection planes
+%   .diffpathlist           [ndiff,7] one row per first-order diffraction
+%                           component: [source receiver edge Spoint Rpoint
+%                           zstart zend], zstart/zend = the visible part of
+%                           the edge, as fractions 0-1
+%   .Spoints, .Rpoints      the sources/receivers (first rows) and their
+%                           image points up to order specorder:
+%                           .coordinates, .parent, .order, .planeseq,
+%                           .previous, .amplitude (product of the reflection
+%                           factors), .edgeintervals [nint,4] = [point edge
+%                           zstart zend]
+%   .specorder
+% For the integral equation, EDimagepointdata turns the image points into
+% extra source/receiver points of Sdata and Rdata, with the fields
+% .parentsource (Sdata) and .parentreceiver, .receiveramplitude (Rdata),
+% and .vispartedgesfroms_start/_end (double, fractions 0-1).
 %
 %--------------------------------------------------------------------------
 % edgetoedgedata

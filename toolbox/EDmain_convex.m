@@ -482,16 +482,42 @@ end
 % Find the paths for direct sound, first-order specular, and first-order
 % diffraction paths.
 
-if controlparameters.skipfirstorder == 0
+% 20 Nov. 2026: for a non-convex model (geoinputdata.allownonconvex = 1),
+% EDfindGApaths is used. It finds specular reflections up to the order
+% controlparameters.specorder, the visible parts of the edges, and the
+% image sources and image receivers that are needed for the first-order
+% diffraction and the integral equation. Only for the 'tf' methods.
+
+usenonconvexpaths = geoinputdata.freefieldcase == 0 && geoinputdata.allownonconvex == 1;
+if usenonconvexpaths && strcmp(controlparameters.generalmethod,'ir') == 1
+    error(['ERROR: geoinputdata.allownonconvex = 1 is not implemented yet for the ''ir'' method. ',...
+        'Use ''tf''.'])
+end
+
+if controlparameters.skipfirstorder == 0 || (usenonconvexpaths && controlparameters.difforder > 1)
     EDmessage(filehandlingparameters,'s',fid,1,'',['Find the (first-order) GA paths']);
-    [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
-        EDfindconvexGApaths(planedata,edgedata,Snewdata,Rnewdata,...
-        controlparameters,EDversionnumber,filehandlingparameters);
-    nspecs = size(firstorderpathdata.specrefllist,1);
-    ndiffs = prod(size(firstorderpathdata.diffpaths));
-    EDpostfunctext('EDfindconvexGApaths',elapsedtimefindpaths,existingfilename,...
-        filehandlingparameters,fid,'',[int2str(nspecs),' spec. paths and ',...
-        int2str(ndiffs),' diff. paths.'])
+    if usenonconvexpaths
+        [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
+            EDfindGApaths(planedata,edgedata,Snewdata,Rnewdata,...
+            controlparameters,EDversionnumber,filehandlingparameters);
+        nspecs = size(firstorderpathdata.specrefllist,1);
+        ndiffs = size(firstorderpathdata.diffpathlist,1);
+        EDpostfunctext('EDfindGApaths',elapsedtimefindpaths,existingfilename,...
+            filehandlingparameters,fid,'',[int2str(nspecs),' spec. paths and ',...
+            int2str(ndiffs),' diff. paths.'],...
+            [int2str(size(firstorderpathdata.Spoints.coordinates,1)-size(Snewdata.coordinates,1)),' image sources and ',...
+            int2str(size(firstorderpathdata.Rpoints.coordinates,1)-size(Rnewdata.coordinates,1)),' image receivers, up to order ',...
+            int2str(firstorderpathdata.specorder),'.'])
+    else
+        [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
+            EDfindconvexGApaths(planedata,edgedata,Snewdata,Rnewdata,...
+            controlparameters,EDversionnumber,filehandlingparameters);
+        nspecs = size(firstorderpathdata.specrefllist,1);
+        ndiffs = prod(size(firstorderpathdata.diffpaths));
+        EDpostfunctext('EDfindconvexGApaths',elapsedtimefindpaths,existingfilename,...
+            filehandlingparameters,fid,'',[int2str(nspecs),' spec. paths and ',...
+            int2str(ndiffs),' diff. paths.'])
+    end
     timingstruct.findpaths = elapsedtimefindpaths;
 else
     timingstruct.findpaths = 0;
@@ -562,13 +588,24 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Add edge-to-edge visibility data
 
+% 20 Nov. 2026: for a non-convex model, the image sources and image
+% receivers are added as extra points of Sdata and Rdata for the integral
+% equation (EDimagepointdata). Otherwise, the integral equation uses
+% Snewdata and Rnewdata as they are.
+if usenonconvexpaths && controlparameters.difforder > 1
+    [Sdata_inteq,Rdata_inteq] = EDimagepointdata(edgedata,Snewdata,Rnewdata,firstorderpathdata);
+else
+    Sdata_inteq = Snewdata;
+    Rdata_inteq = Rnewdata;
+end
+
 if controlparameters.difforder > 1
     % Temporarily add a field 'specorder'
     controlparametersmod = controlparameters;
     controlparametersmod.specorder = 1;
     EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the edgetoedgedata struct']);
-    [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedata,edgedata,Snewdata,...
-        Rnewdata,controlparametersmod,EDversionnumber,1,filehandlingparameters);
+    [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedata,edgedata,Sdata_inteq,...
+        Rdata_inteq,controlparametersmod,EDversionnumber,1,filehandlingparameters);
     EDpostfunctext('EDed2geo',elapsedtimeed2geo,existingfilename,...
         filehandlingparameters,fid,'')
     timingstruct.edgetoedgedata = elapsedtimeed2geo;
@@ -642,7 +679,7 @@ if controlparameters.difforder > 1 && ( strcmp(controlparameters.generalmethod,'
     EDmessage(filehandlingparameters,'s',fid,1,'',['Calculating the HOD contribution with the FD integral equation'],textline2);
     [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
         EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
-    	Snewdata,Rnewdata,envdata,controlparameters,EDversionnumber,filehandlingparameters);
+    	Sdata_inteq,Rdata_inteq,envdata,controlparameters,EDversionnumber,filehandlingparameters);
 
     % The timing lines. timingdata has totals: H-matrix (built once),
     % source term and solution (summed over frequencies and sources), and

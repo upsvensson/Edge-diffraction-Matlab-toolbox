@@ -514,13 +514,24 @@ else
 end
 
 if thinplanecheckready == 0
-    involvedplanes = [edgedata.planesatedge(edgepairlist(:,1),:) edgedata.planesatedge(edgepairlist(:,2),:)];
-    diffinvolved = diff(sort(involvedplanes.'));
-    isthinplaneedgepair = int8(sum(diffinvolved>0)==1);
-    
-    involvedplanes = [edgedata.planesatedge(edgetripletlist(:,1),:) edgedata.planesatedge(edgetripletlist(:,2),:) edgedata.planesatedge(edgetripletlist(:,3),:)];
-    diffinvolved = diff(sort(involvedplanes.'));
-    isthinplanetriplet = int8(sum(diffinvolved>0)==1);
+    % 20 Nov. 2026: a q segment (an edge pair [to-edge from-edge]) is a
+    % thin-plane edge pair if both edges are thin (closed wedge angle 0)
+    % and lie in the same plane: the path between them then runs along both
+    % sides of the plate. The edge source of the to-edge then gets the
+    % same contribution from the wave along the front side and the one
+    % along the rear side (for a thin edge, beta(0,thetaout) =
+    % -beta(2*pi,thetaout), and the amplitudes of the two waves have
+    % opposite signs too), so the factor 2 (thinplaneboost) applies,
+    % whatever the next edge (or receiver) is.
+    % Therefore a triplet [edge3 edge2 edge1] is a thin-plane triplet if
+    % its incoming edge pair [edge2 edge1] is a thin-plane edge pair.
+    % Before, all three edges had to belong to the same thin plate, and the
+    % edges of a pair had to belong to the same plate. That gives the same
+    % result for a single thin plate and for objects without thin edges,
+    % but not for several thin plates that are connected (non-convex
+    % objects) or divided into coplanar parts.
+    isthinplaneedgepair = int8(edthinplanepair(edgedata,edgepairlist(:,1),edgepairlist(:,2)));
+    isthinplanetriplet = int8(edthinplanepair(edgedata,edgetripletlist(:,2),edgetripletlist(:,3)));
 end
 
 % ----------------------------------------------------------------------------------------------
@@ -570,3 +581,22 @@ elapsedtimesubmatrix = etime(clock,t00);
 if filehandlingparameters.savesubmatrixdata == 1
 	save(desiredname,'Hsubmatrixdata','EDinputdatahash','elapsedtimesubmatrix','stageversion','EDversionnumber');
 end
+
+%--------------------------------------------------------------------------
+function isthin = edthinplanepair(edgedata,edgelistA,edgelistB)
+% 1 for the edge pairs (edgelistA(i),edgelistB(i)) where both edges are
+% thin and lie in the same plane.
+
+geomacc = 1e-9;
+edgelistA = double(edgelistA(:));
+edgelistB = double(edgelistB(:));
+isthin = (edgedata.closwedangvec(edgelistA) == 0) & (edgedata.closwedangvec(edgelistB) == 0);
+iv = find(isthin);
+if ~isempty(iv)
+    nA = edgedata.edgenvecs(edgelistA(iv),:);
+    dA = sum(nA.*edgedata.edgestartcoords(edgelistA(iv),:),2);
+    s1 = sum(nA.*edgedata.edgestartcoords(edgelistB(iv),:),2) - dA;
+    s2 = sum(nA.*edgedata.edgeendcoords(edgelistB(iv),:),2) - dA;
+    isthin(iv) = (abs(s1) < geomacc) & (abs(s2) < geomacc);
+end
+

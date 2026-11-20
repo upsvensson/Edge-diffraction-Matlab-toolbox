@@ -294,7 +294,7 @@ paramspec = edparamspec('controlparameters',struct);
 
 inputorigin = struct;
 
-removedfields = {'inteqnconsecutive','inteqrestimate','intequsemaxcheck','nedgepoints_visibility','specorder'};
+removedfields = {'inteqnconsecutive','inteqrestimate','intequsemaxcheck','nedgepoints_visibility'};
 [controlparameters,inputorigin.controlparameters] = ...
     edapplyparamspec(controlparameters,paramspec,'controlparameters',{},removedfields,prevorigin.controlparameters);
 
@@ -842,6 +842,10 @@ switch structname
             '1: the direct sound, the specular reflections and the first-order diffraction are not computed.';
         'difforder', @(x) isnumeric(x) && isscalar(x) && x>=0 && x==round(x), NaN, @(cp) true, true, ...
             'The highest diffraction order. Required. With the GMRES methods, any difforder > 2 gives the full solution, with all diffraction orders included.';
+        'specorder', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x>=0 && x==round(x), 1, @(cp) true, false, ...
+            'Only with geoinputdata.allownonconvex = 1: the highest number of specular reflections in a path, both for the specular reflections themselves and before or after the diffraction (for the source term and the propagation of the integral equation, it applies to each side separately).';
+        'nedgesamples', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x>=2 && x==round(x), 32, @(cp) true, false, ...
+            'Only with geoinputdata.allownonconvex = 1: the number of intervals per edge that are sampled when the visible part of an edge is found; each change between visible and not visible is then refined by bisection.';
         'diff1method', @(x) ismember(x,{'GL','accurate'}), 'accurate', @(cp) cp.difforder>=1, false, ...
             'The method for first-order diffraction: ''accurate'' (adaptive integration, with an analytic treatment near the apex point) or ''GL'' (Gauss-Legendre quadrature, faster).';
         'diff1GLorder', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x > 0 && x==round(x), 16, @(cp) strcmp(cp.diff1method,'GL'), false, ...
@@ -905,7 +909,7 @@ switch structname
         'planeseesplanestrategy', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1), 0, @(g) true, false, ...
             '1: the plane-to-plane visibility is checked only between the plane midpoints (enough for some geometries). 0: a full check.';
         'allownonconvex', @(x) isnumeric(x) && isscalar(x) && (x==0 || x==1), 0, @(g) true, false, ...
-            '1: a non-convex model is accepted (EDmain_convex computes correct results only for convex models).';
+            '1: a non-convex model is accepted. Specular reflections (up to controlparameters.specorder) and the visible parts of the edges are then included, also in the integral equation, but edge-to-edge paths via specular reflections are not yet included, and slope diffraction is not included. Not for generalmethod = ''ir''.';
         };
     case 'Rinputdata'
     paramspec = {

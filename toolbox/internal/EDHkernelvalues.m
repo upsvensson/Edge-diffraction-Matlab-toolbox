@@ -32,7 +32,7 @@ function [Hvalues,mdist] = EDHkernelvalues(edgedata,edgetoedgedata,edge1,edge2,e
 %
 % See also EDintegralequation_convex_tf, EDrefineQvec
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % [Hvalues,mdist] = EDHkernelvalues(edgedata,edgetoedgedata,edge1,edge2,edge3,...
 %    n1vec,n2vec,n3vec,dzvec,n1ind,n2ind,n3ind,thinplaneboost);
@@ -44,6 +44,12 @@ function [Hvalues,mdist] = EDHkernelvalues(edgedata,edgetoedgedata,edge1,edge2,e
 % ismember (faster; the same result). The distances l and m are computed
 % for the node combinations of two edges and then picked out for the index
 % lists (fewer operations; the same values).
+% 21 Nov. 2026 (by Claude, prompted by PS) When edge 3 is partly on the
+% face side of edge 2 and partly across an indent (non-convex models),
+% each node of edge 3 gets its own factor (2-acrossface_out): 1 on the
+% face side, 2 across.
+% 21 Nov. 2026 (by Claude, prompted by PS) Node angles within 1e-6 of 2*pi
+% are set to 0 for non-thin edges (roundoff on the reference face).
 
 Hsubconstant = -1/4/pi/2;
 refto = edgetoedgedata.reftoshortlistE;
@@ -96,6 +102,12 @@ if acrossface_in*acrossface_out == 0 % This case is a preparation for non-convex
     [re1_re2,thetae1_re2,~] = EDcoordtrans1([xe1_re2.' ye1_re2.' ze1_re2.'],[0 0 0;0 0 edgedata.edgelengthvec(edge2)],[0 1 0]);
     re1_re2 = re1_re2(:).';
     thetae1_re2 = thetae1_re2(:).';
+    % 21 Nov. 2026: a node on the reference face (y = 0) can get y = -1e-13
+    % from roundoff, and then theta = 2*pi instead of 0. Not equivalent for
+    % a non-thin wedge, so snap.
+    if edgedata.closwedangvec(edge2) > 0
+        thetae1_re2(thetae1_re2 > 2*pi-1e-6) = thetae1_re2(thetae1_re2 > 2*pi-1e-6) - 2*pi;
+    end
 
     xedge3start = edgetoedgedata.re1sho(refto(edge3,edge2))*cos(edgetoedgedata.thetae1sho(refto(edge3,edge2)));
     xedge3end   = edgetoedgedata.re2sho(refto(edge3,edge2))*cos(edgetoedgedata.thetae2sho(refto(edge3,edge2)));
@@ -107,6 +119,12 @@ if acrossface_in*acrossface_out == 0 % This case is a preparation for non-convex
     [re3_re2,thetae3_re2,~] = EDcoordtrans1([xe3_re2 ye3_re2 ze3_re2],[0 0 0;0 0 edgedata.edgelengthvec(edge2)],[0 1 0]);
     re3_re2 = re3_re2(:);
     thetae3_re2 = thetae3_re2(:);
+    % 21 Nov. 2026: a node on the reference face (y = 0) can get y = -1e-13
+    % from roundoff, and then theta = 2*pi instead of 0. Not equivalent for
+    % a non-thin wedge, so snap.
+    if edgedata.closwedangvec(edge2) > 0
+        thetae3_re2(thetae3_re2 > 2*pi-1e-6) = thetae3_re2(thetae3_re2 > 2*pi-1e-6) - 2*pi;
+    end
 
 else
 
@@ -153,6 +171,26 @@ if any(offedges == edge1) || any(offedges == edge2) || any(offedges == edge3)
    beta = beta*0;
 end
 
-Hvalues = (2-acrossface_out)*Hsubconstant*ny*beta.*dz_overm*thinplaneboost;
+if acrossface_out == 0 && abs(thetaout-thetaout_other_end_of_edge) >= 1e-10
+    % 21 Nov. 2026: edge 3 is in the plane of a face of edge 2, but partly
+    % on the face side and partly on the other side of edge 2 (across an
+    % indent of the plane; a non-convex model). Then each node of edge 3
+    % gets its own factor: 1 for the nodes on the face side (a path along
+    % the face), 2 for the others. (Before, all the nodes got the factor
+    % 2.) For skewed edges (not in the plane), all the factors stay 2.
+    onface3 = edonface(thetae3_re2,2*pi-edgedata.closwedangvec(edge2));
+    Hvalues = (2-onface3(n3ind)).*Hsubconstant*ny.*beta.*dz_overm*thinplaneboost;
+else
+    Hvalues = (2-acrossface_out)*Hsubconstant*ny*beta.*dz_overm*thinplaneboost;
+end
 
+end
+
+%--------------------------------------------------------------------------
+function onface = edonface(theta,faceangle)
+% 21 Nov. 2026: 1 for the angles that are in the direction of a face of the
+% edge (0, or faceangle; for a thin edge, 0 and 2*pi), 0 otherwise.
+tol = 1e-6;
+theta = double(theta(:));
+onface = double(abs(theta) < tol | abs(theta-faceangle) < tol | abs(theta-2*pi) < tol);
 end

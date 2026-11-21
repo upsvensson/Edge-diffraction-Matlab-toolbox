@@ -145,6 +145,12 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 % source term (0/0 at the apex node, since ch-1 is below the rounding
 % level), and a source almost along a face gave very wrong values. The
 % 'accurate' and 'legacy' paths are unchanged.
+% 21 Nov. 2026 (by Claude, prompted by PS) When edge 3 starts on a face of
+% edge 2 but is partly across an indent of that plane (non-convex models),
+% the per-node angles are used (before: the angle of the start point, for
+% all the nodes), and each node gets its own factor (2-acrossface_out).
+% 21 Nov. 2026 (by Claude, prompted by PS) Edge-3 node angles within 1e-6
+% of 2*pi are set to 0 for non-thin edges (roundoff on the reference face).
 
 if nargin < 14
     showtext = 0;
@@ -375,6 +381,12 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             % edge then the edge-to-edge contribution should be "windowed" too.
 
             [re3_re2,thetae3_re2,ze3_re2] = EDcoordtrans1([xe3_vec_re2 ye3_vec_re2 ze3_vec_re2],[0 0 0;0 0 len2],[0 1 0]);
+            % 21 Nov. 2026: a node on the reference face (y = 0) can get y = -1e-13
+            % from roundoff, and then theta = 2*pi instead of 0. Not equivalent for
+            % a non-thin wedge, so snap.
+            if edgedata.closwedangvec(edge2) > 0
+                thetae3_re2(thetae3_re2 > 2*pi-1e-6) = thetae3_re2(thetae3_re2 > 2*pi-1e-6) - 2*pi;
+            end
             
         end
 
@@ -385,7 +397,11 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
         ch = ( ch + 1./ch)/2;               
             
-        if thetaout == 0
+        % 21 Nov. 2026: "&& skewedges == 0": when edge 3 starts on the face
+        % (thetaout = 0) but ends across an indent of the plane (non-convex
+        % models), the per-node angles below must be used. (Before, the
+        % angle of the start point was used for all the nodes.)
+        if thetaout == 0 && skewedges == 0
            beta = 2*( sin(ny*(pi + thetaS  ))./(ch - cos(ny*(pi + thetaS   ))) + ...
                        sin(ny*(pi - thetaS  ))./(ch - cos(ny*(pi - thetaS   ))));        
 
@@ -408,7 +424,17 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             end
         end
                         
-        Gsub = -(2-acrossface_out)*ny/4/pi*beta.*dz_expjkmoverm;
+        if skewedges == 1
+            % 21 Nov. 2026: each node of edge 3 gets its own factor
+            % (2-acrossface_out): 1 for the nodes on the face side of edge
+            % 2 (when edge 3 is in the plane of a face, partly on the face
+            % side and partly across an indent), 2 for the others.
+            faceangle2 = 2*pi-edgedata.closwedangvec(edge2);
+            onface3 = double(abs(thetae3_re2(:)) < 1e-6 | abs(thetae3_re2(:)-faceangle2) < 1e-6 | abs(thetae3_re2(:)-2*pi) < 1e-6);
+            Gsub = -(2-onface3(n3vertmat))*ny/4/pi.*beta.*dz_expjkmoverm;
+        else
+            Gsub = -(2-acrossface_out)*ny/4/pi*beta.*dz_expjkmoverm;
+        end
         
         soudiagnostics.npairs = soudiagnostics.npairs + 1;
 

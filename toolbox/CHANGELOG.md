@@ -3,6 +3,35 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.633 (21 Nov. 2026)
+
+Fixes for non-convex models, found with a V-groove (a prism with a concave
+dip in its top). The result for a receiver below the prism jumped between
+about 1.0 and 1.44 (k = 0, where 1 is expected) when the groove depth was
+changed slightly. It is now smooth (0.98-0.99). A 100-degree folded plate
+also improved (1.16/0.88 to 1.03/1.01). Results for convex models are
+unchanged (checked bit for bit for a convex prism).
+
+**Changes that affect the results (non-convex models).**
+- Points along an edge that lie on the reference face of another edge
+  could get the angle 2*pi instead of 0, from a y coordinate of -1e-13
+  (roundoff). For a non-thin wedge these are not the same direction, and
+  the source term changed sign and size depending on the roundoff. Angles
+  within 1e-6 of 2*pi are now set to 0 for non-thin edges
+  (EDinteg_souterm, EDHkernelvalues, EDcalcpropagatematrix_block).
+- An edge that starts on a face of the via-edge but continues across an
+  indent of that plane now gets per-node angles (before, the angle of its
+  start point for all nodes) and per-node factors: 1 on the face side, 2
+  across (EDinteg_souterm, EDHkernelvalues).
+- Same-plane edge pairs where one edge crosses the line of the other are
+  classified as partly visible, so the node pairs are tested
+  (EDedgepairvisibility).
+
+**Known limitation.** When a reflected wave almost grazes a face (here
+within about 0.15 degrees), the edge source density gets a narrow
+feature that needs more Gauss points: ngauss = 12 gave errors up to
+0.03, ngauss = 20 gave smooth results through the exact grazing case.
+
 ## 0.632 (21 Nov. 2026)
 
 A distant source (a plane wave) exactly or almost along a face, e.g.

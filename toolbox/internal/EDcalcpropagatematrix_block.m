@@ -128,6 +128,9 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 % receiver that sees only part of edge 2 (visstartmat, visendmat), the
 % part gets its own Gauss-Legendre rule, with q interpolated from the
 % edge-2 nodes (before: zero row elements outside the part).
+% 21 Nov. 2026 (by Claude, prompted by PS) Edge-1 node angles within 1e-6
+% of 2*pi (from roundoff, y = -1e-13 on the reference face) are set to 0
+% for non-thin edges.
 
 if nargin < 9 || isempty(polemethod)
     polemethod = 'taylor';
@@ -217,6 +220,12 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         ye1_re2 = yedge1start + n1vec.*(yedge1end-yedge1start);
         [re1_re2,thetae1_re2,ze1_re2] = EDcoordtrans1([xe1_re2 ye1_re2 ze1_re2],[0 0 0;0 0 len2],[0 1 0]);
         re1_re2 = re1_re2(:); thetae1_re2 = thetae1_re2(:); ze1_re2 = ze1_re2(:);
+        % 21 Nov. 2026: a node on the reference face (y = 0) can get y = -1e-13
+        % from roundoff, and then theta = 2*pi instead of 0. Not equivalent for
+        % a non-thin wedge, so snap.
+        if edgedata.closwedangvec(edge2) > 0
+            thetae1_re2(thetae1_re2 > 2*pi-1e-6) = thetae1_re2(thetae1_re2 > 2*pi-1e-6) - 2*pi;
+        end
     end
 
     % 21 Nov. 2026: the receiver-dependent part is in the local function

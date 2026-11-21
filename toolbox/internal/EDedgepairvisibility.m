@@ -22,7 +22,10 @@ function [out1,out2] = EDedgepairvisibility(mode,planedata,edgedata,varargin)
 % Edge pairs that belong to the same plane (the path runs in that plane)
 % get the earlier test: the line between the two edge midpoints. If it
 % passes through a plane, or through an edge or corner of a plane (across
-% an indent), the pair is hidden, otherwise fully visible.
+% an indent), the pair is hidden, otherwise fully visible. But if one of
+% the edges crosses the line of the other (21 Nov. 2026), it is partly on
+% the face side and partly across an indent: the pair is partly visible,
+% with all the planes (but the edges' own) as possible occluders.
 %
 % 'nodepairs': the visibility of all the node pairs of two edges.
 %   vis = EDedgepairvisibility('nodepairs',planedata,edgedata,edgeA,edgeB,uA,uB,occluderplanes)
@@ -50,11 +53,13 @@ function [out1,out2] = EDedgepairvisibility(mode,planedata,edgedata,varargin)
 %
 % See also EDed2geo, EDinteg_submatrixstructure, EDfindGApaths, EDpoinpla
 %
-% Peter Svensson 20 Nov. 2026
+% Peter Svensson 21 Nov. 2026
 %
 % [visclass,occluders] = EDedgepairvisibility('classify',planedata,edgedata,pairs);
 % vis = EDedgepairvisibility('nodepairs',planedata,edgedata,edgeA,edgeB,uA,uB,occluderplanes);
 
+% 21 Nov. 2026 (by Claude, prompted by PS) Edge pairs in the same plane,
+% where one edge crosses the line of the other, are partly visible.
 % 20 Nov. 2026 First version (by Claude, prompted by PS). The idea of a
 % conservative classification before the point-to-point tests is from
 % Antani et al., Applied Acoustics 73 (2012) 218-233.
@@ -136,8 +141,20 @@ occl = zeros(1,0);
 
 pA = geo.planesatedge(edgeA,:);
 pB = geo.planesatedge(edgeB,:);
-sameplane = any(ismember(pA(pA > 0),pB(pB > 0)));
+commonplanes = intersect(pA(pA > 0),pB(pB > 0));
+sameplane = ~isempty(commonplanes);
 if sameplane
+    % 21 Nov. 2026: if one of the edges crosses the line of the other
+    % (within their common plane), the other edge is partly on the face
+    % side and partly across an indent of the plane. Then the pair is
+    % partly visible, and the node pairs are tested (a path across the
+    % indent passes exactly through an edge of a neighbouring plane: 1/2).
+    np = geo.nvecs(commonplanes(1),:);
+    if edcrossesline(A,B,np,acc) || edcrossesline(B,A,np,acc)
+        visclass = 1;
+        occl = testplanes;
+        return
+    end
     % The earlier test: the line between the midpoints. A hit inside a
     % plane, or at an edge or corner of a plane, hides the pair.
     mA = mean(A,1);
@@ -181,6 +198,18 @@ if ~isempty(occl)
     visclass = 1;
 end
 
+end
+
+%------------------------------------------------------------------------
+function c = edcrossesline(A,B,np,acc)
+% 21 Nov. 2026: true if the end points of segment B are strictly on
+% different sides of the line through segment A, within the plane with
+% the normal vector np.
+dA = A(2,:) - A(1,:);
+s1 = dot(cross(dA,B(1,:)-A(1,:)),np);
+s2 = dot(cross(dA,B(2,:)-A(1,:)),np);
+tol = acc*max(norm(dA),1);
+c = (s1 > tol && s2 < -tol) || (s1 < -tol && s2 > tol);
 end
 
 %------------------------------------------------------------------------

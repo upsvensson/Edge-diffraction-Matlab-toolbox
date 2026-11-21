@@ -76,6 +76,13 @@ function stageinfo = EDstageversions(stagename)
 % (for convex models too) only where a source is within about 1e-3 rad of
 % a zone boundary, e.g. a plane wave along a face, which gave NaN or very
 % wrong results before.
+% 21 Nov. 2026 EDinteg_souterm to version 3, EDHkernelvalues and
+% EDcalcpropagatematrix_block to version 2, EDedgepairvisibility to version
+% 2 (non-convex models): per-node angles and factors for an edge that is
+% partly on a face side and partly across an indent, angles of 2*pi from
+% roundoff snapped to 0 for non-thin edges, and same-plane edge pairs where
+% one edge crosses the line of the other are partly visible. Results for
+% the convex test models are unchanged.
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -107,7 +114,7 @@ versions.EDcalcedgeinteqmatrixsub2_mex = 1;  % Compiled file: increase by
                                              % hand when it is recompiled
                                              % from changed source code.
 versions.EDcalcpropagatematrix        = 2;  % 2: bug fix, edge data for edges with the same number of nodes
-versions.EDcalcpropagatematrix_block  = 1;
+versions.EDcalcpropagatematrix_block  = 2;  % 2: per-node angles snapped at 2*pi
 versions.EDcheckobstr_edgetoedge      = 1;
 versions.EDcheckobstr_pointtoedge     = 1;
 versions.EDcheckobstrpaths            = 1;
@@ -120,15 +127,15 @@ versions.EDcoordtrans2                = 1;
 versions.EDcreindexmatrix             = 1;
 versions.EDcross                      = 1;
 versions.EDdistelements               = 1;
-versions.EDedgepairvisibility         = 1;
+versions.EDedgepairvisibility         = 2;  % 2: same-plane pairs across an indent are partly visible
 versions.EDsegmentlayout              = 1;
 versions.EDfindis                     = 1;
 versions.EDgetedgepoints              = 1;
 versions.EDgetGLrule                  = 1;
-versions.EDHkernelvalues              = 1;
+versions.EDHkernelvalues              = 2;  % 2: per-node factors, angles snapped at 2*pi
 versions.EDimagepointdata             = 1;
 versions.EDinfrontofplane             = 1;
-versions.EDinteg_souterm              = 2;  % 2: new implementation 'exactpole' (the default)
+versions.EDinteg_souterm              = 3;  % 3: per-node angles and factors (non-convex); 2: new implementation 'exactpole' (the default)
 versions.EDinteg_soutermsources       = 1;
 versions.EDintegratebetaoverm         = 1;
 versions.EDmatvecH                    = 1;

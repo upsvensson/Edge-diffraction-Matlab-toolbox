@@ -151,6 +151,11 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 % all the nodes), and each node gets its own factor (2-acrossface_out).
 % 21 Nov. 2026 (by Claude, prompted by PS) Edge-3 node angles within 1e-6
 % of 2*pi are set to 0 for non-thin edges (roundoff on the reference face).
+% 21 Nov. 2026 (by Claude, prompted by PS) The legacy single-sample
+% correction of a near-singular slice (dofixsingularity) used the angle of
+% the start point of edge 3 and acrossface_out also for skewed edges; now
+% the angle and the factor of the node of that slice are used. Found as a
+% mirror asymmetry of the source term in a folded plate.
 
 if nargin < 14
     showtext = 0;
@@ -518,11 +523,23 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                % We want only part of the integrand: beta*exp(-jkm)/m
                % and call the function EDintegratebetaoverm
                   
+               % 21 Nov. 2026: for skewed edges, the angle and the factor
+               % of this node of edge 3 (before, the angle of the start
+               % point of edge 3 and acrossface_out were used, which gave
+               % a wrong value for this slice; found as a mirror asymmetry
+               % in a folded plate).
+               if skewedges == 1
+                   thetaslice = thetae3_re2(jj);
+                   factorslice = 2-onface3(jj);
+               else
+                   thetaslice = thetaout;
+                   factorslice = 2-acrossface_out;
+               end
                [Iaccurate,singularterm] = EDintegratebetaoverm(envdata.cair,...
                    frequency,edgedata.closwedangvec(edge2),...
-                   rS,thetaS,zS,re3_re2(jj),thetaout,ze3_re2(jj),...
+                   rS,thetaS,zS,re3_re2(jj),thetaslice,ze3_re2(jj),...
                    [0,len2]);
-                Iaccurate = -(2-acrossface_out)*ny/4/pi*Iaccurate;
+                Iaccurate = -factorslice*ny/4/pi*Iaccurate;
                 
                       
                 % Here comes the LCN part, but with a single sample

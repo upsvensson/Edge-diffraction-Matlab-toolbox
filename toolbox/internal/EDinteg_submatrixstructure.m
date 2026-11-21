@@ -68,7 +68,7 @@ controlparameters,EDversionnumber,filehandlingparameters,planedata)
 %
 % See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 20 Nov. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 %    EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
@@ -135,6 +135,13 @@ controlparameters,EDversionnumber,filehandlingparameters,planedata)
 % 20 Nov. 2026 (by Claude, prompted by PS) New optional input parameter
 % planedata, and new output field .visrowmask: the visibility of the node
 % pairs of partly visible edge pairs (non-convex models).
+% 21 Nov. 2026 (by Claude, prompted by PS) Bug fix: with symmetry
+% compression, two triplets with the same geometry values but different
+% thinplaneboost (since 20 Nov. 2026 defined by the incoming edge pair)
+% could share a submatrix, which then had the wrong factor 2 or 1/2 for
+% one of them. The thin-plane flag is now part of the comparison. Found
+% with a 100-degree folded plate (the solution was not mirror symmetric,
+% and receivers crossing two zone boundaries got jumps of 1-3%). Version 4.
 
 t00 = clock;
 
@@ -425,7 +432,7 @@ if symmetrycompression == 1
 
     refto = edgetoedgedata.reftoshortlistE;
 
-    datamatrix = zeros(submatrixcounter,15);
+    datamatrix = zeros(submatrixcounter,16);
     alledge3 = edgetripletlist(:,1);
     alledge2 = edgetripletlist(:,2);
     alledge1 = edgetripletlist(:,3);
@@ -447,6 +454,16 @@ if symmetrycompression == 1
     % the same numbers of points. Before nedgeelemsuser, the numbers were
     % given by the edge lengths, so this did not change anything.
     datamatrix(:,13:15) = [nedgeelems(alledge3) nedgeelems(alledge2) nedgeelems(alledge1)];
+    % 21 Nov. 2026: whether the triplet is a thin-plane triplet (the factor
+    % thinplaneboost, which depends on the incoming edge pair [edge2
+    % edge1], see below). Two triplets with the same geometry values but a
+    % different thinplaneboost must not share a submatrix. Found with a
+    % folded plate (two thin plates), where e.g. the triplet 2<-6<-3
+    % (thinplaneboost 1) got the submatrix of 3<-1<-2 (thinplaneboost 2):
+    % the solution was not mirror symmetric, and a receiver crossing a
+    % zone boundary got a jump of 1-3%. For a single thin plate or an
+    % object without thin edges, all triplets have the same value.
+    datamatrix(:,16) = double(edthinplanepair(edgedata,alledge2,alledge1));
 
     [shortlist,~,reftoshortlist] = unique(round(datamatrix*1e5)/1e5,'rows');
     nuniquesubmatrices = size(shortlist,1);    

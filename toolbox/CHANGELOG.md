@@ -3,6 +3,36 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.636 (21 Nov. 2026)
+
+Two bug fixes for non-convex models with thin plates, found with a
+100-degree folded plate (two thin plates), a plane wave and k = 0, where
+receivers on a circle got jumps of +0.025 and -0.014 at two zone boundaries
+(the diffraction from the far edge of plate 1, reflected in plate 2 exactly
+at the fold, and the plane of plate 1 beyond the fold). The jumps did not
+get smaller with ngauss. The model and the incident wave are mirror
+symmetric, but the solution of the integral equation was not (up to 98%
+difference between mirrored edge pairs).
+
+**Changes that affect the results (non-convex models with thin plates).**
+- EDinteg_submatrixstructure (version 4): with symmetry compression, edge
+  triplets with the same geometry values share a submatrix of H. Since 0.63
+  (20 Nov. 2026), the thin-plane factor (thinplaneboost) depends on the
+  incoming edge pair, so two triplets with the same geometry values could
+  have different factors (for example 2<-6<-3 with the factor 1 got the
+  submatrix of 3<-1<-2, with the factor 2). The thin-plane flag is now part
+  of the comparison. For a single thin plate or an object without thin
+  edges, all triplets have the same flag, so nothing changes.
+- EDinteg_souterm (version 4): the legacy correction of a near-singular
+  slice of the source term (one sample replaced by an accurate integral)
+  used the angle of the start point of edge 3 also for skewed edges; now
+  the angle (and the factor) of the node of that slice are used.
+
+With both fixes, the solution is mirror symmetric (1e-11), the two jumps
+are gone, and the rms deviation from 1 on the circle went from 0.023 to
+0.019 (ngauss = 16). Results for the convex prism and a single thin plate
+are unchanged, bit for bit.
+
 ## 0.635 (21 Nov. 2026)
 
 New: `controlparameters.specorder = 'auto'`, the new default for non-convex

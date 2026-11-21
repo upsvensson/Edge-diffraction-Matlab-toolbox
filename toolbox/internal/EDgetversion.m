@@ -34,7 +34,10 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % receiver within about 1e-8 rad of a zone boundary.
 % 21 Nov. 2026 Version 0.635: controlparameters.specorder = 'auto' (the new
 % default for non-convex models) and .specordermax.
+% 21 Nov. 2026 Version 0.636: two bug fixes for non-convex models with thin
+% plates (symmetry compression with different thinplaneboost; the slice
+% correction of the source term for skewed edges).
 
-versionnumber = 0.635;
+versionnumber = 0.636;
 lastchangedate = '21Nov2026';
-lastchangetime = '22h30';
+lastchangetime = '23h15';

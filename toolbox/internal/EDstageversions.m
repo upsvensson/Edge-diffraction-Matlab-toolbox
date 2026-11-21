@@ -90,6 +90,10 @@ function stageinfo = EDstageversions(stagename)
 % 21 Nov. 2026 EDfindGApaths to version 3: specorder = 'auto' (the new
 % default), specordermax, and a warning when specorder = N is too low. For
 % a number N, the paths are the same as before.
+% 21 Nov. 2026 EDinteg_submatrixstructure to version 4 (the thin-plane flag
+% in the symmetry comparison of the triplets) and EDinteg_souterm to
+% version 4 (the legacy slice correction for skewed edges). Found with a
+% folded plate; the convex test models are unchanged.
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -104,7 +108,7 @@ versions.EDfindGApaths                = 3;  % 3: specorder = 'auto', specorderma
 versions.EDmakefirstordertfs          = 1;
 versions.EDmakefirstorderirs          = 1;
 versions.EDed2geo                     = 2;  % 2: conservative edge-pair visibility (non-convex models)
-versions.EDinteg_submatrixstructure   = 3;  % 2: thin-plane pairs/triplets defined by the incoming edge pair; 3: node-pair visibility masks (non-convex models)
+versions.EDinteg_submatrixstructure   = 4;  % 4: thin-plane flag in the symmetry comparison; 2: thin-plane pairs/triplets defined by the incoming edge pair; 3: node-pair visibility masks (non-convex models)
 versions.EDintegralequation_convex_tf = 2;  % 2: edge segments for partly visible edges (non-convex models)
 versions.EDfindHODpaths               = 1;
 versions.EDmakeHODirs                 = 2;  % 2: source amplitudes applied also for doaddsources = 0
@@ -142,7 +146,7 @@ versions.EDgetGLrule                  = 1;
 versions.EDHkernelvalues              = 2;  % 2: per-node factors, angles snapped at 2*pi
 versions.EDimagepointdata             = 1;
 versions.EDinfrontofplane             = 1;
-versions.EDinteg_souterm              = 3;  % 3: per-node angles and factors (non-convex); 2: new implementation 'exactpole' (the default)
+versions.EDinteg_souterm              = 4;  % 4: legacy slice correction with the node angle for skewed edges; 3: per-node angles and factors (non-convex); 2: new implementation 'exactpole' (the default)
 versions.EDinteg_soutermsources       = 1;
 versions.EDintegratebetaoverm         = 2;  % 2: no NaN near zone boundaries; exacthalf bug fix
 versions.EDmatvecH                    = 1;

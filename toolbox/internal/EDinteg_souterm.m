@@ -54,6 +54,16 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 %                    EDcalcpropagatematrix. Applied to edge pairs with
 %                    non-skewed edges, a fully visible via-edge and
 %                    Gauss-Legendre nodes; other edge pairs use 'legacy'.
+%       'exactpole' (21 Nov. 2026, the default from EDcheckinputstructs):
+%                    as 'accurate', but a flagged term where the source is
+%                    within about 1e-3 rad of a zone boundary is
+%                    integrated with its exact complex pole (product
+%                    integration), with beta computed without
+%                    cancellation (needed for a distant source, e.g. a
+%                    plane wave), and for a source exactly on the zone
+%                    boundary the limit is used (see
+%                    EDinteg_souterm_exactpole). Other source terms are
+%                    the same as with 'accurate'.
 %
 % Output parameters:
 %   Qfirstterm      Column vector with all edge source signals caused by
@@ -128,6 +138,13 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 % (Hsubmatrixdata.fromnodelist and .segmentlimits, see EDsegmentlayout).
 % The 'accurate' treatment then uses the segment as its interval; the
 % legacy singularity fix is not used for segments.
+% 21 Nov. 2026 (by Claude, prompted by PS) New implementation 'exactpole'
+% (local function EDinteg_souterm_exactpole, with copies of edFexact,
+% edexactpoles and edbetaaccurate from EDcalcpropagatematrix_block). A
+% distant source (a plane wave) exactly along a face gave NaN in the
+% source term (0/0 at the apex node, since ch-1 is below the rounding
+% level), and a source almost along a face gave very wrong values. The
+% 'accurate' and 'legacy' paths are unchanged.
 
 if nargin < 14
     showtext = 0;
@@ -136,13 +153,23 @@ end
 discretizationtype = controlparameters.discretizationtype; %#ok<NASGU>
 
 useaccurate = 0;
+useexactpole = 0;
 if isfield(controlparameters,'ESIEsourcetermimplementation') && ~isempty(controlparameters.ESIEsourcetermimplementation)
     useaccurate = strcmpi(controlparameters.ESIEsourcetermimplementation,'accurate');
+    % 21 Nov. 2026: 'exactpole', the exact-pole treatment of the flagged
+    % slices (see EDinteg_souterm_exactpole below)
+    useexactpole = strcmpi(controlparameters.ESIEsourcetermimplementation,'exactpole');
+    useaccurate = useaccurate || useexactpole;
 end
 soudiagnostics = struct('implementation','legacy','npairs',0,'npairs_eligible',0,...
     'npairs_corrected',0,'nslices',0,'nslices_corrected',0,'correctedpairs',zeros(0,4),...
     'npairs_skew',0,'npairs_partlyvisible',0,'npairs_nodesnotGL',0);
-if useaccurate
+if useexactpole
+    soudiagnostics.implementation = 'exactpole';
+    soudiagnostics.nslices_exactpole = 0;
+    soudiagnostics.nslices_limit = 0;
+    soudiagnostics.nslices_fallback = 0;
+elseif useaccurate
     soudiagnostics.implementation = 'accurate';
 end
 
@@ -399,6 +426,18 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             Gsubfactor = -(2-acrossface_out)*ny/4/pi;
             [Gsub,nslicescorrected,accuratedone] = EDinteg_souterm_accurate(Gsub,ny,thetaS,thetaout,...
                 rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,dz_expjkmoverm(1:n2),Gsubfactor,segoffset,seglength);
+            if useexactpole && accuratedone
+                % 21 Nov. 2026: the slices with a term where the source is
+                % close to a zone boundary are computed again (see the
+                % local function). lit3 tells on which side of a zone
+                % boundary a source exactly on it is taken.
+                lit3 = double(vispartedgesfroms(edge3)) ~= 0;
+                [Gsub,~,~,epcounts] = EDinteg_souterm_exactpole(Gsub,ny,thetaS,thetaout,...
+                    rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,dz_expjkmoverm(1:n2),Gsubfactor,segoffset,seglength,lit3);
+                soudiagnostics.nslices_exactpole = soudiagnostics.nslices_exactpole + epcounts(1);
+                soudiagnostics.nslices_limit = soudiagnostics.nslices_limit + epcounts(2);
+                soudiagnostics.nslices_fallback = soudiagnostics.nslices_fallback + epcounts(3);
+            end
             soudiagnostics.npairs_nodesnotGL = soudiagnostics.npairs_nodesnotGL + (accuratedone == 0);
             if accuratedone == 1
                 soudiagnostics.npairs_eligible = soudiagnostics.npairs_eligible + 1;
@@ -594,6 +633,250 @@ for kk = 1:length(phivec)
 end
 
 Gsub = reshape(Gmat,n2*n3,1);
+
+function [Gsub,nslicescorrected,nodesok,counts] = EDinteg_souterm_exactpole(Gsub,ny,thetaS,thetaout,...
+    rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,fvec,Gsubfactor,segoffset,seglength,lit3)
+% 21 Nov. 2026 (by Claude, prompted by PS): the 'exactpole' treatment of
+% the near-singular source term, the counterpart of 'exactpole' in
+% EDcalcpropagatematrix_block (with the source S in the role of the edge-1
+% point there, and the to-edge point z3 in the role of the receiver).
+% It is applied after EDinteg_souterm_accurate. The slices (z3 nodes) and
+% beta terms are flagged as there, and only the slices that have a
+% flagged term where the source is close to the zone boundary,
+% sin(ny*phi/2)^2 < 1e-6 (within about 1e-3 rad), are computed again.
+% (A term can also be flagged because the to-edge point is close to the
+% edge, re3 small; such terms keep the 'accurate' treatment, which was
+% more accurate for them in EDverify test 1.) A slice that is computed
+% again is computed term by term: unflagged terms plainly, flagged terms
+% with sin(ny*phi/2)^2 >= 1e-6 as in EDinteg_souterm_accurate, and the
+% terms close to the zone boundary as follows:
+%  - the beta values at the z2 nodes are computed without cancellation:
+%      F(z2) = cosh(ny*eta) - cos(ny*phi) = 2*sinh(ny*g)^2 + 2*sin(ny*phi/2)^2,
+%    since the usual form ch - cos(ny*phi) loses all digits close to the
+%    apex when the source is far away (e.g. a plane wave, rS = 1e10 m);
+%  - the exact pole p = zp + 1i*sqrt(Bp) is found by Newton iteration
+%    (edexactpoles), and the term is integrated by product integration with
+%    the weight function 1/((z-zp)^2+Bp) (the nodal values are set so that
+%    a plain GL sum over z2 gives that product integration);
+%  - if the peak is so narrow that it is a delta function on the scale of
+%    the segment (4*B1/seglength^2 < 1e-14), the limit is used: the term
+%    integrates to pi*sqrt(2/kappa)*cos(ny*phi/2)*sign(sin(ny*phi/2)), at
+%    za. For a source exactly on the zone boundary (sin(ny*phi/2) = 0),
+%    the side is taken from lit3: if the to-edge is visible from the source
+%    (vispartedgesfroms), the lit side, otherwise the shadow side, so that
+%    the term is consistent with the direct source term of the to-edge;
+%  - if the Newton iteration fails, the Taylor model is used, with the
+%    cancellation-free beta values.
+% counts = [slices with the exact pole, with the limit, with the Taylor
+% fallback] (per flagged term).
+
+n2 = length(ze2_re2);
+n3 = length(ze3_re2);
+nslicescorrected = 0;
+counts = [0 0 0];
+
+[xstd,wstd,Sstd,tfine,wfine,Pint] = glStandardCached(n2);
+nodesok = double( max(abs(2*(ze2_re2(:)-segoffset)/seglength - 1 - xstd)) < 1e-10 && max(abs(2*weight2vec(:)*len2/seglength - wstd)) < 1e-10 );
+if nodesok == 0
+    return
+end
+
+if thetaout == 0
+    s1vec = [1 -1];
+    s2vec = [0 0];
+    termboost = 2;
+else
+    s1vec = [1 1 -1 -1];
+    s2vec = [1 -1 1 -1];
+    termboost = 1;
+end
+phivec = pi + thetaS*s1vec + thetaout*s2vec;
+
+re3 = re3_re2(:);
+ze3 = ze3_re2(:);
+R0vec    = sqrt( (zS - ze3).^2 + (rS + re3).^2 );
+zavec    = ( ze3*rS + zS*re3 )./( rS + re3 );
+kappavec = ny^2*(rS + re3).^4 ./ (2*rS^2*re3.^2.*R0vec.^2);
+B1_ik    = 2*sin(ny*phivec/2).^2 ./ kappavec;                      % [n3 x nk]
+
+localspacing = max(diff(sort(ze2_re2(:))));
+zrelthreshold = 5;
+insiderange  = (zavec-segoffset >= -0.05*seglength) & (zavec-segoffset <= 1.05*seglength);
+narrowenough = sqrt(max(B1_ik,0)) < zrelthreshold*localspacing;
+flag_ik = insiderange & narrowenough;
+sinhalf2threshold = 1e-6;
+closeik = flag_ik & (sin(ny*phivec/2).^2 < sinhalf2threshold);
+flaggedslices = find(any(closeik,2));
+nslicescorrected = numel(flaggedslices);
+if nslicescorrected == 0
+    return
+end
+num_ik = sin(ny*phivec)./kappavec;
+
+% The side of a zone boundary for a source exactly on it: the sign of the
+% virtual change of thetaS that puts the to-edge on the lit (lit3 = 1) or
+% the shadow side
+if thetaout > thetaS
+    dthetasign = 1;
+else
+    dthetasign = -1;
+end
+if ~lit3
+    dthetasign = -dthetasign;
+end
+
+z2row = ze2_re2(:).';
+dzrow = weight2vec(:).'*len2;
+fcol  = fvec(:);
+Gmat  = reshape(Gsub,n2,n3);
+Lbary = edbarycentricweights(z2row);
+
+for jj = flaggedslices(:).'
+    zR = ze3(jj);
+    rR = re3(jj);
+    za = zavec(jj);
+    kappa = kappavec(jj);
+    a = z2row - zS;
+    b = z2row - zR;
+    m = sqrt(a.^2 + rS^2);
+    l = sqrt(b.^2 + rR^2);
+    ch = (a.*b + m.*l)/(rS*rR);
+    ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
+    ch = ( ch + 1./ch)/2;
+    betasum = zeros(1,n2);
+    for kk = 1:numel(phivec)
+        phi = phivec(kk);
+        if ~flag_ik(jj,kk)
+            betasum = betasum + sin(ny*phi)./(ch - cos(ny*phi));
+            continue
+        end
+        sn2 = sin(ny*phi/2);
+        cs2 = cos(ny*phi/2);
+        sinhalf2 = sn2^2;
+        snphi = sin(ny*phi);
+        B1 = 2*sinhalf2/kappa;
+        if ~closeik(jj,kk)
+            % As in EDinteg_souterm_accurate
+            WT = modifiedWeightsLorentzianVec(Sstd,wstd,tfine,wfine,Pint,...
+                2*(za-segoffset)/seglength-1,4*max(B1,0)/seglength^2);
+            modifiedest = (2/seglength)*(num_ik(jj,kk)*WT.')./dzrow;
+            plainest = num_ik(jj,kk)./((z2row - za).^2 + max(B1,0));
+            betasum = betasum + sin(ny*phi)./(ch - cos(ny*phi)) + (modifiedest - plainest);
+        elseif 4*B1/seglength^2 < 1e-14
+            % The delta-function limit
+            counts(2) = counts(2) + 1;
+            zarel = za - segoffset;
+            if zarel < 0 || zarel > seglength
+                continue
+            end
+            if sn2 ~= 0
+                weight = pi*sqrt(2/kappa)*cs2*sign(sn2);
+            else
+                weight = pi*sqrt(2/kappa)*abs(cs2)*sign(s1vec(kk)*dthetasign);
+            end
+            Lrow = edlagrangerow(z2row,Lbary,za);
+            betasum = betasum + weight*Lrow./dzrow;
+        else
+            betaacc = edbetaaccurate(z2row,zS,rS,zR,rR,za,sinhalf2,snphi,ny);
+            [zp,Bp,ok] = edexactpoles(zS,rS,zR,rR,za,B1,sinhalf2,ny,seglength);
+            if ok
+                counts(1) = counts(1) + 1;
+                WT = modifiedWeightsLorentzianVec(Sstd,wstd,tfine,wfine,Pint,...
+                    2*(zp-segoffset)/seglength-1,4*Bp/seglength^2);          % [n2 x 1]
+                Wg = (2/seglength)*WT.';
+                betasum = betasum + Wg./dzrow.*betaacc.*((z2row - zp).^2 + Bp);
+            else
+                counts(3) = counts(3) + 1;
+                num = snphi/kappa;
+                WT = modifiedWeightsLorentzianVec(Sstd,wstd,tfine,wfine,Pint,...
+                    2*(za-segoffset)/seglength-1,4*B1/seglength^2);
+                modifiedest = (2/seglength)*(num*WT.')./dzrow;
+                plainest = num./((z2row - za).^2 + B1);
+                betasum = betasum + betaacc + (modifiedest - plainest);
+            end
+        end
+    end
+    Gmat(:,jj) = Gsubfactor*termboost*betasum(:).*fcol;
+end
+
+Gsub = reshape(Gmat,n2*n3,1);
+
+
+%--------------------------------------------------------------------------
+function wb = edbarycentricweights(x)
+% 21 Nov. 2026: barycentric weights of the nodes x
+n = numel(x);
+wb = ones(1,n);
+for j = 1:n
+    wb(j) = 1/prod(x(j) - x([1:j-1 j+1:n]));
+end
+
+function Lrow = edlagrangerow(x,wb,z)
+% 21 Nov. 2026: the Lagrange basis polynomials of the nodes x at the point z
+d = z - x;
+iexact = find(d == 0,1);
+if ~isempty(iexact)
+    Lrow = zeros(size(x));
+    Lrow(iexact) = 1;
+    return
+end
+t = wb./d;
+Lrow = t/sum(t);
+
+%--------------------------------------------------------------------------
+% Copies of local functions in EDcalcpropagatematrix_block (21 Nov. 2026)
+
+function [F,dF] = edFexact(z,zS,rS,zR,rR,za,sinhalf2,ny)
+    % F(z) = cosh(ny*eta(z)) - cos(ny*phi) without cancellation, and dF/dz.
+    % z can be complex. All inputs are column vectors (or broadcast).
+    a = z - zS;  b = z - zR;
+    m = sqrt(a.^2 + rS.^2);  l = sqrt(b.^2 + rR.^2);
+    A = (rS + rR).^2;
+    D = rS.*rR.*(m.*l + rS.*rR - a.*b);
+    u = A.*(z - za).^2./D;                  % = ch0 - 1
+    s = sqrt(u/2);
+    g = asinh(s);                           % = eta/2
+    F = 2*sinh(ny*g).^2 + 2*sinhalf2;
+    if nargout > 1
+        Dp = rS.*rR.*(a./m.*l + m.*b./l - (a + b));
+        du = A.*(2*(z - za).*D - (z - za).^2.*Dp)./D.^2;
+        small = abs(s) < 1e-8;
+        ss = s;  ss(small) = 1;
+        dFdu = ny*sinh(2*ny*g)./(2*ss.*sqrt(1 + s.^2));
+        dFdu(small) = ny^2;
+        dF = dFdu.*du;
+    end
+
+function [zp,Bp,ok] = edexactpoles(zS,rS,zR,rR,za,B1,sinhalf2,ny,len2)
+    % The zero p (upper half-plane) of F(z) = cosh(ny*eta) - cos(ny*phi)
+    % near the apex za, by Newton iteration from the Taylor estimate
+    % za + 1i*sqrt(B1). ok = 0 where the iteration fails.
+    p = za + 1i*sqrt(B1);
+    active = true(size(p));
+    for it = 1:12
+        ia = find(active);
+        if isempty(ia)
+            break
+        end
+        [F,dF] = edFexact(p(ia),zS(ia),rS(ia),zR(ia),rR(ia),za(ia),sinhalf2(ia),ny);
+        step = F./dF;
+        step(~isfinite(step)) = 0;
+        p(ia) = p(ia) - step;
+        active(ia) = abs(step) > 1e-14*abs(imag(p(ia)));
+    end
+    F = edFexact(p,zS,rS,zR,rR,za,sinhalf2,ny);
+    ok = isfinite(p) & imag(p) > 0 & sinhalf2 > 1e-30 & ...
+         abs(F) <= 1e-10*2*sinhalf2 & abs(real(p) - za) < 0.25*len2 + 4*sqrt(B1);
+    zp = real(p);
+    Bp = imag(p).^2;
+
+function beta = edbetaaccurate(zrow,zS,rS,zR,rR,za,sinhalf2,snphi,ny)
+    % One beta term at the real nodes zrow [1 x n2], cancellation-free.
+    a = zrow - zS;  b = zrow - zR;
+    m = sqrt(a.^2 + rS.^2);  l = sqrt(b.^2 + rR.^2);
+    u = (rS + rR).^2.*(zrow - za).^2./(rS.*rR.*(m.*l + rS.*rR - a.*b));
+    g = asinh(sqrt(u/2));
+    beta = snphi./(2*sinh(ny*g).^2 + 2*sinhalf2);
 
 function [x,w] = gaussLegendreNodes(n)
 % Golub-Welsch algorithm: standard n-point Gauss-Legendre nodes and

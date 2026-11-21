@@ -35,7 +35,7 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 %
 % See also EDinputdoc, EDmain_convex, EDdatastructs
 %
-% Peter Svensson (peter.svensson@ntnu.no) 9 Nov. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters,inputorigin] = ...
 %    EDcheckinputstructs(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandlingparameters);
@@ -197,6 +197,10 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 'accurate'). 'exactpole' was made default because it gives more accurate
 % results in the "dangerous" directions, and also the extrapolation works
 % better in those directions. Tested for a cube at DC and 1 kHz.
+% 21 Nov. 2026 (by Claude, prompted by PS) New value 'exactpole' for
+% controlparameters.ESIEsourcetermimplementation, which is the new
+% default: the 'accurate' source term gave NaN, or very wrong values, for a
+% distant source (a plane wave) exactly or almost along a face.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Documentation mode: EDcheckinputstructs('paramspecs') returns the tables
@@ -856,8 +860,8 @@ switch structname
             'The relative tolerance for GMRES.';
         'inteqgmresmaxiter', @(x) isnumeric(x) && isscalar(x) && x>=0 && round(x)==x, 100, @(cp) strcmp(cp.inteqsolutionmethod,'GMRES_fast')||strcmp(cp.inteqsolutionmethod,'GMRES_large'), false, ...
             'The maximum number of GMRES iterations.';
-        'ESIEsourcetermimplementation', @(x) ismember(x,{'legacy','accurate'}), 'accurate', @(cp) cp.difforder>=2, false, ...
-            'The source term of the integral equation: ''accurate'' uses singularity subtraction when a source is close to the plane of a face; ''legacy'' is the earlier method.';
+        'ESIEsourcetermimplementation', @(x) ismember(x,{'legacy','accurate','exactpole'}), 'exactpole', @(cp) cp.difforder>=2, false, ...
+            'The source term of the integral equation, for a source close to a zone boundary of an edge (e.g. close to the plane of a face, or a plane wave along a face): ''accurate'' uses singularity subtraction with a Taylor model of the poles; ''exactpole'' is the same, except for terms where the source is within about 1e-3 rad of a zone boundary: they are integrated with their exact complex poles (product integration), with beta computed without cancellation (needed for distant sources), and with the limit for a source exactly on the zone boundary; ''legacy'' is the earlier method.';
         'ESIEpropagationimplementation', @(x) ismember(x,{'legacy','accurate','exactpole'}), 'exactpole', @(cp) cp.difforder>=2, false, ...
             'The propagation from the edge sources to the receivers: ''exactpole'' integrates the near-singular terms close to the zone boundaries with their exact complex poles (product integration), which converges regularly, as 1/ngauss^2; ''accurate'' uses singularity subtraction with a Taylor model of the poles, which leaves an irregular error for receivers within a few degrees of the plane of a face; ''legacy'' uses plain Gauss-Legendre quadrature. ''exactpole'' is not implemented for thin holes (''accurate'' is used).';
         'ESIEpropagationrefine', @(x) isnumeric(x) && isreal(x) && ~isempty(x) && ((isscalar(x) && x >= 1) || (size(x,2) == 2 && all(x(:,1) > 0) && all(x(:,2) >= 1))), 1, @(cp) cp.difforder>=2, false, ...

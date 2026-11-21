@@ -88,6 +88,11 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 %     parallel plates hides one edge pair completely and another one
 %     partly. The classification (hidden, partly or fully visible) and the
 %     visibility of 40 x 40 node pairs agree with the analytic answer.
+% 26. A plane wave exactly along four faces of a convex body (normal
+%     incidence on a box with a low roof), 0 Hz: the total field is 1 at
+%     receivers above, below and beside the body, for source distances
+%     1e10 m and 1e6 m (before 21 Nov. 2026, the source term had NaN or
+%     very wrong values).
 %
 % See also EDmain_convex, EDstageversions
 %
@@ -154,8 +159,10 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % from now on 'exactpole'; its limits were set with 'accurate'.
 % 21 Nov. 2026 Added test 25 (the edge-to-edge visibility of a non-convex
 % model, by Claude, prompted by PS).
+% 21 Nov. 2026 Added test 26 (a plane wave exactly along faces, by Claude,
+% prompted by PS).
 
-ntests = 25;
+ntests = 26;
 
 if nargin < 1 || isempty(outputdirectory)
     outputdirectory = uigetdir('', 'Select the directory for the calculation results and the logfile');
@@ -210,7 +217,7 @@ disp(headerline)
 testfunctions = {@edtest1,@edtest2,@edtest3,@edtest4,@edtest5,@edtest6,@edtest7,...
     @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15,...
     @edtest16,@edtest17,@edtest18,@edtest19,@edtest20,@edtest21,@edtest22,@edtest23,@edtest24,...
-    @edtest25};
+    @edtest25,@edtest26};
 
 for itest = 1:ntests
     if runtest(itest) ~= 1
@@ -1090,6 +1097,53 @@ nwrong = sum(abs(vis(:)-ref(:)) > 1e-12);
 resultlines = {sprintf('Classes (expected 1, 0, 2): %d, %d, %d',visclass),...
     sprintf('Node pairs that differ from the analytic answer: %d of %d',nwrong,numel(ref))};
 r = edresult(title,description,isequal(visclass(:).',[1 0 2]) && nwrong == 0,resultlines);
+end
+
+function r = edtest26(outputdirectory,filestem,~)
+title = 'A plane wave exactly along four faces of a convex body, 0 Hz';
+tol = 0.02;
+description = {'A box (x = -1..1, y = -0.5..0.5, z = -0.5 up to the eaves at -0.3) with a roof (ridge',...
+    'at z = 0), and a source straight above it at 1e10 m and at 1e6 m: the plane wave runs exactly',...
+    '(or within 1e-6 rad) along the four vertical faces. ngauss = 12. At 0 Hz the total field',...
+    ['(times the source distance) must be 1 within ',num2str(tol),' at four receivers: above the roof,'],...
+    'below the bottom, and beside the box. Before 21 Nov. 2026 the source term had NaN (1e10 m:',...
+    '0 below the box) or very wrong values (1e6 m: 11 below the box).'};
+
+depth = -0.3;
+P = [-1 depth;0 0;1 depth;1 -0.5;-1 -0.5];
+corners = [P(:,1) 0.5*ones(5,1) P(:,2); P(:,1) -0.5*ones(5,1) P(:,2)];
+pc = {[3 4 5 1 2],[10 9 8 7 6]};
+for i = 1:5
+    j = mod(i,5)+1;
+    q = [i j j+5 i+5];
+    c = corners(q,:);
+    n = cross(c(2,:)-c(1,:),c(3,:)-c(1,:));
+    if dot(n,mean(c,1) - [0 0 -0.15]) < 0
+        q = fliplr(q);
+    end
+    pc{end+1} = q; %#ok<AGROW>
+end
+planecorners = zeros(numel(pc),5);
+for i = 1:numel(pc)
+    planecorners(i,1:numel(pc{i})) = pc{i};
+end
+geoinputdata = struct('corners',corners,'planecorners',planecorners);
+Rinputdata = struct('coordinates',[0 0 0.2; 0.3 -0.2 -0.7; 0.5 0.1 0.4; 1.3 0.2 -0.2]);
+envdata = struct('cair',344);
+controlparameters = struct('frequencies',0,'generalmethod','tf','ngauss',12,'difforder',20);
+Sdistvec = [1e10 1e6];
+totals = zeros(numel(Sdistvec),4);
+for ii = 1:numel(Sdistvec)
+    Sinputdata = struct('coordinates',[0 0 Sdistvec(ii)]);
+    EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,...
+        edfilehandling(outputdirectory,[filestem,'_',int2str(ii)]));
+    totals(ii,:) = real(EDres.tftot(:).')*Sdistvec(ii);
+end
+resultlines = cell(1,numel(Sdistvec));
+for ii = 1:numel(Sdistvec)
+    resultlines{ii} = sprintf('Source distance %g m: %s',Sdistvec(ii),num2str(totals(ii,:),'%9.5f'));
+end
+r = edresult(title,description,all(isfinite(totals(:))) && max(abs(totals(:)-1)) < tol,resultlines);
 end
 
 function [x,w] = edglrule01(n)

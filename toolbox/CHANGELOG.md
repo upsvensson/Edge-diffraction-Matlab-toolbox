@@ -3,6 +3,39 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.632 (21 Nov. 2026)
+
+A distant source (a plane wave) exactly or almost along a face, e.g.
+normal incidence on a box, gave NaN or very wrong results, also for convex
+models. Fixed by the new source-term implementation 'exactpole' (the new
+default). Results change only where a source is within about 1e-3 rad of
+a zone boundary. New EDverify test 26. EDverify passes all 26 tests.
+
+**Changes that affect the results.** New source-term implementation
+'exactpole' (controlparameters.ESIEsourcetermimplementation), which is the
+new default. A distant source (a plane wave) exactly along a face, e.g.
+normal incidence on a box, gave NaN in the source term of the integral
+equation: at the apex node, ch - 1 is below the rounding level, so the
+near-singular beta term was 0/0. GMRES then failed and the integral
+equation part was lost (in the test, 0 instead of 1 below the box). A
+source within about 1e-6 rad of the plane of a face gave very wrong values
+(11 instead of 1). 'exactpole' computes the flagged beta terms without
+cancellation, integrates them with their exact complex poles (as
+'exactpole' in the propagation), and uses the limit for a source exactly
+on the zone boundary. This is done only for terms where the source is
+within about 1e-3 rad of a zone boundary; all other source terms are the
+same as with 'accurate' (bit for bit; EDverify test 1 showed that the
+exact-pole treatment was less accurate for terms that are near-singular
+because the to-edge point is close to the edge). 'accurate' and 'legacy'
+are unchanged. EDinteg_souterm version 2.
+
+**Input and output**
+
+- controlparameters.ESIEsourcetermimplementation: new value 'exactpole'
+  (the default). doc/EDinputfields.tex was generated again.
+- New EDverify test 26: a plane wave exactly along four faces of a convex
+  body.
+
 ## 0.631 (21 Nov. 2026)
 
 Non-convex models (geoinputdata.allownonconvex = 1): partly visible

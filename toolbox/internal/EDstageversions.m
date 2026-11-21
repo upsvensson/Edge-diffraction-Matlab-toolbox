@@ -70,6 +70,12 @@ function stageinfo = EDstageversions(stagename)
 % EDed2geo no longer uses EDcheckobstr_edgetoedge and EDgetedgepoints
 % (removed from its list); EDintegralequation_convex_tf uses EDpoinpla
 % (via EDsegmentlayout and EDedgepairvisibility).
+% 21 Nov. 2026 EDinteg_souterm to version 2: the new source-term
+% implementation 'exactpole', which is the new default of
+% controlparameters.ESIEsourcetermimplementation. It changes the results
+% (for convex models too) only where a source is within about 1e-3 rad of
+% a zone boundary, e.g. a plane wave along a face, which gave NaN or very
+% wrong results before.
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -122,7 +128,7 @@ versions.EDgetGLrule                  = 1;
 versions.EDHkernelvalues              = 1;
 versions.EDimagepointdata             = 1;
 versions.EDinfrontofplane             = 1;
-versions.EDinteg_souterm              = 1;
+versions.EDinteg_souterm              = 2;  % 2: new implementation 'exactpole' (the default)
 versions.EDinteg_soutermsources       = 1;
 versions.EDintegratebetaoverm         = 1;
 versions.EDmatvecH                    = 1;

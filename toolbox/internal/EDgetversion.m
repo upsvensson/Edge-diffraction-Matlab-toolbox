@@ -26,7 +26,9 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % 20 Nov. 2026 Version 0.63: first step towards non-convex models.
 % 21 Nov. 2026 Version 0.631: partly visible edges and edge pairs
 % (non-convex models).
+% 21 Nov. 2026 Version 0.632: a plane wave along a face (the source term
+% 'exactpole', the new default).
 
-versionnumber = 0.631;
+versionnumber = 0.632;
 lastchangedate = '21Nov2026';
-lastchangetime = '09h50';
+lastchangetime = '12h50';

@@ -201,6 +201,11 @@ function EDdatastructs
 %                           start and end points of one edge, relative to
 %                           another edge
 %   .examplecombE
+%   .partialvispairs        [npartial,2] the partly visible edge pairs
+%                           (non-convex models, see EDedgepairvisibility);
+%                           empty for convex models
+%   .partialvisoccluders    {npartial,1} the planes that can obstruct the
+%                           lines between the edges of each such pair
 %   .EDinputdatahash
 %
 %--------------------------------------------------------------------------
@@ -234,6 +239,12 @@ function EDdatastructs
 %   .edgepairsharedcornertype_from, .edgepairsharedcornertype_to
 %                           0 = shared corner at the edge start, 1 = at the
 %                           end, -1 = no shared corner
+%   .visrowmask             [nQ,1] for partly visible edge pairs: 1 if the
+%                           line from the from-edge node to the to-edge
+%                           node is free, 0 if it is obstructed (1/2 or 2/3
+%                           exactly through an edge or corner of a plane).
+%                           The source term and H*q are multiplied by it.
+%                           Empty if all edge pairs are fully visible.
 %   .EDinputdatahash
 %
 %--------------------------------------------------------------------------
@@ -281,6 +292,9 @@ function EDdatastructs
 %   .nQpropagated           (only if ESIEpropagationrefine is used) the
 %                           number of unknowns of the refined solution that
 %                           was propagated to the receivers
+%   .nsegments              the number of edge segments: source points that
+%                           see only part of an edge, which gets its own
+%                           quadrature (non-convex models, EDsegmentlayout)
 %   .parallelworkers        the number of parallel workers for the
 %                           propagation (0 = serial)
 %   .parallelnote           a note if parallel workers were asked for but
@@ -306,5 +320,10 @@ function EDdatastructs
 % new (controlparameters.ESIEpropagationrefine).
 % 9 Nov. 2026 propdiagnostics: the fields .nrows_exactpole and
 % .nrows_fallback ('exactpole').
+% 20 Nov. 2026 Fields for non-convex models: image sources/receivers
+% (EDfindGApaths, EDimagepointdata), and the partly visible edge pairs
+% (edgetoedgedata.partialvispairs, .partialvisoccluders,
+% Hsubmatrixdata.visrowmask).
+% 21 Nov. 2026 inteqdiagnostics.nsegments.
 
 help(mfilename)

@@ -3,6 +3,64 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.631 (21 Nov. 2026)
+
+Non-convex models (geoinputdata.allownonconvex = 1): partly visible
+edges and edge pairs. A part of an edge that a source or receiver sees
+now gets its own quadrature, instead of zero values at the nodes outside
+it, so the results converge regularly with ngauss; and the visibility
+between edges is classified conservatively (fully visible, hidden, or
+partly visible, with node-pair visibility for the last). The results for
+non-convex models change; the results for convex models are unchanged
+(bit for bit in the tests). New EDverify test 25 (edge-to-edge
+visibility). EDverify passes all tests.
+
+**Partly visible edges, source side.** A source point (a source or an
+image source) that sees only part [c1,c2] of an edge got a zero source
+term at the edge nodes outside that part: a step inside the integration
+interval, which made the convergence with ngauss erratic (O(1/n)). The
+part now gets its own Gauss-Legendre rule, as a segment (new function
+EDsegmentlayout). The segment's source term is taken one H-step to the
+ordinary unknowns (an extra right-hand side of the integral equation)
+and is propagated directly to the receivers. EDintegralequation_convex_tf
+version 2.
+
+**Partly visible edges, receiver side.** A receiver that sees only part
+of an edge got zero propagation weights at the edge nodes outside that
+part. The part now gets its own Gauss-Legendre rule, with q interpolated
+from the edge nodes (EDcalcpropagatematrix_block, where the
+receiver-dependent code of an edge pair was moved unchanged to a local
+function).
+
+Results for convex models are unchanged (bit for bit in the tests).
+
+**Partly visible edge pairs.**
+
+The edge-to-edge visibility test for non-convex models, which used only
+the line between the two edge midpoints (so a pair was either fully
+visible or hidden), is replaced by a conservative classification (new
+function EDedgepairvisibility): fully visible, hidden (by a single plane),
+or partly visible. For partly visible pairs, the visibility of every node
+pair is computed (Hsubmatrixdata.visrowmask), and the source term and the
+H-matrix rows of obstructed node pairs are set to zero. Results for convex
+models are unchanged. EDed2geo version 2, EDinteg_submatrixstructure
+version 3.
+
+**Input and output**
+
+- EDinteg_submatrixstructure has a new optional input parameter,
+  planedata.
+- New fields edgetoedgedata.partialvispairs, .partialvisoccluders and
+  Hsubmatrixdata.visrowmask (see EDdatastructs).
+- controlparameters.ESIEpropagationrefine gives an error for a model with
+  partly visible edge pairs, or with edge segments.
+- New EDverify test 25: the edge-to-edge visibility of three thin plates
+  (EDedgepairvisibility) against the analytic answer.
+- New field inteqdiagnostics.nsegments. EDinteg_souterm and
+  EDcalcpropagatematrix_block accept a layout with segments
+  (Hsubmatrixdata-like structs with the fields .fromnodelist and
+  .segmentlimits, from EDsegmentlayout).
+
 ## 0.63 (20 Nov. 2026)
 
 First step towards non-convex models (geoinputdata.allownonconvex = 1,

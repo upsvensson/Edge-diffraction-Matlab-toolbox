@@ -8,7 +8,7 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 %   lastchangetime      A string with the time of the last change, 
 %                       on the form '15h35m11'
 %
-% Peter Svensson (peter.svensson@ntnu.no) 20 Nov. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % [versionnumber,lastchangedate,lastchangetime]= EDgetversion;
 
@@ -24,7 +24,9 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % 20 Oct. 2026 Version 0.615.
 %  9 Nov. 2026 version 0.62
 % 20 Nov. 2026 Version 0.63: first step towards non-convex models.
+% 21 Nov. 2026 Version 0.631: partly visible edges and edge pairs
+% (non-convex models).
 
-versionnumber = 0.63;
-lastchangedate = '20Nov2026';
-lastchangetime = '21h50';
+versionnumber = 0.631;
+lastchangedate = '21Nov2026';
+lastchangetime = '09h50';

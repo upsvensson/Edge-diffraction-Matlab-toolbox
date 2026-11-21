@@ -67,6 +67,9 @@ function [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
 % 20 Nov. 2026 First version (by Claude, prompted by PS). The rules for
 % which planes and edges can be seen follow EDB1findISEStree,
 % EDB1speculISES and EDB1diffISESx of the EDB toolbox.
+% 20 Nov. 2026 (by Claude, prompted by PS) For a thin plate, only one of
+% its two planes is tested for obstruction (a path exactly through an
+% edge of the plate got the factor 1/4 instead of 1/2). Version 2.
 
 t00 = clock;
 
@@ -286,6 +289,12 @@ geo.ncornersperplanevec = planedata.ncornersperplanevec;
 geo.reflfactors = planedata.reflfactors(:);
 geo.rearsideplane = planedata.rearsideplane(:);
 geo.obstructplanes = find(planedata.canplaneobstruct(:) ~= 0);
+% A thin plate has two planes with the same polygon (each other's
+% rearsideplane): only one of them is tested, so that a path exactly
+% through an edge of the plate gets the factor 1/2 once (20 Nov. 2026)
+rs = planedata.rearsideplane(geo.obstructplanes);
+rs = rs(:);
+geo.obstructplanes = geo.obstructplanes(~(rs > 0 & ismember(rs,geo.obstructplanes) & rs < geo.obstructplanes));
 geo.planesatedge = double(edgedata.planesatedge);
 geo.closwedangvec = edgedata.closwedangvec;
 geo.edgestartcoords = edgedata.edgestartcoords;

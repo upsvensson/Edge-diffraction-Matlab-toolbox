@@ -621,7 +621,7 @@ if controlparameters.difforder > 1 && ( strcmp(controlparameters.generalmethod,'
     EDmessage(filehandlingparameters,'s',fid,1,'',['Creating the integral equation Hsubmatrixdata struct']);
     [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 	    EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
-        controlparameters,EDversionnumber,filehandlingparameters);
+        controlparameters,EDversionnumber,filehandlingparameters,planedata);
     edgeelemsizes = edgedata.edgelengthvec./Hsubmatrixdata.nedgeelems;
     meanelemsize = mean(edgeelemsizes);
     nonzeroelements = sum(prod(Hsubmatrixdata.nedgeelems(Hsubmatrixdata.edgetripletlist),2));   

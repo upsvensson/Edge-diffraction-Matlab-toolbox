@@ -32,7 +32,7 @@ function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedat
 %
 % See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedata,edgedata,Sdata,...
 %    Rdata,controlparameters,EDversionnumber,ndiff2batches,filehandlingparameters);
@@ -80,6 +80,15 @@ function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedat
 % computations into batches). difforder is hashed only as
 % (difforder >= 2). The hash is stored as a field .EDinputdatahash in
 % edgetoedgedata. load/save without eval.
+% 20 Nov. 2026 (by Claude, prompted by PS) For planes with indents
+% (non-convex models): fixed variable names that stopped the function with
+% an error, skipped an unused analysis, and kept the computed angle for
+% edge pairs in the same plane across an indent (see edoffface).
+% 20 Nov. 2026 (by Claude, prompted by PS) The edge-to-edge obstruction
+% test, which used the line between the edge midpoints, was replaced by a
+% conservative classification (EDedgepairvisibility): fully visible,
+% hidden, or partly visible. New output fields .partialvispairs and
+% .partialvisoccluders. Only for models that are not convex.
 % 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
 % also contains the versions of the subroutines that this function uses.
 % 14 Oct. 2026 The header was updated to the standard structure (by Claude,
@@ -915,6 +924,11 @@ end
 
 obstructtestneeded = (sum(planedata.canplaneobstruct)~=0 && strcmp(planedata.modeltype,'convex_ext')==0 & strcmp(planedata.modeltype,'singleplate')==0);
 
+% 20 Nov. 2026: the partly visible edge pairs [edge1 edge2] (edge1 < edge2)
+% and their possible occluding planes (see EDedgepairvisibility)
+partialvispairs = zeros(0,2);
+partialvisoccluders = cell(0,1);
+
 maxedgetoedgevisvalue = 2^(2*nedgesubs)-1;
 
 if obstructtestneeded
@@ -959,280 +973,36 @@ if obstructtestneeded
         end
 
 
-        % The previous version did not use 'rows' - but that must be wrong?
-        % No! Because we want to subdivide each edge only once ,not both
-        % edges in a pair!
-         [uniqueedges,~,junique] = unique([fromedges toedges]);
-                  
-%         [uniqueedges,iunique,junique] = unique([fromedges toedges],'rows')
-%         pause
-        clear fromedges toedges
-        
-        % The lists edgesubcoords are the shortlists.
-        
-        [edgesubcoords,edgeweightlist,edgenumberlist] = EDgetedgepoints(...
-            edgedata.edgestartcoords(uniqueedges,:),edgedata.edgeendcoords(uniqueedges,:),nedgesubs,1);
+        % 20 Nov. 2026: the edge-to-edge visibility test (before: the line
+        % between the edge midpoints, which could miss visible parts) is
+        % replaced by a conservative classification of each edge pair as
+        % fully visible, hidden, or partly visible (EDedgepairvisibility).
+        % For the partly visible pairs, the possible occluding planes are
+        % stored, and the integral equation tests the node pairs.
+        fromedges = double(fromedges(:));
+        toedges = double(toedges(:));
+        [visclass,occl] = EDedgepairvisibility('classify',planedata,edgedata,[fromedges toedges]);
 
-        % The two lists below contain pointers to the first edge segment in the
-        % shortlist.
-	
-        fromcoords_refp1 = nedgesubs*(junique(1:ncombs)-1)+1;
-        tocoords_refp1    = nedgesubs*(junique(ncombs+1:2*ncombs)-1)+1;
-        clear junique
-        
-        % Now the original [fromedges toedges] could be recovered by:
-        % uniqueedges([edgenumberlist(fromcoords_refp1) edgenumberlist(tocoords_refp1)])
-        % reshape(uniqueedges([edgenumberlist(fromcoords_refp1) edgenumberlist(tocoords_refp1)]),6,2)
-%         uniqueedges([edgenumberlist(fromcoords_refp1) edgenumberlist(tocoords_refp1)]);
-%         npairs = length(uniqueedges([edgenumberlist(fromcoords_refp1) edgenumberlist(tocoords_refp1)]));
-%         reshape(uniqueedges([edgenumberlist(fromcoords_refp1) edgenumberlist(tocoords_refp1)]),npairs/2,2)
+        edgeseespartialedge = zeros(nedges,nedges);
+        ivfull = find(visclass == 2);
+        edgeseespartialedge(sub2ind([nedges nedges],toedges(ivfull),fromedges(ivfull))) = maxedgetoedgevisvalue;
+        ivpart = find(visclass == 1);
+        edgeseespartialedge(sub2ind([nedges nedges],toedges(ivpart),fromedges(ivpart))) = 1;
+        edgeseespartialedge = edgeseespartialedge + edgeseespartialedge.';
+        partialvispairs = [toedges(ivpart) fromedges(ivpart)];
+        partialvisoccluders = occl(ivpart);
 
-        addmask = [0:nedgesubs-1];
-        onesvec1 = ones(1,nedgesubs);
-        ntot1 = ncombs*nedgesubs;
-	
-        % First, the from-list gets repetitions of the same values
-        expandfrom_ref = fromcoords_refp1(:,onesvec1);
-        clear fromcoords_refp1;
-        expandfrom_ref = reshape(expandfrom_ref.',ntot1,1);
-        
-        % Second, the expanded from-list gets repetitions that are
-        % incremented in steps of 1 (because the shortlists have the
-        % edge segments placed after each other).
-        expandfrom_ref = expandfrom_ref(:,onesvec1);
-        expandfrom_ref = expandfrom_ref + addmask(ones(ntot1,1),:);
-        expandfrom_ref = reshape(expandfrom_ref.',ncombs*nedgesubs^2,1);
-        
-        % Same thing for the to-list except that the first expansion
-        % gives repetitions that are incremented in steps of 1.
-        expandto_ref   = tocoords_refp1(:,onesvec1);
-        clear tocoords_refp1;
-        expandto_ref = expandto_ref + addmask(ones(ncombs,1),:);
-        expandto_ref = reshape(expandto_ref.',ntot1,1);
-	
-        % Second expansion for the to-list: repetitions
-        expandto_ref = expandto_ref(:,onesvec1);
-        expandto_ref = reshape(expandto_ref.',ncombs*nedgesubs^2,1);
-	
-        % Now we have expanded lists of all combinations, and we can 
-        % make lists with the coordinates, the edge numbers, and the weights of
-        % the segments.
-        
-        % edgesubcoords(expandfrom_ref,:) will give all the starting points,
-        % "fromcoords"
-        % edgesubcoords(expandto_ref,:) will give all the ending points,
-        % "tocoords"
-        % uniqueedges(edgenumberlist(expandfrom_ref)) will give all
-        % the starting edges, "fromedges"
-        % uniqueedges(edgenumberlist(expandto_ref)) will give all
-        % the ending edges, "toedges"
-
-% [uniqueedges(edgenumberlist(expandfrom_ref))   uniqueedges(edgenumberlist(expandto_ref))]
-% pause
-
-        % We can make a simple test of which planes that could be excluded
-        % from the obstruction test by checking the edgeseesplane for the
-        % relevant edges. It can be multiplied by the canplaneobstruct list
-        % when calling the findobstructedpaths function.
-        isplaneactiveforobstruction = (sum(edgedata.edgeseesplane(:,uniqueedges).'==1)>0);
-        
-        
-% %         save /Users/petersve/Documents/Temp/Temp2.mat
-% %         pause
-
-        global STARTPLANES ENDPLANES
-        global BIGFROMCOORDS BIGTOCOORDS BIGSTARTPLANES BIGENDPLANES
-% The global definition was missing - why?
-        global REFTOFROMCOSHO REFTOTOCOSHO
-        
-%             FROMCOORDS = edgesubcoords(expandfrom_ref,:);
-        FROMCOORDSSHORTLIST = edgesubcoords;
-        REFTOFROMCOSHO = uint32(expandfrom_ref);
-%         TOCOORDS   = edgesubcoords(expandto_ref,:);
-        TOCOORDSSHORTLIST   = edgesubcoords;
-        REFTOTOCOSHO = uint32(expandto_ref);
-        if nedges < 256
-            bigfromedge   = uint8(uniqueedges(edgenumberlist(expandfrom_ref)).');
-        else
-            bigfromedge   = uint16(uniqueedges(edgenumberlist(expandfrom_ref)).');
+        if showtext >= 2
+            disp(['      Edge-to-edge visibility: ',int2str(numel(ivfull)),' pairs fully visible, ',...
+                int2str(numel(ivpart)),' partly visible, ',int2str(sum(visclass==0)),' hidden'])
         end
-        clear expandfrom_ref
-        bigfromedge = bigfromedge(:);
-        if nedges < 256
-            bigtoedge     = uint8(uniqueedges(edgenumberlist(expandto_ref)).');
+
+        if maxedgetoedgevisvalue < 128
+            edgeseespartialedge = int8(edgeseespartialedge);
+        elseif maxedgetoedgevisvalue < 32768
+            edgeseespartialedge = int16(edgeseespartialedge);
         else
-            bigtoedge     = uint16(uniqueedges(edgenumberlist(expandto_ref)).');
-        end
-        clear expandto_ref
-        bigtoedge = bigtoedge(:);
-%         [bigfromedge bigtoedge]
-%         pause
-        %  bigfromweight = edgeweightlist((expandfrom_ref));
-      %  bigtoweight   = edgeweightlist((expandto_ref));
-        
-        STARTPLANES = [edgedata.planesatedge(bigfromedge,1) edgedata.planesatedge(bigfromedge,2)];
-        ENDPLANES   = [edgedata.planesatedge(bigtoedge,1) edgedata.planesatedge(bigtoedge,2)];        
-        
-%                     REFTOFROMCOSHO = REFTOFROMCOSHO(nonobstructedpaths);
-%                     REFTOTOCOSHO = REFTOTOCOSHO(nonobstructedpaths);
-%                     STARTPLANES = STARTPLANES(nonobstructedpaths,:);
-%                     ENDPLANES = ENDPLANES(nonobstructedpaths,:);
-%                     bigfromedge = bigfromedge(nonobstructedpaths);
-%                     bigtoedge = bigtoedge(nonobstructedpaths);
-%                     npathstocheck = size(REFTOFROMCOSHO,1);
-
-        shouldplanebechecked = double(planedata.canplaneobstruct).*double(isplaneactiveforobstruction);
-        nplanesperbatch = ceil(sum(shouldplanebechecked)/ndiff2batches);
-        if nplanesperbatch > 0
-            temp = cumsum(shouldplanebechecked);
-            diff2batchlist = zeros(ndiff2batches,2);
-            diff2batchlist(1,1) = 1;
-            loopisfinished = 0;
-            for ii = 1:ndiff2batches-1
-                ivtemp = find(temp==nplanesperbatch*ii);
-                if ~isempty(ivtemp)
-                    diff2batchlist(ii,2) = ivtemp(1);
-                    diff2batchlist(ii+1,1) = ivtemp(1)+1;
-               else
-                   loopisfinished = 1;
-               end               
-            end
-            diff2batchlist(ii,2) = nplanes;
-            ivtemp = diff2batchlist(:,1)>0;
-            diff2batchlist = diff2batchlist(ivtemp,:);
-            ndiff2batches = size(diff2batchlist,1);
-
-            npathstocheck = size(REFTOFROMCOSHO,1);
-            for ii = 1:ndiff2batches
-                if npathstocheck > 0
-                    maskedchkpla = shouldplanebechecked;
-                    if ii > 1
-                        maskedchkpla(1:diff2batchlist(ii,1)-1) = maskedchkpla(1:diff2batchlist(ii,1)-1)*0;    
-                    end
-                    if ii < ndiff2batches
-                        maskedchkpla(diff2batchlist(ii,2)+1:end) = maskedchkpla(diff2batchlist(ii,2)+1:end)*0;                    
-                    end
-                    nplanestocheck = sum(maskedchkpla);
-                    if showtext >= 3 
-                        if round(ii/1)*1==ii
-                            disp(['   Batch ',int2str(ii),' of ',int2str(ndiff2batches),': '])
-                            disp(['   ',int2str(npathstocheck),' paths to check, ',int2str(nplanestocheck),' planes to check obstruction for'])
-%                         disp(['   plane ',int2str(find(maskedchkpla))])
-                        end
-                    end
-                
-                    % We create the BIGFROMCOORDS matrices and BIGTOCOORDS matrices
-                    % outside since they need to be exactly identical from batch to
-                    % batch as long as nplanestocheck is the same.
-        
-                    npathstocheck = size(REFTOFROMCOSHO,1);
-                
-                    ntot = nplanestocheck*npathstocheck;
-                
-                    BIGFROMCOORDS = reshape(repmat(FROMCOORDSSHORTLIST(REFTOFROMCOSHO,:).',[nplanestocheck,1]),3,ntot).';
-                    BIGTOCOORDS = reshape(repmat(TOCOORDSSHORTLIST(REFTOTOCOSHO,:).',[nplanestocheck,1]),3,ntot).';
-                    BIGSTARTPLANES = reshape(repmat(STARTPLANES.',[nplanestocheck,1]),2,ntot).';
-                    BIGENDPLANES = reshape(repmat(ENDPLANES.',[nplanestocheck,1]),2,ntot).';
-                
-%                     [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_edgetoedge(maskedchkpla,planedata.planeseesplane,...
-%                         planedata.planeeqs,planedata.planeeqs(:,1:3),planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,planedata.ncornersperplanevec,planedata.rearsideplane);
-                    [nonobstructedpaths,nobstructions,edgehits,cornerhits] = EDcheckobstr_edgetoedge(maskedchkpla,...
-                        planedata.planeeqs,planedata.planeeqs(:,1:3),planedata.minvals,planedata.maxvals,planedata.planecorners,planedata.corners,planedata.ncornersperplanevec,planedata.rearsideplane);
-                                    
-                    if ~isempty(edgehits)
-                           % Look for the edge-to-edge combos that share a
-                           % plane. When such combos have hit an edge, it
-                           % must mean that they are planes with indents.
-                          wasedgehitnotindent = prod(double(diff(sort([STARTPLANES(edgehits,:) ENDPLANES(edgehits,:)].')))).';
-                        indentedgehits = find(wasedgehitnotindent==0);
-                        if ~isempty(indentedgehits)
-                          nonobstructedpaths = setdiff(nonobstructedpaths,edgehits(indentedgehits));
-                        end
-                        
-                    end
-                    
-                    if ~isempty(nonobstructedpaths)
-                        REFTOFROMCOSHO = REFTOFROMCOSHO(nonobstructedpaths);
-                        REFTOTOCOSHO = REFTOTOCOSHO(nonobstructedpaths);
-                        STARTPLANES = STARTPLANES(nonobstructedpaths,:);
-                        ENDPLANES = ENDPLANES(nonobstructedpaths,:);
-                        bigfromedge = bigfromedge(nonobstructedpaths);
-                        bigtoedge = bigtoedge(nonobstructedpaths);
-                        npathstocheck = size(REFTOFROMCOSHO,1);
-                    else
-                        REFTOFROMCOSHO = [];
-                        REFTOTOCOSHO = [];
-                        STARTPLANES = [];
-                        ENDPLANES = [];
-                        bigfromedge = [];
-                        bigtoedge = [];
-                        npathstocheck = 0;
-                    end
-                   
-                end   %     if npathstocheck > 0,
-            
-            end           %  for ii = 1:ndiff2batches,
-        else
-            nonobstructedpaths = 1;
-            
-        end         %if nplanesperbatch > 0,
-
-        
-            clear REFTOFROMCOSHO REFTOTOCOSHO STARTPLANES ENDPLANES
-
-
-        if ~isempty(nonobstructedpaths)
-            
-            % Add the segment pieces together
-            % NB! We don't try to implement the correct way to do it since
-            % we would need nedgesubs^2 bits to represent all edge-segment
-            % to edge-segment visibility possibilities.
-            % Instead we just establish whether the two edges see each
-            % other fully or partly.
-
-            visiblesegmentscounter = ones(size(bigfromedge));
-            test = [bigfromedge bigtoedge];
-            
-            ncombs = length(bigfromedge);
-            dtest = diff([0;prod(   double(test(1:ncombs-1,:)==test(2:ncombs,:)).'  ).']);
-            ivremove = find(dtest==1);
-            
-            while ~isempty(ivremove)
-                visiblesegmentscounter(ivremove+1) = visiblesegmentscounter(ivremove+1) + visiblesegmentscounter(ivremove);
-                visiblesegmentscounter(ivremove) = [];
-                bigfromedge(ivremove) = [];
-                bigtoedge(ivremove,:) = [];
-                
-                test = [bigfromedge bigtoedge];
-                ncombs = length(bigfromedge);
-                dtest = diff([0;prod(   double(test(1:ncombs-1,:)==test(2:ncombs,:)).'  ).']);
-                ivremove = find(dtest==1);
-	
-            end
-            
-            indexvec = uint32((double(bigfromedge)-1)*nedges + double(bigtoedge));
-            if maxedgetoedgevisvalue < 128
-                edgeseespartialedge = int8(zeros(nedges,nedges));            
-            elseif maxedgetoedgevisvalue < 32768
-                edgeseespartialedge = int16(zeros(nedges,nedges));            
-            else
-                edgeseespartialedge = int32(zeros(nedges,nedges));            
-            end                
-                
-            iv = find(visiblesegmentscounter==nedgesubs^2);
-            edgeseespartialedge(indexvec(iv)) = maxedgetoedgevisvalue*ones(size(iv));
-            iv = find(visiblesegmentscounter>0 & visiblesegmentscounter<nedgesubs^2);
-            edgeseespartialedge(indexvec(iv)) = maxedgetoedgevisvalue/2*ones(size(iv));
-            
-            if maxedgetoedgevisvalue < 128
-               edgeseespartialedge = int8(double(edgeseespartialedge) + double(triu(edgeseespartialedge)).');
-           elseif maxedgetoedgevisvalue < 32768
-               edgeseespartialedge = int16(double(edgeseespartialedge) + double(triu(edgeseespartialedge)).');
-           else
-               edgeseespartialedge = int32(double(edgeseespartialedge) + double(triu(edgeseespartialedge)).');               
-           end
-        else
-            edgeseespartialedge = sparse(zeros(nedges,nedges));            
+            edgeseespartialedge = int32(edgeseespartialedge);
         end
     else
         edgeseespartialedge = [];
@@ -1297,6 +1067,13 @@ edgeseespartialedge = double(edgeseespartialedge).*double(edgetoedgestrength>0);
             
 iv = find(edgetoedgestrength==2);
 edgeseespartialedge(iv) = -edgeseespartialedge(iv);
+
+% 20 Nov. 2026: keep only the partly visible pairs that are still included
+if ~isempty(partialvispairs)
+    ivkeep = edgeseespartialedge(sub2ind([nedges nedges],partialvispairs(:,1),partialvispairs(:,2))) ~= 0;
+    partialvispairs = partialvispairs(ivkeep,:);
+    partialvisoccluders = partialvisoccluders(ivkeep);
+end
 
 clear edgeseesedge edgetoedgestrength
 
@@ -1613,6 +1390,9 @@ edgetoedgedata = struct('reftoshortlistE',reftoshortlistE,'re1sho',re1sho,...
     'edgeconnectedwithedge',edgeconnectedwithedge,'edgeconnectionangle',edgeconnectionangle,...
     'edgeperptoplane',edgeperptoplane,'edgeplaneperptoplane1',edgeplaneperptoplane1,...
     'edgeplaneperptoplane2',edgeplaneperptoplane2);
+% 20 Nov. 2026 (cell arrays can not be given directly to struct)
+edgetoedgedata.partialvispairs = partialvispairs;
+edgetoedgedata.partialvisoccluders = partialvisoccluders;
 
 edgetoedgedata.EDinputdatahash = EDinputdatahash;
 

@@ -83,10 +83,15 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 %     'exactpole'): the propagation rows of an edge pair across a face, for a
 %     receiver close to the plane of the face, agree with high-precision
 %     reference values (EDcalcpropagatematrix_block called directly).
+% 25. The edge-to-edge visibility of a non-convex model
+%     (EDedgepairvisibility): three thin plates, where a strip between two
+%     parallel plates hides one edge pair completely and another one
+%     partly. The classification (hidden, partly or fully visible) and the
+%     visibility of 40 x 40 node pairs agree with the analytic answer.
 %
 % See also EDmain_convex, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 9 Nov. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams);
 
@@ -147,8 +152,10 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % by PS). Test 17 also changes ESIEpropagationimplementation, to 'accurate'
 % (the default is now 'exactpole'). Test 1 uses the default propagation, so
 % from now on 'exactpole'; its limits were set with 'accurate'.
+% 21 Nov. 2026 Added test 25 (the edge-to-edge visibility of a non-convex
+% model, by Claude, prompted by PS).
 
-ntests = 24;
+ntests = 25;
 
 if nargin < 1 || isempty(outputdirectory)
     outputdirectory = uigetdir('', 'Select the directory for the calculation results and the logfile');
@@ -202,7 +209,8 @@ disp(headerline)
 
 testfunctions = {@edtest1,@edtest2,@edtest3,@edtest4,@edtest5,@edtest6,@edtest7,...
     @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15,...
-    @edtest16,@edtest17,@edtest18,@edtest19,@edtest20,@edtest21,@edtest22,@edtest23,@edtest24};
+    @edtest16,@edtest17,@edtest18,@edtest19,@edtest20,@edtest21,@edtest22,@edtest23,@edtest24,...
+    @edtest25};
 
 for itest = 1:ntests
     if runtest(itest) ~= 1
@@ -1033,6 +1041,55 @@ defaultok = isequal(Fdefault,Ftaylor);
 resultlines = {sprintf('Max. relative error, ''exact'': %.2g; ''taylor'': %.2g',errexact,errtaylor),...
     sprintf('Default equals ''taylor'': %d',defaultok)};
 r = edresult(title,description,errexact < tolexact && defaultok,resultlines);
+end
+
+function r = edtest25(outputdirectory,filestem,~)
+title = 'Edge-to-edge visibility of a non-convex model (three thin plates)';
+description = {'Two parallel 1 x 1 m thin plates, at z = 0 and z = 1, and between them a strip at',...
+    'z = 0.5 (x = 0.3 to 0.7, y = -0.5 to 1.5). The geometry is set up by EDmain_convex (difforder = 1),',...
+    'and EDedgepairvisibility is called directly for three edge pairs:',...
+    '  P1 edge y = 0 and P2 edge y = 1: partly visible. The line from (xA,0,0) to (xB,1,1) is',...
+    '    obstructed exactly when 0.3 < (xA+xB)/2 < 0.7 (1/2 when it is 0.3 or 0.7: through an edge of',...
+    '    the strip). Tested for 40 x 40 node pairs.',...
+    '  P1 edge x = 1 and P2 edge x = 0: hidden by the strip.',...
+    '  P1 edge x = 0 and P2 edge x = 0: fully visible (the lines pass beside the strip).'};
+
+P1 = [0 0 0;1 0 0;1 1 0;0 1 0];
+P2 = P1 + [0 0 1];
+P3 = [0.3 -0.5 0.5;0.7 -0.5 0.5;0.7 1.5 0.5;0.3 1.5 0.5];
+geoinputdata = struct('corners',[P1;P2;P3],'planecorners',...
+    [1 2 3 4;4 3 2 1;5 6 7 8;8 7 6 5;9 10 11 12;12 11 10 9],'allownonconvex',1);
+Sinputdata = struct('coordinates',[0.13 0.21 1]/norm([0.13 0.21 1])*100);
+Rinputdata = struct('coordinates',[0.37 0.41 1.3]);
+envdata = struct('cair',344);
+controlparameters = struct('frequencies',100,'generalmethod','tf','difforder',1);
+EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,...
+    edfilehandling(outputdirectory,filestem));
+eddata = load(fullfile(outputdirectory,[filestem,'_eddata.mat']));
+pd = eddata.planedata;
+ed = eddata.edgedata;
+S = ed.edgestartcoords;
+E = ed.edgeendcoords;
+acc = 1e-9;
+along = @(c,val,zval) find(abs(S(:,c)-val) < acc & abs(E(:,c)-val) < acc & abs(S(:,3)-zval) < acc & abs(E(:,3)-zval) < acc);
+iA = along(2,0,0);
+iB = along(2,1,1);
+iC = along(1,1,0);
+iD = along(1,0,1);
+iE = along(1,0,0);
+
+[visclass,occl] = EDedgepairvisibility('classify',pd,ed,[iA iB;iC iD;iE iD]);
+u = ((1:40).'-0.5)/40;
+vis = EDedgepairvisibility('nodepairs',pd,ed,iA,iB,u,u,occl{1});
+xA = S(iA,1) + u*(E(iA,1)-S(iA,1));
+xB = S(iB,1) + u*(E(iB,1)-S(iB,1));
+xm = (xA + xB.')/2;
+ref = double(~(xm > 0.3+acc & xm < 0.7-acc));
+ref(abs(xm-0.3) < acc | abs(xm-0.7) < acc) = 0.5;
+nwrong = sum(abs(vis(:)-ref(:)) > 1e-12);
+resultlines = {sprintf('Classes (expected 1, 0, 2): %d, %d, %d',visclass),...
+    sprintf('Node pairs that differ from the analytic answer: %d of %d',nwrong,numel(ref))};
+r = edresult(title,description,isequal(visclass(:).',[1 0 2]) && nwrong == 0,resultlines);
 end
 
 function [x,w] = edglrule01(n)

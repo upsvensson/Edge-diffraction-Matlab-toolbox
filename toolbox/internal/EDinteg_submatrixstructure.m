@@ -1,6 +1,6 @@
 function [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
-controlparameters,EDversionnumber,filehandlingparameters)
+controlparameters,EDversionnumber,filehandlingparameters,planedata)
 % EDinteg_submatrixstructure - Sets up the structure of the edge source integral equation.
 % Decides the number of Gauss-Legendre points on each edge, the edge pairs
 % (blocks of unknowns) and the edge triplets (submatrices of the H-matrix),
@@ -53,6 +53,9 @@ controlparameters,EDversionnumber,filehandlingparameters)
 %   filehandlingparameters
 %                   struct; the fields .outputdirectory, .filestem, .showtext,
 %                   .suppressresultrecycling and .savesubmatrixdata are used.
+%   planedata       (optional) struct, see help EDdatastructs. Needed only
+%                   if edgetoedgedata.partialvispairs is not empty
+%                   (non-convex models).
 %
 % Output parameters:
 %   Hsubmatrixdata  struct, see help EDdatastructs
@@ -65,11 +68,11 @@ controlparameters,EDversionnumber,filehandlingparameters)
 %
 % See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 20 Nov. 2026
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 %    EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
-%    controlparameters,EDversionnumber,filehandlingparameters);
+%    controlparameters,EDversionnumber,filehandlingparameters,planedata);
 
 % 29-1-2013 Cleaned up quite much and avoided looping through all the
 %           empty combinations. Exported much more data. Introduced
@@ -129,6 +132,9 @@ controlparameters,EDversionnumber,filehandlingparameters)
 % (symmetry) also compares the numbers of points on the three edges; with
 % numbers given per corner pair, geometrically identical triplets can have
 % different numbers of points.
+% 20 Nov. 2026 (by Claude, prompted by PS) New optional input parameter
+% planedata, and new output field .visrowmask: the visibility of the node
+% pairs of partly visible edge pairs (non-convex models).
 
 t00 = clock;
 
@@ -556,6 +562,41 @@ for ii = 1:length(uniquelistofedgepoints)
     quadraturematrix_weights(1:n,n) = weightvec(:);
 end
 
+% ----------------------------------------------------------------------------------------------
+% 20 Nov. 2026: for the partly visible edge pairs (non-convex models, see
+% EDedgepairvisibility), the visibility of every node pair. visrowmask
+% has one value per element of the Q vector: 1 if the straight line from
+% the node on the from-edge to the node on the to-edge is free, 0 if it is
+% obstructed (1/2 or 2/3 if it passes exactly through an edge or corner of
+% a plane). It is empty if all edge pairs are fully visible.
+
+visrowmask = [];
+if isfield(edgetoedgedata,'partialvispairs') && ~isempty(edgetoedgedata.partialvispairs)
+    if nargin < 6 || isempty(planedata)
+        error('EDinteg_submatrixstructure:planedata','planedata is needed for partly visible edge pairs')
+    end
+    visrowmask = ones(double(Qvecendnums(end)),1);
+    pvpairs = sort(double(edgetoedgedata.partialvispairs),2);
+    sortedpairlist = sort(double(edgepairlist),2);
+    [ispartial,locpartial] = ismember(sortedpairlist,pvpairs,'rows');
+    for ii = find(ispartial).'
+        toedge = double(edgepairlist(ii,1));
+        fromedge = double(edgepairlist(ii,2));
+        nto = nedgeelems(toedge);
+        nfrom = nedgeelems(fromedge);
+        ufrom = full(quadraturematrix_pos(1:nfrom,nfrom));
+        uto = full(quadraturematrix_pos(1:nto,nto));
+        vis = EDedgepairvisibility('nodepairs',planedata,edgedata,fromedge,toedge,...
+            ufrom,uto,edgetoedgedata.partialvisoccluders{locpartial(ii)});
+        % Element ifrom + (ito-1)*nfrom of the Q segment
+        visrowmask(Qvecstartnums(ii):Qvecendnums(ii)) = vis(:);
+    end
+    if showtext >= 2
+        disp(['      ',int2str(sum(ispartial)),' partly visible edge pairs: ',...
+            int2str(sum(visrowmask==0)),' of ',int2str(numel(visrowmask)),' node pairs obstructed'])
+    end
+end
+
 Hsubmatrixdata = struct('Hsubmatrix',Hsubmatrix);
 Hsubmatrixdata.listofsubmatrices = listofsubmatrices;
 Hsubmatrixdata.edgepairlist = edgepairlist;
@@ -574,6 +615,7 @@ Hsubmatrixdata.edgepairsharecorner = edgepairsharecorner;
 Hsubmatrixdata.edgepairsharedcornertype_from = edgepairsharedcornertype_from;
 Hsubmatrixdata.edgepairsharedcornertype_to = edgepairsharedcornertype_to;
 Hsubmatrixdata.edgepairangle = edgepairangle;
+Hsubmatrixdata.visrowmask = visrowmask;
 Hsubmatrixdata.EDinputdatahash = EDinputdatahash;
 
 elapsedtimesubmatrix = etime(clock,t00);

@@ -34,7 +34,7 @@ function stageinfo = EDstageversions(stagename)
 %                                    (struct of cell arrays)
 %                 .ignored           cell array with the ignored functions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % stageinfo = EDstageversions(stagename);
 
@@ -58,6 +58,18 @@ function stageinfo = EDstageversions(stagename)
 % increased. EDinteg_submatrixstructure to version 2: the thin-plane edge
 % pairs and triplets are defined differently, which changes the results
 % for several connected thin plates (e.g., a folded plate).
+% 20 Nov. 2026 EDed2geo to version 2 and EDinteg_submatrixstructure to
+% version 3: partly visible edge pairs (non-convex models), with the new
+% subroutine EDedgepairvisibility. Results for convex models are unchanged.
+% EDfindGApaths to version 2 (thin-plate obstruction at exact edge hits).
+% 21 Nov. 2026 EDintegralequation_convex_tf to version 2: a source point
+% that sees only part of an edge gets that part as a segment with its own
+% quadrature (new subroutine EDsegmentlayout). The results for convex
+% models are unchanged, but the version is increased so that stored
+% solutions of non-convex models (_qfinal files) are not reused.
+% EDed2geo no longer uses EDcheckobstr_edgetoedge and EDgetedgepoints
+% (removed from its list); EDintegralequation_convex_tf uses EDpoinpla
+% (via EDsegmentlayout and EDedgepairvisibility).
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -68,12 +80,12 @@ versions = struct;
 versions.EDedgeo                      = 1;
 versions.EDSorRgeo                    = 1;
 versions.EDfindconvexGApaths          = 1;
-versions.EDfindGApaths                = 1;
+versions.EDfindGApaths                = 2;  % 2: thin plates tested once for obstruction
 versions.EDmakefirstordertfs          = 1;
 versions.EDmakefirstorderirs          = 1;
-versions.EDed2geo                     = 1;
-versions.EDinteg_submatrixstructure   = 2;  % 2: thin-plane pairs/triplets defined by the incoming edge pair (non-convex models)
-versions.EDintegralequation_convex_tf = 1;
+versions.EDed2geo                     = 2;  % 2: conservative edge-pair visibility (non-convex models)
+versions.EDinteg_submatrixstructure   = 3;  % 2: thin-plane pairs/triplets defined by the incoming edge pair; 3: node-pair visibility masks (non-convex models)
+versions.EDintegralequation_convex_tf = 2;  % 2: edge segments for partly visible edges (non-convex models)
 versions.EDfindHODpaths               = 1;
 versions.EDmakeHODirs                 = 2;  % 2: source amplitudes applied also for doaddsources = 0
 versions.EDpropagateESIEBEM           = 2;  % 2: complete hash; several sources give an error
@@ -102,6 +114,8 @@ versions.EDcoordtrans2                = 1;
 versions.EDcreindexmatrix             = 1;
 versions.EDcross                      = 1;
 versions.EDdistelements               = 1;
+versions.EDedgepairvisibility         = 1;
+versions.EDsegmentlayout              = 1;
 versions.EDfindis                     = 1;
 versions.EDgetedgepoints              = 1;
 versions.EDgetGLrule                  = 1;
@@ -140,12 +154,13 @@ stagesubroutines.EDmakefirstordertfs = {'EDpistonedgeintegrand','EDwedge1st_fd',
     'EDbetaoverml_fd','EDquadgk','EDgetGLrule','EDdistelements','lgwt'};
 stagesubroutines.EDmakefirstorderirs = {'EDcoordtrans2','EDcross','EDwedge1st_ir',...
     'EDbetaoverml','EDquadstep'};
-stagesubroutines.EDed2geo = {'EDcheckobstr_edgetoedge','EDpoinpla','EDcompress7',...
-    'EDcoordtrans2','EDcross','EDgetedgepoints','EDinfrontofplane'};
-stagesubroutines.EDinteg_submatrixstructure = {'EDgetGLrule','EDdistelements','lgwt'};
+stagesubroutines.EDed2geo = {'EDedgepairvisibility','EDpoinpla','EDcompress7',...
+    'EDcoordtrans2','EDcross','EDinfrontofplane'};
+stagesubroutines.EDinteg_submatrixstructure = {'EDgetGLrule','EDdistelements','lgwt','EDedgepairvisibility','EDpoinpla'};
 stagesubroutines.EDintegralequation_convex_tf = {'EDinteg_souterm','EDinteg_soutermsources','EDintegratebetaoverm',...
     'EDbetaoverm_fd','EDpropagateQvec','EDcalcpropagatematrix','EDcalcpropagatematrix_block','EDbuildHsparse','EDmatvecH',...
-    'EDHkernelvalues','EDrefineQvec','EDcalcedgeinteqmatrixsub2_mex','EDcoordtrans1','EDdistelements','EDgetGLrule','lgwt'};
+    'EDHkernelvalues','EDrefineQvec','EDcalcedgeinteqmatrixsub2_mex','EDcoordtrans1','EDdistelements','EDgetGLrule','lgwt',...
+    'EDsegmentlayout','EDedgepairvisibility','EDpoinpla'};
 stagesubroutines.EDfindHODpaths = {};
 stagesubroutines.EDmakeHODirs = {'EDwedge2nd','EDwedgeN','EDcreindexmatrix','EDcoordtrans1'};
 stagesubroutines.EDpropagateESIEBEM = {'EDcalccosfi','EDcalcdist'};

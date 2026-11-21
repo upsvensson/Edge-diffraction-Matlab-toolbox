@@ -91,7 +91,7 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % See also EDdatastructs, EDstageversions, EDpropagateQvec, EDrefineQvec,
 % EDinteg_soutermsources, EDHkernelvalues
 %
-% Peter Svensson (peter.svensson@ntnu.no) 28 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % [tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilename] = ...
 %    EDintegralequation_convex_tf(Hsubmatrixdata,planedata,edgedata,edgetoedgedata,...
@@ -266,6 +266,20 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % (filehandlingparameters.parallelworkers).
 % 20 Oct. 2026 The node and weight table (gaussvectors) also covers edges
 % with more points than abs(ngauss) (controlparameters.ngaussmin).
+% 20 Nov. 2026 (by Claude, prompted by PS) Non-convex models: image
+% sources and receivers (Sdata.parentsource, Rdata.parentreceiver), and
+% the visibility of the node pairs of partly visible edge pairs
+% (Hsubmatrixdata.visrowmask), which multiplies the source term and H*q
+% (local function edapplyvisrowmask). ESIEpropagationrefine gives an
+% error for partly visible edge pairs.
+% 21 Nov. 2026 (by Claude, prompted by PS) A source point that sees only
+% part of an edge gets that part as a segment with its own quadrature
+% (EDsegmentlayout, local function edsegmentterms): its source term is
+% taken one H-step to the ordinary unknowns (an extra right-hand side,
+% see edsolveinteq) and propagated directly to the receivers. Before, the
+% edge nodes outside the part got a zero source term, which made the
+% convergence with ngauss erratic. ESIEpropagationrefine gives an error
+% when there are segments. New inteqdiagnostics.nsegments.
 
 t00_total = clock;
 t00 = clock;
@@ -754,6 +768,23 @@ t00 = clock;
 % savetemp
 % pause
 
+% 21 Nov. 2026: source points that see only part of an edge (non-convex
+% models) get that part as a segment with its own quadrature (see
+% EDsegmentlayout). Sdata_souterm is Sdata without those parts, for the
+% ordinary source term.
+[segdata,Sdata_souterm] = EDsegmentlayout(edgedata,edgetoedgedata,Hsubmatrixdata,Sdata,planedata,controlparameters);
+if segdata.ngroups > 0
+    Qsegstore = cell(nfrequencies,ndiagcols);
+    if dorefine
+        error('EDintegralequation_convex_tf:refineseg',...
+            'ESIEpropagationrefine can not be used when a source sees only part of an edge (yet)')
+    end
+    if showtext >= 2
+        disp(['      ',int2str(segdata.ngroups),' edge segments (sources that see only part of an edge)'])
+    end
+end
+inteqdiagnostics.nsegments = segdata.ngroups;
+
 % dcol is only defined if the H-matrix is used (difforder > 2), and Bsp
 % only for GMRES_fast; they are given to edsolveinteq in any case.
 dcol = [];
@@ -797,7 +828,16 @@ for ifreq = 1:nfrequencies
         
         if qfinalreused == 0
             Q_firstterm = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
-                controlparameters,Sdata,frequency,ifreq,gaussvectors,1:nsourcepoints,1,filehandlingparameters.showtext);
+                controlparameters,Sdata_souterm,frequency,ifreq,gaussvectors,1:nsourcepoints,1,filehandlingparameters.showtext);
+            % 20 Nov. 2026: partly visible edge pairs (non-convex models)
+            Q_firstterm = edapplyvisrowmask(Q_firstterm,Hsubmatrixdata);
+            % 21 Nov. 2026: edge segments (non-convex models)
+            Qextra = [];
+            if segdata.ngroups > 0
+                [Qsegstore{ifreq,1},Qextra] = edsegmentterms(segdata,1:segdata.ngroups,envdata,edgedata,...
+                    edgetoedgedata,Hsubmatrixdata,controlparameters,Sdata,frequency,ifreq,gaussvectors,...
+                    thinplaneboostvec,controlparameters.difforder > 2,filehandlingparameters.showtext);
+            end
 
             timingdata(2) = timingdata(2) + etime(clock,t00);
             t00 = clock;
@@ -809,7 +849,7 @@ for ifreq = 1:nfrequencies
             % local function edsolveinteq).
 
             [Qfinal,solvediag] = edsolveinteq(Q_firstterm,dcol,Bsp,Hsubmatrixdata,Hsubdatalists,ivuselists,...
-                controlparameters,showtext);
+                controlparameters,showtext,Qextra);
             inteqdiagnostics = edstoresolvediag(inteqdiagnostics,solvediag,ifreq,1);
 
             doesQsegmenthavevalues = zeros(length(Hsubmatrixdata.edgepairlist(:,1)),1);
@@ -831,6 +871,11 @@ for ifreq = 1:nfrequencies
             Qfinal = Qfinalstore{ifreq,1};
             Q_firstterm = Qfirsttermstore{ifreq,1};
             doesQsegmenthavevalues = edQsegmentflags(Qfinal,Hsubmatrixdata);
+            if segdata.ngroups > 0
+                Qsegstore{ifreq,1} = edsegmentterms(segdata,1:segdata.ngroups,envdata,edgedata,...
+                    edgetoedgedata,Hsubmatrixdata,controlparameters,Sdata,frequency,ifreq,gaussvectors,...
+                    thinplaneboostvec,0,filehandlingparameters.showtext);
+            end
         end
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -869,10 +914,20 @@ for ifreq = 1:nfrequencies
                 sourcepointlist = find(parentsource == isou);
                 if numel(sourcepointlist) == 1
                     Q_firstterm = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
-                        controlparameters,Sdata,frequency,ifreq,gaussvectors,sourcepointlist,0,filehandlingparameters.showtext);
+                        controlparameters,Sdata_souterm,frequency,ifreq,gaussvectors,sourcepointlist,0,filehandlingparameters.showtext);
                 else
                     Q_firstterm = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,Hsubmatrixdata,...
-                        controlparameters,Sdata,frequency,ifreq,gaussvectors,sourcepointlist,1,filehandlingparameters.showtext);
+                        controlparameters,Sdata_souterm,frequency,ifreq,gaussvectors,sourcepointlist,1,filehandlingparameters.showtext);
+                end
+                % 20 Nov. 2026: partly visible edge pairs (non-convex models)
+                Q_firstterm = edapplyvisrowmask(Q_firstterm,Hsubmatrixdata);
+                % 21 Nov. 2026: edge segments (non-convex models)
+                Qextra = [];
+                if segdata.ngroups > 0
+                    grouplist = find(ismember(segdata.groups(:,1),sourcepointlist));
+                    [Qsegstore{ifreq,isou},Qextra] = edsegmentterms(segdata,grouplist,envdata,edgedata,...
+                        edgetoedgedata,Hsubmatrixdata,controlparameters,Sdata,frequency,ifreq,gaussvectors,...
+                        thinplaneboostvec,controlparameters.difforder > 2,filehandlingparameters.showtext);
                 end
 
                 timingdata(2) = timingdata(2) + etime(clock,t00);
@@ -885,7 +940,7 @@ for ifreq = 1:nfrequencies
                 % local function edsolveinteq).
 
                 [Qfinal,solvediag] = edsolveinteq(Q_firstterm,dcol,Bsp,Hsubmatrixdata,Hsubdatalists,ivuselists,...
-                    controlparameters,showtext);
+                    controlparameters,showtext,Qextra);
                 inteqdiagnostics = edstoresolvediag(inteqdiagnostics,solvediag,ifreq,isou);
 
                 % savetemp
@@ -912,6 +967,12 @@ for ifreq = 1:nfrequencies
                 Qfinal = Qfinalstore{ifreq,isou};
                 Q_firstterm = Qfirsttermstore{ifreq,isou};
                 doesQsegmenthavevalues = edQsegmentflags(Qfinal,Hsubmatrixdata);
+                if segdata.ngroups > 0
+                    grouplist = find(ismember(segdata.groups(:,1),find(parentsource == isou)));
+                    Qsegstore{ifreq,isou} = edsegmentterms(segdata,grouplist,envdata,edgedata,...
+                        edgetoedgedata,Hsubmatrixdata,controlparameters,Sdata,frequency,ifreq,gaussvectors,...
+                        thinplaneboostvec,0,filehandlingparameters.showtext);
+                end
             end  
 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -969,6 +1030,10 @@ if controlparameters.skipreceiverpropagation == 0
         'savediff2',filehandlingparameters.savediff2result,...
         'nworkers',nworkers,'showtext',showtext,'isthinhole',isthinhole);
     if dorefine
+        if isfield(Hsubmatrixdata,'visrowmask') && ~isempty(Hsubmatrixdata.visrowmask)
+            error('EDintegralequation_convex_tf:refinevis',...
+                'ESIEpropagationrefine can not be used for a model with partly visible edge pairs (yet)')
+        end
         % The refined discretization: the number of nodes on each edge is
         % multiplied by its factor from ESIEpropagationrefine.
         t00_refine = clock;
@@ -1003,6 +1068,17 @@ if controlparameters.skipreceiverpropagation == 0
     [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgedata,Hsubmatrixdata_prop,Rdata,...
         Qfinalstore_prop,Qfirsttermstore_prop,controlparameters.frequencies,envdata,propsettings);
     clear Hsubmatrixdata_prop Qfinalstore_prop Qfirsttermstore_prop
+    % 21 Nov. 2026: the direct propagation of the edge segments (source ->
+    % segment -> edge -> receiver). It is part of the second-order
+    % diffraction, so it is not added to P_nodiff2.
+    if segdata.ngroups > 0
+        propsettings_seg = propsettings;
+        propsettings_seg.savediff2 = 0;
+        P_seg = EDpropagateQvec(edgedata,edgetoedgedata,segdata.layout,Rdata,...
+            Qsegstore,{},controlparameters.frequencies,envdata,propsettings_seg);
+        P_receiver = P_receiver + P_seg;
+        clear P_seg
+    end
     % 20 Nov. 2026: add the results of the extra receiver points (image
     % receivers, non-convex objects) to their parent receivers
     if nreceiverpoints > nreceivers
@@ -1094,14 +1170,22 @@ end
 
 %--------------------------------------------------------------------------
 function [Qfinal,solvediag] = edsolveinteq(Q_firstterm,dcol,Bsp,Hsubmatrixdata,Hsubdatalists,ivuselists,...
-    controlparameters,showtext)
+    controlparameters,showtext,Qextra)
 % Solves the integral equation Q = Q_firstterm + H*Q for one frequency
 % (and one source, or the added sources), with H(k)*x = B*(dcol.*x).
 % (Before 28 Oct. 2026, this code was written out twice, for CASE 1 and
 % CASE 2.) solvediag has the diagnostics for this solution: .normQ for
 % the iterative method, and .solvetime, .gmresiter, .gmresflag,
 % .gmresrelres for the GMRES methods.
+% 21 Nov. 2026: Qextra (optional, may be empty) is an extra right-hand
+% side, one diffraction order higher than Q_firstterm (the H-step from
+% the edge segments, see edsegmentterms): Q = Q_firstterm + Qextra + H*Q.
+% With the iterative method, its Neumann series has one term less, so
+% that both end at the same diffraction order.
 
+if nargin < 9
+    Qextra = [];
+end
 solvediag = struct;
 Q = Q_firstterm;
 Qfinal = Q;
@@ -1114,18 +1198,35 @@ if strcmp(controlparameters.inteqsolutionmethod,'iterative_fixeddifforder') == 1
         if showtext >= 3
            disp(['         Iteration no. ',int2str(iiter),' of ',int2str(controlparameters.difforder-2)])
         end
-        Q = EDmatvecH(dcol.*Q, Hsubmatrixdata, Hsubdatalists, ivuselists);
+        Q = edapplyvisrowmask(EDmatvecH(dcol.*Q, Hsubmatrixdata, Hsubdatalists, ivuselists),Hsubmatrixdata);
         Qfinal = Qfinal + Q;
         solvediag.normQ(iiter) = norm(Q);
+    end
+    if ~isempty(Qextra) && controlparameters.difforder > 2
+        Q = Qextra;
+        Qfinal = Qfinal + Q;
+        for iiter = 1:(controlparameters.difforder-3)
+            Q = edapplyvisrowmask(EDmatvecH(dcol.*Q, Hsubmatrixdata, Hsubdatalists, ivuselists),Hsubmatrixdata);
+            Qfinal = Qfinal + Q;
+        end
     end
 
 elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_fast') == 1 % Here we do the GMRES, fast version
     if showtext >= 2
         disp('      Starting to solve the int.eq. with GMRES, fast version (for smaller problems)')
     end
-    A = @(x) x - Bsp*(dcol.*x);     % H*x = B*(dcol.*x)
+    if ~isfield(Hsubmatrixdata,'visrowmask') || isempty(Hsubmatrixdata.visrowmask)
+        A = @(x) x - Bsp*(dcol.*x);     % H*x = B*(dcol.*x)
+    else
+        % 20 Nov. 2026: partly visible edge pairs (non-convex models)
+        A = @(x) x - Hsubmatrixdata.visrowmask.*(Bsp*(dcol.*x));
+    end
     t00_gmres = clock;
-    [Qfinal,flag,relres,iter] = gmres(A,Q_firstterm,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+    rhs = Q_firstterm;
+    if ~isempty(Qextra)
+        rhs = rhs + Qextra;
+    end
+    [Qfinal,flag,relres,iter] = gmres(A,rhs,[],controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
     solvediag.solvetime = etime(clock,t00_gmres);
     solvediag.gmresiter = iter(2);
     solvediag.gmresflag = flag;
@@ -1136,12 +1237,104 @@ elseif strcmp(controlparameters.inteqsolutionmethod,'GMRES_large') == 1 % Here w
         disp('      Starting to solve the int.eq. with GMRES, the version for larger problems')
     end
     t00_gmres = clock;
-    afun = @(q) q - EDmatvecH(dcol.*q, Hsubmatrixdata, Hsubdatalists, ivuselists);
-    [Qfinal, flag, relres, iter] = gmres(afun, Q_firstterm, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
+    afun = @(q) q - edapplyvisrowmask(EDmatvecH(dcol.*q, Hsubmatrixdata, Hsubdatalists, ivuselists),Hsubmatrixdata);
+    rhs = Q_firstterm;
+    if ~isempty(Qextra)
+        rhs = rhs + Qextra;
+    end
+    [Qfinal, flag, relres, iter] = gmres(afun, rhs, [], controlparameters.inteqtargettol,controlparameters.inteqgmresmaxiter);
     solvediag.solvetime = etime(clock,t00_gmres);
     solvediag.gmresiter = iter(2);
     solvediag.gmresflag = flag;
     solvediag.gmresrelres = relres;
+end
+end
+
+%--------------------------------------------------------------------------
+function [q0seg,bseg] = edsegmentterms(segdata,grouplist,envdata,edgedata,edgetoedgedata,...
+    Hsubmatrixdata,controlparameters,Sdata,frequency,ifreq,gaussvectors,thinplaneboostvec,dorhs,showtext)
+% 21 Nov. 2026: the edge segments (see EDsegmentlayout) of the groups in
+% grouplist, for one frequency.
+%   q0seg   the source term at the segment nodes, in the combined layout
+%           segdata.layout (zero for the groups that are not in grouplist)
+%   bseg    (if dorhs = 1) one H-step from the segments to the ordinary
+%           unknowns:
+%           b(Y <- X) = sum over the segment nodes z1 of
+%                       H(Y <- X <- z1) exp(-1i*k*m) q0seg(X <- z1),
+%           with the kernel values of EDHkernelvalues at the segment nodes
+%           (and the triplet's thin-plane factor). Empty if dorhs = 0.
+
+nQseg = double(segdata.layout.Qvecendnums(end));
+q0seg = zeros(nQseg,1);
+if dorhs
+    bseg = zeros(double(Hsubmatrixdata.Qvecendnums(end)),1);
+else
+    bseg = [];
+end
+k = 2*pi*frequency/envdata.cair;
+
+for g = grouplist(:).'
+    col = segdata.groups(g,1);
+    e = segdata.groups(g,2);
+    L = segdata.grouplayout{g};
+    % Only edge e is visible for this source point, over the whole segment
+    Sg = Sdata;
+    vp = zeros(size(Sdata.vispartedgesfroms));
+    vp(e,col) = 1;
+    Sg.vispartedgesfroms = vp;
+    Sg.vispartedgesfroms_start = zeros(size(vp));
+    Sg.vispartedgesfroms_end = ones(size(vp));
+    qg = EDinteg_soutermsources(envdata,edgedata,edgetoedgedata,L,controlparameters,...
+        Sg,frequency,ifreq,gaussvectors,col,1,showtext);
+    qg = qg(:);
+    if ~isempty(L.visrowmask)
+        qg = L.visrowmask.*qg;
+    end
+    q0seg(segdata.groupoffset(g) + (1:numel(qg))) = qg;
+
+    if dorhs
+        lene = edgedata.edgelengthvec(e);
+        for p = 1:size(L.edgepairlist,1)
+            X = double(L.edgepairlist(p,1));
+            nodes = L.fromnodelist{p};
+            na = size(nodes,1);
+            nX = double(Hsubmatrixdata.nedgeelems(X));
+            qa = reshape(qg(L.Qvecstartnums(p):L.Qvecendnums(p)),na,nX);
+            if ~any(qa(:))
+                continue
+            end
+            jc = L.regpairindex(p);
+            nnlist = find(Hsubmatrixdata.listofsubmatrices(:,3) == jc);
+            n2vec = full(Hsubmatrixdata.quadraturematrix_pos(1:nX,nX));
+            for nn = nnlist(:).'
+                ir = Hsubmatrixdata.listofsubmatrices(nn,2);
+                Y = double(Hsubmatrixdata.edgetripletlist(nn,1));
+                nY = double(Hsubmatrixdata.nedgeelems(Y));
+                n3vec = full(Hsubmatrixdata.quadraturematrix_pos(1:nY,nY));
+                [i1,i2,i3] = ndgrid(1:na,1:nX,1:nY);
+                [Hv,md] = EDHkernelvalues(edgedata,edgetoedgedata,e,X,Y,nodes(:,1),n2vec,n3vec,...
+                    nodes(:,2)*lene,i1(:),i2(:),i3(:),thinplaneboostvec(nn));
+                Hv = reshape(Hv(:).*exp(-1i*k*md(:)),na,nX,nY);
+                c = reshape(sum(Hv.*qa,1),nX,nY);
+                rows = double(Hsubmatrixdata.Qvecstartnums(ir)):double(Hsubmatrixdata.Qvecendnums(ir));
+                bseg(rows) = bseg(rows) + c(:);
+            end
+        end
+    end
+end
+if dorhs
+    bseg = edapplyvisrowmask(bseg,Hsubmatrixdata);
+end
+end
+
+%--------------------------------------------------------------------------
+function Q = edapplyvisrowmask(Q,Hsubmatrixdata)
+% 20 Nov. 2026: the elements of Q (the source term, or H*Q) for node pairs
+% whose straight line is obstructed are set to zero (partly visible edge
+% pairs of non-convex models, Hsubmatrixdata.visrowmask). Without the
+% field, or with an empty one, Q is not changed.
+if isfield(Hsubmatrixdata,'visrowmask') && ~isempty(Hsubmatrixdata.visrowmask)
+    Q = Hsubmatrixdata.visrowmask.*Q;
 end
 end
 

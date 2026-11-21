@@ -77,6 +77,11 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 %                       edge source amplitudes are not all zero
 %   polemethod          (optional) 'taylor' (default) or 'exact', the
 %                       treatment of the near-singular rows (see above)
+%   visstartmat, visendmat   (optional) [nedges,nrec] the visible part of
+%                       each edge for each receiver, as fractions 0-1. A
+%                       part that is not the whole edge gets its own
+%                       Gauss-Legendre rule, with q interpolated from the
+%                       edge nodes.
 %
 % Output parameters:
 %   Fgeom           [nrec,nQ] the frequency-independent part of the
@@ -94,11 +99,11 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 %
 % See also EDcalcpropagatematrix, EDintegralequation_convex_tf
 %
-% Peter Svensson (peter.svensson@ntnu.no) 9 Nov. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edgedata,...
 %    edgetoedgedata,Hsubmatrixdata,vispartedgesfromr,rRmat,thetaRmat,zRmat,...
-%    doesQsegmenthavevalues,polemethod);
+%    doesQsegmenthavevalues,polemethod,visstartmat,visendmat);
 
 % 16 Oct. 2026 First version (by Claude, prompted by PS). The local
 % functions gaussLegendreNodes, legendreVandermonde, glStandardCached,
@@ -115,13 +120,21 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 % the exact pole pair as the weight function. 'taylor' (the default) is
 % the earlier treatment, unchanged. New propdiagnostics fields
 % .nrows_exactpole and .nrows_fallback (only for 'exact').
+% 21 Nov. 2026 (by Claude, prompted by PS) The from-edge (edge 1) of a q
+% segment can have its own nodes and weights (Hsubmatrixdata.fromnodelist,
+% for a segment of an edge, see EDsegmentlayout).
+% 21 Nov. 2026 (by Claude, prompted by PS) The receiver-dependent part of
+% the main loop is moved, unchanged, to the local function edpairF. For a
+% receiver that sees only part of edge 2 (visstartmat, visendmat), the
+% part gets its own Gauss-Legendre rule, with q interpolated from the
+% edge-2 nodes (before: zero row elements outside the part).
 
 if nargin < 9 || isempty(polemethod)
     polemethod = 'taylor';
 end
 % 20 Nov. 2026: optional visible parts of the edges, [nedges,nrec]
 % fractions 0-1 (for a non-convex object, from EDimagepointdata). The
-% edge-2 nodes outside the visible part get zero row elements.
+% visible part gets its own quadrature (see "if usewindows" below).
 usewindows = nargin >= 11 && ~isempty(visstartmat) && ~isempty(visendmat);
 if ~ischar(polemethod) || ~any(strcmp(polemethod,{'taylor','exact'}))
     error('EDcalcpropagatematrix_block:polemethod','polemethod must be ''taylor'' or ''exact''')
@@ -177,6 +190,13 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
     ze2_re2 = (0 + n2vec*len2);
     n1vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n1,n1));
     weightvec1 = full(Hsubmatrixdata.quadraturematrix_weights(1:n1,n1));
+    % 21 Nov. 2026: a segment of the from-edge with its own nodes
+    % (Hsubmatrixdata.fromnodelist, see EDsegmentlayout)
+    if isfield(Hsubmatrixdata,'fromnodelist') && ~isempty(Hsubmatrixdata.fromnodelist{ii})
+        n1vec = Hsubmatrixdata.fromnodelist{ii}(:,1);
+        weightvec1 = Hsubmatrixdata.fromnodelist{ii}(:,2);
+        n1 = numel(n1vec);
+    end
     dzvec1 = weightvec1*edgedata.edgelengthvec(edge1);
 
     ze1_re2 = edgetoedgedata.ze1sho(refto(edge1,edge2)) + n1vec*( edgetoedgedata.ze2sho(refto(edge1,edge2))-edgetoedgedata.ze1sho(refto(edge1,edge2))   );
@@ -184,6 +204,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
 
     thetain = edgetoedgedata.thetae1sho(refto(edge1,edge2));
     thetain_end = edgetoedgedata.thetae2sho(refto(edge1,edge2));
+    thetae1_re2 = [];
     if (abs(thetain) < 1e-10 || abs(thetain-(2*pi-edgedata.closwedangvec(edge2))) < 1e-10) && abs(thetain-thetain_end) < 1e-10
         acrossface_in = 1;
     else
@@ -198,134 +219,16 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         re1_re2 = re1_re2(:); thetae1_re2 = thetae1_re2(:); ze1_re2 = ze1_re2(:);
     end
 
-    % Index vectors: element (i,j) of the n1-by-n2 block is number
-    % i + (j-1)*n1, as in EDcalcpropagatematrix.
-    n2vertmat = reshape(repmat(1:n2,n1,1),n1*n2,1);
-    n1vertmat = repmat((1:n1).',n2,1);
-
-    mdist = sqrt( (ze1_re2(n1vertmat) - ze2_re2(n2vertmat)).^2 + re1_re2(n1vertmat).^2 );   % [n1n2 x 1]
-
-    % Receiver-dependent quantities, [n1n2 x nr]
-    rR = rRmat(edge2,rr);           % [1 x nr]
-    thetaout = thetaRmat(edge2,rr);
-    zR = zRmat(edge2,rr);
-    ldist = sqrt( (zR - ze2_re2(n2vertmat)).^2 + rR.^2 );
-    pathlengths(rr,Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) = (ldist + mdist).';
-
-    ch = ((ze2_re2(n2vertmat) - ze1_re2(n1vertmat)).*(ze2_re2(n2vertmat) - zR) + mdist.*ldist)./re1_re2(n1vertmat)./rR;
-    ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
-    ch = ( ch + 1./ch)/2;
-
-    % 1/(l*m), the frequency-independent part of the kernel
-    kernelfactor = 1./ldist./mdist;
-
+    % 21 Nov. 2026: the receiver-dependent part is in the local function
+    % edpairF (unchanged), so that it can be used for segments too.
+    [Fsub,Lp,dg] = edpairF(n1,ze1_re2,re1_re2,thetae1_re2,thetain,acrossface_in,ny,...
+        dzvec1,ze2_re2,dzvec2,0,len2,rRmat(edge2,rr),thetaRmat(edge2,rr),zRmat(edge2,rr),...
+        thinplaneboost,useexactpole);
+    pathlengths(rr,Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) = Lp;
+    nrows_exactpole = nrows_exactpole + dg.nrows_exactpole;
+    nrows_fallback = nrows_fallback + dg.nrows_fallback;
     if acrossface_in == 1
-        % As EDcalcpropagatematrix_accuratebeta in EDcalcpropagatematrix
-        s1 = [1 1];  s2 = [1 -1];  termboost = 2;
-        betaterms = {sin(ny*(pi + thetain + thetaout  ))./(ch - cos(ny*(pi + thetain + thetaout   ))), ...
-                     sin(ny*(pi + thetain - thetaout  ))./(ch - cos(ny*(pi + thetain - thetaout   )))};
-
-        R0vec = sqrt( (ze1_re2 - zR).^2 + (re1_re2 + rR).^2 );          % [n1 x nr]
-        zavec = ( zR.*re1_re2 + ze1_re2.*rR ) ./ ( re1_re2 + rR );        % [n1 x nr]
-        kappavec = ny^2*(re1_re2+rR).^4 ./ (2*re1_re2.^2.*rR.^2.*R0vec.^2); % [n1 x nr]
-
-        if n2 > 1
-            localspacing = max(diff(sort(ze2_re2)));
-        else
-            localspacing = len2;
-        end
-        zrelthreshold = 5;
-        insiderange = (zavec >= -0.05*len2) & (zavec <= 1.05*len2);   % [n1 x nr]
-
-        dzvec2_row = dzvec2(:).';
-        ze2_row = ze2_re2(:).';
-        patched = zeros(n1*nr,n2);          % rows: (i,r) with i fastest
-        anyflag = false(n1,nr);
-        for kk = 1:2
-            phi_k = pi + thetain*s1(kk) + thetaout*s2(kk);          % [1 x nr]
-            B1_k  = 2*sin(ny*phi_k/2).^2 ./ kappavec;                 % [n1 x nr]
-            num_k = sin(ny*phi_k) ./ kappavec;                        % [n1 x nr]
-            flag_k = insiderange & (sqrt(max(B1_k,0)) < zrelthreshold*localspacing);
-            anyflag = anyflag | flag_k;
-
-            % The exact term, [n1 x n2 x nr] -> [n1*nr x n2] (rows (i,r))
-            termk = reshape(betaterms{kk},n1,n2,nr);
-            contrib = reshape(permute(termk,[1 3 2]),n1*nr,n2);
-            contrib = termboost*contrib.*dzvec2_row;
-
-            if useexactpole
-                flaggedrows = find(flag_k(:));
-                if ~isempty(flaggedrows)
-                    [~,wnodes_std,Sstd,tfine_std,wfine_std,Pint_std] = glStandardCached(n2);
-                    zaf  = zavec(flaggedrows);
-                    B1f  = max(B1_k(flaggedrows),0);
-                    numf = num_k(flaggedrows);
-                    % The geometry of each flagged row (i,r)
-                    [iif,rrf] = ind2sub([n1 nr],flaggedrows);
-                    zSf = ze1_re2(iif);  zSf = zSf(:);
-                    rSf = re1_re2(iif);  rSf = rSf(:);
-                    zRf = zR(rrf);       zRf = zRf(:);
-                    rRf = rR(rrf);       rRf = rRf(:);
-                    phif = phi_k(rrf);   phif = phif(:);
-                    sinhalf2 = sin(ny*phif/2).^2;
-                    snphi = sin(ny*phif);
-                    [zpf,Bpf,okf] = edexactpoles(zSf,rSf,zRf,rRf,zaf(:),B1f(:),sinhalf2,ny,len2);
-                    iok = find(okf);
-                    inok = find(~okf);
-                    nrows_exactpole = nrows_exactpole + numel(iok);
-                    nrows_fallback = nrows_fallback + numel(inok);
-                    if ~isempty(iok)
-                        WT = modifiedWeightsLorentzianVec(Sstd,wnodes_std,tfine_std,wfine_std,Pint_std,...
-                            2*zpf(iok)/len2-1,4*Bpf(iok)/len2^2);                       % [n2 x nok]
-                        Wg = (2/len2)*WT.';                                               % [nok x n2]
-                        % beta at the nodes: the values already computed, except for
-                        % receivers extremely close to the zone boundary, where
-                        % cosh - cos loses digits (relative error ~ eps/sin^2(ny*phi/2))
-                        betaacc = contrib(flaggedrows(iok),:)./(termboost*dzvec2_row);  % [nok x n2]
-                        irec = find(sinhalf2(iok) < 1e-6);
-                        if ~isempty(irec)
-                            ik = iok(irec);
-                            betaacc(irec,:) = edbetaaccurate(ze2_row,zSf(ik),rSf(ik),zRf(ik),rRf(ik),...
-                                zaf(ik),sinhalf2(ik),snphi(ik),ny);
-                        end
-                        contrib(flaggedrows(iok),:) = termboost*Wg.*betaacc.*((ze2_row - zpf(iok)).^2 + Bpf(iok));
-                    end
-                    if ~isempty(inok)
-                        % The original correction (Taylor model of the pole)
-                        fr = flaggedrows(inok);
-                        xa   = 2*zaf(inok)/len2 - 1;
-                        Bhat = 4*B1f(inok)/len2^2;
-                        WT = modifiedWeightsLorentzianVec(Sstd,wnodes_std,tfine_std,wfine_std,Pint_std,xa,Bhat);
-                        wt_physical = termboost*(2/len2) * (numf(inok) .* WT.');
-                        lorentzian_at_nodes = numf(inok) ./ ((ze2_row - zaf(inok)).^2 + B1f(inok));
-                        plain_lorentzian_est = termboost * lorentzian_at_nodes .* dzvec2_row;
-                        contrib(fr,:) = contrib(fr,:) + (wt_physical - plain_lorentzian_est);
-                    end
-                end
-            else
-                flaggedrows = find(flag_k(:));
-                if ~isempty(flaggedrows)
-                    [~,wnodes_std,Sstd,tfine_std,wfine_std,Pint_std] = glStandardCached(n2);
-                    zaf  = zavec(flaggedrows);
-                    B1f  = max(B1_k(flaggedrows),0);
-                    numf = num_k(flaggedrows);
-                    xa   = 2*zaf/len2 - 1;
-                    Bhat = 4*B1f/len2^2;
-                    WT = modifiedWeightsLorentzianVec(Sstd,wnodes_std,tfine_std,wfine_std,Pint_std,xa,Bhat);   % [n2 x nf]
-                    wt_physical = termboost*(2/len2) * (numf .* WT.');           % [nf x n2]
-                    lorentzian_at_nodes = numf ./ ((ze2_row - zaf).^2 + B1f);    % [nf x n2]
-                    plain_lorentzian_est = termboost * lorentzian_at_nodes .* dzvec2_row;
-                    contrib(flaggedrows,:) = contrib(flaggedrows,:) + (wt_physical - plain_lorentzian_est);
-                end
-            end
-            patched = patched + contrib;
-        end
-        % Back to [n1 x n2 x nr], then to [n1n2 x nr]
-        patched = permute(reshape(patched,n1,nr,n2),[1 3 2]);
-        Fsub = -ny/4/2/pi*thinplaneboost * (dzvec1(:) .* patched) .* reshape(kernelfactor,n1,n2,nr);
-        Fsub = reshape(Fsub,n1*n2,nr);
-
-        ncorrected = sum(anyflag,1);       % [1 x nr]
+        ncorrected = sum(dg.anyflag,1);       % [1 x nr]
         propdiagnostics.npairs_eligible = propdiagnostics.npairs_eligible + nr;
         propdiagnostics.nrows           = propdiagnostics.nrows + n1*nr;
         propdiagnostics.nrows_corrected = propdiagnostics.nrows_corrected + sum(ncorrected);
@@ -334,20 +237,47 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             ncorrectedpairs = ncorrectedpairs + 1;
             correctedpairs(ncorrectedpairs,:) = [edge1 edge2 sum(ncorrected) n1*nr];
         end
-    else
-        beta =  sin(ny*(pi + thetae1_re2(n1vertmat) + thetaout  ))./(ch - cos(ny*(pi + thetae1_re2(n1vertmat) + thetaout   ))) + ...
-                sin(ny*(pi + thetae1_re2(n1vertmat) - thetaout  ))./(ch - cos(ny*(pi + thetae1_re2(n1vertmat) - thetaout   ))) + ...
-                sin(ny*(pi - thetae1_re2(n1vertmat) + thetaout  ))./(ch - cos(ny*(pi - thetae1_re2(n1vertmat) + thetaout   ))) + ...
-                sin(ny*(pi - thetae1_re2(n1vertmat) - thetaout  ))./(ch - cos(ny*(pi - thetae1_re2(n1vertmat) - thetaout   )));
-        Fsub = -ny/4/2/pi*beta.*kernelfactor.*(dzvec2(n2vertmat).*dzvec1(n1vertmat))*thinplaneboost;
     end
 
     if usewindows
+        % 21 Nov. 2026: a receiver that sees only the part [ws,we] of edge 2.
+        % Before, the edge-2 nodes outside it got zero row elements, a step
+        % inside the integration interval, which limits the convergence to
+        % an erratic O(1/n). Now the part gets its own Gauss-Legendre rule
+        % (as many nodes as the edge), and q at those nodes is interpolated
+        % from the edge-2 nodes (Lagrange, q(z2 <- z1) is smooth in z2).
+        % The quantity that is interpolated is q times the phase
+        % exp(-1i*k*(l+m)) of each node column, so the row elements stay
+        % frequency independent: element j = sum_m Fseg(m)*L_j(xi_m).
         winstart = double(visstartmat(edge2,rr));    % [1 x nr]
         winend = double(visendmat(edge2,rr));
-        if any(winstart > 0) || any(winend < 1)
-            windowmask = (n2vec >= winstart) & (n2vec <= winend);     % [n2 x nr]
-            Fsub = Fsub.*windowmask(n2vertmat,:);
+        iw = find(winstart > 0 | winend < 1);
+        if ~isempty(iw)
+            [x01,w01] = EDgetGLrule(n2);
+            wins = unique([winstart(iw).' winend(iw).'],'rows');
+            rRsub = rRmat(edge2,rr);
+            thetaRsub = thetaRmat(edge2,rr);
+            zRsub = zRmat(edge2,rr);
+            for iwin = 1:size(wins,1)
+                ws = wins(iwin,1);
+                we = wins(iwin,2);
+                sel = iw(winstart(iw) == ws & winend(iw) == we);
+                if we <= ws
+                    Fsub(:,sel) = 0;
+                    continue
+                end
+                xi = ws + (we-ws)*x01(:);
+                ze2seg = xi*len2;
+                dz2seg = (we-ws)*w01(:)*len2;
+                Fseg = edpairF(n1,ze1_re2,re1_re2,thetae1_re2,thetain,acrossface_in,ny,...
+                    dzvec1,ze2seg,dz2seg,ws*len2,(we-ws)*len2,rRsub(sel),thetaRsub(sel),zRsub(sel),...
+                    thinplaneboost,useexactpole);
+                Lmat = edlagrangematrix(n2vec(:),xi);       % [nseg x n2]
+                for kr = 1:numel(sel)
+                    Feff = reshape(Fseg(:,kr),n1,numel(xi))*Lmat;  % [n1 x n2]
+                    Fsub(:,sel(kr)) = Feff(:);
+                end
+            end
         end
     end
 
@@ -360,6 +290,180 @@ if useexactpole
     propdiagnostics.nrows_fallback = nrows_fallback;
 end
 
+end
+
+%--------------------------------------------------------------------------
+function [Fsub,Lp,dg] = edpairF(n1,ze1_re2,re1_re2,thetae1_re2,thetain,acrossface_in,ny,...
+    dzvec1,ze2_re2,dzvec2,segoffset,seglength,rR,thetaout,zR,thinplaneboost,useexactpole)
+% 21 Nov. 2026 (by Claude, prompted by PS): the receiver-dependent part of
+% the computation for one edge pair, moved here unchanged from the main
+% loop, so that it can also be used with the nodes of a segment of edge 2
+% (the visible part for a receiver). The nodes ze2_re2 (weights dzvec2)
+% are a Gauss-Legendre rule on [segoffset, segoffset+seglength] of edge 2;
+% for the whole edge, segoffset = 0 and seglength = len2, which gives the
+% same operations as before. Outputs: Fsub [n1*n2,nr], the path lengths
+% Lp [nr,n1*n2], and dg with .anyflag (the flagged rows, [n1,nr], only for
+% acrossface_in = 1) and .nrows_exactpole, .nrows_fallback.
+
+n2 = numel(ze2_re2);
+nr = numel(rR);
+dg = struct('anyflag',[],'nrows_exactpole',0,'nrows_fallback',0);
+
+% Index vectors: element (i,j) of the n1-by-n2 block is number
+% i + (j-1)*n1, as in EDcalcpropagatematrix.
+n2vertmat = reshape(repmat(1:n2,n1,1),n1*n2,1);
+n1vertmat = repmat((1:n1).',n2,1);
+
+mdist = sqrt( (ze1_re2(n1vertmat) - ze2_re2(n2vertmat)).^2 + re1_re2(n1vertmat).^2 );   % [n1n2 x 1]
+
+% Receiver-dependent quantities, [n1n2 x nr]
+ldist = sqrt( (zR - ze2_re2(n2vertmat)).^2 + rR.^2 );
+Lp = (ldist + mdist).';
+
+ch = ((ze2_re2(n2vertmat) - ze1_re2(n1vertmat)).*(ze2_re2(n2vertmat) - zR) + mdist.*ldist)./re1_re2(n1vertmat)./rR;
+ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
+ch = ( ch + 1./ch)/2;
+
+% 1/(l*m), the frequency-independent part of the kernel
+kernelfactor = 1./ldist./mdist;
+
+if acrossface_in == 1
+    % As EDcalcpropagatematrix_accuratebeta in EDcalcpropagatematrix
+    s1 = [1 1];  s2 = [1 -1];  termboost = 2;
+    betaterms = {sin(ny*(pi + thetain + thetaout  ))./(ch - cos(ny*(pi + thetain + thetaout   ))), ...
+                 sin(ny*(pi + thetain - thetaout  ))./(ch - cos(ny*(pi + thetain - thetaout   )))};
+
+    R0vec = sqrt( (ze1_re2 - zR).^2 + (re1_re2 + rR).^2 );          % [n1 x nr]
+    zavec = ( zR.*re1_re2 + ze1_re2.*rR ) ./ ( re1_re2 + rR );        % [n1 x nr]
+    kappavec = ny^2*(re1_re2+rR).^4 ./ (2*re1_re2.^2.*rR.^2.*R0vec.^2); % [n1 x nr]
+
+    if n2 > 1
+        localspacing = max(diff(sort(ze2_re2)));
+    else
+        localspacing = seglength;
+    end
+    zrelthreshold = 5;
+    insiderange = (zavec-segoffset >= -0.05*seglength) & (zavec-segoffset <= 1.05*seglength);   % [n1 x nr]
+
+    dzvec2_row = dzvec2(:).';
+    ze2_row = ze2_re2(:).';
+    patched = zeros(n1*nr,n2);          % rows: (i,r) with i fastest
+    anyflag = false(n1,nr);
+    for kk = 1:2
+        phi_k = pi + thetain*s1(kk) + thetaout*s2(kk);          % [1 x nr]
+        B1_k  = 2*sin(ny*phi_k/2).^2 ./ kappavec;                 % [n1 x nr]
+        num_k = sin(ny*phi_k) ./ kappavec;                        % [n1 x nr]
+        flag_k = insiderange & (sqrt(max(B1_k,0)) < zrelthreshold*localspacing);
+        anyflag = anyflag | flag_k;
+
+        % The exact term, [n1 x n2 x nr] -> [n1*nr x n2] (rows (i,r))
+        termk = reshape(betaterms{kk},n1,n2,nr);
+        contrib = reshape(permute(termk,[1 3 2]),n1*nr,n2);
+        contrib = termboost*contrib.*dzvec2_row;
+
+        if useexactpole
+            flaggedrows = find(flag_k(:));
+            if ~isempty(flaggedrows)
+                [~,wnodes_std,Sstd,tfine_std,wfine_std,Pint_std] = glStandardCached(n2);
+                zaf  = zavec(flaggedrows);
+                B1f  = max(B1_k(flaggedrows),0);
+                numf = num_k(flaggedrows);
+                % The geometry of each flagged row (i,r)
+                [iif,rrf] = ind2sub([n1 nr],flaggedrows);
+                zSf = ze1_re2(iif);  zSf = zSf(:);
+                rSf = re1_re2(iif);  rSf = rSf(:);
+                zRf = zR(rrf);       zRf = zRf(:);
+                rRf = rR(rrf);       rRf = rRf(:);
+                phif = phi_k(rrf);   phif = phif(:);
+                sinhalf2 = sin(ny*phif/2).^2;
+                snphi = sin(ny*phif);
+                [zpf,Bpf,okf] = edexactpoles(zSf,rSf,zRf,rRf,zaf(:),B1f(:),sinhalf2,ny,seglength);
+                iok = find(okf);
+                inok = find(~okf);
+                dg.nrows_exactpole = dg.nrows_exactpole + numel(iok);
+                dg.nrows_fallback = dg.nrows_fallback + numel(inok);
+                if ~isempty(iok)
+                    WT = modifiedWeightsLorentzianVec(Sstd,wnodes_std,tfine_std,wfine_std,Pint_std,...
+                        2*(zpf(iok)-segoffset)/seglength-1,4*Bpf(iok)/seglength^2); % [n2 x nok]
+                    Wg = (2/seglength)*WT.';                                          % [nok x n2]
+                    % beta at the nodes: the values already computed, except for
+                    % receivers extremely close to the zone boundary, where
+                    % cosh - cos loses digits (relative error ~ eps/sin^2(ny*phi/2))
+                    betaacc = contrib(flaggedrows(iok),:)./(termboost*dzvec2_row);  % [nok x n2]
+                    irec = find(sinhalf2(iok) < 1e-6);
+                    if ~isempty(irec)
+                        ik = iok(irec);
+                        betaacc(irec,:) = edbetaaccurate(ze2_row,zSf(ik),rSf(ik),zRf(ik),rRf(ik),...
+                            zaf(ik),sinhalf2(ik),snphi(ik),ny);
+                    end
+                    contrib(flaggedrows(iok),:) = termboost*Wg.*betaacc.*((ze2_row - zpf(iok)).^2 + Bpf(iok));
+                end
+                if ~isempty(inok)
+                    % The original correction (Taylor model of the pole)
+                    fr = flaggedrows(inok);
+                    xa   = 2*(zaf(inok)-segoffset)/seglength - 1;
+                    Bhat = 4*B1f(inok)/seglength^2;
+                    WT = modifiedWeightsLorentzianVec(Sstd,wnodes_std,tfine_std,wfine_std,Pint_std,xa,Bhat);
+                    wt_physical = termboost*(2/seglength) * (numf(inok) .* WT.');
+                    lorentzian_at_nodes = numf(inok) ./ ((ze2_row - zaf(inok)).^2 + B1f(inok));
+                    plain_lorentzian_est = termboost * lorentzian_at_nodes .* dzvec2_row;
+                    contrib(fr,:) = contrib(fr,:) + (wt_physical - plain_lorentzian_est);
+                end
+            end
+        else
+            flaggedrows = find(flag_k(:));
+            if ~isempty(flaggedrows)
+                [~,wnodes_std,Sstd,tfine_std,wfine_std,Pint_std] = glStandardCached(n2);
+                zaf  = zavec(flaggedrows);
+                B1f  = max(B1_k(flaggedrows),0);
+                numf = num_k(flaggedrows);
+                xa   = 2*(zaf-segoffset)/seglength - 1;
+                Bhat = 4*B1f/seglength^2;
+                WT = modifiedWeightsLorentzianVec(Sstd,wnodes_std,tfine_std,wfine_std,Pint_std,xa,Bhat);   % [n2 x nf]
+                wt_physical = termboost*(2/seglength) * (numf .* WT.');      % [nf x n2]
+                lorentzian_at_nodes = numf ./ ((ze2_row - zaf).^2 + B1f);    % [nf x n2]
+                plain_lorentzian_est = termboost * lorentzian_at_nodes .* dzvec2_row;
+                contrib(flaggedrows,:) = contrib(flaggedrows,:) + (wt_physical - plain_lorentzian_est);
+            end
+        end
+        patched = patched + contrib;
+    end
+    % Back to [n1 x n2 x nr], then to [n1n2 x nr]
+    patched = permute(reshape(patched,n1,nr,n2),[1 3 2]);
+    Fsub = -ny/4/2/pi*thinplaneboost * (dzvec1(:) .* patched) .* reshape(kernelfactor,n1,n2,nr);
+    Fsub = reshape(Fsub,n1*n2,nr);
+
+    dg.anyflag = anyflag;
+else
+    beta =  sin(ny*(pi + thetae1_re2(n1vertmat) + thetaout  ))./(ch - cos(ny*(pi + thetae1_re2(n1vertmat) + thetaout   ))) + ...
+            sin(ny*(pi + thetae1_re2(n1vertmat) - thetaout  ))./(ch - cos(ny*(pi + thetae1_re2(n1vertmat) - thetaout   ))) + ...
+            sin(ny*(pi - thetae1_re2(n1vertmat) + thetaout  ))./(ch - cos(ny*(pi - thetae1_re2(n1vertmat) + thetaout   ))) + ...
+            sin(ny*(pi - thetae1_re2(n1vertmat) - thetaout  ))./(ch - cos(ny*(pi - thetae1_re2(n1vertmat) - thetaout   )));
+    Fsub = -ny/4/2/pi*beta.*kernelfactor.*(dzvec2(n2vertmat).*dzvec1(n1vertmat))*thinplaneboost;
+end
+
+end
+
+%--------------------------------------------------------------------------
+function Lmat = edlagrangematrix(x,xi)
+% 21 Nov. 2026: Lmat(m,j) = L_j(xi(m)), the Lagrange basis polynomials of
+% the nodes x, evaluated at the points xi (barycentric formula).
+x = x(:);
+xi = xi(:);
+n = numel(x);
+wb = ones(n,1);
+for j = 1:n
+    d = x(j) - x([1:j-1 j+1:n]);
+    wb(j) = 1/prod(d);
+end
+D = xi - x.';                 % [nxi x n]
+exact = (D == 0);
+T = wb.'./D;
+Lmat = T./sum(T,2);
+irow = find(any(exact,2));
+for m = irow(:).'
+    Lmat(m,:) = double(exact(m,:));
+end
 end
 
 %--------------------------------------------------------------------------

@@ -77,7 +77,7 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 %                   .npairs_skew, .npairs_partlyvisible, .npairs_nodesnotGL
 %                                       pairs left to the legacy code, by reason
 %
-% Peter Svensson (peter.svensson@ntnu.no) 18 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,...
 %    edgetoedgedata,Hsubmatrixdata,controlparameters,vispartedgesfroms,...
@@ -123,6 +123,11 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 % 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
 % 18 Oct. 2026 (by Claude, prompted by PS) The edge numbering (edge 2 is
 % always the diffracting edge) is described in the header.
+% 21 Nov. 2026 (by Claude, prompted by PS) The from-edge (edge 2) of a q
+% segment can have its own nodes and weights, for a segment of the edge
+% (Hsubmatrixdata.fromnodelist and .segmentlimits, see EDsegmentlayout).
+% The 'accurate' treatment then uses the segment as its interval; the
+% legacy singularity fix is not used for segments.
 
 if nargin < 14
     showtext = 0;
@@ -195,6 +200,21 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
 %         end
         n2vec = gaussvectors{n2}(:,1);
         weight2vec = gaussvectors{n2}(:,2);
+        % 21 Nov. 2026: a segment of the from-edge (edge 2) with its own
+        % Gauss-Legendre rule (Hsubmatrixdata.fromnodelist, see
+        % EDsegmentlayout). The q segment is then n2seg*n3, and the
+        % source term is computed at the segment nodes.
+        issegment = 0;
+        segoffset = 0;
+        seglength = len2;
+        if isfield(Hsubmatrixdata,'fromnodelist') && ~isempty(Hsubmatrixdata.fromnodelist{ii})
+            issegment = 1;
+            n2vec = Hsubmatrixdata.fromnodelist{ii}(:,1);
+            weight2vec = Hsubmatrixdata.fromnodelist{ii}(:,2);
+            n2 = numel(n2vec);
+            segoffset = Hsubmatrixdata.segmentlimits(ii,1)*len2;
+            seglength = (Hsubmatrixdata.segmentlimits(ii,2) - Hsubmatrixdata.segmentlimits(ii,1))*len2;
+        end
         % New 4 Nov. 2017: here we zero out the edge points that are not
         % visible.
         % 20 Nov. 2026: the edge points that are not visible get a zero
@@ -203,6 +223,9 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         % below. For a fully visible edge (_start = 0, _end = 1) nothing
         % changes.
         visiblemask2 = (n2vec >= double(vispartedgesfroms_start(edge2))) & (n2vec <= double(vispartedgesfroms_end(edge2)));
+        if issegment == 1
+            visiblemask2 = true(n2,1);
+        end
         % Change 24 Nov. 2023 gaussvectors is now a cell variable
         % containing gauss nodes and weights for all orders up to the
         % maximum one.
@@ -375,7 +398,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
         if useaccurate && skewedges == 0 && fullyvisible && n2 > 1
             Gsubfactor = -(2-acrossface_out)*ny/4/pi;
             [Gsub,nslicescorrected,accuratedone] = EDinteg_souterm_accurate(Gsub,ny,thetaS,thetaout,...
-                rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,dz_expjkmoverm(1:n2),Gsubfactor);
+                rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,dz_expjkmoverm(1:n2),Gsubfactor,segoffset,seglength);
             soudiagnostics.npairs_nodesnotGL = soudiagnostics.npairs_nodesnotGL + (accuratedone == 0);
             if accuratedone == 1
                 soudiagnostics.npairs_eligible = soudiagnostics.npairs_eligible + 1;
@@ -404,7 +427,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             dofixsingularity = 0;
             iv1 = find( abs(dGrel(1)+1) < 2e-3 );
             iv2 = find( abs(dGrel) > 0.8e3 );
-            if (any(iv1) || any(iv2)) && fullyvisible
+            if (any(iv1) || any(iv2)) && fullyvisible && issegment == 0
                 % (20 Nov. 2026: not for a partly visible edge, since the
                 % correction integrates over the whole edge)
                 dofixsingularity = 1;
@@ -490,7 +513,7 @@ end
 % ========================================================================
 
 function [Gsub,nslicescorrected,nodesok] = EDinteg_souterm_accurate(Gsub,ny,thetaS,thetaout,...
-    rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,fvec,Gsubfactor)
+    rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,fvec,Gsubfactor,segoffset,seglength)
 % For each fixed point z3 on the to-edge (one "slice"), the source term
 %   Gsub(z2) = Gsubfactor*beta(z2)*exp(-jkm)/m
 % is a function of z2 along the via-edge. Near the apex point za of the
@@ -506,6 +529,10 @@ function [Gsub,nslicescorrected,nodesok] = EDinteg_souterm_accurate(Gsub,ny,thet
 % I_1 + I_2 split: the exact beta values integrated by plain GL, with the
 % plain-GL estimate of the Lorentzian part replaced by its product-
 % integration estimate.
+% 21 Nov. 2026: the nodes can be a Gauss-Legendre rule on a segment of the
+% edge, from z = segoffset, of length seglength (for the whole edge,
+% segoffset = 0 and seglength = len2, which gives the same operations as
+% before).
 
 n2 = length(ze2_re2);
 n3 = length(ze3_re2);
@@ -514,7 +541,7 @@ nslicescorrected = 0;
 [xstd,wstd,Sstd,tfine,wfine,Pint] = glStandardCached(n2);
 
 % The modified weights assume ascending Gauss-Legendre nodes on the edge.
-nodesok = double( max(abs(2*ze2_re2(:)/len2 - 1 - xstd)) < 1e-10 && max(abs(2*weight2vec(:) - wstd)) < 1e-10 );
+nodesok = double( max(abs(2*(ze2_re2(:)-segoffset)/seglength - 1 - xstd)) < 1e-10 && max(abs(2*weight2vec(:)*len2/seglength - wstd)) < 1e-10 );
 if nodesok == 0
     return
 end
@@ -538,7 +565,7 @@ num_ik   = sin(ny*phivec) ./ kappavec;                             % [n3 x nk]
 % Same flag criterion as in EDcalcpropagatematrix
 localspacing = max(diff(sort(ze2_re2(:))));
 zrelthreshold = 5;
-insiderange  = (zavec >= -0.05*len2) & (zavec <= 1.05*len2);
+insiderange  = (zavec-segoffset >= -0.05*seglength) & (zavec-segoffset <= 1.05*seglength);
 narrowenough = sqrt(max(B1_ik,0)) < zrelthreshold*localspacing;
 flag_ik = insiderange & narrowenough;                              % [n3 x nk]
 nslicescorrected = nnz(any(flag_ik,2));
@@ -557,10 +584,10 @@ for kk = 1:length(phivec)
         zaf  = reshape(zavec(flaggedj),1,[]);                % [1 x nf]
         B1f  = reshape(max(B1_ik(flaggedj,kk),0),1,[]);      % [1 x nf]
         numf = reshape(num_ik(flaggedj,kk),1,[]);            % [1 x nf]
-        xa   = 2*zaf/len2 - 1;
-        Bhat = 4*B1f/len2^2;
+        xa   = 2*(zaf-segoffset)/seglength - 1;
+        Bhat = 4*B1f/seglength^2;
         WT = modifiedWeightsLorentzianVec(Sstd,wstd,tfine,wfine,Pint,xa,Bhat);   % [n2 x nf]
-        modifiedest = (2/len2)*(numf.*WT)./dzcol;            % W_j/dz_j
+        modifiedest = (2/seglength)*(numf.*WT)./dzcol;       % W_j/dz_j
         plainest    = numf./( (z2col - zaf).^2 + B1f );      % L_j
         Gmat(:,flaggedj) = Gmat(:,flaggedj) + Gsubfactor*termboost*(modifiedest - plainest).*fcol;
     end

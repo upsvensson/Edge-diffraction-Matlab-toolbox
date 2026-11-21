@@ -77,7 +77,7 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 % See also EDintegralequation_convex_tf, EDrefineQvec,
 % EDcalcpropagatematrix_block, EDcalcpropagatematrix
 %
-% Peter Svensson (peter.svensson@ntnu.no) 9 Nov. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgedata,Hsubmatrixdata,Rdata,...
 %    Qfinalstore,Qfirsttermstore,frequencies,envdata,propsettings);
@@ -90,6 +90,9 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 % the block propagation with polemethod = 'exact'. The totals of the new
 % propdiagnostics fields are collected. For thin holes, 'exactpole' is
 % replaced by 'accurate'.
+% 21 Nov. 2026 (by Claude, prompted by PS) A layout with edge segments
+% (Hsubmatrixdata.fromnodelist, see EDsegmentlayout) gives an error with
+% the legacy propagation and for thin holes.
 
 showtext = edgetsetting(propsettings,'showtext',0);
 isthinhole = edgetsetting(propsettings,'isthinhole',0);
@@ -111,6 +114,12 @@ if strcmpi(propimplementation,'exactpole')
     polemethod = 'exact';
 else
     polemethod = 'taylor';
+end
+% 21 Nov. 2026: a layout with edge segments (Hsubmatrixdata.fromnodelist,
+% see EDsegmentlayout) is only handled by EDcalcpropagatematrix_block
+if isfield(Hsubmatrixdata,'fromnodelist') && (strcmpi(propimplementation,'legacy') || isthinhole ~= 0)
+    error('EDpropagateQvec:segments',...
+        'Edge segments (partly visible edges of non-convex models) need ESIEpropagationimplementation = ''accurate'' or ''exactpole'', and not a thin hole')
 end
 
 [nfrequencies,nsolutions] = size(Qfinalstore);

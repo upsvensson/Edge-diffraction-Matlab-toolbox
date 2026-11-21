@@ -30,7 +30,9 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % 'exactpole', the new default).
 % 21 Nov. 2026 Version 0.633: a V-groove (non-convex) fix; per-node angles
 % and factors for edges partly across an indent.
+% 21 Nov. 2026 Version 0.634: no NaN in first-order diffraction for a
+% receiver within about 1e-8 rad of a zone boundary.
 
-versionnumber = 0.633;
+versionnumber = 0.634;
 lastchangedate = '21Nov2026';
-lastchangetime = '14h10';
+lastchangetime = '16h15';

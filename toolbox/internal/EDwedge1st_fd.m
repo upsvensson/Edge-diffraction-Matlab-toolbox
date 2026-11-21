@@ -44,7 +44,7 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 %   diff1GLorder    (optional) GL order; only relevant if diff1method =
 %                   'GL'.
 %
-% Peter Svensson (peter.svensson@ntnu.no) 20 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs,...
 %    thetas,zs,rr,thetar,zr,zw,Method,Rstart,bc,diff1method,diff1GLorder);
@@ -99,6 +99,13 @@ function [tf,singularterm,zfirst] = EDwedge1st_fd(cair,frequencies,closwedang,rs
 % the GL sum was not multiplied by the length of the integration interval
 % (the GL weights are for [0,1]), so the result was only correct for edges
 % of length 1. Found with a plate with extra corners near the corners.
+% 21 Nov. 2026 Bug fix (by Claude, prompted by PS): a receiver within about
+% 1e-8 rad of a zone boundary (but not on it) gave NaN. In the analytic
+% apex approximation, 1-cos(ny*fi) rounded to 0, and the masked term gave
+% Inf*0. The denominator is now set to 1 where the series expansion is
+% used (the same results elsewhere, bit for bit). Also, the loop over the
+% four terms (when some term is singular) now has the series expansion
+% near 2*pi too (before, such a term was set to 0).
 
 localshowtext = 0;
 
@@ -387,12 +394,19 @@ if strcmp(diff1method,'accurate')
                            disp('            Using series expansion for the cosnyfivec');
                     end
     
+                    % 21 Nov. 2026: the denominator 2*|sin(ny*fi/2)| is set to 1 for the
+                    % terms that use the series expansion (they are masked out below).
+                    % Before, 1-cos(ny*fi) rounded to 0 for |ny*fi| below about 2e-8, and
+                    % Inf*0 gave NaN (a receiver within about 1e-8 rad of a zone boundary).
+                    denomvec = sqrt(2*(1-cosnyfivec));
+                    denomvec(useserialexp) = 1;
+
                     if ~any(singularterm)
     
-                        cosnyfifactor = ny./sqrt(2*(1-cosnyfivec)).*(useserialexp==0) + ...
+                        cosnyfifactor = ny./denomvec.*(useserialexp==0) + ...
                                     1./abs(fivec).*(useserialexp1==1) + ...
                                     1./sqrt( (fivec-2*pi/ny).^2 ).*(useserialexp2==1);
-                        sinovercosnyfifactor =  sinnyfivec./sqrt(2*(1-cosnyfivec)).*(useserialexp==0) + ...          
+                        sinovercosnyfifactor =  sinnyfivec./denomvec.*(useserialexp==0) + ...          
                                     sign(fivec).*(1- (ny*fivec).^2/6).*(useserialexp1==1) + ...
                                     sign(ny*fivec-2*pi) .*(1- (ny*fivec-2*pi).^2/6).*(useserialexp2==1);
                         if analyticalsymmetry == 1
@@ -422,10 +436,12 @@ if strcmp(diff1method,'accurate')
                        tf2 = zeros(1,4); 
                        for jj = 1:4
                            if ~singularterm(jj)
-                                cosnyfifactor = ny./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...
-                                            1./abs(fivec(jj)).*(useserialexp1(jj)==1);
-                                sinovercosnyfifactor =  sinnyfivec(jj)./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...          
-                                            sign(fivec(jj)).*(1- (ny*fivec(jj)).^2/6).*(useserialexp1(jj)==1);
+                                cosnyfifactor = ny./denomvec(jj).*(useserialexp(jj)==0) + ...
+                                            1./abs(fivec(jj)).*(useserialexp1(jj)==1) + ...
+                                            1./sqrt( (fivec(jj)-2*pi/ny).^2 ).*(useserialexp2(jj)==1);
+                                sinovercosnyfifactor =  sinnyfivec(jj)./denomvec(jj).*(useserialexp(jj)==0) + ...          
+                                            sign(fivec(jj)).*(1- (ny*fivec(jj)).^2/6).*(useserialexp1(jj)==1) + ...
+                                            sign(ny*fivec(jj)-2*pi).*(1- (ny*fivec(jj)-2*pi).^2/6).*(useserialexp2(jj)==1);
                                 if analyticalsymmetry == 1  
                                     tf2(jj) = -sinovercosnyfifactor/pi/R0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
                                     if exacthalf == 1

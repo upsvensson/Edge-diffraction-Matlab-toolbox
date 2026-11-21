@@ -20,7 +20,7 @@ function [tf,singularterm] = EDintegratebetaoverm(cair,frequencies,closwedang,rs
 %   rr, thetar, zr	cyl. coordinates of the receiver pos
 %   zw		        the edge ends given as [z1 z2]
 %
-% Peter Svensson (peter.svensson@ntnu.no) 15 Oct. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
 %
 % [tf,singularterm] = EDintegratebetaoverm(cair,frequencies,closwedang,rs,thetas,zs,rr,thetar,zr,zw);
 
@@ -28,6 +28,11 @@ function [tf,singularterm] = EDintegratebetaoverm(cair,frequencies,closwedang,rs
 % Rstart and bc are not used here.
 % 28 May 2018 Did some corrections, switching R0 to m0
 % 15 Oct. 2026 The header was updated (by Claude, prompted by PS).
+% 21 Nov. 2026 Bug fixes (by Claude, prompted by PS), as in EDwedge1st_fd:
+% no NaN within about 1e-8 rad of a zone boundary (1-cos(ny*fi) rounded to
+% 0, and Inf*0), the series expansion near 2*pi also in the loop over the
+% four terms, and exacthalf halves only term jj (it halved all of tf2; the
+% bug that was fixed in EDwedge1st_fd 15.3.2021).
 
 localshowtext = 0;
 
@@ -242,11 +247,18 @@ else
                    disp('   Using serial expansion for the cosnyfivec');
             end
 
+            % 21 Nov. 2026: the denominator 2*|sin(ny*fi/2)| is set to 1 for the
+            % terms that use the series expansion (they are masked out below).
+            % Before, 1-cos(ny*fi) rounded to 0 for |ny*fi| below about 2e-8, and
+            % Inf*0 gave NaN (a receiver within about 1e-8 rad of a zone boundary).
+            denomvec = sqrt(2*(1-cosnyfivec));
+            denomvec(useserialexp) = 1;
+
             if ~any(singularterm)
-                cosnyfifactor = ny./sqrt(2*(1-cosnyfivec)).*(useserialexp==0) + ...
+                cosnyfifactor = ny./denomvec.*(useserialexp==0) + ...
                             1./abs(fivec).*(useserialexp1==1) + ...
                             1./sqrt( (fivec-2*pi/ny).^2 ).*(useserialexp2==1);
-                sinovercosnyfifactor =  sinnyfivec./sqrt(2*(1-cosnyfivec)).*(useserialexp==0) + ...          
+                sinovercosnyfifactor =  sinnyfivec./denomvec.*(useserialexp==0) + ...          
                             sign(fivec).*(1- (ny*fivec).^2/6).*(useserialexp1==1) + ...
                             sign(ny*fivec-2*pi) .*(1- (ny*fivec-2*pi).^2/6).*(useserialexp2==1);
                 if analyticalsymmetry == 1
@@ -264,14 +276,18 @@ else
               tf2 = zeros(1,4); 
                for jj = 1:4
                    if ~singularterm(jj)
-                    cosnyfifactor = ny./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...
-                                1./abs(fivec(jj)).*(useserialexp1(jj)==1);
-                    sinovercosnyfifactor =  sinnyfivec(jj)./sqrt(2*(1-cosnyfivec(jj))).*(useserialexp(jj)==0) + ...          
-                                sign(fivec(jj)).*(1- (ny*fivec(jj)).^2/6).*(useserialexp1(jj)==1);
+                    cosnyfifactor = ny./denomvec(jj).*(useserialexp(jj)==0) + ...
+                                1./abs(fivec(jj)).*(useserialexp1(jj)==1) + ...
+                                1./sqrt( (fivec(jj)-2*pi/ny).^2 ).*(useserialexp2(jj)==1);
+                    sinovercosnyfifactor =  sinnyfivec(jj)./denomvec(jj).*(useserialexp(jj)==0) + ...          
+                                sign(fivec(jj)).*(1- (ny*fivec(jj)).^2/6).*(useserialexp1(jj)==1) + ...
+                                sign(ny*fivec(jj)-2*pi).*(1- (ny*fivec(jj)-2*pi).^2/6).*(useserialexp2(jj)==1);
                     if analyticalsymmetry == 1  
                         tf2(jj) = -sinovercosnyfifactor/pi/m0.*atan(R0*zrangespecial/m0/l0*cosnyfifactor);
                         if exacthalf == 1
-                            tf2 = tf2/2;
+                            % 21 Nov. 2026: tf2(jj), not tf2 (the bug that was fixed in
+                            % EDwedge1st_fd 15.3.2021)
+                            tf2(jj) = tf2(jj)/2;
                         end
                     else
                         tf2(jj) = -sinovercosnyfifactor/pi/m0.*(atan(R0*zanalyticalstart/m0/l0*cosnyfifactor) + atan(R0*zanalyticalend/m0/l0*cosnyfifactor))/2;                            

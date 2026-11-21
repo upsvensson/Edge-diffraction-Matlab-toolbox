@@ -83,6 +83,10 @@ function stageinfo = EDstageversions(stagename)
 % roundoff snapped to 0 for non-thin edges, and same-plane edge pairs where
 % one edge crosses the line of the other are partly visible. Results for
 % the convex test models are unchanged.
+% 21 Nov. 2026 EDwedge1st_fd to version 5 and EDintegratebetaoverm to
+% version 2: no NaN for a receiver within about 1e-8 rad of a zone
+% boundary, the series expansion near 2*pi in the loop over the terms, and
+% (EDintegratebetaoverm) the exacthalf bug.
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -137,7 +141,7 @@ versions.EDimagepointdata             = 1;
 versions.EDinfrontofplane             = 1;
 versions.EDinteg_souterm              = 3;  % 3: per-node angles and factors (non-convex); 2: new implementation 'exactpole' (the default)
 versions.EDinteg_soutermsources       = 1;
-versions.EDintegratebetaoverm         = 1;
+versions.EDintegratebetaoverm         = 2;  % 2: no NaN near zone boundaries; exacthalf bug fix
 versions.EDmatvecH                    = 1;
 versions.EDpistonedgeintegrand        = 1;
 versions.EDpoinpla                    = 1;
@@ -146,7 +150,7 @@ versions.EDpropagateQvec              = 1;
 versions.EDquadgk                     = 1;
 versions.EDquadstep                   = 1;
 versions.EDrefineQvec                 = 1;
-versions.EDwedge1st_fd                = 4;  % 2: 'GL' falls back to 'accurate' for singular cases; 3: also near-singular; 4: 'GL' bug fix (edge length)
+versions.EDwedge1st_fd                = 5;  % 5: no NaN within 1e-8 rad of a zone boundary; 2: 'GL' falls back to 'accurate' for singular cases; 3: also near-singular; 4: 'GL' bug fix (edge length)
 versions.EDwedge1st_ir                = 1;
 versions.EDwedge2nd                   = 1;
 versions.EDwedgeN                     = 1;

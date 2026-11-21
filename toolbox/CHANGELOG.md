@@ -3,6 +3,35 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.634 (21 Nov. 2026)
+
+Bug fix in the first-order diffraction, for convex and non-convex models:
+a receiver (or a source) within about 1e-8 rad of a zone boundary, but not
+exactly on it, gave NaN. Found with a continuity test where a point source
+was moved across the plane of a face. Results that were finite before are
+unchanged, bit for bit (checked for a convex prism).
+
+**Changes that affect the results.**
+- EDwedge1st_fd (version 5) and EDintegratebetaoverm (version 2): in the
+  analytic approximation around the apex point, 1-cos(ny*fi) rounded to 0
+  for |ny*fi| below about 2e-8, and the masked term gave Inf*0 = NaN even
+  though the series expansion was the one used. Now the result goes
+  smoothly to the value on each side of the zone boundary, and exactly on
+  the boundary it is their average, as before.
+- In the loop over the four terms (used when one term is exactly
+  singular), a term close to 2*pi got no series expansion and was set to
+  0. It now gets the same series expansion as in the vectorized branch.
+- EDintegratebetaoverm: with exacthalf, all four terms were halved
+  instead of term jj (the bug that was fixed in EDwedge1st_fd in 2021).
+
+**Known limitation (found with the same test).** When a point source is
+moved across the plane of a face, edges in that plane become visible or
+hidden abruptly. The integral equation compensates for this, but the
+quadrature converges only as about 1/n to 1/n^2 there: the total field
+jumps by 1-3% at ngauss = 8 (up to 19% at 500 Hz for a V-groove), and by
+less than 0.7% at ngauss = 16. Same cause as the near-grazing window in
+0.633.
+
 ## 0.633 (21 Nov. 2026)
 
 Fixes for non-convex models, found with a V-groove (a prism with a concave

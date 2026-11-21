@@ -87,6 +87,9 @@ function stageinfo = EDstageversions(stagename)
 % version 2: no NaN for a receiver within about 1e-8 rad of a zone
 % boundary, the series expansion near 2*pi in the loop over the terms, and
 % (EDintegratebetaoverm) the exacthalf bug.
+% 21 Nov. 2026 EDfindGApaths to version 3: specorder = 'auto' (the new
+% default), specordermax, and a warning when specorder = N is too low. For
+% a number N, the paths are the same as before.
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -97,7 +100,7 @@ versions = struct;
 versions.EDedgeo                      = 1;
 versions.EDSorRgeo                    = 1;
 versions.EDfindconvexGApaths          = 1;
-versions.EDfindGApaths                = 2;  % 2: thin plates tested once for obstruction
+versions.EDfindGApaths                = 3;  % 3: specorder = 'auto', specordermax, truncation warning; 2: thin plates tested once for obstruction
 versions.EDmakefirstordertfs          = 1;
 versions.EDmakefirstorderirs          = 1;
 versions.EDed2geo                     = 2;  % 2: conservative edge-pair visibility (non-convex models)

@@ -487,6 +487,8 @@ end
 % controlparameters.specorder, the visible parts of the edges, and the
 % image sources and image receivers that are needed for the first-order
 % diffraction and the integral equation. Only for the 'tf' methods.
+% 21 Nov. 2026: specorder can be 'auto' (the default); the text gives the
+% order that was used.
 
 usenonconvexpaths = geoinputdata.freefieldcase == 0 && geoinputdata.allownonconvex == 1;
 if usenonconvexpaths && strcmp(controlparameters.generalmethod,'ir') == 1
@@ -502,12 +504,16 @@ if controlparameters.skipfirstorder == 0 || (usenonconvexpaths && controlparamet
             controlparameters,EDversionnumber,filehandlingparameters);
         nspecs = size(firstorderpathdata.specrefllist,1);
         ndiffs = size(firstorderpathdata.diffpathlist,1);
+        specordertext = '';
+        if ischar(firstorderpathdata.specorder)
+            specordertext = ' (specorder = ''auto'')';
+        end
         EDpostfunctext('EDfindGApaths',elapsedtimefindpaths,existingfilename,...
             filehandlingparameters,fid,'',[int2str(nspecs),' spec. paths and ',...
             int2str(ndiffs),' diff. paths.'],...
             [int2str(size(firstorderpathdata.Spoints.coordinates,1)-size(Snewdata.coordinates,1)),' image sources and ',...
             int2str(size(firstorderpathdata.Rpoints.coordinates,1)-size(Rnewdata.coordinates,1)),' image receivers, up to order ',...
-            int2str(firstorderpathdata.specorder),'.'])
+            int2str(firstorderpathdata.specorderused),specordertext,'.'])
     else
         [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
             EDfindconvexGApaths(planedata,edgedata,Snewdata,Rnewdata,...

@@ -162,20 +162,26 @@ function EDdatastructs
 %   .EDinputdatahash
 % From EDfindGApaths (geoinputdata.allownonconvex = 1), also:
 %   .specrefllist           the specular reflections of all orders up to
-%                           controlparameters.specorder; column 3 includes
-%                           the product of the reflection factors
-%   .specreflplanes         [nIS,specorder] the reflection planes
+%                           .specorderused; column 3 includes the product
+%                           of the reflection factors
+%   .specreflplanes         [nIS,specorderused] the reflection planes
 %   .diffpathlist           [ndiff,7] one row per first-order diffraction
 %                           component: [source receiver edge Spoint Rpoint
 %                           zstart zend], zstart/zend = the visible part of
 %                           the edge, as fractions 0-1
 %   .Spoints, .Rpoints      the sources/receivers (first rows) and their
-%                           image points up to order specorder:
+%                           image points up to order specorderused (with
+%                           specorder = 'auto', only those that see a
+%                           receiver/source, a part of an edge or a part of
+%                           a plane):
 %                           .coordinates, .parent, .order, .planeseq,
 %                           .previous, .amplitude (product of the reflection
 %                           factors), .edgeintervals [nint,4] = [point edge
 %                           zstart zend]
-%   .specorder
+%   .specorder              as in controlparameters: a number or 'auto'
+%   .specorderused          the highest order of the image points
+%   .specordertruncated     1 if image points of a higher order would still
+%                           contribute (a warning was given), 0 if not
 % For the integral equation, EDimagepointdata turns the image points into
 % extra source/receiver points of Sdata and Rdata, with the fields
 % .parentsource (Sdata) and .parentreceiver, .receiveramplitude (Rdata),
@@ -325,5 +331,7 @@ function EDdatastructs
 % (edgetoedgedata.partialvispairs, .partialvisoccluders,
 % Hsubmatrixdata.visrowmask).
 % 21 Nov. 2026 inteqdiagnostics.nsegments.
+% 21 Nov. 2026 firstorderpathdata.specorderused and .specordertruncated
+% (specorder = 'auto').
 
 help(mfilename)

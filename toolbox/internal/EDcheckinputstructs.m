@@ -201,6 +201,9 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % controlparameters.ESIEsourcetermimplementation, which is the new
 % default: the 'accurate' source term gave NaN, or very wrong values, for a
 % distant source (a plane wave) exactly or almost along a face.
+% 21 Nov. 2026 (by Claude, prompted by PS) controlparameters.specorder can
+% be 'auto', which is the new default, and the new field
+% controlparameters.specordermax (default 8) is used with 'auto'.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Documentation mode: EDcheckinputstructs('paramspecs') returns the tables
@@ -846,8 +849,10 @@ switch structname
             '1: the direct sound, the specular reflections and the first-order diffraction are not computed.';
         'difforder', @(x) isnumeric(x) && isscalar(x) && x>=0 && x==round(x), NaN, @(cp) true, true, ...
             'The highest diffraction order. Required. With the GMRES methods, any difforder > 2 gives the full solution, with all diffraction orders included.';
-        'specorder', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x>=0 && x==round(x), 1, @(cp) true, false, ...
-            'Only with geoinputdata.allownonconvex = 1: the highest number of specular reflections in a path, both for the specular reflections themselves and before or after the diffraction (for the source term and the propagation of the integral equation, it applies to each side separately).';
+        'specorder', @(x) (ischar(x) && strcmp(x,'auto')) || (isnumeric(x) && isreal(x) && isscalar(x) && x>=0 && x==round(x)), 'auto', @(cp) true, false, ...
+            'Only with geoinputdata.allownonconvex = 1: the highest number of specular reflections in a path, both for the specular reflections themselves and before or after the diffraction (for the source term and the propagation of the integral equation, it applies to each side separately). ''auto'': the order is raised one step at a time, and only image sources and image receivers that see a receiver (source), a part of an edge or a part of a plane are kept; it stops when an order adds nothing, or at specordermax. A number N: all orders up to N, with a warning if order N+1 would contribute (diffraction from the image sources of order N assumes the reflections of order N+1, so a too low N gives discontinuities).';
+        'specordermax', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x>=1 && x==round(x), 8, @(cp) ischar(cp.specorder), false, ...
+            'Only with geoinputdata.allownonconvex = 1 and specorder = ''auto'': the highest order that is tried. If image points of order specordermax+1 would still contribute (e.g. between parallel planes that face each other), a warning is given.';
         'nedgesamples', @(x) isnumeric(x) && isreal(x) && isscalar(x) && x>=2 && x==round(x), 32, @(cp) true, false, ...
             'Only with geoinputdata.allownonconvex = 1: the number of intervals per edge that are sampled when the visible part of an edge is found; each change between visible and not visible is then refined by bisection.';
         'diff1method', @(x) ismember(x,{'GL','accurate'}), 'accurate', @(cp) cp.difforder>=1, false, ...

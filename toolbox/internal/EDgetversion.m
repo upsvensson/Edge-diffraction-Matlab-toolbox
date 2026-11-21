@@ -32,7 +32,9 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % and factors for edges partly across an indent.
 % 21 Nov. 2026 Version 0.634: no NaN in first-order diffraction for a
 % receiver within about 1e-8 rad of a zone boundary.
+% 21 Nov. 2026 Version 0.635: controlparameters.specorder = 'auto' (the new
+% default for non-convex models) and .specordermax.
 
-versionnumber = 0.634;
+versionnumber = 0.635;
 lastchangedate = '21Nov2026';
-lastchangetime = '16h15';
+lastchangetime = '22h30';

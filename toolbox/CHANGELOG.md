@@ -3,6 +3,34 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.635 (21 Nov. 2026)
+
+New: `controlparameters.specorder = 'auto'`, the new default for non-convex
+models (`geoinputdata.allownonconvex = 1`), and the new field
+`controlparameters.specordermax` (default 8). Found with a 100-degree folded
+plate (two thin plates) and a plane wave: with the earlier default
+`specorder = 1`, a sector of receivers got a total field of about 0 instead
+of 1. The first-order diffraction from the image source in plate 1, at the
+edges of plate 2, assumes the double reflection plate 1 - plate 2, which was
+not included. Diffraction from image sources of order N always assumes the
+reflections of order N+1.
+
+- `specorder = 'auto'`: the order is raised one step at a time. A new image
+  source (image receiver) is kept only if its path reaches a receiver
+  (source), a part of an edge, or a part of a plane (sample points). The
+  tree stops growing when an order adds nothing, or at `specordermax`, with
+  a warning if order `specordermax+1` would still contribute (for example
+  parallel planes that face each other). Only image points that can
+  contribute are kept, so 'auto' usually gives fewer image points than a
+  fixed order (the folded plate: 2 image sources and 10 image receivers,
+  against 6 and 24 for `specorder = 2`, with the same results).
+- `specorder = N`: as before (the same paths and results, bit for bit), but
+  with a warning if image points of order N+1 would see a receiver (source)
+  or a part of an edge. The warning also gives the most acute concave edge,
+  whose open angle theta allows up to ceil(pi/theta) reflections.
+- New fields in the paths file: `.specorderused` and `.specordertruncated`.
+- Convex models (`allownonconvex = 0`) are not affected.
+
 ## 0.634 (21 Nov. 2026)
 
 Bug fix in the first-order diffraction, for convex and non-convex models:

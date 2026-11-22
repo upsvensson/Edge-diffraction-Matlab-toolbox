@@ -31,6 +31,10 @@ circle went up by about 15%.
   Gauss-Legendre rules, q interpolated from the edge-1 nodes), as for the
   receiver windows of edge 2. Not yet for segments of edge 1.
 - New diagnostic: propinfo.propdiagnostics.nsplitreceivers.
+- EDverify, test 25: specorder = 1. With the default 'auto' (since 0.635),
+  its two parallel plates facing each other gave image points up to
+  specordermax = 8 and a warning; the test only checks the edge-pair
+  visibility.
 
 ## 0.636 (21 Nov. 2026)
 

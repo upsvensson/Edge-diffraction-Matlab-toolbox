@@ -96,7 +96,7 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 %
 % See also EDmain_convex, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 22 Nov. 2026
 %
 % passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams);
 
@@ -161,6 +161,8 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % model, by Claude, prompted by PS).
 % 21 Nov. 2026 Added test 26 (a plane wave exactly along faces, by Claude,
 % prompted by PS).
+% 22 Nov. 2026 Test 25 uses specorder = 1 (with the default 'auto', the two
+% parallel plates gave image points up to specordermax and a warning).
 
 ntests = 26;
 
@@ -1069,7 +1071,10 @@ geoinputdata = struct('corners',[P1;P2;P3],'planecorners',...
 Sinputdata = struct('coordinates',[0.13 0.21 1]/norm([0.13 0.21 1])*100);
 Rinputdata = struct('coordinates',[0.37 0.41 1.3]);
 envdata = struct('cair',344);
-controlparameters = struct('frequencies',100,'generalmethod','tf','difforder',1);
+% specorder = 1 (22 Nov. 2026): the test only needs the geometry. With the
+% default specorder = 'auto' (since v0.635), the two parallel plates that
+% face each other give image points up to specordermax and a warning.
+controlparameters = struct('frequencies',100,'generalmethod','tf','difforder',1,'specorder',1);
 EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,...
     edfilehandling(outputdirectory,filestem));
 eddata = load(fullfile(outputdirectory,[filestem,'_eddata.mat']));

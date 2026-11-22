@@ -93,6 +93,9 @@ function [firstorderpathdata,elapsedtimefindpaths,existingfilename] = ...
 % if order N+1 would contribute (found with a 100-degree folded plate and
 % specorder = 1, where a sector of receivers got the total field 0 instead
 % of 1). New fields .specorderused and .specordertruncated. Version 3.
+% 22 Nov. 2026 (by Claude, prompted by PS) The plane sequences of the
+% specular paths are padded to specorderused columns (an error when the
+% image receivers reached a higher order than the image sources).
 
 t00 = clock;
 
@@ -262,7 +265,11 @@ for jj = 1:numel(ivIS)
         nok = numel(ivok);
         specrefllist = [specrefllist;[isou*ones(nok,1) reclist(ivok) fac(ivok)*Spoints.amplitude(row)]];
         specreflIScoords = [specreflIScoords;repmat(Spoints.coordinates(row,:),nok,1)];
-        specreflplanes = [specreflplanes;repmat(Spoints.planeseq(row,:),nok,1)];
+        % 22 Nov. 2026: padded to specorderused columns (Spoints.planeseq can
+        % have fewer columns, when only the image receivers reach that order)
+        ps = zeros(1,specorderused);
+        ps(1:size(Spoints.planeseq,2)) = Spoints.planeseq(row,:);
+        specreflplanes = [specreflplanes;repmat(ps,nok,1)];
     end
 end
 

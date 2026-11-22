@@ -164,6 +164,9 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 % scattered by a few percent with ngauss.
 % 22 Nov. 2026 (by Claude, prompted by PS) The to-edge (edge 3) can have
 % its own nodes (Hsubmatrixdata.tonodelist, see EDsegmentlayout).
+% 22 Nov. 2026 (by Claude, prompted by PS) In the 'exactpole' delta-function
+% limit, |sin(ny*phi/2)| < 1e-12 counts as exactly on the zone boundary
+% (the side from lit3), not the sign of the roundoff. Version 6.
 
 if nargin < 14
     showtext = 0;
@@ -852,7 +855,10 @@ for jj = flaggedslices(:).'
             if zarel < 0 || zarel > seglength
                 continue
             end
-            if sn2 ~= 0
+            % 22 Nov. 2026: |sn2| < 1e-12 counts as exactly on the zone
+            % boundary (a source angle of pi from roundoff, e.g. 3.14159...
+            % +-4e-16, otherwise gave a side by the sign of the roundoff)
+            if abs(sn2) >= 1e-12
                 weight = pi*sqrt(2/kappa)*cs2*sign(sn2);
             else
                 weight = pi*sqrt(2/kappa)*abs(cs2)*sign(s1vec(kk)*dthetasign);

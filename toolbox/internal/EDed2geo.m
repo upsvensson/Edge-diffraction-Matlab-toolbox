@@ -89,6 +89,10 @@ function [edgetoedgedata,elapsedtimeed2geo,existingfilename] = EDed2geo(planedat
 % conservative classification (EDedgepairvisibility): fully visible,
 % hidden, or partly visible. New output fields .partialvispairs and
 % .partialvisoccluders. Only for models that are not convex.
+% 22 Nov. 2026 (by Claude, prompted by PS) Edges of coplanar planes (the
+% same plane equation) see each other along the plane, as the edges of one
+% plane (before, such pairs were missing; found with a box whose top face
+% was split into two coplanar faces).
 % 14 Oct. 2026 The stageversion is taken from EDstageversions, and it
 % also contains the versions of the subroutines that this function uses.
 % 14 Oct. 2026 The header was updated to the standard structure (by Claude,
@@ -592,6 +596,19 @@ if showtext >= 4
 	disp('         checking which edges see which edges...')
 end
 
+% 22 Nov. 2026: coplanar planes (the same plane equation, the same side),
+% e.g. two faces that meet at a flat (180 degree) edge. An edge sees the
+% edges of a plane that is coplanar with one of its own planes along that
+% plane, just as the edges of its own planes. Before, such pairs were
+% missing (a coplanar plane is not "in front of" the plane), so the
+% coupling along the face was lost.
+pe = planedata.planeeqs;
+coplanarmatrix = false(size(pe,1));
+for pp = 1:size(pe,1)
+    coplanarmatrix(:,pp) = all(abs(pe(:,1:3) - pe(pp,1:3)) < 1e-9,2) & abs(pe(:,4) - pe(pp,4)) < 1e-9*max(1,abs(pe(pp,4)));
+    coplanarmatrix(pp,pp) = false;
+end
+
 edgeseesedge = int8(zeros(nedges,nedges));
 for ii = 1:nedges
 	closwed = edgedata.closwedangvec(ii);
@@ -625,6 +642,12 @@ for ii = 1:nedges
 		edgesatplane1 = edgedata.edgesatplane(plane1,:);
 		edgesatplane2 = edgedata.edgesatplane(plane2,:);
 		okedges = [edgesatplane1 edgesatplane2].';
+		% 22 Nov. 2026: and the edges of the coplanar planes
+		cop = find(coplanarmatrix(:,plane1) | coplanarmatrix(:,plane2));
+		if ~isempty(cop)
+			copedges = edgedata.edgesatplane(cop,:);
+			okedges = unique([okedges;copedges(:)]);
+		end
 		okedges = okedges(okedges~=0);
 		edgeseesedge(okedges,ii) = int8(double(edgeseesedge(okedges,ii)) + 1); 
 	
@@ -851,6 +874,12 @@ for ii = 1:nedges
 		edgesatplane1 = edgedata.edgesatplane(plane1,:);
 		edgesatplane2 = edgedata.edgesatplane(plane2,:);
 		sameplaneedges = [edgesatplane1 edgesatplane2].';
+		% 22 Nov. 2026: and the edges of the coplanar planes
+		cop = find(coplanarmatrix(:,plane1) | coplanarmatrix(:,plane2));
+		if ~isempty(cop)
+			copedges = edgedata.edgesatplane(cop,:);
+			sameplaneedges = unique([sameplaneedges;copedges(:)]);
+		end
 		sameplaneedges = sameplaneedges(sameplaneedges~=0);
 		edgetoedgestrength(sameplaneedges,ii) = edgetoedgestrength(sameplaneedges,ii)*0 + 1;  
 	end % % if sum(edge

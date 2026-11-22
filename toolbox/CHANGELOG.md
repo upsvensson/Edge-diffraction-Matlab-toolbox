@@ -3,6 +3,16 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.641 (22 Nov. 2026)
+
+Bug fix in EDfindGApaths: with specorder = 'auto', the image receivers can
+reach a higher reflection order than the image sources. The list of
+reflection planes of the specular paths then had fewer columns than
+specorderused, and EDfindGApaths stopped with "vertical dimensions
+mismatch". Found with an L-plate with a 60-degree fold and a plane wave at
+70 degrees. Now the plane sequences are padded with zeros. No other
+results change.
+
 ## 0.640 (22 Nov. 2026)
 
 Two fixes for non-convex models, found with the folded plate (L-plate,

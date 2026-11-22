@@ -48,6 +48,12 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % the 'accurate'/'exactpole' treatment, and the propagation of a source
 % term that jumps along an edge with split nodes (non-convex models).
 
-versionnumber = 0.640;
+% 22 Nov. 2026 Version 0.641: bug fix in EDfindGApaths (an error when the
+% image receivers reach a higher reflection order than the image sources).
+
+% 22 Nov. 2026 Version 0.642: two bug fixes for non-convex models (edges
+% of coplanar planes; a source within roundoff of a zone boundary).
+
+versionnumber = 0.642;
 lastchangedate = '22Nov2026';
-lastchangetime = '19h30';
+lastchangetime = '21h00';

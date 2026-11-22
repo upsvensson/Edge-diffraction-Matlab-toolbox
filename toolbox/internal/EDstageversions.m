@@ -107,6 +107,9 @@ function stageinfo = EDstageversions(stagename)
 % EDsegmentlayout to version 2 (to-edge splits) and
 % EDintegralequation_convex_tf to version 3 (the to-edge splits as a
 % correction of the propagation). Convex models are unchanged, bit for bit.
+% 22 Nov. 2026 EDed2geo to version 3 (coplanar planes) and EDinteg_souterm
+% to version 6 (the side of a zone boundary for a source within roundoff
+% of it).
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -120,7 +123,7 @@ versions.EDfindconvexGApaths          = 1;
 versions.EDfindGApaths                = 3;  % 3: specorder = 'auto', specordermax, truncation warning; 2: thin plates tested once for obstruction
 versions.EDmakefirstordertfs          = 1;
 versions.EDmakefirstorderirs          = 1;
-versions.EDed2geo                     = 2;  % 2: conservative edge-pair visibility (non-convex models)
+versions.EDed2geo                     = 3;  % 3: edges of coplanar planes see each other along the plane; 2: conservative edge-pair visibility (non-convex models)
 versions.EDinteg_submatrixstructure   = 5;  % 5: thetain+thetaout in the symmetry comparison; 4: thin-plane flag in the symmetry comparison; 2: thin-plane pairs/triplets defined by the incoming edge pair; 3: node-pair visibility masks (non-convex models)
 versions.EDintegralequation_convex_tf = 3;  % 3: to-edge splits (propagation correction); 2: edge segments for partly visible edges (non-convex models)
 versions.EDfindHODpaths               = 1;
@@ -159,7 +162,7 @@ versions.EDgetGLrule                  = 1;
 versions.EDHkernelvalues              = 2;  % 2: per-node factors, angles snapped at 2*pi
 versions.EDimagepointdata             = 1;
 versions.EDinfrontofplane             = 1;
-versions.EDinteg_souterm              = 5;  % 5: 'accurate'/'exactpole' also for skewed edges, tonodelist; 4: legacy slice correction with the node angle for skewed edges; 3: per-node angles and factors (non-convex); 2: new implementation 'exactpole' (the default)
+versions.EDinteg_souterm              = 6;  % 6: a source within roundoff of a zone boundary takes the side from lit3; 5: 'accurate'/'exactpole' also for skewed edges, tonodelist; 4: legacy slice correction with the node angle for skewed edges; 3: per-node angles and factors (non-convex); 2: new implementation 'exactpole' (the default)
 versions.EDinteg_soutermsources       = 1;
 versions.EDintegratebetaoverm         = 2;  % 2: no NaN near zone boundaries; exacthalf bug fix
 versions.EDmatvecH                    = 1;

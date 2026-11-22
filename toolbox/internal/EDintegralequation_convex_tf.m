@@ -280,6 +280,15 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % edge nodes outside the part got a zero source term, which made the
 % convergence with ngauss erratic. ESIEpropagationrefine gives an error
 % when there are segments. New inteqdiagnostics.nsegments.
+% 22 Nov. 2026 (by Claude, prompted by PS) Where a zone boundary of the
+% first edge e (for a source point) crosses the second edge X, the source
+% term q0(X <- e) jumps along X, and the propagation (a Gauss-Legendre
+% rule over X) converged erratically, as O(1/n). EDsegmentlayout now also
+% gives such cases as "to-edge splits" (group type 2): the source term on
+% nodes of X split at the jump points, minus the one on the ordinary
+% nodes, propagated with the segments. A correction of the propagation
+% only; the integral equation is not changed. New
+% inteqdiagnostics.ntosplits.
 
 t00_total = clock;
 t00 = clock;
@@ -777,13 +786,15 @@ if segdata.ngroups > 0
     Qsegstore = cell(nfrequencies,ndiagcols);
     if dorefine
         error('EDintegralequation_convex_tf:refineseg',...
-            'ESIEpropagationrefine can not be used when a source sees only part of an edge (yet)')
+            'ESIEpropagationrefine can not be used when a source sees only part of an edge, or when a source term jumps along an edge (yet)')
     end
     if showtext >= 2
-        disp(['      ',int2str(segdata.ngroups),' edge segments (sources that see only part of an edge)'])
+        disp(['      ',int2str(sum(segdata.grouptype==1)),' edge segments (sources that see only part of an edge), ',...
+            int2str(sum(segdata.grouptype==2)),' to-edge splits (source terms that jump along an edge)'])
     end
 end
-inteqdiagnostics.nsegments = segdata.ngroups;
+inteqdiagnostics.nsegments = sum(segdata.grouptype==1);
+inteqdiagnostics.ntosplits = sum(segdata.grouptype==2);
 
 % dcol is only defined if the H-matrix is used (difforder > 2), and Bsp
 % only for GMRES_fast; they are given to edsolveinteq in any case.
@@ -1290,9 +1301,18 @@ for g = grouplist(:).'
     if ~isempty(L.visrowmask)
         qg = L.visrowmask.*qg;
     end
+    % 22 Nov. 2026: a to-edge split (group type 2) is a correction of the
+    % propagation only: the source term on the split nodes of X minus the
+    % one on the ordinary nodes (which is part of the ordinary source term).
+    % It does not change the integral equation.
+    istosplit = isfield(segdata,'grouptype') && segdata.grouptype(g) == 2;
+    if istosplit
+        i2 = L.Qvecstartnums(2):L.Qvecendnums(2);
+        qg(i2) = -qg(i2);
+    end
     q0seg(segdata.groupoffset(g) + (1:numel(qg))) = qg;
 
-    if dorhs
+    if dorhs && ~istosplit
         lene = edgedata.edgelengthvec(e);
         for p = 1:size(L.edgepairlist,1)
             X = double(L.edgepairlist(p,1));

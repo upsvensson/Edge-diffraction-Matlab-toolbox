@@ -101,6 +101,12 @@ function stageinfo = EDstageversions(stagename)
 % integration also for segments of edge 1.
 % 22 Nov. 2026 EDinteg_submatrixstructure to version 5: |thetain + thetaout
 % - openangle| in the symmetry comparison of the triplets.
+% 22 Nov. 2026 EDinteg_souterm to version 5 ('accurate'/'exactpole' also
+% for skewed edges, and the to-edge nodes tonodelist),
+% EDcalcpropagatematrix_block to version 5 (split edge-2 nodes),
+% EDsegmentlayout to version 2 (to-edge splits) and
+% EDintegralequation_convex_tf to version 3 (the to-edge splits as a
+% correction of the propagation). Convex models are unchanged, bit for bit.
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -116,7 +122,7 @@ versions.EDmakefirstordertfs          = 1;
 versions.EDmakefirstorderirs          = 1;
 versions.EDed2geo                     = 2;  % 2: conservative edge-pair visibility (non-convex models)
 versions.EDinteg_submatrixstructure   = 5;  % 5: thetain+thetaout in the symmetry comparison; 4: thin-plane flag in the symmetry comparison; 2: thin-plane pairs/triplets defined by the incoming edge pair; 3: node-pair visibility masks (non-convex models)
-versions.EDintegralequation_convex_tf = 2;  % 2: edge segments for partly visible edges (non-convex models)
+versions.EDintegralequation_convex_tf = 3;  % 3: to-edge splits (propagation correction); 2: edge segments for partly visible edges (non-convex models)
 versions.EDfindHODpaths               = 1;
 versions.EDmakeHODirs                 = 2;  % 2: source amplitudes applied also for doaddsources = 0
 versions.EDpropagateESIEBEM           = 2;  % 2: complete hash; several sources give an error
@@ -132,7 +138,7 @@ versions.EDcalcedgeinteqmatrixsub2_mex = 1;  % Compiled file: increase by
                                              % hand when it is recompiled
                                              % from changed source code.
 versions.EDcalcpropagatematrix        = 2;  % 2: bug fix, edge data for edges with the same number of nodes
-versions.EDcalcpropagatematrix_block  = 4;  % 4: split edge-1 integration also for segments; 3: near-pole treatment for pairs not along a face, split edge-1 integration; 2: per-node angles snapped at 2*pi
+versions.EDcalcpropagatematrix_block  = 5;  % 5: split edge-2 nodes (tonodelist), part by part; 4: split edge-1 integration also for segments; 3: near-pole treatment for pairs not along a face, split edge-1 integration; 2: per-node angles snapped at 2*pi
 versions.EDcheckobstr_edgetoedge      = 1;
 versions.EDcheckobstr_pointtoedge     = 1;
 versions.EDcheckobstrpaths            = 1;
@@ -146,14 +152,14 @@ versions.EDcreindexmatrix             = 1;
 versions.EDcross                      = 1;
 versions.EDdistelements               = 1;
 versions.EDedgepairvisibility         = 2;  % 2: same-plane pairs across an indent are partly visible
-versions.EDsegmentlayout              = 1;
+versions.EDsegmentlayout              = 2;  % 2: to-edge splits (group type 2)
 versions.EDfindis                     = 1;
 versions.EDgetedgepoints              = 1;
 versions.EDgetGLrule                  = 1;
 versions.EDHkernelvalues              = 2;  % 2: per-node factors, angles snapped at 2*pi
 versions.EDimagepointdata             = 1;
 versions.EDinfrontofplane             = 1;
-versions.EDinteg_souterm              = 4;  % 4: legacy slice correction with the node angle for skewed edges; 3: per-node angles and factors (non-convex); 2: new implementation 'exactpole' (the default)
+versions.EDinteg_souterm              = 5;  % 5: 'accurate'/'exactpole' also for skewed edges, tonodelist; 4: legacy slice correction with the node angle for skewed edges; 3: per-node angles and factors (non-convex); 2: new implementation 'exactpole' (the default)
 versions.EDinteg_soutermsources       = 1;
 versions.EDintegratebetaoverm         = 2;  % 2: no NaN near zone boundaries; exacthalf bug fix
 versions.EDmatvecH                    = 1;

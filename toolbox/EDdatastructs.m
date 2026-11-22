@@ -301,6 +301,11 @@ function EDdatastructs
 %   .nsegments              the number of edge segments: source points that
 %                           see only part of an edge, which gets its own
 %                           quadrature (non-convex models, EDsegmentlayout)
+%   .ntosplits              the number of to-edge splits: source points for
+%                           which the source term q0(X <- e) jumps along
+%                           edge X (a zone boundary of e crosses X); the
+%                           propagation then uses nodes of X split at the
+%                           jumps (non-convex models, EDsegmentlayout)
 %   .parallelworkers        the number of parallel workers for the
 %                           propagation (0 = serial)
 %   .parallelnote           a note if parallel workers were asked for but
@@ -333,5 +338,6 @@ function EDdatastructs
 % 21 Nov. 2026 inteqdiagnostics.nsegments.
 % 21 Nov. 2026 firstorderpathdata.specorderused and .specordertruncated
 % (specorder = 'auto').
+% 22 Nov. 2026 inteqdiagnostics.ntosplits.
 
 help(mfilename)

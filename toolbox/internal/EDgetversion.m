@@ -44,7 +44,10 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % segments of edge 1.
 % 22 Nov. 2026 Version 0.639: bug fix in the symmetry compression of the H
 % matrix (triplets with different beta could share a submatrix).
+% 22 Nov. 2026 Version 0.640: the source term of skewed edge pairs with
+% the 'accurate'/'exactpole' treatment, and the propagation of a source
+% term that jumps along an edge with split nodes (non-convex models).
 
-versionnumber = 0.639;
+versionnumber = 0.640;
 lastchangedate = '22Nov2026';
-lastchangetime = '17h00';
+lastchangetime = '19h30';

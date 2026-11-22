@@ -3,6 +3,35 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.640 (22 Nov. 2026)
+
+Two fixes for non-convex models, found with the folded plate (L-plate,
+100 degrees) and a plane wave 15 degrees out of the symmetry plane, where
+the total field at k = 0 scattered by up to 3% with ngauss (8-20).
+
+1. The source term of skewed edge pairs (the angle of the to-edge varies
+along it) now gets the 'accurate'/'exactpole' near-singularity treatment,
+with the angle and the face factor of each to-edge node (EDinteg_souterm,
+version 5). Before, such pairs were left to the legacy treatment, which
+only corrects a slice with an extreme peak, so where a zone boundary of the
+first edge crosses the second edge, the jump of the source term along the
+second edge was smeared out over about one node spacing of the first edge.
+The source term now agrees with an adaptive reference integration to about
+1e-4, also next to the jump.
+
+2. That jump along the second edge X is now integrated with nodes of X
+split at the jump points, in the propagation to the receivers
+(EDsegmentlayout version 2, "to-edge splits"; EDcalcpropagatematrix_block
+version 5; EDintegralequation_convex_tf version 3). The source term on the
+split nodes replaces the one on the ordinary nodes, as a correction that is
+propagated together with the edge segments; the integral equation itself is
+not changed. New inteqdiagnostics.ntosplits.
+
+Results for the convex prism and a single thin plate are unchanged, bit for
+bit. For the folded plate the scatter with ngauss went from up to 3% to
+about 0.5%; the remaining part is spread over many edge pairs (probably
+the H-matrix integration over the same jumps).
+
 ## 0.639 (22 Nov. 2026)
 
 EDverify, test 25: the warning EDfindGApaths:specorder (order 2 would

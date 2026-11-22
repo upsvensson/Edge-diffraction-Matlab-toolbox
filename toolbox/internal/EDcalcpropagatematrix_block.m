@@ -146,6 +146,11 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 % 21 Nov. 2026 (by Claude, prompted by PS) Edge-1 node angles within 1e-6
 % of 2*pi (from roundoff, y = -1e-13 on the reference face) are set to 0
 % for non-thin edges.
+% 22 Nov. 2026 (by Claude, prompted by PS) Edge 2 can have its own nodes,
+% a Gauss-Legendre rule split into parts (Hsubmatrixdata.tonodelist and
+% .tobreaks, see EDsegmentlayout); the receiver windows and the edge-1
+% split then interpolate q part by part (local function edwindownodes).
+% Version 5.
 
 if nargin < 9 || isempty(polemethod)
     polemethod = 'taylor';
@@ -204,6 +209,16 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
     % the bug fix of 15 Oct. 2026 in EDcalcpropagatematrix)
     n2vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n2,n2));
     weightvec2 = full(Hsubmatrixdata.quadraturematrix_weights(1:n2,n2));
+    % 22 Nov. 2026: edge 2 can have its own nodes, a Gauss-Legendre rule
+    % split at the points tobreaks (Hsubmatrixdata.tonodelist, see
+    % EDsegmentlayout). q is then smooth only within each part.
+    tobreaks = [];
+    if isfield(Hsubmatrixdata,'tonodelist') && ~isempty(Hsubmatrixdata.tonodelist{ii})
+        n2vec = Hsubmatrixdata.tonodelist{ii}(:,1);
+        weightvec2 = Hsubmatrixdata.tonodelist{ii}(:,2);
+        n2 = numel(n2vec);
+        tobreaks = Hsubmatrixdata.tobreaks{ii};
+    end
     dzvec2 = weightvec2*edgedata.edgelengthvec(edge2);
     ze2_re2 = (0 + n2vec*len2);
     n1vec = full(Hsubmatrixdata.quadraturematrix_pos(1:n1,n1));
@@ -245,8 +260,18 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
 
     % 21 Nov. 2026: the receiver-dependent part is in the local function
     % edpairF (unchanged), so that it can be used for segments too.
-    [Fsub,Lp,dg] = edpairF(n1,ze1_re2,re1_re2,thetae1_re2,thetain,acrossface_in,ny,...
-        dzvec1,ze2_re2,dzvec2,0,len2,rRmat(edge2,rr),thetaRmat(edge2,rr),zRmat(edge2,rr),...
+    % 22 Nov. 2026: for split edge-2 nodes (tonodelist), part by part
+    % (edpairFparts), since the near-pole treatment assumes one
+    % Gauss-Legendre rule over [segoffset, segoffset+seglength].
+    if isempty(tobreaks)
+        off2all = 0;
+        seg2all = len2;
+    else
+        off2all = tobreaks(1:end-1)*len2;
+        seg2all = diff(tobreaks)*len2;
+    end
+    [Fsub,Lp,dg] = edpairFparts(n1,ze1_re2,re1_re2,thetae1_re2,thetain,acrossface_in,ny,...
+        dzvec1,ze2_re2,dzvec2,off2all,seg2all,rRmat(edge2,rr),thetaRmat(edge2,rr),zRmat(edge2,rr),...
         thinplaneboost,useexactpole);
     pathlengths(rr,Hsubmatrixdata.Qvecstartnums(ii):Hsubmatrixdata.Qvecendnums(ii)) = Lp;
     nrows_exactpole = nrows_exactpole + dg.nrows_exactpole;
@@ -290,13 +315,26 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                     Fsub(:,sel) = 0;
                     continue
                 end
-                xi = ws + (we-ws)*x01(:);
+                if isempty(tobreaks)
+                    xi = ws + (we-ws)*x01(:);
+                    dz2seg = (we-ws)*w01(:)*len2;
+                    Lmat = edlagrangematrix(n2vec(:),xi);       % [nseg x n2]
+                    offw = ws*len2;
+                    segw = (we-ws)*len2;
+                else
+                    [xi,wxi,Lmat,limw] = edwindownodes(n2vec,tobreaks,ws,we);
+                    dz2seg = wxi*len2;
+                    if isempty(xi)
+                        Fsub(:,sel) = 0;
+                        continue
+                    end
+                    offw = limw(:,1)*len2;
+                    segw = (limw(:,2)-limw(:,1))*len2;
+                end
                 ze2seg = xi*len2;
-                dz2seg = (we-ws)*w01(:)*len2;
-                Fseg = edpairF(n1,ze1_re2,re1_re2,thetae1_re2,thetain,acrossface_in,ny,...
-                    dzvec1,ze2seg,dz2seg,ws*len2,(we-ws)*len2,rRsub(sel),thetaRsub(sel),zRsub(sel),...
+                Fseg = edpairFparts(n1,ze1_re2,re1_re2,thetae1_re2,thetain,acrossface_in,ny,...
+                    dzvec1,ze2seg,dz2seg,offw,segw,rRsub(sel),thetaRsub(sel),zRsub(sel),...
                     thinplaneboost,useexactpole);
-                Lmat = edlagrangematrix(n2vec(:),xi);       % [nseg x n2]
                 for kr = 1:numel(sel)
                     Feff = reshape(Fseg(:,kr),n1,numel(xi))*Lmat;  % [n1 x n2]
                     Fsub(:,sel(kr)) = Feff(:);
@@ -354,21 +392,32 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             [r1n,th1n,z1n] = edgeom1(e1geom,x1new);
             dz1n = w1new*edgedata.edgelengthvec(edge1);
             if ws > 0 || we < 1
-                [x02,w02] = EDgetGLrule(n2);
-                xi2 = ws + (we-ws)*x02(:);
+                if isempty(tobreaks)
+                    [x02,w02] = EDgetGLrule(n2);
+                    xi2 = ws + (we-ws)*x02(:);
+                    dz2x = (we-ws)*w02(:)*len2;
+                    L2 = edlagrangematrix(n2vec(:),xi2);   % [n2 x n2]
+                    off2 = ws*len2;
+                    seg2 = (we-ws)*len2;
+                else
+                    [xi2,wxi2,L2,limw2] = edwindownodes(n2vec,tobreaks,ws,we);
+                    dz2x = wxi2*len2;
+                    if isempty(xi2)
+                        Fsub(:,kr) = 0;
+                        continue
+                    end
+                    off2 = limw2(:,1)*len2;
+                    seg2 = (limw2(:,2)-limw2(:,1))*len2;
+                end
                 ze2x = xi2*len2;
-                dz2x = (we-ws)*w02(:)*len2;
-                L2 = edlagrangematrix(n2vec(:),xi2);   % [n2 x n2]
-                off2 = ws*len2;
-                seg2 = (we-ws)*len2;
             else
                 ze2x = ze2_re2;
                 dz2x = dzvec2;
                 L2 = [];
-                off2 = 0;
-                seg2 = len2;
+                off2 = off2all;
+                seg2 = seg2all;
             end
-            Fnew = edpairF(numel(x1new),z1n,r1n,th1n,thetain,acrossface_in,ny,...
+            Fnew = edpairFparts(numel(x1new),z1n,r1n,th1n,thetain,acrossface_in,ny,...
                 dz1n,ze2x,dz2x,off2,seg2,rRsub(kr),thetaRsub(kr),zRsub(kr),...
                 thinplaneboost,useexactpole);
             L1 = edlagrangematrix(n1vec(:),x1new);      % [n1new x n1]
@@ -640,6 +689,74 @@ else
     dg.anyflag = anyflag;
 end
 
+end
+
+%--------------------------------------------------------------------------
+function [Fsub,Lp,dg] = edpairFparts(n1,ze1_re2,re1_re2,thetae1_re2,thetain,acrossface_in,ny,...
+    dzvec1,ze2_re2,dzvec2,offsets,lengths,rR,thetaout,zR,thinplaneboost,useexactpole)
+% 22 Nov. 2026: edpairF for edge-2 nodes that are a composite rule: the
+% same number of Gauss-Legendre nodes on each part [offsets(p),
+% offsets(p)+lengths(p)] (in metres), in order. Each part is computed by
+% edpairF on its own (the near-pole treatment there assumes one
+% Gauss-Legendre rule over the given interval), and the blocks are put
+% together (the edge-2 node is the slower index). With one part, the
+% same as edpairF.
+nparts = numel(offsets);
+if nparts == 1
+    [Fsub,Lp,dg] = edpairF(n1,ze1_re2,re1_re2,thetae1_re2,thetain,acrossface_in,ny,...
+        dzvec1,ze2_re2,dzvec2,offsets,lengths,rR,thetaout,zR,thinplaneboost,useexactpole);
+    return
+end
+nper = numel(ze2_re2)/nparts;
+Fsub = [];
+Lp = [];
+dg = struct('anyflag',[],'nrows_exactpole',0,'nrows_fallback',0);
+for p = 1:nparts
+    jj = (p-1)*nper + (1:nper);
+    [Fp,Lpp,dgp] = edpairF(n1,ze1_re2,re1_re2,thetae1_re2,thetain,acrossface_in,ny,...
+        dzvec1,ze2_re2(jj),dzvec2(jj),offsets(p),lengths(p),rR,thetaout,zR,thinplaneboost,useexactpole);
+    Fsub = [Fsub; Fp]; %#ok<AGROW>
+    Lp = [Lp Lpp]; %#ok<AGROW>
+    if isempty(dg.anyflag)
+        dg.anyflag = dgp.anyflag;
+    elseif ~isempty(dgp.anyflag)
+        dg.anyflag = dg.anyflag | dgp.anyflag;
+    end
+    dg.nrows_exactpole = dg.nrows_exactpole + dgp.nrows_exactpole;
+    dg.nrows_fallback = dg.nrows_fallback + dgp.nrows_fallback;
+end
+end
+
+%--------------------------------------------------------------------------
+function [xi,wi,Lmat,lims] = edwindownodes(nodes,breaks,ws,we)
+% 22 Nov. 2026: the nodes xi (0..1) and weights wi of a Gauss-Legendre
+% rule over the window [ws,we] of an edge whose layout nodes are a
+% composite rule (breaks = [0 b1 ... 1], the same number of nodes in each
+% part), and the matrix Lmat [nxi x nnodes] that interpolates q from the
+% layout nodes to xi, part by part (q is smooth only within each part).
+nodes = nodes(:);
+nparts = numel(breaks)-1;
+nper = numel(nodes)/nparts;
+[x01,w01] = EDgetGLrule(nper);
+xi = zeros(0,1);
+wi = zeros(0,1);
+Lmat = zeros(0,numel(nodes));
+lims = zeros(0,2);
+for p = 1:nparts
+    a = max(breaks(p),ws);
+    b = min(breaks(p+1),we);
+    if b <= a + 1e-12
+        continue
+    end
+    xn = a + (b-a)*x01(:);
+    cols = (p-1)*nper + (1:nper);
+    Lp = zeros(nper,numel(nodes));
+    Lp(:,cols) = edlagrangematrix(nodes(cols),xn);
+    xi = [xi; xn]; %#ok<AGROW>
+    wi = [wi; (b-a)*w01(:)]; %#ok<AGROW>
+    Lmat = [Lmat; Lp]; %#ok<AGROW>
+    lims = [lims; a b]; %#ok<AGROW>
+end
 end
 
 %--------------------------------------------------------------------------

@@ -156,6 +156,14 @@ function [Qfirstterm,soudiagnostics] = EDinteg_souterm(envdata,edgedata,edgetoed
 % the start point of edge 3 and acrossface_out also for skewed edges; now
 % the angle and the factor of the node of that slice are used. Found as a
 % mirror asymmetry of the source term in a folded plate.
+% 22 Nov. 2026 (by Claude, prompted by PS) 'accurate' and 'exactpole' also
+% for skewed edges (the angle of edge 3 varies along it), with the angle
+% and the factor (2-onface3) of each node of edge 3. Found with a folded
+% plate and an oblique plane wave: the source term q0(X <- e) of the nodes
+% of X close to a zone boundary of e was smeared out, and the result
+% scattered by a few percent with ngauss.
+% 22 Nov. 2026 (by Claude, prompted by PS) The to-edge (edge 3) can have
+% its own nodes (Hsubmatrixdata.tonodelist, see EDsegmentlayout).
 
 if nargin < 14
     showtext = 0;
@@ -273,6 +281,13 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
 %            [n3vec,~] = EDdistelements(n3,discretizationtype);
 %         end
         n3vec = gaussvectors{n3}(:,1);
+        % 22 Nov. 2026: the to-edge (edge 3) can have its own nodes
+        % (Hsubmatrixdata.tonodelist, a Gauss-Legendre rule split at the
+        % points where the source term jumps, see EDsegmentlayout).
+        if isfield(Hsubmatrixdata,'tonodelist') && ~isempty(Hsubmatrixdata.tonodelist{ii})
+            n3vec = Hsubmatrixdata.tonodelist{ii}(:,1);
+            n3 = numel(n3vec);
+        end
         
         % FOund bug 23 Sep. 2014: did not take into account that the other
         % end of the edge might have a different theta value.
@@ -453,18 +468,30 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             soudiagnostics.npairs_skew = soudiagnostics.npairs_skew + (skewedges ~= 0);
             soudiagnostics.npairs_partlyvisible = soudiagnostics.npairs_partlyvisible + (fullyvisible == 0);
         end
-        if useaccurate && skewedges == 0 && fullyvisible && n2 > 1
-            Gsubfactor = -(2-acrossface_out)*ny/4/pi;
-            [Gsub,nslicescorrected,accuratedone] = EDinteg_souterm_accurate(Gsub,ny,thetaS,thetaout,...
-                rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,dz_expjkmoverm(1:n2),Gsubfactor,segoffset,seglength);
+        if useaccurate && fullyvisible && n2 > 1
+            % 22 Nov. 2026: also for skewed edges (skewedges = 1), with the
+            % angle and the factor (2-onface3) of each node of edge 3.
+            % Before, they were left to the legacy treatment, which only
+            % corrects a slice with an extreme peak, so the source term of
+            % the nodes close to a zone boundary was smeared out over about
+            % one node spacing of edge 2.
+            if skewedges == 0
+                thetaarg = thetaout;
+                Gsubfactor = -(2-acrossface_out)*ny/4/pi;
+            else
+                thetaarg = thetae3_re2(:);
+                Gsubfactor = -(2-onface3(:)).'*ny/4/pi;
+            end
+            [Gsub,nslicescorrected,accuratedone] = EDinteg_souterm_accurate(Gsub,ny,thetaS,thetaarg,...
+                rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,dz_expjkmoverm(1:n2),Gsubfactor,segoffset,seglength,skewedges);
             if useexactpole && accuratedone
                 % 21 Nov. 2026: the slices with a term where the source is
                 % close to a zone boundary are computed again (see the
                 % local function). lit3 tells on which side of a zone
                 % boundary a source exactly on it is taken.
                 lit3 = double(vispartedgesfroms(edge3)) ~= 0;
-                [Gsub,~,~,epcounts] = EDinteg_souterm_exactpole(Gsub,ny,thetaS,thetaout,...
-                    rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,dz_expjkmoverm(1:n2),Gsubfactor,segoffset,seglength,lit3);
+                [Gsub,~,~,epcounts] = EDinteg_souterm_exactpole(Gsub,ny,thetaS,thetaarg,...
+                    rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,dz_expjkmoverm(1:n2),Gsubfactor,segoffset,seglength,lit3,skewedges);
                 soudiagnostics.nslices_exactpole = soudiagnostics.nslices_exactpole + epcounts(1);
                 soudiagnostics.nslices_limit = soudiagnostics.nslices_limit + epcounts(2);
                 soudiagnostics.nslices_fallback = soudiagnostics.nslices_fallback + epcounts(3);
@@ -584,8 +611,8 @@ if useaccurate && showtext >= 2
     disp(['      Source term, accurate: ',int2str(soudiagnostics.nslices_corrected),' of ',...
         int2str(soudiagnostics.nslices),' slices corrected, in ',int2str(soudiagnostics.npairs_corrected),...
         ' of ',int2str(soudiagnostics.npairs),' edge pairs'])
-    disp(['         Pairs left to legacy: skewed ',int2str(soudiagnostics.npairs_skew),...
-        ', partly visible ',int2str(soudiagnostics.npairs_partlyvisible),...
+    disp(['         Skewed pairs (per-node angles): ',int2str(soudiagnostics.npairs_skew),...
+        '. Pairs left to legacy: partly visible ',int2str(soudiagnostics.npairs_partlyvisible),...
         ', nodes not GL ',int2str(soudiagnostics.npairs_nodesnotGL)])
 end
 
@@ -595,7 +622,7 @@ end
 % ========================================================================
 
 function [Gsub,nslicescorrected,nodesok] = EDinteg_souterm_accurate(Gsub,ny,thetaS,thetaout,...
-    rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,fvec,Gsubfactor,segoffset,seglength)
+    rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,fvec,Gsubfactor,segoffset,seglength,skew)
 % For each fixed point z3 on the to-edge (one "slice"), the source term
 %   Gsub(z2) = Gsubfactor*beta(z2)*exp(-jkm)/m
 % is a function of z2 along the via-edge. Near the apex point za of the
@@ -615,10 +642,15 @@ function [Gsub,nslicescorrected,nodesok] = EDinteg_souterm_accurate(Gsub,ny,thet
 % edge, from z = segoffset, of length seglength (for the whole edge,
 % segoffset = 0 and seglength = len2, which gives the same operations as
 % before).
+% 22 Nov. 2026: skew = 1 (skewed edges): thetaout [n3,1] and Gsubfactor
+% [1,n3] are given per node of edge 3, and the four terms are used.
 
 n2 = length(ze2_re2);
 n3 = length(ze3_re2);
 nslicescorrected = 0;
+if nargin < 16
+    skew = 0;
+end
 
 [xstd,wstd,Sstd,tfine,wfine,Pint] = glStandardCached(n2);
 
@@ -628,13 +660,14 @@ if nodesok == 0
     return
 end
 
-if thetaout == 0
+if skew == 0 && thetaout == 0
     phivec = pi + thetaS*[1 -1];
     termboost = 2;
 else
-    phivec = pi + thetaS*[1 1 -1 -1] + thetaout*[1 -1 1 -1];
+    phivec = pi + thetaS*[1 1 -1 -1] + thetaout(:)*[1 -1 1 -1];     % [1 x 4], or [n3 x 4] if skew
     termboost = 1;
 end
+gfrow = Gsubfactor(:).'.*ones(1,n3);
 
 re3 = re3_re2(:);
 ze3 = ze3_re2(:);
@@ -660,7 +693,7 @@ z2col = ze2_re2(:);                    % [n2 x 1]
 dzcol = weight2vec(:)*len2;            % [n2 x 1]
 fcol  = fvec(:);                       % [n2 x 1]
 
-for kk = 1:length(phivec)
+for kk = 1:size(phivec,2)
     flaggedj = find(flag_ik(:,kk));
     if ~isempty(flaggedj)
         zaf  = reshape(zavec(flaggedj),1,[]);                % [1 x nf]
@@ -671,14 +704,18 @@ for kk = 1:length(phivec)
         WT = modifiedWeightsLorentzianVec(Sstd,wstd,tfine,wfine,Pint,xa,Bhat);   % [n2 x nf]
         modifiedest = (2/seglength)*(numf.*WT)./dzcol;       % W_j/dz_j
         plainest    = numf./( (z2col - zaf).^2 + B1f );      % L_j
-        Gmat(:,flaggedj) = Gmat(:,flaggedj) + Gsubfactor*termboost*(modifiedest - plainest).*fcol;
+        if skew == 0
+            Gmat(:,flaggedj) = Gmat(:,flaggedj) + Gsubfactor*termboost*(modifiedest - plainest).*fcol;
+        else
+            Gmat(:,flaggedj) = Gmat(:,flaggedj) + termboost*(modifiedest - plainest).*fcol.*gfrow(flaggedj);
+        end
     end
 end
 
 Gsub = reshape(Gmat,n2*n3,1);
 
 function [Gsub,nslicescorrected,nodesok,counts] = EDinteg_souterm_exactpole(Gsub,ny,thetaS,thetaout,...
-    rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,fvec,Gsubfactor,segoffset,seglength,lit3)
+    rS,zS,re3_re2,ze3_re2,ze2_re2,weight2vec,len2,fvec,Gsubfactor,segoffset,seglength,lit3,skew)
 % 21 Nov. 2026 (by Claude, prompted by PS): the 'exactpole' treatment of
 % the near-singular source term, the counterpart of 'exactpole' in
 % EDcalcpropagatematrix_block (with the source S in the role of the edge-1
@@ -712,11 +749,16 @@ function [Gsub,nslicescorrected,nodesok,counts] = EDinteg_souterm_exactpole(Gsub
 %    cancellation-free beta values.
 % counts = [slices with the exact pole, with the limit, with the Taylor
 % fallback] (per flagged term).
+% 22 Nov. 2026: skew = 1 (skewed edges): thetaout [n3,1] and Gsubfactor
+% [1,n3] are given per node of edge 3, and the four terms are used.
 
 n2 = length(ze2_re2);
 n3 = length(ze3_re2);
 nslicescorrected = 0;
 counts = [0 0 0];
+if nargin < 17
+    skew = 0;
+end
 
 [xstd,wstd,Sstd,tfine,wfine,Pint] = glStandardCached(n2);
 nodesok = double( max(abs(2*(ze2_re2(:)-segoffset)/seglength - 1 - xstd)) < 1e-10 && max(abs(2*weight2vec(:)*len2/seglength - wstd)) < 1e-10 );
@@ -724,7 +766,7 @@ if nodesok == 0
     return
 end
 
-if thetaout == 0
+if skew == 0 && thetaout == 0
     s1vec = [1 -1];
     s2vec = [0 0];
     termboost = 2;
@@ -733,7 +775,8 @@ else
     s2vec = [1 -1 1 -1];
     termboost = 1;
 end
-phivec = pi + thetaS*s1vec + thetaout*s2vec;
+phivec = pi + thetaS*s1vec + thetaout(:)*s2vec;      % [1 x nk], or [n3 x nk] if skew
+gfrow = Gsubfactor(:).'.*ones(1,n3);
 
 re3 = re3_re2(:);
 ze3 = ze3_re2(:);
@@ -759,13 +802,9 @@ num_ik = sin(ny*phivec)./kappavec;
 % The side of a zone boundary for a source exactly on it: the sign of the
 % virtual change of thetaS that puts the to-edge on the lit (lit3 = 1) or
 % the shadow side
-if thetaout > thetaS
-    dthetasign = 1;
-else
-    dthetasign = -1;
-end
+dthetasignvec = 2*double(thetaout(:) > thetaS) - 1;
 if ~lit3
-    dthetasign = -dthetasign;
+    dthetasignvec = -dthetasignvec;
 end
 
 z2row = ze2_re2(:).';
@@ -787,8 +826,9 @@ for jj = flaggedslices(:).'
     ch = ( real(sqrt( ch.^2-1)) + ch ).^ny;
     ch = ( ch + 1./ch)/2;
     betasum = zeros(1,n2);
-    for kk = 1:numel(phivec)
-        phi = phivec(kk);
+    dthetasign = dthetasignvec(min(jj,end));
+    for kk = 1:size(phivec,2)
+        phi = phivec(min(jj,end),kk);
         if ~flag_ik(jj,kk)
             betasum = betasum + sin(ny*phi)./(ch - cos(ny*phi));
             continue
@@ -839,7 +879,7 @@ for jj = flaggedslices(:).'
             end
         end
     end
-    Gmat(:,jj) = Gsubfactor*termboost*betasum(:).*fcol;
+    Gmat(:,jj) = gfrow(jj)*termboost*betasum(:).*fcol;
 end
 
 Gsub = reshape(Gmat,n2*n3,1);

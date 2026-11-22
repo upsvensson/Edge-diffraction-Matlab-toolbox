@@ -3,6 +3,38 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.639 (22 Nov. 2026)
+
+Bug fix in the symmetry compression of the H matrix
+(EDinteg_submatrixstructure, version 5). Edge triplets [edge3 edge2 edge1]
+with the same geometry values share one submatrix. The comparison used the
+angles of edge 1 and edge 3 (relative to the via edge 2) only as
+|thetain - thetaout|, but beta also depends on thetain + thetaout. Found with
+the folded plate: the triplet 2<-8<-2 (from the far edge of plate 1 via the
+top edge of plate 2 back to the far edge, 55.6 degrees from the via edge)
+shared the submatrix of 8<-2<-8 (24.4 degrees), which has the same lengths
+and distances. The compensation of the path via that triplet was then only
+76% correct, and two zone boundaries on the receiver circle (0.32 and 5.96
+rad) had jumps of about -0.0014, independent of ngauss. Now |thetain +
+thetaout - openangle| is part of the comparison too; it is the same for two
+triplets that are mirror images in the wedge of the via edge, which can
+still share a submatrix. Results for the convex prism and a single thin
+plate are unchanged, bit for bit.
+
+## 0.638 (22 Nov. 2026)
+
+The split of the edge-1 integration in the propagation (0.637) now also
+covers segments of edge 1 (the visible part of an edge for an image source,
+with its own nodes). EDcalcpropagatematrix_block, version 4. Found with the
+folded plate and 5 times as many receivers (step 0.002 rad): within about 4
+degrees of the plane of plate 1, neighbouring receivers had steps of 0.001
+to 0.003 (decreasing as 1/ngauss); the segments of the side edges of plate 2
+were not split. With ngauss = 16, the largest second difference there went
+from 0.0030 to 0.00001. Results for the convex prism and a single thin
+plate are unchanged, bit for bit.
+
+Known: two jumps of about -0.0014 remain on the circle (fixed in 0.639).
+
 ## 0.637 (22 Nov. 2026)
 
 Two improvements of the propagation of the integral equation to the

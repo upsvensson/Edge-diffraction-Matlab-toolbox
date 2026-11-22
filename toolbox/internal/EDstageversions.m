@@ -97,6 +97,10 @@ function stageinfo = EDstageversions(stagename)
 % 22 Nov. 2026 EDcalcpropagatematrix_block to version 3: the near-pole
 % treatment also for edge pairs that are not along a face, and the split
 % edge-1 integration at zone-boundary points (skewed edge pairs).
+% 22 Nov. 2026 EDcalcpropagatematrix_block to version 4: the split edge-1
+% integration also for segments of edge 1.
+% 22 Nov. 2026 EDinteg_submatrixstructure to version 5: |thetain + thetaout
+% - openangle| in the symmetry comparison of the triplets.
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -111,7 +115,7 @@ versions.EDfindGApaths                = 3;  % 3: specorder = 'auto', specorderma
 versions.EDmakefirstordertfs          = 1;
 versions.EDmakefirstorderirs          = 1;
 versions.EDed2geo                     = 2;  % 2: conservative edge-pair visibility (non-convex models)
-versions.EDinteg_submatrixstructure   = 4;  % 4: thin-plane flag in the symmetry comparison; 2: thin-plane pairs/triplets defined by the incoming edge pair; 3: node-pair visibility masks (non-convex models)
+versions.EDinteg_submatrixstructure   = 5;  % 5: thetain+thetaout in the symmetry comparison; 4: thin-plane flag in the symmetry comparison; 2: thin-plane pairs/triplets defined by the incoming edge pair; 3: node-pair visibility masks (non-convex models)
 versions.EDintegralequation_convex_tf = 2;  % 2: edge segments for partly visible edges (non-convex models)
 versions.EDfindHODpaths               = 1;
 versions.EDmakeHODirs                 = 2;  % 2: source amplitudes applied also for doaddsources = 0
@@ -128,7 +132,7 @@ versions.EDcalcedgeinteqmatrixsub2_mex = 1;  % Compiled file: increase by
                                              % hand when it is recompiled
                                              % from changed source code.
 versions.EDcalcpropagatematrix        = 2;  % 2: bug fix, edge data for edges with the same number of nodes
-versions.EDcalcpropagatematrix_block  = 3;  % 3: near-pole treatment for pairs not along a face, split edge-1 integration; 2: per-node angles snapped at 2*pi
+versions.EDcalcpropagatematrix_block  = 4;  % 4: split edge-1 integration also for segments; 3: near-pole treatment for pairs not along a face, split edge-1 integration; 2: per-node angles snapped at 2*pi
 versions.EDcheckobstr_edgetoedge      = 1;
 versions.EDcheckobstr_pointtoedge     = 1;
 versions.EDcheckobstrpaths            = 1;

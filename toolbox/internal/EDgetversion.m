@@ -40,7 +40,11 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % 22 Nov. 2026 Version 0.637: smoother propagation of the integral equation
 % near zone boundaries (near-pole treatment for all edge pairs, split
 % edge-1 integration for skewed edge pairs).
+% 22 Nov. 2026 Version 0.638: the split edge-1 integration also for
+% segments of edge 1.
+% 22 Nov. 2026 Version 0.639: bug fix in the symmetry compression of the H
+% matrix (triplets with different beta could share a submatrix).
 
-versionnumber = 0.637;
+versionnumber = 0.639;
 lastchangedate = '22Nov2026';
-lastchangetime = '15h30';
+lastchangetime = '17h00';

@@ -68,7 +68,7 @@ controlparameters,EDversionnumber,filehandlingparameters,planedata)
 %
 % See also EDdatastructs, EDstageversions
 %
-% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 22 Nov. 2026
 %
 % [Hsubmatrixdata,elapsedtimesubmatrix,existingfilename] = ...
 %    EDinteg_submatrixstructure(edgedata,edgetoedgedata,...
@@ -142,6 +142,11 @@ controlparameters,EDversionnumber,filehandlingparameters,planedata)
 % one of them. The thin-plane flag is now part of the comparison. Found
 % with a 100-degree folded plate (the solution was not mirror symmetric,
 % and receivers crossing two zone boundaries got jumps of 1-3%). Version 4.
+% 22 Nov. 2026 (by Claude, prompted by PS) Bug fix: the symmetry comparison
+% used only |thetain - thetaout|, so triplets with different beta (e.g.
+% 2<-8<-2 and 8<-2<-8 of a folded plate, from-edge at 55.6 and 24.4 degrees
+% from the via edge) could share a submatrix. |thetain + thetaout -
+% openangle| is now part of the comparison too. Version 5.
 
 t00 = clock;
 
@@ -432,7 +437,7 @@ if symmetrycompression == 1
 
     refto = edgetoedgedata.reftoshortlistE;
 
-    datamatrix = zeros(submatrixcounter,16);
+    datamatrix = zeros(submatrixcounter,17);
     alledge3 = edgetripletlist(:,1);
     alledge2 = edgetripletlist(:,2);
     alledge1 = edgetripletlist(:,3);
@@ -464,6 +469,19 @@ if symmetrycompression == 1
     % zone boundary got a jump of 1-3%. For a single thin plate or an
     % object without thin edges, all triplets have the same value.
     datamatrix(:,16) = double(edthinplanepair(edgedata,alledge2,alledge1));
+    % 22 Nov. 2026: |thetain + thetaout - openangle| of the via edge. Column 4
+    % has only |thetain - thetaout|, but beta also depends on thetain +
+    % thetaout. The new value is the same for two triplets that are mirror
+    % images in the wedge of edge 2 (theta -> openangle - theta), so those
+    % still share a submatrix. Found with a folded plate: the triplet 2<-8<-2
+    % (from-edge at 55.6 degrees from the via edge) shared the submatrix of
+    % 8<-2<-8 (24.4 degrees), with the same lengths and distances; a
+    % receiver crossing a zone boundary got a jump of 0.0014 that did not
+    % depend on ngauss.
+    for ii = 1:submatrixcounter
+        datamatrix(ii,17) = abs( edgetoedgedata.thetae1sho(refto(alledge1(ii),alledge2(ii))) + ...
+            edgetoedgedata.thetae1sho(refto(alledge3(ii),alledge2(ii))) - (2*pi-edgedata.closwedangvec(alledge2(ii))) );
+    end
 
     [shortlist,~,reftoshortlist] = unique(round(datamatrix*1e5)/1e5,'rows');
     nuniquesubmatrices = size(shortlist,1);    

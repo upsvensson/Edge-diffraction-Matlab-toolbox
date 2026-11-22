@@ -140,8 +140,9 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 % the receiver is on a zone boundary of edge 2 (a pole of a beta term with
 % the apex point inside edge 2): the integral over edge 2 jumps there.
 % Each part gets its own Gauss-Legendre rule, and q is interpolated from
-% the edge-1 nodes (local functions edsplitpoints, edgeom1). Not yet for
-% segments of edge 1 (fromnodelist). Version 3.
+% the edge-1 nodes (local functions edsplitpoints, edgeom1). Version 3.
+% 22 Nov. 2026 (by Claude, prompted by PS) The split also for segments of
+% edge 1 (fromnodelist, the part [c1,c2]). Version 4.
 % 21 Nov. 2026 (by Claude, prompted by PS) Edge-1 node angles within 1e-6
 % of 2*pi (from roundoff, y = -1e-13 on the reference face) are set to 0
 % for non-thin edges.
@@ -316,7 +317,12 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
     % split at each z1*: each part gets its own Gauss-Legendre rule (n1
     % nodes), and q (times the phase) at those nodes is interpolated from
     % the edge-1 nodes (Lagrange), as for the receiver windows of edge 2.
-    if acrossface_in == 0 && ~(isfield(Hsubmatrixdata,'fromnodelist') && ~isempty(Hsubmatrixdata.fromnodelist{ii}))
+    % 22 Nov. 2026: also for a segment [c1,c2] of edge 1 (fromnodelist).
+    if acrossface_in == 0
+        lim1 = [0 1];
+        if isfield(Hsubmatrixdata,'fromnodelist') && ~isempty(Hsubmatrixdata.fromnodelist{ii})
+            lim1 = double(Hsubmatrixdata.segmentlimits(ii,:));
+        end
         e1geom = struct('xs',xedge1start,'xe',xedge1end,'ys',yedge1start,'ye',yedge1end,...
             'zs',edgetoedgedata.ze1sho(refto(edge1,edge2)),'ze',edgetoedgedata.ze2sho(refto(edge1,edge2)),...
             'len2',len2,'snap',edgedata.closwedangvec(edge2) > 0);
@@ -330,7 +336,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
             wsvec = zeros(1,nr);
             wevec = ones(1,nr);
         end
-        splitlists = edsplitpoints(e1geom,ny,rRsub,thetaRsub,zRsub,wsvec,wevec);
+        splitlists = edsplitpoints(e1geom,ny,rRsub,thetaRsub,zRsub,wsvec,wevec,lim1);
         for kr = find(~cellfun(@isempty,splitlists))
             ws = wsvec(kr);
             we = wevec(kr);
@@ -338,7 +344,7 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                 continue
             end
             [x01,w01] = EDgetGLrule(n1);
-            bp = [0 splitlists{kr} 1];
+            bp = [lim1(1) splitlists{kr} lim1(2)];
             x1new = zeros(0,1);
             w1new = zeros(0,1);
             for ib = 1:numel(bp)-1
@@ -652,13 +658,14 @@ end
 end
 
 %--------------------------------------------------------------------------
-function splitlists = edsplitpoints(g,ny,rR,thetaR,zR,wsvec,wevec)
+function splitlists = edsplitpoints(g,ny,rR,thetaR,zR,wsvec,wevec,lim1)
 % 22 Nov. 2026: for each receiver, the points t* (0..1) along edge 1 where
 % one of the four beta terms has its pole (sin(ny*phi/2) = 0, phi = pi +-
 % theta1 +- thetaR) and the apex point is inside the (visible part of)
 % edge 2. Found on 201 sample points, then refined by the secant method.
+% 22 Nov. 2026: only inside lim1 = [c1 c2] (a segment of edge 1, or [0 1]).
 nsamp = 201;
-tf = linspace(0,1,nsamp).';
+tf = linspace(lim1(1),lim1(2),nsamp).';
 [rf,thf,zf] = edgeom1(g,tf);
 nr = numel(rR);
 splitlists = cell(1,nr);
@@ -684,7 +691,7 @@ for kr = 1:nr
             end
             [rn,~,zn] = edgeom1(g,tb);
             za = (zR(kr)*rn + zn*rR(kr))/(rn + rR(kr));
-            if za > wsvec(kr)*g.len2 && za < wevec(kr)*g.len2 && tb > 1e-6 && tb < 1-1e-6
+            if za > wsvec(kr)*g.len2 && za < wevec(kr)*g.len2 && tb > lim1(1)+1e-6 && tb < lim1(2)-1e-6
                 tlist = [tlist tb];
             end
         end

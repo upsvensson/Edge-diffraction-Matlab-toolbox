@@ -5,6 +5,10 @@ comments at the top of its .m file.
 
 ## 0.639 (22 Nov. 2026)
 
+EDverify, test 25: the warning EDfindGApaths:specorder (order 2 would
+contribute) is switched off during its call of EDmain_convex; the test only
+uses the geometry.
+
 Bug fix in the symmetry compression of the H matrix
 (EDinteg_submatrixstructure, version 5). Edge triplets [edge3 edge2 edge1]
 with the same geometry values share one submatrix. The comparison used the

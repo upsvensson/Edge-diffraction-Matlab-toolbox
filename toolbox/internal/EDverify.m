@@ -162,7 +162,8 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 21 Nov. 2026 Added test 26 (a plane wave exactly along faces, by Claude,
 % prompted by PS).
 % 22 Nov. 2026 Test 25 uses specorder = 1 (with the default 'auto', the two
-% parallel plates gave image points up to specordermax and a warning).
+% parallel plates gave image points up to specordermax and a warning), with
+% the warning EDfindGApaths:specorder switched off during that call.
 
 ntests = 26;
 
@@ -1073,10 +1074,14 @@ Rinputdata = struct('coordinates',[0.37 0.41 1.3]);
 envdata = struct('cair',344);
 % specorder = 1 (22 Nov. 2026): the test only needs the geometry. With the
 % default specorder = 'auto' (since v0.635), the two parallel plates that
-% face each other give image points up to specordermax and a warning.
+% face each other give image points up to specordermax and a warning. With
+% specorder = 1, EDfindGApaths warns that order 2 would contribute, so that
+% warning is switched off during this call (and the state is restored).
 controlparameters = struct('frequencies',100,'generalmethod','tf','difforder',1,'specorder',1);
+warnstate = warning('off','EDfindGApaths:specorder');
 EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,...
     edfilehandling(outputdirectory,filestem));
+warning(warnstate);
 eddata = load(fullfile(outputdirectory,[filestem,'_eddata.mat']));
 pd = eddata.planedata;
 ed = eddata.edgedata;

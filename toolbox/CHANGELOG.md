@@ -3,6 +3,49 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.643 (22 Nov. 2026)
+
+New function EDslopediffractionplanes, a first building block for slope
+diffraction handling. The edge source formulation is exact when an edge is
+hit by the wave from a monopole, or by a diffraction wave along a rigid
+surface; when an edge is hit by a diffraction wave through free space, the
+missing slope diffraction makes the higher-order diffraction approximate,
+and the rigid boundary condition is not fulfilled on the surfaces that
+such waves hit. EDslopediffractionplanes finds those planes: a plane is
+included if some part of it is visible from an edge that is active, not in
+the plane (or a coplanar plane), at least partly in front of it, with a
+path strictly inside the edge's open wedge that no plane obstructs. It
+returns the planes, the edges that hit each of them, and sample points with
+hit counts. For a convex polyhedron no plane is found; for a folded plate
+(L-shape) the two inner faces are found. The function is not yet called by
+EDmain_convex (no results change). New EDverify test 27.
+
+## 0.642 (22 Nov. 2026)
+
+Two bug fixes for non-convex models, found with solid (non-thin) L-shaped
+bodies, where the total field at k = 0 should be 1 everywhere.
+
+1. Coplanar planes (EDed2geo, version 3). When two planes are coplanar,
+e.g. two faces that meet at a flat (180 degree) edge, an edge of one did
+not see the edges of the other: a coplanar plane is not "in front of" a
+plane, so the pair was never a candidate, and the coupling along the face
+was lost. Found with a box whose top face was split into two coplanar
+faces: errors of up to 21% at k = 0 (the plain box: 1%). Now the edges of
+coplanar planes are treated as the edges of the same plane, and the split
+box gives the same results as the plain box (within 1%).
+
+2. A source within roundoff of a zone boundary (EDinteg_souterm, version
+6). In the 'exactpole' source term, the delta-function limit took the side
+of the zone boundary from the sign of sin(ny*phi/2), which for a source
+angle of exactly pi (e.g. a plane wave along a face) is decided by
+roundoff (+-4e-16). The side is now taken from lit3 (as for a source
+exactly on the boundary) when |sin(ny*phi/2)| < 1e-12. Found with a solid
+L-shaped body and a plane wave along its front and back faces: the result
+toggled between correct (1%) and 40% wrong from one fold angle to the next
+(175, 176, 177 degrees right; 174, 178, 179 wrong).
+
+The convex prism, a single thin plate and the thin L-plate are unchanged.
+
 ## 0.641 (22 Nov. 2026)
 
 Bug fix in EDfindGApaths: with specorder = 'auto', the image receivers can

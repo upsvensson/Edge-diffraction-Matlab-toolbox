@@ -54,6 +54,9 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % 22 Nov. 2026 Version 0.642: two bug fixes for non-convex models (edges
 % of coplanar planes; a source within roundoff of a zone boundary).
 
-versionnumber = 0.642;
+% 22 Nov. 2026 Version 0.643: new function EDslopediffractionplanes (the
+% planes that need slope diffraction handling), EDverify test 27.
+
+versionnumber = 0.643;
 lastchangedate = '22Nov2026';
-lastchangetime = '21h00';
+lastchangetime = '22h00';

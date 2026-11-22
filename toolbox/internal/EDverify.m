@@ -93,6 +93,11 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 %     receivers above, below and beside the body, for source distances
 %     1e10 m and 1e6 m (before 21 Nov. 2026, the source term had NaN or
 %     very wrong values).
+% 27. The planes that need slope diffraction handling
+%     (EDslopediffractionplanes): the planes hit by diffraction waves
+%     through free space. A folded thin plate (the two inner faces), three
+%     thin plates (the four faces that face another plate), and a box whose
+%     top and bottom faces are split into coplanar faces (none).
 %
 % See also EDmain_convex, EDstageversions
 %
@@ -164,8 +169,10 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % 22 Nov. 2026 Test 25 uses specorder = 1 (with the default 'auto', the two
 % parallel plates gave image points up to specordermax and a warning), with
 % the warning EDfindGApaths:specorder switched off during that call.
+% 22 Nov. 2026 Added test 27 (the planes that need slope diffraction
+% handling, by Claude, prompted by PS).
 
-ntests = 26;
+ntests = 27;
 
 if nargin < 1 || isempty(outputdirectory)
     outputdirectory = uigetdir('', 'Select the directory for the calculation results and the logfile');
@@ -220,7 +227,7 @@ disp(headerline)
 testfunctions = {@edtest1,@edtest2,@edtest3,@edtest4,@edtest5,@edtest6,@edtest7,...
     @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15,...
     @edtest16,@edtest17,@edtest18,@edtest19,@edtest20,@edtest21,@edtest22,@edtest23,@edtest24,...
-    @edtest25,@edtest26};
+    @edtest25,@edtest26,@edtest27};
 
 for itest = 1:ntests
     if runtest(itest) ~= 1
@@ -1355,4 +1362,82 @@ for ii = 1:numel(stagesuffixes)
         end
     end
 end
+end
+
+function r = edtest27(outputdirectory,filestem,~)
+title = 'The planes that need slope diffraction handling';
+description = {'EDslopediffractionplanes finds the planes that are hit by diffraction waves through',...
+    'free space (an edge that is not in the plane, in front of it, and a path strictly inside the',...
+    'edge''s open wedge that no plane obstructs). Three models, set up by EDmain_convex (difforder = 1):',...
+    '  A thin plate folded to 100 degrees: the two inner faces (the faces whose normals point into',...
+    '    the fold), and not the two outer faces.',...
+    '  Three thin plates (test 25): the four faces that face another plate, not the two outer faces.',...
+    '  A box whose top and bottom faces are split into two coplanar faces each: no plane.'};
+
+envdata = struct('cair',344);
+controlparameters = struct('frequencies',100,'generalmethod','tf','difforder',1,'specorder',1,'ngauss',4);
+Sinputdata = struct('coordinates',[3 0.1 2]);
+Rinputdata = struct('coordinates',[-3 0.2 2]);
+warnstate = warning('off','EDfindGApaths:specorder');
+
+% Folded thin plate, 100 degrees
+L = 100;
+corners = [0.5*[1 1 0;-1 1 0;-1 -1 0;1 -1 0];-0.5+0.5*cosd(L) 0.5 0.5*sind(L);-0.5+0.5*cosd(L) -0.5 0.5*sind(L)];
+geo1 = struct('corners',corners,'planecorners',[1 2 3 4;4 3 2 1;2 5 6 3;3 6 5 2],'allownonconvex',1);
+% Three thin plates (as in test 25)
+P1 = [0 0 0;1 0 0;1 1 0;0 1 0];
+P2 = P1 + [0 0 1];
+P3 = [0.3 -0.5 0.5;0.7 -0.5 0.5;0.7 1.5 0.5;0.3 1.5 0.5];
+geo2 = struct('corners',[P1;P2;P3],'planecorners',...
+    [1 2 3 4;4 3 2 1;5 6 7 8;8 7 6 5;9 10 11 12;12 11 10 9],'allownonconvex',1);
+Sinputdata2 = struct('coordinates',[0.13 0.21 1]/norm([0.13 0.21 1])*100);
+Rinputdata2 = struct('coordinates',[0.37 0.41 1.3]);
+% Box with split top and bottom faces (cross-section in the xz plane,
+% extruded along y)
+P = [0.5 -0.3;0.5 0;-0.5 0;-1 0;-1 -0.3;-0.5 -0.3];
+np = size(P,1);
+corners = [P(:,1) -0.5*ones(np,1) P(:,2); P(:,1) 0.5*ones(np,1) P(:,2)];
+pc = zeros(np+2,np);
+pc(1,:) = 1:np;
+pc(2,:) = 2*np:-1:np+1;
+for i = 1:np
+    j = mod(i,np)+1;
+    pc(i+2,1:4) = [j i i+np j+np];
+end
+geo3 = struct('corners',corners,'planecorners',pc,'allownonconvex',1);
+
+geos = {geo1,geo2,geo3};
+Ss = {Sinputdata,Sinputdata2,Sinputdata};
+Rs = {Rinputdata,Rinputdata2,Rinputdata};
+found = cell(1,3);
+expected = cell(1,3);
+for ii = 1:3
+    fs = [filestem,'_',int2str(ii)];
+    EDmain_convex(geos{ii},Ss{ii},Rs{ii},envdata,controlparameters,edfilehandling(outputdirectory,fs));
+    eddata = load(fullfile(outputdirectory,[fs,'_eddata.mat']));
+    sp = EDslopediffractionplanes(eddata.planedata,eddata.edgedata,struct('spacing',0.05));
+    found{ii} = sp.planelist(:).';
+    pe = eddata.planedata.planeeqs;
+    switch ii
+        case 1
+            % The inner faces: normals pointing into the fold (towards the
+            % bisector of the two plates)
+            bis = [cosd(L/2) 0 sind(L/2)];
+            dfold = [-0.5 0 0];
+            expected{ii} = find((pe(:,1:3)*(dfold + bis).' - pe(:,4)) > 0).';
+        case 2
+            % The faces that face another plate: z = 0 upwards, z = 1
+            % downwards, and both sides of the strip at z = 0.5
+            expected{ii} = find((abs(pe(:,4)) < 1e-9 & pe(:,3) > 0.5) | (abs(abs(pe(:,4))-1) < 1e-9 & pe(:,3) < -0.5) ...
+                | abs(abs(pe(:,4))-0.5) < 1e-9).';
+        case 3
+            expected{ii} = zeros(1,0);
+    end
+end
+warning(warnstate);
+pass = isequal(found{1},expected{1}) && isequal(found{2},expected{2}) && isempty(found{3});
+resultlines = {['Folded plate: planes ',mat2str(found{1}),' (expected ',mat2str(expected{1}),')'],...
+    ['Three plates: planes ',mat2str(found{2}),' (expected ',mat2str(expected{2}),')'],...
+    ['Split box: planes ',mat2str(found{3}),' (expected none)']};
+r = edresult(title,description,pass,resultlines);
 end

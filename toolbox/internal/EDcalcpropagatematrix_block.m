@@ -96,10 +96,13 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 %                   .nrows_exactpole and .nrows_fallback: the flagged rows
 %                   (per beta term) with the exact pole, and those where the
 %                   Newton iteration failed ('taylor' treatment).
+%                   .nsplitreceivers (22 Nov. 2026): the number of
+%                   (receiver, edge pair) combinations where the edge-1
+%                   integration was split at a zone-boundary point.
 %
 % See also EDcalcpropagatematrix, EDintegralequation_convex_tf
 %
-% Peter Svensson (peter.svensson@ntnu.no) 21 Nov. 2026
+% Peter Svensson (peter.svensson@ntnu.no) 22 Nov. 2026
 %
 % [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edgedata,...
 %    edgetoedgedata,Hsubmatrixdata,vispartedgesfromr,rRmat,thetaRmat,zRmat,...
@@ -128,6 +131,17 @@ function [Fgeom,pathlengths,propdiagnostics] = EDcalcpropagatematrix_block(edged
 % receiver that sees only part of edge 2 (visstartmat, visendmat), the
 % part gets its own Gauss-Legendre rule, with q interpolated from the
 % edge-2 nodes (before: zero row elements outside the part).
+% 22 Nov. 2026 (by Claude, prompted by PS) The near-pole treatment (the
+% flagged rows, 'exactpole' or the Lorentzian correction) also for edge
+% pairs that are not along a face (acrossface_in = 0): four beta terms, the
+% angle of each edge-1 node. Only the flagged rows change.
+% 22 Nov. 2026 (by Claude, prompted by PS) For an edge 1 that is skewed
+% relative to edge 2, the edge-1 integration is split at the points where
+% the receiver is on a zone boundary of edge 2 (a pole of a beta term with
+% the apex point inside edge 2): the integral over edge 2 jumps there.
+% Each part gets its own Gauss-Legendre rule, and q is interpolated from
+% the edge-1 nodes (local functions edsplitpoints, edgeom1). Not yet for
+% segments of edge 1 (fromnodelist). Version 3.
 % 21 Nov. 2026 (by Claude, prompted by PS) Edge-1 node angles within 1e-6
 % of 2*pi (from roundoff, y = -1e-13 on the reference face) are set to 0
 % for non-thin edges.
@@ -154,7 +168,7 @@ alledgepairsthin = prod(double(Hsubmatrixdata.isthinplaneedgepair));
 noedgepairsthin  = prod(1-double(Hsubmatrixdata.isthinplaneedgepair));
 
 propdiagnostics = struct('npairs',0,'npairs_eligible',0,'npairs_corrected',0, ...
-    'nrows',0,'nrows_corrected',0,'correctedpairs',zeros(0,4));
+    'nrows',0,'nrows_corrected',0,'correctedpairs',zeros(0,4),'nsplitreceivers',0);
 correctedpairs = zeros(size(Hsubmatrixdata.edgepairlist,1),4);
 ncorrectedpairs = 0;
 nrows_exactpole = 0;
@@ -287,6 +301,79 @@ for ii = 1:size(Hsubmatrixdata.edgepairlist,1)
                     Fsub(:,sel(kr)) = Feff(:);
                 end
             end
+        end
+    end
+
+    % 22 Nov. 2026 (by Claude, prompted by PS): the splitting of the edge-1
+    % integration. For an edge 1 that is skewed relative to edge 2, the
+    % angle of the edge-1 point varies along edge 1, and the receiver can
+    % be on a zone boundary of edge 2 for one point z1* of edge 1 (one of
+    % the four beta terms has its pole there, with the apex point inside
+    % edge 2). The integral over edge 2 then jumps at z1*, and a
+    % Gauss-Legendre rule over the whole edge 1 converges only as an erratic
+    % O(1/n). Found with a folded plate, where receivers next to each other
+    % got a noise of +-0.004 at ngauss = 16. Now the edge-1 integration is
+    % split at each z1*: each part gets its own Gauss-Legendre rule (n1
+    % nodes), and q (times the phase) at those nodes is interpolated from
+    % the edge-1 nodes (Lagrange), as for the receiver windows of edge 2.
+    if acrossface_in == 0 && ~(isfield(Hsubmatrixdata,'fromnodelist') && ~isempty(Hsubmatrixdata.fromnodelist{ii}))
+        e1geom = struct('xs',xedge1start,'xe',xedge1end,'ys',yedge1start,'ye',yedge1end,...
+            'zs',edgetoedgedata.ze1sho(refto(edge1,edge2)),'ze',edgetoedgedata.ze2sho(refto(edge1,edge2)),...
+            'len2',len2,'snap',edgedata.closwedangvec(edge2) > 0);
+        rRsub = rRmat(edge2,rr);
+        thetaRsub = thetaRmat(edge2,rr);
+        zRsub = zRmat(edge2,rr);
+        if usewindows
+            wsvec = double(visstartmat(edge2,rr));
+            wevec = double(visendmat(edge2,rr));
+        else
+            wsvec = zeros(1,nr);
+            wevec = ones(1,nr);
+        end
+        splitlists = edsplitpoints(e1geom,ny,rRsub,thetaRsub,zRsub,wsvec,wevec);
+        for kr = find(~cellfun(@isempty,splitlists))
+            ws = wsvec(kr);
+            we = wevec(kr);
+            if we <= ws
+                continue
+            end
+            [x01,w01] = EDgetGLrule(n1);
+            bp = [0 splitlists{kr} 1];
+            x1new = zeros(0,1);
+            w1new = zeros(0,1);
+            for ib = 1:numel(bp)-1
+                x1new = [x1new; bp(ib) + (bp(ib+1)-bp(ib))*x01(:)];
+                w1new = [w1new; (bp(ib+1)-bp(ib))*w01(:)];
+            end
+            [r1n,th1n,z1n] = edgeom1(e1geom,x1new);
+            dz1n = w1new*edgedata.edgelengthvec(edge1);
+            if ws > 0 || we < 1
+                [x02,w02] = EDgetGLrule(n2);
+                xi2 = ws + (we-ws)*x02(:);
+                ze2x = xi2*len2;
+                dz2x = (we-ws)*w02(:)*len2;
+                L2 = edlagrangematrix(n2vec(:),xi2);   % [n2 x n2]
+                off2 = ws*len2;
+                seg2 = (we-ws)*len2;
+            else
+                ze2x = ze2_re2;
+                dz2x = dzvec2;
+                L2 = [];
+                off2 = 0;
+                seg2 = len2;
+            end
+            Fnew = edpairF(numel(x1new),z1n,r1n,th1n,thetain,acrossface_in,ny,...
+                dz1n,ze2x,dz2x,off2,seg2,rRsub(kr),thetaRsub(kr),zRsub(kr),...
+                thinplaneboost,useexactpole);
+            L1 = edlagrangematrix(n1vec(:),x1new);      % [n1new x n1]
+            F2 = reshape(Fnew,numel(x1new),numel(ze2x));
+            if isempty(L2)
+                Feff = L1.'*F2;
+            else
+                Feff = L1.'*F2*L2;
+            end
+            Fsub(:,kr) = Feff(:);
+            propdiagnostics.nsplitreceivers = propdiagnostics.nsplitreceivers + 1;
         end
     end
 
@@ -449,8 +536,165 @@ else
             sin(ny*(pi - thetae1_re2(n1vertmat) + thetaout  ))./(ch - cos(ny*(pi - thetae1_re2(n1vertmat) + thetaout   ))) + ...
             sin(ny*(pi - thetae1_re2(n1vertmat) - thetaout  ))./(ch - cos(ny*(pi - thetae1_re2(n1vertmat) - thetaout   )));
     Fsub = -ny/4/2/pi*beta.*kernelfactor.*(dzvec2(n2vertmat).*dzvec1(n1vertmat))*thinplaneboost;
+
+    % 22 Nov. 2026 (by Claude, prompted by PS): the near-pole treatment of
+    % the acrossface_in branch, now also for edge pairs that are not along
+    % a face (four beta terms, the angle of each edge-1 node). Before, a
+    % receiver close to a zone boundary of edge 2 (for the sources at edge
+    % 1) got plain Gauss-Legendre over edge 2, and a narrow peak gave an
+    % error that is largest near the zone boundary (found with a folded
+    % plate: a spike at a receiver 0.002 rad from the reflection boundary,
+    % in plate 1, of the path from the top edge of plate 2 via the far edge
+    % of plate 1). Only the flagged rows (edge-1 node, receiver) are
+    % changed, by adding the difference to the plain terms, so all other
+    % values stay the same, bit for bit.
+    R0vec = sqrt( (ze1_re2 - zR).^2 + (re1_re2 + rR).^2 );          % [n1 x nr]
+    zavec = ( zR.*re1_re2 + ze1_re2.*rR ) ./ ( re1_re2 + rR );        % [n1 x nr]
+    kappavec = ny^2*(re1_re2+rR).^4 ./ (2*re1_re2.^2.*rR.^2.*R0vec.^2); % [n1 x nr]
+    if n2 > 1
+        localspacing = max(diff(sort(ze2_re2)));
+    else
+        localspacing = seglength;
+    end
+    zrelthreshold = 5;
+    insiderange = (zavec-segoffset >= -0.05*seglength) & (zavec-segoffset <= 1.05*seglength);   % [n1 x nr]
+    dzvec2_row = dzvec2(:).';
+    ze2_row = ze2_re2(:).';
+    th1 = thetae1_re2(:);
+    s1 = [1 1 -1 -1];
+    s2 = [1 -1 1 -1];
+    anyflag = false(n1,nr);
+    for kk = 1:4
+        phi_k = pi + s1(kk)*th1 + s2(kk)*thetaout;                % [n1 x nr]
+        B1_k  = 2*sin(ny*phi_k/2).^2 ./ kappavec;                   % [n1 x nr]
+        num_k = sin(ny*phi_k) ./ kappavec;                          % [n1 x nr]
+        flag_k = insiderange & (sqrt(max(B1_k,0)) < zrelthreshold*localspacing);
+        if ~any(flag_k(:))
+            continue
+        end
+        anyflag = anyflag | flag_k;
+        flaggedrows = find(flag_k(:));
+        [iif,rrf] = ind2sub([n1 nr],flaggedrows);
+        iif = iif(:);
+        rrf = rrf(:);
+        nf = numel(flaggedrows);
+        rowidx = iif + (0:n2-1)*n1;                                 % [nf x n2], rows of ch, Fsub
+        linidx = rowidx + (rrf-1)*(n1*n2);                          % [nf x n2]
+        phif = phi_k(flaggedrows);
+        phif = phif(:);
+        % This term at the nodes, as in beta above, [nf x n2]
+        chf = reshape(ch(linidx),nf,n2);
+        contribold = sin(ny*phif)./(chf - cos(ny*phif)).*dzvec2_row;
+        contribnew = contribold;
+        zaf  = zavec(flaggedrows);   zaf = zaf(:);
+        B1f  = max(B1_k(flaggedrows),0);  B1f = B1f(:);
+        numf = num_k(flaggedrows);   numf = numf(:);
+        [~,wnodes_std,Sstd,tfine_std,wfine_std,Pint_std] = glStandardCached(n2);
+        inok = (1:nf).';
+        if useexactpole
+            zSf = ze1_re2(iif);  zSf = zSf(:);
+            rSf = re1_re2(iif);  rSf = rSf(:);
+            zRf = zR(rrf);       zRf = zRf(:);
+            rRf = rR(rrf);       rRf = rRf(:);
+            sinhalf2 = sin(ny*phif/2).^2;
+            snphi = sin(ny*phif);
+            [zpf,Bpf,okf] = edexactpoles(zSf,rSf,zRf,rRf,zaf,B1f,sinhalf2,ny,seglength);
+            iok = find(okf);
+            inok = find(~okf);
+            dg.nrows_exactpole = dg.nrows_exactpole + numel(iok);
+            dg.nrows_fallback = dg.nrows_fallback + numel(inok);
+            if ~isempty(iok)
+                WT = modifiedWeightsLorentzianVec(Sstd,wnodes_std,tfine_std,wfine_std,Pint_std,...
+                    2*(zpf(iok)-segoffset)/seglength-1,4*Bpf(iok)/seglength^2);   % [n2 x nok]
+                Wg = (2/seglength)*WT.';                                           % [nok x n2]
+                betaacc = contribold(iok,:)./dzvec2_row;
+                irec = find(sinhalf2(iok) < 1e-6);
+                if ~isempty(irec)
+                    ik = iok(irec);
+                    betaacc(irec,:) = edbetaaccurate(ze2_row,zSf(ik),rSf(ik),zRf(ik),rRf(ik),...
+                        zaf(ik),sinhalf2(ik),snphi(ik),ny);
+                end
+                contribnew(iok,:) = Wg.*betaacc.*((ze2_row - zpf(iok)).^2 + Bpf(iok));
+            end
+        end
+        if ~isempty(inok)
+            % The Taylor model of the pole (the correction of the face branch)
+            xa   = 2*(zaf(inok)-segoffset)/seglength - 1;
+            Bhat = 4*B1f(inok)/seglength^2;
+            WT = modifiedWeightsLorentzianVec(Sstd,wnodes_std,tfine_std,wfine_std,Pint_std,xa,Bhat);
+            wt_physical = (2/seglength) * (numf(inok) .* WT.');
+            lorentzian_at_nodes = numf(inok) ./ ((ze2_row - zaf(inok)).^2 + B1f(inok));
+            contribnew(inok,:) = contribold(inok,:) + (wt_physical - lorentzian_at_nodes.*dzvec2_row);
+        end
+        delta = contribnew - contribold;
+        delta(~isfinite(delta)) = 0;
+        Fadd = (-ny/4/2/pi*thinplaneboost)*reshape(dzvec1(iif),[],1).*reshape(kernelfactor(linidx),nf,n2).*delta;
+        Fsub(linidx(:)) = Fsub(linidx(:)) + Fadd(:);
+    end
+    dg.anyflag = anyflag;
 end
 
+end
+
+%--------------------------------------------------------------------------
+function [r1,th1,z1] = edgeom1(g,t)
+% 22 Nov. 2026: the cylindrical coordinates (relative to edge 2) of the
+% points t (0..1) along edge 1, as for the edge-1 nodes in the main loop.
+t = t(:);
+x = g.xs + t*(g.xe-g.xs);
+y = g.ys + t*(g.ye-g.ys);
+z = g.zs + t*(g.ze-g.zs);
+[r1,th1,z1] = EDcoordtrans1([x y z],[0 0 0;0 0 g.len2],[0 1 0]);
+r1 = r1(:); th1 = th1(:); z1 = z1(:);
+if g.snap
+    th1(th1 > 2*pi-1e-6) = th1(th1 > 2*pi-1e-6) - 2*pi;
+end
+end
+
+%--------------------------------------------------------------------------
+function splitlists = edsplitpoints(g,ny,rR,thetaR,zR,wsvec,wevec)
+% 22 Nov. 2026: for each receiver, the points t* (0..1) along edge 1 where
+% one of the four beta terms has its pole (sin(ny*phi/2) = 0, phi = pi +-
+% theta1 +- thetaR) and the apex point is inside the (visible part of)
+% edge 2. Found on 201 sample points, then refined by the secant method.
+nsamp = 201;
+tf = linspace(0,1,nsamp).';
+[rf,thf,zf] = edgeom1(g,tf);
+nr = numel(rR);
+splitlists = cell(1,nr);
+s1 = [1 1 -1 -1];
+s2 = [1 -1 1 -1];
+for kr = 1:nr
+    tlist = [];
+    for kk = 1:4
+        gk = sin(ny*(pi + s1(kk)*thf + s2(kk)*thetaR(kr))/2);
+        ic = find(gk(1:end-1).*gk(2:end) < 0);
+        for ic1 = ic(:).'
+            ta = tf(ic1); tb = tf(ic1+1);
+            ga = gk(ic1); gb = gk(ic1+1);
+            for it = 1:6
+                tn = tb - gb*(tb-ta)/(gb-ga);
+                tn = min(max(tn,tf(ic1)),tf(ic1+1));
+                [~,thn] = edgeom1(g,tn);
+                gn = sin(ny*(pi + s1(kk)*thn + s2(kk)*thetaR(kr))/2);
+                ta = tb; ga = gb; tb = tn; gb = gn;
+                if abs(gn) < 1e-14 || ga == gb
+                    break
+                end
+            end
+            [rn,~,zn] = edgeom1(g,tb);
+            za = (zR(kr)*rn + zn*rR(kr))/(rn + rR(kr));
+            if za > wsvec(kr)*g.len2 && za < wevec(kr)*g.len2 && tb > 1e-6 && tb < 1-1e-6
+                tlist = [tlist tb];
+            end
+        end
+    end
+    if ~isempty(tlist)
+        tlist = sort(tlist);
+        tlist = tlist([true diff(tlist) > 1e-9]);
+        splitlists{kr} = tlist;
+    end
+end
 end
 
 %--------------------------------------------------------------------------

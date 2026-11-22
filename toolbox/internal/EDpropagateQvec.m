@@ -63,7 +63,9 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 %     .propdiagnostics    the totals of the singularity corrections (see
 %                         EDcalcpropagatematrix_block); for 'legacy', the
 %                         values of the last receiver. For 'exactpole' also
-%                         .nrows_exactpole and .nrows_fallback.
+%                         .nrows_exactpole and .nrows_fallback. Since 22 Nov.
+%                         2026 also .nsplitreceivers (see
+%                         EDcalcpropagatematrix_block).
 %     .propagationblocksize  the number of receivers per block ('accurate'),
 %                         or [] ('legacy')
 %     .ivproblematicmatrix   ('legacy') the near-singular entries per receiver
@@ -90,6 +92,8 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 % the block propagation with polemethod = 'exact'. The totals of the new
 % propdiagnostics fields are collected. For thin holes, 'exactpole' is
 % replaced by 'accurate'.
+% 22 Nov. 2026 (by Claude, prompted by PS) propdiagnostics.nsplitreceivers
+% (the receiver/edge-pair combinations with a split edge-1 integration).
 % 21 Nov. 2026 (by Claude, prompted by PS) A layout with edge segments
 % (Hsubmatrixdata.fromnodelist, see EDsegmentlayout) gives an error with
 % the legacy propagation and for thin holes.
@@ -284,7 +288,7 @@ if useblocks
 
     % Collect the results of all the blocks
     propdiagnostics = struct('npairs',0,'npairs_eligible',0,'npairs_corrected',0, ...
-        'nrows',0,'nrows_corrected',0,'correctedpairs',zeros(0,4));
+        'nrows',0,'nrows_corrected',0,'correctedpairs',zeros(0,4),'nsplitreceivers',0);
     if strcmp(polemethod,'exact')
         propdiagnostics.nrows_exactpole = 0;
         propdiagnostics.nrows_fallback = 0;
@@ -311,6 +315,9 @@ if useblocks
         propdiagnostics.nrows = propdiagnostics.nrows + pd.nrows;
         propdiagnostics.nrows_corrected = propdiagnostics.nrows_corrected + pd.nrows_corrected;
         propdiagnostics.correctedpairs = [propdiagnostics.correctedpairs; pd.correctedpairs];
+        if isfield(pd,'nsplitreceivers')
+            propdiagnostics.nsplitreceivers = propdiagnostics.nsplitreceivers + pd.nsplitreceivers;
+        end
         if strcmp(polemethod,'exact')
             propdiagnostics.nrows_exactpole = propdiagnostics.nrows_exactpole + pd.nrows_exactpole;
             propdiagnostics.nrows_fallback = propdiagnostics.nrows_fallback + pd.nrows_fallback;

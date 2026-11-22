@@ -3,6 +3,35 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.637 (22 Nov. 2026)
+
+Two improvements of the propagation of the integral equation to the
+receivers (EDcalcpropagatematrix_block, version 3), found with a
+100-degree folded plate and receivers on a circle (k = 0 and k = 5), which
+had isolated spikes and receiver-to-receiver noise. With ngauss = 16, the
+largest second difference along the circle went from 0.044 to 0.0016 at
+k = 0 (rms from 0.0043 to 0.0002), and from 0.062 to 0.0054 at k = 5,
+smoother than ngauss = 48 before. The smooth deviation from 1 at k = 0
+(the model residual) is unchanged. Results for the convex prism and a
+single thin plate are unchanged, bit for bit; the computation time of the
+circle went up by about 15%.
+
+**Changes that affect the results.**
+- The near-pole treatment of the propagation (the rows whose peak is
+  narrow compared with the node spacing, with 'exactpole' or the
+  Lorentzian correction) was only done for edge pairs along a face
+  (acrossface_in = 1). Now also for the other edge pairs, with the four
+  beta terms and the angle of each edge-1 node. Before, a receiver close to
+  a zone boundary of such a pair got plain Gauss-Legendre, which gave a
+  spike (for example 0.04 at a receiver 0.002 rad from a boundary).
+- For an edge 1 that is skewed relative to edge 2, the receiver can be on
+  a zone boundary of edge 2 for one point of edge 1; the integral over edge
+  2 jumps there, which gave an erratic O(1/n) noise between neighbouring
+  receivers. The edge-1 integration is now split at those points (own
+  Gauss-Legendre rules, q interpolated from the edge-1 nodes), as for the
+  receiver windows of edge 2. Not yet for segments of edge 1.
+- New diagnostic: propinfo.propdiagnostics.nsplitreceivers.
+
 ## 0.636 (21 Nov. 2026)
 
 Two bug fixes for non-convex models with thin plates, found with a

@@ -37,7 +37,10 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % 21 Nov. 2026 Version 0.636: two bug fixes for non-convex models with thin
 % plates (symmetry compression with different thinplaneboost; the slice
 % correction of the source term for skewed edges).
+% 22 Nov. 2026 Version 0.637: smoother propagation of the integral equation
+% near zone boundaries (near-pole treatment for all edge pairs, split
+% edge-1 integration for skewed edge pairs).
 
-versionnumber = 0.636;
-lastchangedate = '21Nov2026';
-lastchangetime = '23h15';
+versionnumber = 0.637;
+lastchangedate = '22Nov2026';
+lastchangetime = '15h30';

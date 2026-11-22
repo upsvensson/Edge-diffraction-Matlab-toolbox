@@ -94,6 +94,9 @@ function stageinfo = EDstageversions(stagename)
 % in the symmetry comparison of the triplets) and EDinteg_souterm to
 % version 4 (the legacy slice correction for skewed edges). Found with a
 % folded plate; the convex test models are unchanged.
+% 22 Nov. 2026 EDcalcpropagatematrix_block to version 3: the near-pole
+% treatment also for edge pairs that are not along a face, and the split
+% edge-1 integration at zone-boundary points (skewed edge pairs).
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -125,7 +128,7 @@ versions.EDcalcedgeinteqmatrixsub2_mex = 1;  % Compiled file: increase by
                                              % hand when it is recompiled
                                              % from changed source code.
 versions.EDcalcpropagatematrix        = 2;  % 2: bug fix, edge data for edges with the same number of nodes
-versions.EDcalcpropagatematrix_block  = 2;  % 2: per-node angles snapped at 2*pi
+versions.EDcalcpropagatematrix_block  = 3;  % 3: near-pole treatment for pairs not along a face, split edge-1 integration; 2: per-node angles snapped at 2*pi
 versions.EDcheckobstr_edgetoedge      = 1;
 versions.EDcheckobstr_pointtoedge     = 1;
 versions.EDcheckobstrpaths            = 1;

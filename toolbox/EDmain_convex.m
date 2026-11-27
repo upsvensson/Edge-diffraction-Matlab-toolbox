@@ -210,6 +210,10 @@ function EDres = EDmain_convex(geoinputdata,Sinputdata,Rinputdata,envdata,contro
 % per frequency (and source), and the propagation in total.
 % 28 Oct. 2026 The timing line of the propagation also gives the time for
 % the refinement (controlparameters.ESIEpropagationrefine), if it is used.
+% 27 Nov. 2026 Sources and receivers on the extension of a plane are moved
+% slightly off the plane (EDnudgepoints), with a warning (identifiers
+% EDmain_convex:nudgedS and EDmain_convex:nudgedR) on screen and in the log
+% file (by Claude, prompted by PS).
 
 [EDversionnumber,lastsavedate,lastsavetime] = EDgetversion;
 
@@ -412,6 +416,47 @@ else
      EDinputdatahash = '00000000';
      eval(['save(''',desiredname,''',''planedata'',''edgedata'',''EDinputdatahash'',''elapsedtimeedgeo'');'])
      timingstruct.edgedata = 0;
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Sources and receivers that lie exactly on the extension of a plane (in
+% the plane, outside the face) are moved slightly off the plane, along its
+% normal (EDnudgepoints), with a warning on screen and in the log file.
+% The input structs (in the _settings file and in EDres) keep the original
+% coordinates; Sdata and Rdata get the moved ones, and the field
+% .nudgeinfo = [point number, plane number, distance moved] per move.
+
+if geoinputdata.freefieldcase == 0 && ~strcmp(controlparameters.generalmethod,'tf_ESIEBEM')
+    pointtypes = {'S','R'};
+    for ipt = 1:2
+        if ipt == 1
+            if isfield(Snewdata,'sourcetype') && strcmp(Snewdata.sourcetype,'polygonpiston')
+                continue
+            end
+            [newcoords,nudgeinfo] = EDnudgepoints(Snewdata.coordinates,planedata);
+            Snewdata.coordinates = newcoords;
+            Snewdata.nudgeinfo = nudgeinfo;
+            pointname = 'source';
+        else
+            [newcoords,nudgeinfo] = EDnudgepoints(Rnewdata.coordinates,planedata);
+            Rnewdata.coordinates = newcoords;
+            Rnewdata.nudgeinfo = nudgeinfo;
+            pointname = 'receiver';
+        end
+        if ~isempty(nudgeinfo)
+            nmoved = numel(unique(nudgeinfo(:,1)));
+            textlines = {['WARNING: ',int2str(nmoved),' ',pointname,'(s) on the extension of a plane were moved ',...
+                num2str(nudgeinfo(1,3),3),' m along the plane normal:']};
+            for ii = 1:min(size(nudgeinfo,1),10)
+                textlines{end+1} = ['   ',pointname,' ',int2str(nudgeinfo(ii,1)),': plane ',int2str(nudgeinfo(ii,2))]; %#ok<AGROW>
+            end
+            if size(nudgeinfo,1) > 10
+                textlines{end+1} = ['   (and ',int2str(size(nudgeinfo,1)-10),' more)']; %#ok<AGROW>
+            end
+            warning(['EDmain_convex:nudged',pointtypes{ipt}],'%s',strjoin(textlines,newline));
+            EDmessage(filehandlingparameters,'f',fid,1,'',textlines{:});
+        end
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

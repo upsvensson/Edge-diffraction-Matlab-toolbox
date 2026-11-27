@@ -3,6 +3,34 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.644 (27 Nov. 2026)
+
+Sources and receivers that lie exactly on the extension of a plane (in the
+plane of a face, outside the face) are now moved a small distance along
+the plane's outward normal, instead of giving the error "too close to the
+extension of plane". The distance is max(1e-6 x the model size, 1e-6 m);
+the point is checked again after the move (it could lie on the extension
+of another plane). A warning (identifiers EDmain_convex:nudgedS and
+EDmain_convex:nudgedR) lists the moved points and planes, on screen and in
+the log file. The input structs (in the _settings file and in EDres) keep
+the original coordinates; Sdata/Rdata have the moved ones and the new field
+.nudgeinfo = [point number, plane number, distance moved].
+
+Such a point is on a visibility boundary for the edges of that face, and
+the half-written "aligned" handling in EDSorRgeo gave wrong results for
+convex models (all first-order diffraction from the face's edges was
+lost) and an error for non-convex models. The total field is continuous
+across the plane, so the moved point gives the one-sided limit, which
+differs from the value on the other side by the small discontinuity that
+the edge diffraction model has there (0.03 - 0.6% in the tests).
+
+Points on a face itself (inside the polygon), or on an edge or corner of
+a face, still give an error (the two sides of a thin plate have different
+pressures). Piston sources, and the surface receivers of tf_ESIEBEM, are
+not moved.
+
+New function EDnudgepoints. New EDverify test 28.
+
 ## 0.643 (22 Nov. 2026)
 
 New function EDslopediffractionplanes, a first building block for slope

@@ -121,6 +121,15 @@ function EDdatastructs
 % The input struct (Sinputdata/Rinputdata, after EDcheckinputstructs),
 % with these fields added by EDSorRgeo. For Sdata the names end with s/S,
 % for Rdata with r/R:
+%   .coordinates            the coordinates that were used: a point that
+%                           lay exactly on the extension of a plane (in the
+%                           plane, outside the face) was moved a small
+%                           distance along the plane normal by
+%                           EDnudgepoints (the input structs in the
+%                           _settings file and in EDres keep the original)
+%   .nudgeinfo              [nmoves,3] one row per such move: [point
+%                           number, plane number, distance moved] (empty
+%                           if none; set by EDmain_convex)
 %   .visplanesfroms         [nplanes,nsources], values 0-5:
 %                           0 behind a reflective or totabs plane
 %                           1 aligned with a plane, but outside it
@@ -339,5 +348,7 @@ function EDdatastructs
 % 21 Nov. 2026 firstorderpathdata.specorderused and .specordertruncated
 % (specorder = 'auto').
 % 22 Nov. 2026 inteqdiagnostics.ntosplits.
+% 27 Nov. 2026 Sdata.nudgeinfo and Rdata.nudgeinfo (points on the
+% extension of a plane, moved by EDnudgepoints).
 
 help(mfilename)

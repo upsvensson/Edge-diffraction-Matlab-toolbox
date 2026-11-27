@@ -98,6 +98,12 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 %     through free space. A folded thin plate (the two inner faces), three
 %     thin plates (the four faces that face another plate), and a box whose
 %     top and bottom faces are split into coplanar faces (none).
+% 28. Receivers on the extension of a plane: a box (receiver on the
+%     extension of its top face) and a thin plate (receiver in its plane,
+%     outside it). The receivers are moved off the plane (EDnudgepoints) with
+%     a warning; the result must equal that of a receiver placed at the moved
+%     position by hand, the input structs must keep the original
+%     coordinates, and a receiver on a face itself must still give an error.
 %
 % See also EDmain_convex, EDstageversions
 %
@@ -171,8 +177,10 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % the warning EDfindGApaths:specorder switched off during that call.
 % 22 Nov. 2026 Added test 27 (the planes that need slope diffraction
 % handling, by Claude, prompted by PS).
+% 27 Nov. 2026 Added test 28 (receivers on the extension of a plane, by
+% Claude, prompted by PS).
 
-ntests = 27;
+ntests = 28;
 
 if nargin < 1 || isempty(outputdirectory)
     outputdirectory = uigetdir('', 'Select the directory for the calculation results and the logfile');
@@ -227,7 +235,7 @@ disp(headerline)
 testfunctions = {@edtest1,@edtest2,@edtest3,@edtest4,@edtest5,@edtest6,@edtest7,...
     @edtest8,@edtest9,@edtest10,@edtest11,@edtest12,@edtest13,@edtest14,@edtest15,...
     @edtest16,@edtest17,@edtest18,@edtest19,@edtest20,@edtest21,@edtest22,@edtest23,@edtest24,...
-    @edtest25,@edtest26,@edtest27};
+    @edtest25,@edtest26,@edtest27,@edtest28};
 
 for itest = 1:ntests
     if runtest(itest) ~= 1
@@ -1439,5 +1447,73 @@ pass = isequal(found{1},expected{1}) && isequal(found{2},expected{2}) && isempty
 resultlines = {['Folded plate: planes ',mat2str(found{1}),' (expected ',mat2str(expected{1}),')'],...
     ['Three plates: planes ',mat2str(found{2}),' (expected ',mat2str(expected{2}),')'],...
     ['Split box: planes ',mat2str(found{3}),' (expected none)']};
+r = edresult(title,description,pass,resultlines);
+end
+
+function r = edtest28(outputdirectory,filestem,~)
+title = 'Receivers on the extension of a plane';
+description = {'A receiver exactly in the plane of a face, outside the face, is moved a small distance',...
+    'along the plane normal (EDnudgepoints), with a warning. Checked for a box (the extension of the',...
+    'top face) and a thin plate (its plane): the result must equal that of a receiver placed at the',...
+    'moved position by hand, EDres.Rinputdata must keep the original coordinates, and a receiver on',...
+    'a face itself must still give an error.'};
+
+envdata = struct('cair',344);
+controlparameters = struct('frequencies',[0 500],'generalmethod','tf','difforder',20,...
+    'inteqsolutionmethod','GMRES_fast','ngauss',8);
+Sinputdata = struct('coordinates',[0.31 0.17 1.03]);
+Ron = [1.52 0.11 0];
+boxcorners = [0.5 0.5 0;-0.5 0.5 0;-0.5 -0.5 0;0.5 -0.5 0;0.5 0.5 -0.6;-0.5 0.5 -0.6;-0.5 -0.5 -0.6;0.5 -0.5 -0.6];
+boxplanes = [4 3 2 1;5 6 7 8;1 5 8 4;2 6 5 1;3 7 6 2;4 8 7 3];
+% Outward normals (right-hand rule): flip a plane whose normal points inwards
+boxcentre = mean(boxcorners,1);
+for ip = 1:size(boxplanes,1)
+    X = boxcorners(boxplanes(ip,:),:);
+    if dot(cross(X(2,:)-X(1,:),X(3,:)-X(1,:)),mean(X,1)-boxcentre) < 0
+        boxplanes(ip,:) = fliplr(boxplanes(ip,:));
+    end
+end
+geos = {struct('corners',boxcorners,'planecorners',boxplanes),...
+    struct('corners',[0.5 0.5 0;-0.5 0.5 0;-0.5 -0.5 0;0.5 -0.5 0],'planecorners',[1 2 3 4;4 3 2 1],'allownonconvex',1)};
+names = {'box','thin plate'};
+warnstate = warning('off','EDmain_convex:nudgedR');
+pass = true;
+resultlines = {};
+for ii = 1:2
+    fs = [filestem,'_',int2str(ii)];
+    res = EDmain_convex(geos{ii},Sinputdata,struct('coordinates',Ron),envdata,controlparameters,edfilehandling(outputdirectory,fs));
+    % The warning must be in the log file
+    logtext = '';
+    if isfield(res,'logfilename') && ~isempty(res.logfilename) && exist(fullfile(outputdirectory,res.logfilename),'file')
+        logtext = fileread(fullfile(outputdirectory,res.logfilename));
+    end
+    warnlogged = ~isempty(strfind(logtext,'on the extension of a plane were moved'));
+    Rdatafile = load(fullfile(outputdirectory,[fs,'_Rdata.mat']));
+    eddata = load(fullfile(outputdirectory,[fs,'_eddata.mat']));
+    ni = Rdatafile.Rdata.nudgeinfo;
+    moved = size(ni,1) >= 1;
+    Rmoved = Ron;
+    for jj = 1:size(ni,1)
+        Rmoved = Rmoved + ni(jj,3)*eddata.planedata.planeeqs(ni(jj,2),1:3);
+    end
+    res2 = EDmain_convex(geos{ii},Sinputdata,struct('coordinates',Rmoved),envdata,controlparameters,edfilehandling(outputdirectory,[fs,'b']));
+    d = max(abs(res.tftot(:) - res2.tftot(:)))/max(abs(res2.tftot(:)));
+    keptinput = isequal(res.Rinputdata.coordinates,Ron);
+    ok = moved && d < 1e-12 && keptinput && warnlogged;
+    pass = pass && ok;
+    resultlines{end+1} = [names{ii},': moved ',num2str(sum(ni(:,3))),' m (plane(s) ',int2str(ni(:,2).'),...
+        '), difference to the moved receiver ',num2str(d,3),', input kept: ',int2str(keptinput),...
+        ', warning in the log file: ',int2str(warnlogged)]; %#ok<AGROW>
+end
+% A receiver on the face itself must still give an error
+gaveerror = false;
+try
+    EDmain_convex(geos{1},Sinputdata,struct('coordinates',[0.1 0.2 0]),envdata,controlparameters,edfilehandling(outputdirectory,[filestem,'_3']));
+catch
+    gaveerror = true;
+end
+warning(warnstate);
+pass = pass && gaveerror;
+resultlines{end+1} = ['Receiver on the face itself gives an error: ',int2str(gaveerror)];
 r = edresult(title,description,pass,resultlines);
 end

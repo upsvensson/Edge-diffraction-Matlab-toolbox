@@ -57,6 +57,10 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % 22 Nov. 2026 Version 0.643: new function EDslopediffractionplanes (the
 % planes that need slope diffraction handling), EDverify test 27.
 
-versionnumber = 0.643;
-lastchangedate = '22Nov2026';
-lastchangetime = '22h00';
+% 27 Nov. 2026 Version 0.644: sources and receivers on the extension of a
+% plane are moved slightly off the plane (EDnudgepoints), with a warning.
+% EDverify test 28.
+
+versionnumber = 0.644;
+lastchangedate = '27Nov2026';
+lastchangetime = '10h00';

@@ -315,10 +315,13 @@ function EDdatastructs
 %                           edge X (a zone boundary of e crosses X); the
 %                           propagation then uses nodes of X split at the
 %                           jumps (non-convex models, EDsegmentlayout)
-%   .parallelworkers        the number of parallel workers for the
-%                           propagation (0 = serial)
+%   .parallelworkers        the number of parallel workers given to parfor
+%                           for the propagation (0 = serial; also 0 if no
+%                           pool was running and the propagation was too
+%                           short to start one, see EDparallelworkers)
 %   .parallelnote           a note if parallel workers were asked for but
-%                           the Parallel Computing Toolbox is not available
+%                           the Parallel Computing Toolbox is not available,
+%                           or why a parallel pool was or was not started
 %   .qfinalfile             text: computed and saved, reused from, or
 %                           not saved
 %

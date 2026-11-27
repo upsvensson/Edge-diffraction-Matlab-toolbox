@@ -3,6 +3,37 @@
 Newest version first. The detailed history of each function is in the
 comments at the top of its .m file.
 
+## 0.645 (27 Nov. 2026)
+
+With filehandlingparameters.parallelworkers > 0, a parallel pool is no
+longer started for short computations. Before, every parfor loop (the
+propagation to the receivers in EDpropagateQvec, and the kernel blocks in
+EDrefineQvec) started a pool if none was running, which takes 10-30 s,
+also when the work took a fraction of a second, e.g. when the solution of
+the integral equation was read from a _qfinal file and only the
+propagation to new receivers was computed. Now (new function
+EDparallelworkers):
+- if a pool is already running, it is used, as before;
+- otherwise the first block of receivers (or kernel block) is computed
+  serially, the time of the rest is estimated from it, and a pool is
+  started only if the rest would take more than 30 s serially.
+To use the workers also for short computations, start the pool (parpool)
+before calling EDmain_convex. The decision is written in the log file
+(inteqdiagnostics.parallelnote), and inteqdiagnostics.parallelworkers is
+the number of workers actually used. The results are unchanged, and the
+stage files are still reused.
+
+The cheatsheet has the version number in its title: EDinputdoc also
+writes doc/EDversion.tex (\newcommand{\EDversion}{...}), next to
+doc/EDinputfields.tex, and EDtoolbox_cheatsheet.tex inputs it. EDverify
+test 19 runs EDinputdoc in a temporary folder of its own.
+EDparallelworkers is in the ignored list of EDstageversions (EDverify
+test 16).
+
+When all the stage files can be reused (also the _tfinteq file),
+EDintegralequation_convex_tf returns before any parfor loop, so no pool
+is started then, in this version or before.
+
 ## 0.644 (27 Nov. 2026)
 
 Sources and receivers that lie exactly on the extension of a plane (in the

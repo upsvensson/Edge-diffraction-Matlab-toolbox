@@ -177,6 +177,8 @@ function [geoinputdata,Sinputdata,Rinputdata,envdata,controlparameters,filehandl
 % 15 Oct. 2026 The difforder description says that, with the GMRES
 % methods, all diffraction orders are included for any difforder > 2.
 % 15 Oct. 2026 New field filehandlingparameters.parallelworkers (default 0).
+% 27 Nov. 2026 The description of parallelworkers: a pool is started only
+% if the propagation is long enough (EDparallelworkers).
 % 18 Oct. 2026 The piston quadrature was moved to the new function
 % EDpolygonquadrature (by Claude, prompted by PS). Bug fix: the area of
 % 4-sided pistons was wrong, except for squares (a 2x1 m rectangle got
@@ -953,7 +955,7 @@ switch structname
         'showtext', @(x) isnumeric(x) && x >= 0 && round(x)==x, 1, @(s) true, false, ...
             '0: no text on the screen. 1: one line per stage. 2 or more: more details.';
         'parallelworkers', @(x) isnumeric(x) && isscalar(x) && x >= 0 && (round(x)==x || isinf(x)), 0, @(s) true, false, ...
-            'The largest number of parallel workers (Parallel Computing Toolbox) for the propagation to the receivers in the integral equation stage. 0: no parallel computing. Inf: all the workers of the parallel pool, which is started if needed. The results are the same; it only affects the computing time.';
+            'The largest number of parallel workers (Parallel Computing Toolbox) for the propagation to the receivers in the integral equation stage. 0: no parallel computing. Inf: all the workers of the parallel pool. If no pool is running, one is started only if the propagation is estimated to take more than 30 s serially (from the time of the first block of receivers); start a pool with parpool before the call to use the workers also for short computations. The results are the same; it only affects the computing time.';
         'saveSRdatafiles', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...
             '1: the stage files _Sdata and _Rdata are saved.';
         'saveeddatafile', @(x) isnumeric(x) && (x == 0 | x == 1), 1, @(s) true, false, ...

@@ -179,6 +179,8 @@ function passtest = EDverify(outputdirectory,runtest,showtext,plotdiagrams)
 % handling, by Claude, prompted by PS).
 % 27 Nov. 2026 Added test 28 (receivers on the extension of a plane, by
 % Claude, prompted by PS).
+% 27 Nov. 2026 Test 19 runs EDinputdoc in a temporary folder of its own
+% (EDinputdoc now also writes EDversion.tex).
 
 ntests = 28;
 
@@ -1199,8 +1201,11 @@ if exist(committedfile,'file') ~= 2
     return
 end
 
-newfile = [tempname,'.tex'];
-cleanupobj = onCleanup(@() delete(newfile));
+% In a folder of its own, since EDinputdoc also writes EDversion.tex
+newfolder = tempname;
+mkdir(newfolder);
+newfile = fullfile(newfolder,'EDinputfields.tex');
+cleanupobj = onCleanup(@() rmdir(newfolder,'s'));
 EDinputdoc('',newfile);
 committedlines = edtexlines(committedfile);
 newlines = edtexlines(newfile);

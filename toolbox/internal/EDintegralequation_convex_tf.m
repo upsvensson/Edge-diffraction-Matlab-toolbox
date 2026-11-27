@@ -289,6 +289,14 @@ function[tfinteqdiff,timingdata,extraoutputdata,elapsedtimehodtf,existingfilenam
 % nodes, propagated with the segments. A correction of the propagation
 % only; the integral equation is not changed. New
 % inteqdiagnostics.ntosplits.
+% 27 Nov. 2026 (by Claude, prompted by PS) A parallel pool is started only
+% if the propagation is long enough (EDparallelworkers, used by
+% EDpropagateQvec and EDrefineQvec): if no pool is running, the first
+% block of receivers is computed serially to estimate the time, and a pool
+% is started only if the rest would take more than 30 s. Before, the pool
+% was started also for very short propagations, e.g. when the solution was
+% read from a _qfinal file. inteqdiagnostics.parallelworkers is the number
+% of workers actually used.
 
 t00_total = clock;
 t00 = clock;
@@ -1104,6 +1112,18 @@ if controlparameters.skipreceiverpropagation == 0
     propdiagnostics = propinfo.propdiagnostics;
     if ~isempty(propinfo.propagationblocksize)
         inteqdiagnostics.propagationblocksize = propinfo.propagationblocksize;
+    end
+    % 27 Nov. 2026: a parallel pool is started only if the propagation is
+    % long enough (EDparallelworkers). The number of workers that was
+    % actually given to parfor, and the reason, go to the log file.
+    if isfield(propinfo,'nworkersused')
+        inteqdiagnostics.parallelworkers = propinfo.nworkersused;
+    end
+    if isfield(propinfo,'parallelnote') && ~isempty(propinfo.parallelnote)
+        inteqdiagnostics.parallelnote = strtrim([inteqdiagnostics.parallelnote,' ',propinfo.parallelnote]);
+        if showtext >= 1
+            disp(['      ',propinfo.parallelnote])
+        end
     end
     clear propinfo P_nodiff2
 end

@@ -75,6 +75,10 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 %                         nreceivers,nsolutions,nparts]
 %     .implementationnote  '' or a note that 'exactpole' was replaced by
 %                         'accurate' (thin holes)
+%     .nworkersused       the number of workers given to parfor (0 if
+%                         no parallel pool was started, see
+%                         EDparallelworkers)
+%     .parallelnote       '' or a note on that decision
 %
 % See also EDintegralequation_convex_tf, EDrefineQvec,
 % EDcalcpropagatematrix_block, EDcalcpropagatematrix
@@ -94,6 +98,10 @@ function [P_receiver,P_nodiff2,propinfo] = EDpropagateQvec(edgedata,edgetoedgeda
 % replaced by 'accurate'.
 % 22 Nov. 2026 (by Claude, prompted by PS) propdiagnostics.nsplitreceivers
 % (the receiver/edge-pair combinations with a split edge-1 integration).
+% 27 Nov. 2026 (by Claude, prompted by PS) A parallel pool is started only
+% if the propagation is long enough (EDparallelworkers): if no pool is
+% running, the first block (or receiver) is computed serially to estimate
+% the time. New propinfo.nworkersused and .parallelnote.
 % 21 Nov. 2026 (by Claude, prompted by PS) A layout with edge segments
 % (Hsubmatrixdata.fromnodelist, see EDsegmentlayout) gives an error with
 % the legacy propagation and for thin holes.
@@ -102,6 +110,7 @@ showtext = edgetsetting(propsettings,'showtext',0);
 isthinhole = edgetsetting(propsettings,'isthinhole',0);
 splitlabels = edgetsetting(propsettings,'splitlabels',[]);
 nworkers = propsettings.nworkers;
+parallelnote = '';
 savediff2 = propsettings.savediff2;
 doallSRcombinations = propsettings.doallSRcombinations;
 Rstartvalue = propsettings.Rstart;
@@ -216,7 +225,23 @@ if useblocks
     Partscell = cell(nblocks,1);
     propdiagnosticscell = cell(nblocks,1);
 
-    parfor (ib = 1:nblocks, nworkers)
+    % The parallel pool is started only if the propagation is long enough
+    % (EDparallelworkers): if no pool is running, the first block is
+    % computed serially, and the time it takes gives the estimate.
+    [nworkersuse,needprobe] = EDparallelworkers(nworkers);
+    if needprobe && nblocks > 1
+        phaseends = [1 nblocks];
+    else
+        phaseends = nblocks;
+    end
+    ibstart = 1;
+    for iphase = 1:numel(phaseends)
+    ibend = phaseends(iphase);
+    if iphase == 2
+        [nworkersuse,~,parallelnote] = EDparallelworkers(nworkers,toc(tprobe)*(nblocks-1));
+    end
+    tprobe = tic;
+    parfor (ib = ibstart:ibend, nworkersuse)
         recs = blockstarts(ib):min(blockstarts(ib)+blocksize-1,nreceivers);
         nb = numel(recs);
         if showtext >= 2
@@ -285,6 +310,8 @@ if useblocks
         P2cell{ib} = P2block;
         Partscell{ib} = Partsblock;
     end
+    ibstart = ibend + 1;
+    end
 
     % Collect the results of all the blocks
     propdiagnostics = struct('npairs',0,'npairs_eligible',0,'npairs_corrected',0, ...
@@ -330,7 +357,22 @@ else
     ivproblematiccell = cell(nreceivers,1);
     propdiagnosticscell = cell(nreceivers,1);
 
-    parfor (irec = 1:nreceivers, nworkers)
+    % As for the blocks above: the first receiver is computed serially if
+    % no parallel pool is running, to estimate the time.
+    [nworkersuse,needprobe] = EDparallelworkers(nworkers);
+    if needprobe && nreceivers > 1
+        phaseends = [1 nreceivers];
+    else
+        phaseends = nreceivers;
+    end
+    irstart = 1;
+    for iphase = 1:numel(phaseends)
+    irend = phaseends(iphase);
+    if iphase == 2
+        [nworkersuse,~,parallelnote] = EDparallelworkers(nworkers,toc(tprobe)*(nreceivers-1));
+    end
+    tprobe = tic;
+    parfor (irec = irstart:irend, nworkersuse)
         if showtext >=2
             disp(['      Receiver number ',int2str(irec)])
         end
@@ -379,6 +421,8 @@ else
         ivproblematiccell{irec} = ivproblematicrec;
         propdiagnosticscell{irec} = propdiagnosticsrec;
     end
+    irstart = irend + 1;
+    end
 
     % Collect the results of all the receivers
     for irec = 1:nreceivers
@@ -408,6 +452,8 @@ propinfo.propagationblocksize = propagationblocksize;
 propinfo.ivproblematicmatrix = ivproblematicmatrix;
 propinfo.doesQsegmenthavevalues = doesQsegmenthavevalues;
 propinfo.implementationnote = implementationnote;
+propinfo.nworkersused = nworkersuse;
+propinfo.parallelnote = parallelnote;
 if dosplit
     propinfo.parts = parts;
 end

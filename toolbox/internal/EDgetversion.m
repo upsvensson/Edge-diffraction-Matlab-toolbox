@@ -61,6 +61,9 @@ function [versionnumber,lastchangedate,lastchangetime]= EDgetversion
 % plane are moved slightly off the plane (EDnudgepoints), with a warning.
 % EDverify test 28.
 
-versionnumber = 0.644;
+% 27 Nov. 2026 Version 0.645: a parallel pool is started only if the
+% propagation is long enough (new function EDparallelworkers).
+
+versionnumber = 0.645;
 lastchangedate = '27Nov2026';
-lastchangetime = '10h00';
+lastchangetime = '16h00';

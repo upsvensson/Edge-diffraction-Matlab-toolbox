@@ -110,6 +110,8 @@ function stageinfo = EDstageversions(stagename)
 % 22 Nov. 2026 EDed2geo to version 3 (coplanar planes) and EDinteg_souterm
 % to version 6 (the side of a zone boundary for a source within roundoff
 % of it).
+% 27 Nov. 2026 EDparallelworkers in the ignored list (it only decides if a
+% parallel pool is started; the results are the same).
 
 %--------------------------------------------------------------------------
 % Version numbers
@@ -211,7 +213,7 @@ stagesubroutines.EDpropagateESIEBEM = {'EDcalccosfi','EDcalcdist'};
 
 ignored = {'DataHash','EDrecycleresultfiles','EDparenthash','EDstageversions',...
     'EDmessage','EDpostfunctext','EDgetversion','EDinputsummary','EDinteqsummary',...
-    'EDinputhash','EDassembleresults'};
+    'EDinputhash','EDassembleresults','EDparallelworkers'};
 
 %--------------------------------------------------------------------------
 

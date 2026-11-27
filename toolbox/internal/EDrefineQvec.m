@@ -185,6 +185,8 @@ function refined = EDrefineQvec(inteqdata,refineopts)
 % triplets) are computed only once, optionally on parallel workers
 % (.parallelworkers), and shared. New output field .nkernelblocks =
 % [number of blocks, number computed]. The results are unchanged.
+% 27 Nov. 2026 (by Claude, prompted by PS) A parallel pool is started only
+% if the kernel blocks take long enough to compute (EDparallelworkers).
 
 t00 = clock;
 
@@ -422,7 +424,24 @@ if strcmp(method,'nystrom')
         Bstore = cell(numel(iunique),1);
         mstore = cell(numel(iunique),1);
         nworkers = edgetopt(refineopts,'parallelworkers',0);
-        parfor (iu = 1:numel(iunique), nworkers)
+        % A parallel pool is started only if the work is long enough
+        % (EDparallelworkers): if no pool is running, the first block is
+        % computed serially to estimate the time.
+        nu = numel(iunique);
+        [nworkersuse,needprobe] = EDparallelworkers(nworkers);
+        if needprobe && nu > 1
+            phaseends = [1 nu];
+        else
+            phaseends = nu;
+        end
+        iustart = 1;
+        for iphase = 1:numel(phaseends)
+        iuend = phaseends(iphase);
+        if iphase == 2
+            nworkersuse = EDparallelworkers(nworkers,toc(tprobe)*(nu-1));
+        end
+        tprobe = tic;
+        parfor (iu = iustart:iuend, nworkersuse)
             it = iunique(iu);
             nn = tripletlist(it,2);
             e1 = Hsub.edgetripletlist(nn,3);
@@ -436,6 +455,8 @@ if strcmp(method,'nystrom')
             [Bstore{iu},mstore{iu}] = edHgeomblock(edgedata,edgetoedgedata,Hsub,nn,...
                 edglnodes(HsubN,n3),n2vec,edglnodes(Hsub,n1),...
                 edglweights(Hsub,n1)*edgedata.edgelengthvec(e1));
+        end
+        iustart = iuend + 1;
         end
         % The blocks of each segment (the arrays are shared, not copied)
         for it = 1:ntrip
